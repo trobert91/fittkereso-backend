@@ -1,0 +1,2107 @@
+{
+  "79a8e039-c043-48c4-927f-1a69af0c7e60": {
+    "subtreeLabel": "subtree-0",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I can't find many reviews or much information on the Acer and Gigabyte.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I like the ROG's design the most but it is a matte-WOLED with a much higher price and doesn't seem to offer better performance than the others.",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "it might just come down to the LG vs. MSI.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I've been using 165 Hz for so many years it's starting to look \"not fast enough for me\".",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I intend to buy a 5070 Ti so less than 240 Hz at 1440p would be a waste of GPU power and not really an upgrade for me.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I mostly game in well-lit environments so I am concerned about the \"grey tint\" on a glossy-QD-OLED.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "800R curve could be very immersive in games but I am concern regular content like videos or photos might look too distorted, especially when not centered.",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "Thinner bezels and better looking design.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "LG just gives me the impression of better QC than the other.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Certified G-sync compatible.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "So, I'd expect it to work better than the non-certified ones.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "A glossy QD-OLED is said to have much superior color vibrancy and text clarity.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "1800R curve might be less immersive than 800R but regular content might look less distorted.",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "A bit cheaper than LG",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Most youtube and website reviews like Rtings favor the MSI but on Reddit I seem to find more issues reported than the LG.",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "My biggest concern is actually G-sync not working properly on the MSI as there are quite a few issues reported online.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "it is unnecessarily overpriced in most stores, just like the ROG.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Plus, Corsair is rather new to the monitor market so I don't have much faith in that product.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cac94807-25ea-4390-bd94-11254a05d3e3": {
+    "subtreeLabel": "subtree-1",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I’ve had the MSI MPG341 for about a week now and it’s been great",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "it definitely feels smoother and the colors are crazy",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "The 1800R curve feels just right",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "the 800R curve was too much when I looked at one at Best Buy",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I’d say get whichever one you can find cheaper",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "all I can say is wow",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "This monitor is absolutely insane",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I wish I had bought it sooner",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report",
+                "recommendation"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I'm also leaning toward MSI as it's slightly cheaper while offering a better panel",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "My biggest concern is not being able to use G-sync properly",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "The LG panels are at least certified while the MSI feels like a huge gamble",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "I've seen people online saying it works well while others reporting it not working even after a firmware update",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "The LG panels are at least certified while the MSI feels like a huge gamble",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "when I enabled G-Sync, I had black screen flickers (not OLED flicker), it looked like losing a signal or something",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I had to return it",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prior_owner",
+              "depth": "detailed",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "the concern on G-sync is holding me back",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "g-sync straight up unusable",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "issue_report",
+                "seeking_advice"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I have tried 3 DP cables and two HDMI. Result was the same",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "It had black screen flickers several times per 10 seconds",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "it wasnt usable for me while paying so much money for it",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prior_owner",
+              "depth": "detailed",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "dd7c7365-3f3d-48e7-860a-9c9a57e10446": {
+    "subtreeLabel": "subtree-2",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Both MPG and ROG have an usb-c DP with power delivery port which is really nice if you have a MacBook.",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "Both MPG and ROG have an usb-c DP with power delivery port which is really nice if you have a MacBook.",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "f5773475-c3d7-4c78-970d-aa58bede41b9": {
+    "subtreeLabel": "subtree-3",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "i got the LG and the 800r feels amazing, so yeah would recommend that one",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "recommendation",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Thought the curve might be too much but saw it in person and I liked it",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "It’s great for gaming",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Mediocre for productivity",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "tested",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "experience_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Yes the curve is perfect",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Excellent gaming monitor",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I have the 39” and love it",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report",
+                "recommendation"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Yes it works without issues",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "love this monitor",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I would love to enjoy the immersion from the curve but I'm a bit worried videos and pictures being distorted",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "the matte coating not delivering better clarity",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "costing a bit more than the MSI model",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "costing a bit more than the MSI model",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c6",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Nothing looks distorted to me, at first it's weird but after couple days you don't notice it anymore and it's just super immersive",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "picture is clear using it at 80% sharpening",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I had a flat ultrawide before and definitely prefer 800r now",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "experience_report",
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c7",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "for the love of god, it seems awfull for any kind of 2d platformers",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Moving left right feels like walking on a globe, makes me feel like the screen is constantly rotating",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "which is makng me a bit nauseous",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "tested",
+              "depth": "detailed",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c8",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "qdoled >> woled",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Don’t get LG",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "recommendation",
+                "comparison"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "65e09779-f1cb-4b8c-9590-04422d9bcb89": {
+    "subtreeLabel": "subtree-4",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "\"MSI MPG 341CQPX\" for good price",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "MSI looks like the best option in the market, for now",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "recommendation",
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Right now it seems like the cheapest of the bunch",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I'm worried about G-sync not working and how dim my room needs to be to avoid the \"grey tint\" issue",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I’m getting the 175Hz version of the MSI and LG 34GS95QE(240Hz) for almost the same price",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "neutral",
+              "specs": [
+                {
+                  "name": "refreshRate",
+                  "value": "175Hz"
+                }
+              ]
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "I’m getting the 175Hz version of the MSI and LG 34GS95QE(240Hz) for almost the same price",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "neutral",
+              "specs": [
+                {
+                  "name": "refreshRate",
+                  "value": "240Hz"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I bought  \"MSI MPG 341CQPX\", just got it yesterday",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "Colors, pixel density, factory callibrations  etc. is 9/10",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "The overall color, games, movies  are looking good",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "The desktop icons are oversaturated -  It feels like there is too much contrast",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I also have a problem with objects that are black or transition from 'almost black' or 'transparent to black' appearing completely black, even when they should be otherwise visible",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "experience_report",
+                "issue_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [],
+              "experience": "owner",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c6",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I have newest firmware (0.23)",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "Looks like it is working, I guess?",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "It is working",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c7",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I just recently did a ton of research and price comparisons and landed on the LG 34GS9QE",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "It's the same panel as the ASUS, I do believe the asus model has a KVM switch but I refuse to buy asus still",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I was looking for as aggressive a curve on a 34 inch OLED as possible",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "On paper it checked all my boxes though",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c8",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I absolutely love my LG",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I love an aggressive curve so no issue there",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Couldn't be happier with the 800mm radius",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Colors look great",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Brightness is great as well",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I really have no complaints",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I've greatly enjoyed the upgrade",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Loved the idea of the 39 inch model for the added height but the huge dip in pixel density didn't seem worth it",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "experience_report",
+                "comparison"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "1184b90f-aa1b-4dfd-b560-43502310f852": {
+    "subtreeLabel": "subtree-5",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I love it",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I prefer the lesser curve",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I’ve been having fun with it",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "the text clarity is good",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I mostly worry about G-sync not working well on the MSI and how dark my room needs to be to avoid the \"grey tint\" issue.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I literally just received my MSI 341CQP the other day, and it's gorgeous.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Amazing colors, text is clear and perfectly readable to me, HDR is amazing in various games that have it.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "HUGE upgrade over my Samsung G5 I had.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Highly recommend.",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "recommendation",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Can the HDR mode and G-sync be turned on together at 240 hz?",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "Many monitor makers advertise all the great features but hide the fact that a lot of these can't be turned on at the same time due to limited bandwidth or other issues.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "And online reviews rarely mention this.",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "question",
+                "comparison"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "So I just checked, seems HDR stays on with the Freesync turned on!",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "175Hz still.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "All is good!",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "And yes I believe they’re the same panel.",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "4b52ad87-62cc-47a5-9303-80546f8b041d": {
+    "subtreeLabel": "subtree-6",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "The curve on the LG takes a bit of getting used to but I really enjoy it now!",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "It's amazing",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I haven't noticed any flicker or text fringing that I heard were issues with oled",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "only issue so far is I can't enable sub logo dimming for some reason",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report",
+                "issue_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "LG earned my trust so I would probably go with their product when the options are more or less similar",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "positive"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "team QD OLED Is cheaping out on ultrawide with gen 1 panel",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [],
+              "experience": "owner",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            },
+            {
+              "productIndex": 2,
+              "quotes": [],
+              "experience": "owner",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Prob my biggest worry is VRR flicker",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "warning",
+                "seeking_advice"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I love this thing",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "You should def get it and you shouldn’t worry",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "if you’re playing a game that will surpass what your monitors refresh rate (240hz) you should cap the game at 240 fps to avoid the flicker",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "recommendation",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c6",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "this should feel like nice upgrade",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c7",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "MSI has 3 years of burn in warranty",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "7427b751-2f8a-4547-8959-e44907812701": {
+    "subtreeLabel": "subtree-7",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "TFT says its the MSI 341CQPX",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "they just released firmware which fixes the HDR which no other monitor in this field has done",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "detailed",
+              "intents": [
+                "reputation_report",
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I also lean more toward the MSI as it offers a better panel at a lower price",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I'm mostly concerned about G-sync since the panel is not certified and if HDR and G-sync can be turned on together at 240 Hz",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "It looks great on specs but I'm also seeing a lot more issues reported than the LG",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "Feeling like a huge gamble is what's making me hesitate atm",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "than the LG",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "VRR Flicker seems to be a lot worse on the MSI compared to the LG",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I've heard complaints about Coil whine",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "reference",
+              "depth": "detailed",
+              "intents": [
+                "reputation_report",
+                "comparison"
+              ],
+              "overallSentiment": "negative"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "I'm hesitant on the 800R curve on a 34 inch screen (should be fine for gaming but for movies or general use - especially if things aren't centered)",
+                  "sentiment": "mixed"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I ordered the LG now and it arrives on Wednesday",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I will test if I like the curve",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "neutral"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "I could order the MSI MAG with 175Hz, but i am unsure if i need the 240 Hz 😂 (7900XTX)",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "No greats so far",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "043fe207-33ee-4237-92cf-99d8f77c4c60": {
+    "subtreeLabel": "subtree-8",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "It's not as large and immersive as I had thought but it's definitely better than 16:9",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "It just feels like this is how content should be viewed and I really can't go back to 16:9 anymore",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "In some games, yeah, it's indeed quite useful to have a wider view",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "The purple tint, the glossy finish, text clarity and fringing are really not problems for me",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "They are completely blown out of proportion and dramatized in reviews",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "98w PD is appreciated and the KVM switch is very useful",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "how seamlessly it works will depend on the devices you connect to",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "It you're not looking for pro level image quality than it's more than good enough, especially when watching HDR videos",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "HDR gaming will obviously depend on the games and some just handle it better than others",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I'm only using 120 Hz because my GPU is too old",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "But it's surprisingly smooth",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Possibly thanks to the fast pixel response time",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "And they are regularly releasing new firmware while I'm still using one that's quite old",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "That 800r is just too much, maybe for the 32:9 and 40 or more inches ones, but for a 21:9 34 nop.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Flat, 34 and 21:9 is great, but I think there are no flat oleds ultrawide, so get the 1800r",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "recommendation"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "852e9fda-9bc5-4a38-a500-e3cd087e3587": {
+    "subtreeLabel": "subtree-9",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "There were completely black blank screens several times per a few seconds.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I have tried 3 DP and 2 HDMI cables and everytime chose 144Hz.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I didnt even try to set the 160Hz cause I wanted RBG@10Bit.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "this monitor supports DSC and my GPU too (RTX 4070Ti).",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "tested",
+              "depth": "comprehensive",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I have tried 60/120Hz and it was the same.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "As far as the G-Sync was enabled, there was this black screen s**t show.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I liked this monitor otherwise.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Design and everything is really nice",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "unusable in my case",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I dont want to have monitor for more than 1000€ euro which is not G-Sync compatible.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Its IPS but atleast G-Sync is working without any problems.",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "tested",
+              "depth": "comprehensive",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "that just sounds like buggy firmware if it bugged out like that at lower refresh too.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "5f835da7-6752-4ed8-ae45-e6359817a704": {
+    "subtreeLabel": "subtree-10",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I actually have the LG 45GX950A and the MSI MPG 321URX and can tell you for a fact that the WOLED isn’t easier on the eyes",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "negative"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "I actually have the LG 45GX950A and the MSI MPG 321URX and can tell you for a fact that the WOLED isn’t easier on the eyes",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "6548c28b-2911-4743-bdda-1e8b438d9174": {
+    "subtreeLabel": "subtree-11",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I can't find many reviews or much information on the Acer and Gigabyte.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I like the ROG's design the most but it is a matte-WOLED with a much higher price and doesn't seem to offer better performance than the others.",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "So, it might just come down to the LG vs. MSI.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "I'm not considering Samsung or Alienware because I don't want anything larger than 34'' and don't want to compromise on 240 Hz.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I've been using 165 Hz for so many years it's starting to look \"not fast enough for me\".",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "And I intend to buy a 5070 Ti so less than 240 Hz at 1440p would be a waste of GPU power and not really an upgrade for me.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I mostly game in well-lit environments so I am concerned about the \"grey tint\" on a glossy-QD-OLED.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "800R curve could be very immersive in games but I am concern regular content like videos or photos might look too distorted, especially when not centered.",
+                  "sentiment": "mixed"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bfaee9f7-542c-41f9-99d5-3bbbb918adf2": {
+    "subtreeLabel": "subtree-12",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "There's a newer version of this model with full size ports.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "G8sd I think it's called, it has a black remote.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "My initial impression is that the panel it's great",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "if it had android instead of tizen os it would have been awesome",
+                  "sentiment": "mixed"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "the newer version(SD) has a matte panel coating.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "thats the exact reason i myself bought the older version (SB).",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "depends on his preference",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "The display is great!",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Software is awful.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Takes for ever to get to the settings you want.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Sometimes it just doesn’t register correctly as a display and just blanks out.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Common issues.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": [
+                "issue_report",
+                "experience_report"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I've had mine since July of 2023, and I love it.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "It was $999 USD back then so $999 AUD sounds like a fantastic deal.",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "recommendation",
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Hey, have you faced issues like burn-ins or anything else so far and how is the text clarity?",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "question"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "No burn in, but I have taken preventative measures from day one.",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I wear glasses now because my eyes aren't the better than normal that they used to be, and sometimes I upscale the UI in games a little and the same in browsers, but that's a me thing for when I want to take the glasses off sometimes, not the monitor itself.",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bd1570d7-6a65-4bef-93f4-b6539728aeb6": {
+    "subtreeLabel": "subtree-13",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I am currently using one and it is a stunning monitor",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "One of the best I have had",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report",
+                "recommendation"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Definitely worth it!",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "recommendation"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "if you are not into font clarity.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "some software that fixes the issue of fringing",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Very happy with it",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "Only issues I’ve had are with monitor arm compatibility",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "Found a seller on eBay who prints a clean vesa mount adapter in UK",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report",
+                "issue_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "The UI and OS, apparently, are infuriating.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "It’s more a tv/monitor hybrid.",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "It is not a plug and play monitor.",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I have a couple homies who have this monitor and they HATE how long it takes to start up and then manually select the PC output every single time they use it.",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "reference",
+              "depth": "detailed",
+              "intents": [
+                "warning",
+                "reputation_report"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "51e71270-9b9c-4aa5-b01f-b0faa0607afc": {
+    "subtreeLabel": "subtree-14",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "the price is in the more reasonable side",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "you can also check out MSi 341cqpx for 1371 aud",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "it’s a 240hz version",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "comparison",
+                "recommendation"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

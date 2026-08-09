@@ -1,0 +1,173 @@
+{
+  "id": "msi-mpg341cqpx-vrr-thread",
+  "phase": "labeling",
+  "description": "Whole-thread labeling replay from thread 736b1b30-d7da-4ddf-8504-a6957b64c789 (r/ultrawidemasterrace, 'Best 34\" 240 Hz OLED ultrawide'). The fixture replays every labeling call the production pipeline emitted for this thread: 12 subtrees, 47 PLAN comments, 54 product references, 131 quotes total. Products span MSI MPG341CQPX, MSI MAG 341CQP, LG UltraGear 34GS95QE, LG UltraGear 39GS95QE-B, LG UltraGear OLED 45GX950A-B, Acer Predator X34X5, Gigabyte MO34WQC2, ASUS ROG Swift PG34WCDM, Corsair Xeneon, MSI MPG431CQPX (the last is unresolved in the original run). Each subtree has its own per-subtree golden output covering every quote on every ref, so the judge sees concrete ground truth for every labeling decision.\n\nDiscriminations exercised across the 12 subtrees:\n- Closed-list issueType picking: 'vrr black screen' vs 'vrr flickering' (the most common canonical-sibling failure). Calls 2 and 10 carry first-hand black-screen reports; call 4 and 5 carry hearsay flicker reports.\n- Speculative reference-tier handling: calls 1, 4, 6, 7, 9, 10, 11 contain reference-tier or prospective_buyer claims that should be flagged speculative=true.\n- Closed-list omission: call 2 Ca-q0 ('buggy firmware') has no canonical issueType under 'controls' that fits — golden expects controls/issue/speculative=true with NO issueType.\n- Multi-aspect single quote: call 3 q3 ('purple tint, glossy finish, text clarity and fringing are really not problems for me') earns three feature entries on one quote.\n- useCase-only entries: call 8 has multiple quotes that name a use case ('great for gaming', 'mediocre for productivity') without naming a feature — useCases[] populated, features[] omitted.\n- Bare-verdict / method-dump drop: ~40 quotes across the dataset are 'amazing', 'love it', 'huge upgrade', 'I tried 3 cables', 'just got it' — golden drops them all.\n- Multi-product comments: calls 4, 5, 7, 8, 10, 11 contain comments that reference multiple products — refs split per product, quotes attached to the right one.\n- Mixed sentiment with split-evidence: calls 2, 7, 11 have refs with mixed sentiment that should produce mixed praise+issue evidence within the same ref's quotes (different quotes carry different polarities).\n- Unresolved-ref handling: call 6 Aa and Ba reference MSI MPG431CQPX with no resolved specs — fixture marks them unresolved=true; the labeling prompt sees no '(known specs: ...)' line. Golden expects normal labeling regardless.\n\nCompares two candidates on deepseek-v4-flash: 'current' (production prompt) and 'v1-stepped' (a stepped restructure modeled on the recent identification/extraction prompt updates — four numbered steps, grouped issue-label vocabulary, six worked examples). 12 subtrees × 2 candidates × 3 runs = 72 candidate calls + 12 judge calls.",
+  "runs": {
+    "perCandidate": 2,
+    "maxInFlight": 10
+  },
+  "reportFormats": [
+    "markdown",
+    "html"
+  ],
+  "inputs": [
+    {
+      "id": "msi-mpg341cqpx-vrr-thread",
+      "kind": "fixture",
+      "path": "../../fixtures/labeling/msi-mpg341cqpx-vrr-thread.fixture.json",
+      "subtrees": [
+        {
+          "index": 0,
+          "label": "call-0",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-0.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 1,
+          "label": "call-1",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-1.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 2,
+          "label": "call-2",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-2.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 3,
+          "label": "call-3",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-3.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 4,
+          "label": "call-4",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-4.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 5,
+          "label": "call-5",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-5.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 6,
+          "label": "call-6",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-6.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 7,
+          "label": "call-7",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-7.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 8,
+          "label": "call-8",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-8.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 9,
+          "label": "call-9",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-9.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 10,
+          "label": "call-10",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-10.golden.json",
+              "role": "reference"
+            }
+          }
+        },
+        {
+          "index": 11,
+          "label": "call-11",
+          "judge": {
+            "goldenOutput": {
+              "path": "msi-mpg341cqpx-vrr-thread-goldens/call-11.golden.json",
+              "role": "reference"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "current",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "v1-stepped",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/labeling/labeling-v1-stepped.md"
+      }
+    },
+    {
+      "id": "v3",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/labeling/labeling-v3.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "Every input productId across all 12 subtrees appears in products[]. Every quote that names a specific feature aspect or use-case scenario produces at least one evidence entry; every bare verdict, method/setup dump, acquisition or logistics line, and unanchored panel-tech comparison drops without an entry.\n\nCore rules the labeling output is judged against:\n\n1. Closed-list issueType. issueType is structurally constrained to the canonical list at the wire — any issueType that appears is by definition in-vocabulary. The judge scores whether the model picked the right CANONICAL SIBLING. Specifically: 'vrr black screen' (full signal-loss-like drop) vs 'vrr flickering' (brightness oscillation) vs 'vrr incompatibility' (G-Sync/FreeSync not certified or not working at all) are three distinct symptoms — quotes describing full signal drops get 'vrr black screen', quotes describing flicker or brightness oscillation get 'vrr flickering', quotes describing certification/compatibility concerns get 'vrr incompatibility'. When NO canonical label fits the described defect (e.g. 'buggy firmware' under the controls feature), the right call is to OMIT issueType and keep just feature/type/speculative — never reach for a wrong canonical sibling.\n\n2. Speculative discipline. Set speculative=true on evidence entries where the speaker has not first-hand experienced what the quote describes:\n  - experience='reference' speakers (relaying others' claims) → all evidence is speculative.\n  - experience='prospective_buyer' speakers making feature claims → speculative.\n  - first-hand owners speculating about future risks ('worried about burn-in long term') → speculative on that evidence.\n  - first-hand owners and prior_owners reporting concrete experienced defects or features → NOT speculative.\n\n3. Drop bare verdicts and method dumps. 'It's amazing', 'love it', 'huge upgrade', 'all I can say is wow', 'highly recommend', 'feels like a huge gamble', 'I'd say get whichever' (alone), 'this should feel like a nice upgrade' all carry no named aspect → no feature, no useCase, no entry. Method/setup dumps ('I tried 3 DP cables', 'I have firmware 0.23', 'Fixed my problem a litte') describe what was tried, not how the product behaved → no entry. Acquisition / logistics ('just got it', 'arrives tomorrow', 'I had to return it') feed referenceDetails when explicit, never feature evidence on the quote itself.\n\n4. useCase tightness. A useCase is set ONLY when (a) the quote explicitly names the use case (e.g. 'great for gaming', 'mediocre for productivity'), or (b) a trigger term from the implications list appears AND the quote is evaluating the product through that lens. A bare G-Sync mention describing the VRR feature itself does NOT earn pc gaming — only quotes that use G-Sync as a proxy for the gaming experience do.\n\n5. Multi-aspect quotes. A single quote may evaluate multiple features in different clauses ('purple tint, glossy finish, text clarity and fringing are really not problems for me' → coating + text clarity + colors). Emit one features[] entry per distinct named aspect. Never repeat the same label on the same quote.\n\n6. referenceDetails. Populate ONLY when explicitly stated. Price thresholds the speaker WON'T pay are NOT purchasePrice. Switching to a different monitor is not an explicit return statement. Defective covers physical defects only (dead pixels, coil whine, panel fault) — not VRR misbehavior or software bugs.\n\n7. Output every productId. Every input productId appears in products[], even when no quote earned evidence — emit `quotes: []` in that case.\n\nThe per-subtree golden output for each call carries the authoritative quote-by-quote labeling. Judge each candidate against its subtree's specific golden plus the rules above.",
+    "schemaCheck": "quote-labeling.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "claude-haiku-4-5-20251001",
+    "instructions": "Score each candidate 1-10 on three dimensions, scoring this specific subtree against its per-subtree golden output. The labeling schema constrains issueType to the category's canonical list at the wire, so any issueType that appears is in-vocabulary — judge whether the right canonical sibling was picked, NOT whether labels were coined. Small deviations from the golden are acceptable when the golden's note marks them negotiable; punish only deviations that contradict the desiredOutcome rules or the golden's authoritative parts.\n\n(1) faithfulness — feature/useCase labels come from the vocabulary; the right canonical issueType sibling is picked. Hard penalty: any feature/useCase label outside the vocabulary → faithfulness ≤4. Hard penalty: 'vrr black screen' replaced by 'vrr flickering' on full-signal-drop quotes, or vice versa, on first-hand reports → faithfulness ≤6. When the golden assigns NO issueType to an issue evidence (because no canonical fits), a candidate that picks ANY canonical sibling is reaching — penalize that more than omitting.\n\n(2) calibration — type matches polarity; speculative is set correctly per the rules in desiredOutcome (reference-tier and prospective_buyer claims are speculative; first-hand owners reporting experienced facts are not, but first-hand owners speculating about future risks are); referenceDetails populated only on explicit statements; bare-verdict and method-dump quotes carry no feature evidence; useCases set only when explicitly named or via triggers used to evaluate the product through that lens. Hard penalty: tagging bare-verdict or method-dump quotes with features → calibration ≤5. Hard penalty: missing speculative on reference-tier or hearsay quotes → calibration ≤6. Hard penalty: marking first-hand owner experienced reports speculative → calibration ≤6.\n\n(3) completeness — every input productId in this subtree appears in products[]; every quote the golden labels is also labeled by the candidate (label may differ in defensible ways, but the quote should not be silently dropped when the golden labels it). A candidate that under-labels — emits dramatically fewer quote entries than the golden across the subtree — is under-labeling. Multi-aspect quotes (the golden emits multiple features[] entries on one quote) should be split similarly by the candidate.\n\nReturn JSON {candidates:[{candidateId, scores:{faithfulness, calibration, completeness}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'.",
+    "perRun": false
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "ui:order": [
+    "type",
+    "connectivity",
+    "connectionType",
+    "bluetoothVersion",
+    "range",
+    "surroundSound",
+    "driverSize",
+    "frequencyResponseMin",
+    "frequencyResponseMax",
+    "impedance",
+    "sensitivity",
+    "microphone",
+    "volumeControl",
+    "microphoneType",
+    "micNoiseCancelling",
+    "noiseCancelling",
+    "weight",
+    "batteryLife",
+    "cableLength",
+    "rgbLighting",
+    "platform"
+  ],
+  "type": {
+    "ui:placeholder": "e.g. Over-ear"
+  },
+  "connectivity": {
+    "ui:placeholder": "e.g. Wireless"
+  },
+  "connectionType": {
+    "ui:placeholder": "e.g. USB dongle"
+  },
+  "bluetoothVersion": {
+    "ui:placeholder": "e.g. 5.2"
+  },
+  "range": {
+    "ui:widget": "updown"
+  },
+  "surroundSound": {
+    "ui:widget": "checkbox"
+  },
+  "driverSize": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 50"
+  },
+  "frequencyResponseMin": {
+    "ui:widget": "updown"
+  },
+  "frequencyResponseMax": {
+    "ui:widget": "updown"
+  },
+  "impedance": {
+    "ui:widget": "updown"
+  },
+  "sensitivity": {
+    "ui:widget": "updown"
+  },
+  "microphone": {
+    "ui:widget": "checkbox"
+  },
+  "volumeControl": {
+    "ui:widget": "checkbox"
+  },
+  "microphoneType": {
+    "ui:placeholder": "e.g. Detachable boom"
+  },
+  "micNoiseCancelling": {
+    "ui:widget": "checkbox"
+  },
+  "noiseCancelling": {
+    "ui:widget": "checkbox"
+  },
+  "weight": {
+    "ui:widget": "updown"
+  },
+  "batteryLife": {
+    "ui:widget": "updown"
+  },
+  "cableLength": {
+    "ui:widget": "updown"
+  },
+  "rgbLighting": {
+    "ui:widget": "checkbox"
+  },
+  "platform": {
+    "ui:widget": "checkboxes"
+  }
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Calculate Relevance
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:8080/api/relevance-test/thread/{{threadId}}
+  body: none
+  auth: inherit
+}
+
+vars:pre-request {
+  threadId: 212dea8b-f98c-4901-bfcd-48b50c42000a
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Approve Duplicate Pair
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8088/api/admin-product/duplicate-pairs/00000000-0000-0000-0000-000000000000/approve
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

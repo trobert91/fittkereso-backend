@@ -1,0 +1,7 @@
+{
+  "priorWeight": 2,
+  "useCasePriorWeight": 1.5,
+  "minHighlightScore": 20,
+  "minHighlightMentions": 2,
+  "minReviewScore": 20
+}

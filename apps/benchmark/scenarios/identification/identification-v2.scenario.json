@@ -1,0 +1,85 @@
+{
+  "id": "identification-v2",
+  "phase": "identification",
+  "description": "Two-way test: v4-flash-current (production) vs v4-flash-v5 (cheat-sheet-first rewrite). v4 (verbatim-first) scored 6.40 vs current 5.06 across 16 subtrees, fixing model fabrication, capturing Corsair anti-rec, and avoiding the 120Hz GPU-constraint spec. The remaining v4 issue: 'MSI MPG341' / '341cqpx' / 'the MSI' all stayed verbatim, fragmenting one product across multiple model strings even when the cheat sheet had only one matching entry — defeating the cheat-sheet's consolidation purpose. v5 flips RULE A: when commenter text unambiguously matches a single cheat-sheet entry (abbreviation, partial name, single-brand bare reference), use the cheat-sheet model. Stay verbatim only on genuine variant cues, distinct SKU numbers, conflicting specs, or off-cheat-sheet products. v5 also broadens same-author chain to explicitly cover ownership/experience comments (not just bare logistics) and disambiguates two-MSI cheat sheets via stated specs (175Hz → MAG 341CQP). 16 subtrees: 12 from thread 736b1b30 + 4 from thread 0dfc0e00. Goals: (a) 'MPG341' / 'the MSI' / '341cqpx' / 'LG Ultragear' resolve to the cheat-sheet model when unambiguous; (b) 'MPG431CQPX' / 'G8sd' / '34GS9QE' stay verbatim (variant-distinct); (c) same-author chain extends through ownership and experience comments on the Samsung G8sd subtree; (d) Corsair captured, 120Hz constraint not emitted.",
+  "runs": {
+    "perCandidate": 2,
+    "maxInFlight": 10
+  },
+  "reportFormats": [
+    "markdown",
+    "html"
+  ],
+  "inputs": [
+    {
+      "id": "best-34-ultrawide",
+      "kind": "fixture",
+      "path": "../../fixtures/identification/monitors-thread-736-identification-full.fixture.json",
+      "subtrees": "all",
+      "goldenOutput": {
+        "path": "v4-flash-vs-gpt-mini.golden.json",
+        "role": "reference",
+        "note": "Hand-curated Opus reference. Keyed by subtreeId. Quality floor: candidate must match or exceed this recall, with no more false positives and no fabricated model strings."
+      }
+    },
+    {
+      "id": "samsung-g8",
+      "kind": "fixture",
+      "path": "../../fixtures/identification/monitors-thread-0dfc0e00-identification-full.fixture.json",
+      "subtrees": "all",
+      "goldenOutput": {
+        "path": "v4-flash-vs-gpt-mini.golden.json",
+        "role": "reference",
+        "note": "Same golden file (keyed by subtreeId). The Samsung subtrees stress-test variant-distinct preservation — 'G8sd', 'SD', 'SB' name a different variant than the cheat sheet's 'G8 SU' and must stay verbatim with searchKeyword (RULE A level 2). Same-author chain must extend through ownership/experience comments ('I've had mine for a year', 'the display is great') back to c0's G8sd."
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "id": "v4-flash-current",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "v4-flash-v1",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/identification/identification-v1.md"
+      },
+      "enabled": false
+    },
+    {
+      "id": "v4-flash-v2",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/identification/identification-v2.md"
+      },
+      "enabled": false
+    },
+    {
+      "id": "v4-flash-v4",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/identification/identification-v4.md"
+      },
+      "enabled": false
+    },
+    {
+      "id": "v4-flash-v5",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/identification/identification-v5.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "Schema-valid JSON for every subtree; every PLAN comment has an entry even when products is empty. Two hard rules: (A) MODEL FIELD: prefer the cheat-sheet model; stay verbatim only when the text names a different SKU. When the commenter's text resolves to one cheat-sheet entry — by abbreviation, partial name, single-brand bare reference, parent context, or same-author chain — use the cheat-sheet model ('MPG341' + only 'MSI MPG 341CQPX' → 'MPG 341CQPX'; 'the MSI' + only one MSI entry → that entry; 'LG Ultragear' + only one LG → that entry; 'the 39\" LG' + only one LG → that entry with screenSize spec '39\"'). Stay verbatim and add a searchKeyword only when the text is a different SKU number ('MPG431CQPX' ≠ 'MPG 341CQPX'), a variant cue diverges ('34GS9QE' missing -B; 'G8sd' vs 'G8 SU'), the brand has multiple cheat-sheet entries with no disambiguator, or the product isn't in the cheat sheet. (B) BARE BRAND OR PANEL TALK — pick from three paths: (1) resolve from parent [CONTEXT] or same-author chain when one product is clearly being referred to ('Don't get LG' under [CONTEXT: LG 34GS95QE-B] → emit it); (2) resolve from the cheat sheet when the named brand has exactly one entry ('Don't get LG' + cheat sheet has only one LG → emit it); (3) otherwise products: [] (panel tech alone like 'qdoled >> woled', brand facts with multiple cheat-sheet entries like 'MSI has 3 years burn-in warranty', pure speculation 'Should I wait for the 5K2K version?', generic tech questions 'Does G-sync work at 240Hz?'). If a specific model IS named — even inside a question, hypothetical, anti-rec, or future-action — emit it; the framing shapes contentQuality (low for unevaluated mentions like questions and intent, medium for anti-rec with reason). References resolve via: (1) parent [CONTEXT] products using the chosen [CONTEXT] model string, (2) same-author chain — logistics, ownership ('I've had mine for a year'), verdicts ('absolutely insane'), and issue reports ('software is awful') all confirm the chain back to the same author's earliest specific mention, (3) cheat sheet by single-brand match or stated discriminator (e.g. '175Hz one' picks MAG 341CQP over MPG 341CQPX). contentQuality: low for bare ownership/logistics/anti-rec without reason/question naming a model/future-action; medium for verdict or preference without depth or anti-rec with reason; high for feature-level feedback or detailed first-hand experience. Specs: emit only values the commenter stated that describe the product's own capability — not hardware constraints ('I'm only using 120Hz because my GPU is too old' → do NOT emit refreshRate), not 'coming from' clauses, not parent [CONTEXT] specs. searchKeyword: emit only when the model field stayed verbatim under RULE A; omit when resolved to a cheat-sheet entry. Format: '<brand> <product-line> [<spec1> <spec2> …] <product-type>' max 8 tokens.",
+    "schemaCheck": "subtree-identification.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "deepseek-v4-flash",
+    "instructions": "Score each candidate on three dimensions, each 1-10. Hard penalties: (i) FAILING TO CONSOLIDATE: when the commenter's text is an unambiguous abbreviation/partial name/bare brand reference of exactly one cheat-sheet entry (no conflicting variant), the candidate must use the cheat-sheet model. Leaving 'MPG341' or '341cqpx' or 'the MSI' as the model when the cheat sheet has only 'MSI MPG 341CQPX' fragments the product across references → faithfulness ≤5. (ii) FABRICATING A VARIANT: changing the commenter's text in a way that destroys variant information — 'MPG431CQPX' (note the 4) normalised to 'MPG 341CQPX'; '34GS9QE' (no -B) silently completed; 'G8sd' upgraded to 'G8 SU' — faithfulness ≤3. (iii) DROPPING A NAMED MODEL inside a question/hypothetical/future-action ('Anyone tried the MPG 341CQPX?' → empty; 'I'm gonna buy the LG 34GS95QE-B' → empty) is a faithfulness miss → ≤5. The product should be emitted at contentQuality low. Only pure speculation or generic tech questions with NO model named ('Should I wait for the 5K2K version?', 'Does G-sync work at 240Hz?') stay empty. (iv) on bare brand talk ('Don't get LG'): the candidate must try to resolve via parent [CONTEXT] or single-cheat-sheet-entry first, and emit the resolved product. Only when no parent context exists AND the cheat sheet has multiple entries for that brand should it return products: []. Returning products: [] when parent [CONTEXT: LG 34GS95QE-B] was present, or when the cheat sheet has only one LG entry, is a faithfulness miss → ≤5. Conversely, fabricating a product from purely generic talk ('qdoled >> woled', no parent context, multiple cheat-sheet entries) is also a faithfulness miss → ≤4. (v) emitting a spec that reflects the commenter's hardware constraint rather than the product's capability ('I'm only using 120Hz because my GPU is too old' → refreshRate 120Hz) is a calibration miss. (vi) breaking the same-author chain on ownership/experience comments ('I've had mine for a year' → empty when the same author's c0 specifies a model) → faithfulness ≤5. (1) faithfulness (weight: highest) — every specific product mention surfaced with no hallucinations and consolidated to the cheat-sheet entry when unambiguous. Covers: explicit model names (resolved to cheat sheet when possible), parent-context pronoun resolution, same-author chains (logistics, ownership, verdicts, issue reports, questions all keep the chain alive — only an explicit topic shift breaks it), informal endorsements ('absolutely insane'), reference-tier claims ('TFT says it's the MSI'), questions and future-actions with a named model, anti-recs with or without reason, off-cheat-sheet products kept verbatim. Variant cues must be preserved. (2) calibration (weight: medium) — contentQuality correct: high = feature-level or detailed first-hand; medium = verdict/preference without depth, or anti-rec with reason, or single-clause verdict ('display is great, software is awful'); low = named but not evaluated (ownership, logistics, anti-rec without reason, question naming a model, future-action). Borderline → lower. Also: specs emitted iff commenter stated them for this product's capability (not constraints, not context nodes, not 'coming from' clauses); searchKeyword present iff model stayed verbatim (different SKU, variant cue, ambiguous brand, off-cheat-sheet); variant accuracy (MAG 341CQP ≠ MPG 341CQPX; G8 SD ≠ G8 SU). (3) completeness (weight: low) — every PLAN comment has an entry. Use goldenOutput as recall floor. Return JSON {candidates:[{candidateId, scores:{faithfulness, calibration, completeness}, rationale}], verdict}. Verdict: 'best=<id>' | 'tie' | 'none-acceptable'. Rationale must name specific subtrees and comment IDs where candidates diverge from the golden.",
+    "perRun": false
+  }
+}

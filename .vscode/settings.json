@@ -1,0 +1,16 @@
+{
+  "search.exclude": {
+    "**/dist": true
+  },
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "javascript.preferences.importModuleSpecifier": "relative",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "chat.tools.terminal.autoApprove": {
+    "nx": true,
+    "Test-Path": true,
+    "ForEach-Object": true,
+    "Out-File": true,
+    "Get-Item": true
+  },
+}

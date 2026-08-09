@@ -1,0 +1,64 @@
+meta {
+  name: Test Product Resolution
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/test/resolve/product
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "input": {
+      "brand": "LG",
+      "model": "34GS95QE-B",
+      "displayName": "LG 34GS95QE-B",
+      "specs": [
+        {
+          "name": "screenSize",
+          "value": "39\""
+        }
+      ],
+      "categories": ["Monitors"],
+      "searchBefore": "2025-01-18T15:42:08.000Z",
+      "abbreviations": []
+    },
+    "options": {
+      "webSearchEnabled": true,
+      "useEmbedding": true,
+      "mode": "loose",
+      "preResolvedCategories": [
+        {
+          "id": "09614f8f-4af7-42ee-b876-ba4df5046c37",
+          "name": "Monitors",
+          "similarity": 1
+        }
+      ],
+      "contextualResolutionEnabled": true,
+      "threadContext": {
+        "opSummary": "@No_Committee8856: \"The author is looking to buy a 34'' 1440p 240 Hz OLED ultrawide purely for gaming and media consumption (no content creation) and has narrowed it down to five models: LG Ultragear [34GS95QE-B], MSI MPG [341CQPX], Acer Predator [X34 X5], Gigabyte [MO34WQC2], and ROG swift [PG34WCDM]. They can't find many reviews on the Acer Predator [X34 X5] or Gigabyte [MO34WQC2], which is a major reason they're not confident about those options. They personally like the ROG swift [PG34WCDM] design the most, but it's much higher priced and they don't think it offers better performance than the others; they also point out it's matte-WOLED, while the key tradeoff they're debating across the rest is curve and panel type (glossy QD-OLED vs matte WOLED), not raw specs. They're excluding Samsung and Alienware because they don't want anything larger than 34'' and they don't want to compromise on 240 Hz; they've been on 165 Hz for years and feel it's no longer \"fast enough.\" They're planning to buy a 5070 Ti, so they believe dropping below 240 Hz at 1440p would be wasting GPU capability and not a real upgrade.\n\nThey're mostly torn between LG Ultragear [34GS95QE-B] and MSI MPG [341CQPX]. For the LG, their main considerations are that they game in well-lit environments and worry about \"grey tint\" on a glossy-QD-OLED, making a matte-WOLED potentially better. They also consider whether the 800R curve will feel immersive for games but possibly distort regular video/photos when not centered. They value the thinner bezels and overall design aesthetics, believe LG might have better QC since it's a panel-manufacturer brand, and like that it's certified G-sync compatible, expecting more reliable behavior than non-certified options. For the MSI MPG [341CQPX], they want the glossy QD-OLED for better color vibrancy and text clarity and worry they'd regret missing that. They think the 1800R curve may be less immersive but could reduce distortion in regular content. They also note it's a bit cheaper than LG and that many reviews (including RTings) seem to favor the MSI, while Reddit discussions they've seen report more issues for it. Their biggest anxiety is specifically whether G-sync works properly on the MSI, since they see \"quite a few issues\" reported online, and they ask for recommendations and red flags from actual owners. They also mention that they may be ignoring that other models likely share the same LG panel, reinforcing that the real decision is 800R vs 1800R and glossy QD-OLED vs matte WOLED. As an additional reference point, they mention Corsair Xeneon 34WQHD240-C as another QD-OLED option but say they're not considering it because it's overpriced and Corsair feels new to the monitor market, so they don't have much confidence.\nAlso mentioned: MPG-341CQPX-QD-OLED/Specification, LG UltraGear OLED\"",
+        "subreddit": "r/ultrawidemasterrace",
+        "commentBody": "I'm currently testing the 39\" LG oled, for now the 800r is good in most games but for the love of god, it seems awfull for any kind of 2d platformers. Moving left right feels like walking on a globe, makes me feel like the screen is constantly rotating. which is makng me a bit nauseous.  \n  \nDidn't any of you guys had similar experience? Does it go away after a time?",
+        "threadTitle": "Best 34'' 240 Hz OLED ultrawide to date?",
+        "resolvedProducts": [
+          "LG UltraGear 34GS95QE",
+          "MSI MPG341CQPX",
+          "Acer Predator X34X5bmiiphuzx UM.CXXEE.501",
+          "GIGABYTE MO34WQC2",
+          "ASUS ROG Swift PG34WCDM",
+          "Samsung Odyssey S49CG934SU",
+          "Corsair XENEON 34WQHD240-C CM-9030005-PE"
+        ]
+      }
+    }
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

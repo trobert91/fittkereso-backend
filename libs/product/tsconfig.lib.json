@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "declaration": true,
+    "types": ["node"],
+    "target": "es2021",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts", "../search/src/lib/services/product-category-search.service.ts", "../search/src/lib/services/product-search.service.ts", "../search/src/lib/models/product-search-result.ts", "../search/src/lib/models/product-search-params.ts", "../search/src/lib/models/category-search-result.ts", "../search/src/lib/models/category-search-params.ts", "../search/src/lib/models/base-page-result.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+}

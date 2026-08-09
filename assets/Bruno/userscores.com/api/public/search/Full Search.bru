@@ -1,0 +1,22 @@
+meta {
+  name: Full Search
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:8088/api/v1/public/search
+  body: none
+  auth: inherit
+}
+
+params:query {
+  q: mechanical keyboard
+  page: 1
+  pageSize: 20
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

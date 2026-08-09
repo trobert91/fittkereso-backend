@@ -1,0 +1,17 @@
+{
+  "name": "reddit",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/reddit/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project reddit --web",
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "libs/reddit/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  }
+}

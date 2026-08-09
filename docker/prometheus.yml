@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/pipeline_alerts.yml
+
+scrape_configs:
+  - job_name: "ebike-services"
+    static_configs:
+      - targets:
+          - "host.docker.internal:8080" # review-collector if exposed
+
+          - "host.docker.internal:8081" # product-collector exposed
+
+          - "host.docker.internal:8088" # API if exposed
+  # Add more service targets here as they expose metrics endpoints
+  # Example NestJS metrics endpoint: http://<host>:<port>/metrics

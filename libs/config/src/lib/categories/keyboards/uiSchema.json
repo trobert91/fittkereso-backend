@@ -1,0 +1,41 @@
+{
+  "ui:order": [
+    "connectionInterface",
+    "connectionMode",
+    "mechanical",
+    "keyCount",
+    "numpad",
+    "backlighting",
+    "multimediaKeys",
+    "layout",
+    "color"
+  ],
+  "connectionInterface": {
+    "ui:placeholder": "e.g. USB"
+  },
+  "connectionMode": {
+    "ui:placeholder": "e.g. Wired"
+  },
+  "mechanical": {
+    "ui:widget": "checkbox"
+  },
+  "keyCount": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 87"
+  },
+  "numpad": {
+    "ui:widget": "checkbox"
+  },
+  "backlighting": {
+    "ui:widget": "checkbox"
+  },
+  "multimediaKeys": {
+    "ui:widget": "checkbox"
+  },
+  "layout": {
+    "ui:placeholder": "e.g. Hungarian"
+  },
+  "color": {
+    "ui:placeholder": "e.g. Black"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "pricing": {
+    "openrouter:deepseek/deepseek-v4-flash": {
+      "inputPerMillion": 0.14,
+      "outputPerMillion": 0.28
+    },
+    "openrouter:deepseek/deepseek-v4-pro": {
+      "inputPerMillion": 0.435,
+      "outputPerMillion": 0.87
+    }
+  },
+  "maxRetries": 3,
+  "fallbackModel": "openrouter:deepseek/deepseek-v4-flash"
+}

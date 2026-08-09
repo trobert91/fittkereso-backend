@@ -1,0 +1,19 @@
+meta {
+  name: Search Reddit threads
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:8080/api/reddit-test/threads?query=best+ultrawide+monitor
+  body: none
+  auth: inherit
+}
+
+params:query {
+  query: best+ultrawide+monitor
+}
+
+settings {
+  encodeUrl: true
+}

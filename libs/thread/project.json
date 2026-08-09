@@ -1,0 +1,9 @@
+{
+  "name": "thread",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/thread/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project thread --web",
+  "targets": {}
+}

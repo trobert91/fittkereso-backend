@@ -1,0 +1,88 @@
+{
+  "id": "monitors-thread-sweep-v1",
+  "phase": "identification",
+  "description": "Multi-subtree sweep across three identification edge cases. Subtree 0 (direct): two clearly-named products with detailed evaluations — straightforward. Subtree 1 (anaphoric): the dismissive-Corsair scenario from M1 — tests anaphoric reference resolution AND calibrated handling of an anti-recommendation. Subtree 2 (no product): a comment that explicitly says 'almost any 27\" IPS panel works fine' — tests that the candidate does NOT hallucinate specific products from a generic recommendation, plus a one-word reply that should produce empty products. Runs 2 candidates with perCandidate: 3 so the per-comment table demonstrates the stacked-runs layout.",
+  "runs": {
+    "perCandidate": 3,
+    "concurrency": 3
+  },
+  "candidates": [
+    {
+      "id": "baseline",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "baseline-on-nano",
+      "model": "gpt-5.4-nano",
+      "systemPromptSource": "current"
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "Default expectation: schema-valid JSON conforming to subtree-identification.schema, every PLAN comment receives an entry. Per-subtree overrides above describe the specific behaviors each subtree tests.",
+    "schemaCheck": "subtree-identification.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "claude-haiku-4-5-20251001",
+    "instructions": "Score each candidate on three dimensions, each 1-10: (1) faithfulness — exactly the products mentioned in each PLAN comment, no hallucinations, anaphoric references resolved when present? (2) calibration — does contentQuality match the depth of evaluation? high = detailed first-hand or reasoned; medium = short verdict; low = bare mention. (3) completeness — every PLAN comment has an entry, even if products is empty? Return JSON {candidates:[{candidateId, scores:{faithfulness,calibration,completeness}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'.",
+    "perRun": false
+  },
+  "inputs": [
+    {
+      "id": "default",
+      "kind": "fixture",
+      "path": "../../fixtures/identification/monitors-thread-sweep.fixture.json",
+      "subtrees": [
+        {
+          "index": 0,
+          "label": "direct",
+          "expectations": {
+            "desiredOutcome": "Surface both Acer Predator X34 X5 (in ds-r1) with high contentQuality (first-hand owner with detailed evaluation) and ROG Swift PG34WCDM (in ds-r2) with medium-to-high quality (reasoned recommendation with rationale). Schema-valid JSON. No products hallucinated into either comment.",
+            "schemaCheck": "subtree-identification.schema",
+            "mustContain": [
+              {
+                "kind": "productMention",
+                "brand": "Acer",
+                "model": "Predator X34 X5"
+              },
+              {
+                "kind": "productMention",
+                "brand": "ASUS",
+                "model": "ROG Swift PG34WCDM"
+              }
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "label": "anaphoric",
+          "expectations": {
+            "desiredOutcome": "Surface LG 34GS95QE-B AND MSI MPG 341CQPX in an-r1 via anaphoric reference resolution from 'both are solid' (medium contentQuality — short verdict, no detail). ALSO surface Corsair Xeneon 34WQHD240-C with low or medium contentQuality reflecting that it's a buyer-relevant anti-recommendation. Surfacing only Corsair (dropping LG/MSI) is a faithfulness failure. Schema-valid JSON.",
+            "schemaCheck": "subtree-identification.schema",
+            "mustContain": [
+              {
+                "kind": "productMention",
+                "brand": "LG",
+                "model": "34GS95QE-B"
+              },
+              {
+                "kind": "productMention",
+                "brand": "MSI",
+                "model": "MPG 341CQPX"
+              }
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "label": "no-product",
+          "expectations": {
+            "desiredOutcome": "np-r1 contains a generic product class recommendation (any 27\" 1440p IPS panel) but no specific brand+model pair. Candidates should produce an empty products array for np-r1 — hallucinating a specific product like 'Dell U2723QE' from this comment is a faithfulness failure. np-r2 ('Thanks, that's helpful!') has no product reference and must produce an empty products array. Schema-valid JSON.",
+            "schemaCheck": "subtree-identification.schema"
+          }
+        }
+      ]
+    }
+  ]
+}

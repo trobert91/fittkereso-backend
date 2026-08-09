@@ -1,0 +1,9 @@
+{
+  "name": "resolution",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/resolution/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project resolution --web",
+  "targets": {}
+}

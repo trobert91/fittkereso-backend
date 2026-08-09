@@ -1,0 +1,108 @@
+{
+  "name": "review-collector",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/review-collector/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": [
+          "--node-env=production"
+        ],
+        "cwd": "apps/review-collector"
+      },
+      "configurations": {
+        "development": {
+          "args": [
+            "--node-env=development"
+          ]
+        }
+      }
+    },
+    "prune-lockfile": {
+      "dependsOn": [
+        "build"
+      ],
+      "cache": true,
+      "executor": "@nx/js:prune-lockfile",
+      "outputs": [
+        "{workspaceRoot}/dist/apps/review-collector/package.json",
+        "{workspaceRoot}/dist/apps/review-collector/package-lock.json"
+      ],
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "copy-workspace-modules": {
+      "dependsOn": [
+        "build"
+      ],
+      "cache": true,
+      "outputs": [
+        "{workspaceRoot}/dist/apps/review-collector/workspace_modules"
+      ],
+      "executor": "@nx/js:copy-workspace-modules",
+      "options": {
+        "buildTarget": "build"
+      }
+    },
+    "prune": {
+      "dependsOn": [
+        "prune-lockfile",
+        "copy-workspace-modules"
+      ],
+      "executor": "nx:noop"
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "buildTarget": "review-collector:build",
+        "runBuildTargetDependencies": false,
+        "watch": false,
+        "port": 9229
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "review-collector:build:development"
+        },
+        "production": {
+          "buildTarget": "review-collector:build:production"
+        }
+      }
+    },
+    "serve:scheduler": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "buildTarget": "review-collector:build",
+        "runBuildTargetDependencies": false,
+        "watch": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "review-collector:build:development"
+        },
+        "production": {
+          "buildTarget": "review-collector:build:production"
+        }
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

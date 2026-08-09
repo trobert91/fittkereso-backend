@@ -1,0 +1,16 @@
+meta {
+  name: Update specs in category
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/admin-category/09614f8f-4af7-42ee-b876-ba4df5046c37/update-specs
+  body: json
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

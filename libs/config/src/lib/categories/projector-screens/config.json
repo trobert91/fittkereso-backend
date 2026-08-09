@@ -1,0 +1,94 @@
+{
+  "negativeTerms": [
+    {
+      "keyword": "throw ratio",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "lumens",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "DLP",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "laser projector",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "projector lamp",
+      "penalty": 0.7
+    }
+  ],
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "projector screen"
+    },
+    {
+      "weight": 2.5,
+      "keyword": "projection screen",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "screen gain",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "ambient light rejecting",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "ALR screen",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "fixed frame screen",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "motorized screen",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "pull down screen",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "screen material",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "screen size inches"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "gain rating",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "tab-tensioned screen",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "perforated screen",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "screen matte white",
+      "exclusive": true
+    }
+  ]
+}

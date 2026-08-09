@@ -1,0 +1,107 @@
+{
+  "implementation": "product-identity-first",
+  "pipeline": {
+    "maxIterations": 16,
+    "maxParentProducts": 6
+  },
+  "relevance": {
+    "opBypassScore": 1,
+    "minApprovalScore": 42,
+    "webSearchMinRelevance": 60,
+    "minReferenceEnabledScore": 40
+  },
+  "moderation": {
+    "maxReferenceFlags": 2,
+    "minAutoApprovalScore": 80,
+    "enableStructuredFixes": true,
+    "openSeverityReviewThreshold": 50,
+    "severityCap": 200
+  },
+  "relevanceCalculation": {
+    "commentFetchLimit": 60,
+    "commentSampleSize": 30,
+    "minWeightedScore": 40,
+    "overFetchMultiplier": 3,
+    "model": "deepseek-v4-flash",
+    "thinking": false,
+    "effort": "high",
+    "compositeScoring": {
+      "llmWeight": 0.85,
+      "recencyWeight": 0.15,
+      "recencyHalfLifeDays": 180,
+      "lowCommentThreshold": 20,
+      "lowCommentMultiplier": 0.85,
+      "veryLowCommentThreshold": 10,
+      "veryLowCommentMultiplier": 0.70
+    }
+  },
+  "threadSelection": {
+    "candidatePoolSize": 4,
+    "minCategoryRelevance": 50,
+    "maxCategoriesPerThread": 3
+  },
+  "identificationBuilder": {
+    "softBudget": 24000,
+    "hardBudget": 32000,
+    "maxPlanNodes": 30,
+    "maxDepth": 8
+  },
+  "analysisBuilder": {
+    "softBudget": 11000,
+    "hardBudget": 18000,
+    "maxPlanNodes": 14,
+    "maxDepth": 8
+  },
+  "discovery": {
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "effort": "max",
+    "missRateRetryThreshold": 0.1
+  },
+  "identification": {
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "effort": "max",
+    "missRateRetryThreshold": 0.1
+  },
+  "extraction": {
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "effort": "max",
+    "missRateRetryThreshold": 0.1,
+    "maxFocusCategories": 1,
+    "maxQuotesCeiling": 8,
+    "maxQuotesPerProduct": 8,
+    "minIngestionRelevance": 50
+  },
+  "labeling": {
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "effort": "max",
+    "maxNodes": 7,
+    "strictSchema": false
+  },
+  "validation": {
+    "model": "deepseek-v4-flash",
+    "thinking": true,
+    "effort": "max",
+    "softBudget": 10000,
+    "hardBudget": 16000,
+    "maxNodes": 14,
+    "maxDepth": 8
+  },
+  "opSummarizer": {
+    "model": "deepseek-v4-flash",
+    "threshold": 1000
+  },
+  "imageAnalysis": {
+    "model": "gpt-5.4-mini"
+  },
+  "cheatSheet": {
+    "maxProducts": 16,
+    "maxOpSlots": 5,
+    "maxChars": 4500,
+    "minSlotsPerCategory": 2,
+    "lowRefThreshold": 3
+  }
+}

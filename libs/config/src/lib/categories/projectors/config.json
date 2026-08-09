@@ -1,0 +1,1088 @@
+{
+  "filterSpecs": [
+    {
+      "key": "brightness",
+      "buckets": [
+        {
+          "max": 1999,
+          "label": "Under 2000 lumens"
+        },
+        {
+          "max": 2999,
+          "min": 2000,
+          "label": "2000–3000 lumens"
+        },
+        {
+          "max": 3999,
+          "min": 3000,
+          "label": "3000–4000 lumens"
+        },
+        {
+          "min": 4000,
+          "label": "4000+ lumens"
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "projectorType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "resolution",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "throwType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "lightSource",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "is3d",
+      "filterType": "boolean"
+    },
+    {
+      "key": "speakers",
+      "filterType": "boolean"
+    }
+  ],
+  "primarySpecs": [
+    "brightness",
+    "projectorType",
+    "resolution"
+  ],
+  "promptConfig": {
+    "validSpecs": [
+      {
+        "name": "brightness",
+        "examples": "3000 lumens, 2300 lumens, 4000 ANSI lumens"
+      },
+      {
+        "name": "projectorType",
+        "examples": "DLP, 3LCD, LCoS, LED, laser"
+      }
+    ],
+    "productIdExamples": [
+      {
+        "mentioned": "Epson EH-TW7000",
+        "brand": "Epson",
+        "model": "EH-TW7000"
+      },
+      {
+        "mentioned": "BenQ HT2050A",
+        "brand": "BenQ",
+        "model": "HT2050A"
+      },
+      {
+        "mentioned": "XGIMI Horizon Ultra",
+        "brand": "XGIMI",
+        "model": "Horizon Ultra"
+      },
+      {
+        "mentioned": "Optoma UHD38",
+        "brand": "Optoma",
+        "model": "UHD38"
+      },
+      {
+        "mentioned": "JVC DLA-NZ8",
+        "brand": "JVC",
+        "model": "DLA-NZ8"
+      },
+      {
+        "mentioned": "Samsung The Premiere LSP9T",
+        "brand": "Samsung",
+        "model": "The Premiere LSP9T"
+      },
+      {
+        "mentioned": "ViewSonic PX701-4K",
+        "brand": "ViewSonic",
+        "model": "PX701-4K"
+      },
+      {
+        "mentioned": "LG CineBeam HU915QE",
+        "brand": "LG",
+        "model": "CineBeam HU915QE"
+      }
+    ],
+    "brandCorrectnessExamples": [
+      {
+        "mentioned": "HT2050A",
+        "brand": "BenQ",
+        "model": "HT2050A",
+        "context": "in an Epson discussion"
+      },
+      {
+        "mentioned": "my old Optoma HD146X",
+        "brand": "Optoma",
+        "model": "HD146X",
+        "context": "in an XGIMI thread"
+      },
+      {
+        "mentioned": "DLA-NZ8",
+        "brand": "JVC",
+        "model": "DLA-NZ8",
+        "context": "in a BenQ thread"
+      }
+    ],
+    "technologyDescriptors": [
+      "DLP",
+      "3LCD",
+      "LCoS",
+      "D-ILA",
+      "SXRD",
+      "LED",
+      "laser",
+      "HDMI 2.1",
+      "4K",
+      "1080p"
+    ],
+    "productTypeWord": "projector",
+    "quoteCategories": [
+      {
+        "label": "product_evaluation",
+        "description": "Concrete buyer-useful evaluation of picture quality, brightness, noise, setup experience, gaming performance, or day-to-day ownership experience",
+        "example": "the brightness is more than enough for my living room with the blinds open"
+      },
+      {
+        "label": "issue_or_concern",
+        "description": "Specific problem, limitation, or concern with a clear reason, symptom, or resolved worry",
+        "example": "rainbow effect is very noticeable on high-contrast scenes if you're sensitive to it"
+      },
+      {
+        "label": "comparison",
+        "description": "Direct comparison where THIS projector gets a clear verdict; keep only the clause about this product, not the comparison baseline",
+        "example": "coming from a 65 inch OLED, the contrast can't compete but the 120 inch image is incredible"
+      },
+      {
+        "label": "personal_verdict",
+        "description": "Overall verdict only when it adds real buyer value through context, use case, or supporting detail",
+        "example": "after six months it's been fantastic for movies but the fan noise is annoying in quiet scenes"
+      }
+    ],
+    "quoteExamples": {
+      "good": [
+        {
+          "text": "the brightness is more than enough for my living room with the blinds open",
+          "why": "Specific brightness evaluation with use context"
+        },
+        {
+          "text": "rainbow effect is very noticeable on high-contrast scenes if you're sensitive to it",
+          "why": "Concrete DLP issue report with trigger condition"
+        },
+        {
+          "text": "fan noise is distractingly loud in a quiet room, even on eco mode",
+          "why": "Specific noise issue with context"
+        },
+        {
+          "text": "keystone correction is automatic and got the image perfectly square in seconds",
+          "why": "Setup feature evaluated with concrete outcome"
+        },
+        {
+          "text": "black levels are surprisingly good for a DLP, not OLED level but way better than expected",
+          "why": "Feature evaluation with comparison context"
+        },
+        {
+          "text": "input lag measured at 16ms in game mode which is great for casual gaming",
+          "why": "Gaming evaluation with measured data"
+        },
+        {
+          "text": "I was worried about lamp replacement cost but the laser source should last 20000 hours",
+          "why": "Resolved concern — extract as positive"
+        },
+        {
+          "text": "the built-in speakers are usable for casual viewing but you'll want a soundbar for movies",
+          "why": "Nuanced audio evaluation with use case context"
+        }
+      ],
+      "bad": [
+        {
+          "text": "I have the Epson",
+          "why": "Ownership confirmation with no opinion"
+        },
+        {
+          "text": "it's 3000 lumens",
+          "why": "Bare spec with no judgment"
+        },
+        {
+          "text": "thinking about getting a UST projector",
+          "why": "Future purchase intent — not an evaluation"
+        },
+        {
+          "text": "projectors are better than TVs",
+          "why": "Generic technology comparison, not about a specific product"
+        },
+        {
+          "text": "BenQ makes great projectors",
+          "why": "Generic brand praise with no product evaluation"
+        },
+        {
+          "text": "got mine set up yesterday",
+          "why": "Setup/delivery chatter with no evaluation"
+        },
+        {
+          "text": "probably the best projector you can buy",
+          "why": "Generic recommendation with no supporting evidence"
+        },
+        {
+          "text": "I'm coming from an Optoma HD146X",
+          "why": "Describes the previous projector — not an evaluation of this product"
+        },
+        {
+          "text": "does it support eARC?",
+          "why": "A question about specs — asking is not evaluating"
+        },
+        {
+          "text": "I want something with more lumens",
+          "why": "A wish for a hypothetical product, not an evaluation"
+        }
+      ]
+    },
+    "disambiguationExamples": {
+      "suffix": [
+        [
+          "V11H961040",
+          "Epson EH-TW7000"
+        ],
+        [
+          "XM13N",
+          "XGIMI Horizon Ultra"
+        ]
+      ],
+      "abbreviated": [
+        [
+          "HT2050A",
+          "BenQ HT2050A"
+        ],
+        [
+          "TW7000",
+          "Epson EH-TW7000"
+        ]
+      ],
+      "variant": [
+        [
+          "Epson EH-TW7100",
+          "Epson EH-TW7000"
+        ],
+        [
+          "XGIMI Horizon",
+          "XGIMI Horizon Ultra"
+        ],
+        [
+          "BenQ HT2060",
+          "BenQ HT2050A"
+        ],
+        [
+          "Optoma UHD38x",
+          "Optoma UHD38"
+        ]
+      ]
+    },
+    "extractionExamples": {
+      "comments": [
+        {
+          "NOTE": "c0: Strong owner report. Prefer concrete buyer-useful observations over short generic praise.",
+          "commentId": "c0",
+          "products": [
+            {
+              "brand": "XGIMI",
+              "model": "Horizon Ultra",
+              "categoryHint": "Projectors",
+              "quotes": [
+                {
+                  "text": "the brightness is more than enough for my living room with the blinds open",
+                  "sentiment": "positive",
+                  "features": [
+                    "brightness"
+                  ]
+                },
+                {
+                  "text": "the built-in speakers are usable for casual viewing but you'll want a soundbar for movies",
+                  "sentiment": "mixed",
+                  "features": [
+                    "speakers & audio"
+                  ]
+                },
+                {
+                  "text": "keystone correction is automatic and got the image perfectly square in seconds",
+                  "sentiment": "positive",
+                  "features": [
+                    "keystone & alignment"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c1: Comparison with TV. Keep only the clause about the projector.",
+          "commentId": "c1",
+          "products": [
+            {
+              "brand": "Epson",
+              "model": "EH-TW7000",
+              "categoryHint": "Projectors",
+              "quotes": [
+                {
+                  "text": "black levels are surprisingly good for a 3LCD, not OLED level but way better than expected",
+                  "sentiment": "positive",
+                  "features": [
+                    "contrast"
+                  ]
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "NOTE": "c2: Prospective buyer concern is valid only when it names a concrete issue.",
+          "commentId": "c2",
+          "products": [
+            {
+              "brand": "BenQ",
+              "model": "HT2050A",
+              "categoryHint": "Projectors",
+              "quotes": [
+                {
+                  "text": "rainbow effect is very noticeable on high-contrast scenes if you're sensitive to it",
+                  "sentiment": "negative",
+                  "features": [
+                    "colors"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c3: Setup/delivery chatter is not evaluative.",
+          "commentId": "c3",
+          "products": [
+            {
+              "brand": "Optoma",
+              "model": "UHD38",
+              "categoryHint": "Projectors",
+              "quotes": []
+            }
+          ]
+        },
+        {
+          "NOTE": "c4: Mixed evaluation by use case. Keep the concrete positives and negatives.",
+          "commentId": "c4",
+          "products": [
+            {
+              "brand": "JVC",
+              "model": "DLA-NZ8",
+              "categoryHint": "Projectors",
+              "quotes": [
+                {
+                  "text": "contrast and black levels are in a completely different league from any DLP",
+                  "sentiment": "positive",
+                  "features": [
+                    "contrast",
+                    "picture quality"
+                  ]
+                },
+                {
+                  "text": "fan noise is distractingly loud in a quiet room, even on eco mode",
+                  "sentiment": "negative",
+                  "features": [
+                    "fan noise"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c5: Wrong variant mention. Preserve the exact variant instead of collapsing.",
+          "commentId": "c5",
+          "products": [
+            {
+              "brand": "Epson",
+              "model": "EH-TW7100",
+              "categoryHint": "Projectors",
+              "quotes": [
+                {
+                  "text": "the lens shift makes ceiling mounting so much easier than keystone-only projectors",
+                  "sentiment": "positive",
+                  "features": [
+                    "keystone & alignment"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c6: Generic fear language alone is not enough for extraction.",
+          "commentId": "c6",
+          "products": []
+        },
+        {
+          "NOTE": "c7: Spec discussions without judgment do not produce quotes.",
+          "commentId": "c7",
+          "products": [
+            {
+              "brand": "ViewSonic",
+              "model": "PX701-4K",
+              "categoryHint": "Projectors",
+              "quotes": []
+            }
+          ]
+        }
+      ]
+    },
+    "labelingExamples": {
+      "NOTE": "ID format: uppercase letter = comment (A, B, C…), lowercase letter = product within that comment (a, b, c…). Aa = comment A product a, Ab = comment A product b. Copy the EXACT bracket IDs from the input.",
+      "products": [
+        {
+          "productId": "Aa",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "brightness",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "living room",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "features": [
+                {
+                  "label": "speakers & audio",
+                  "sentiment": "neutral"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 2,
+              "features": [
+                {
+                  "label": "keystone & alignment",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ba",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "contrast",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ca",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "issues": [
+                {
+                  "label": "rainbow effect",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Da",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "contrast",
+                  "sentiment": "positive"
+                },
+                {
+                  "label": "picture quality",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "home cinema",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "issues": [
+                {
+                  "label": "fan noise loud",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ea",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "keystone & alignment",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Fa",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "gaming",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "gaming",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ga",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "useCases": [
+                {
+                  "label": "outdoor projection",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ha",
+          "NOTE": "q0: 'Picture quality is amazing' — feature only, no use case context. q1: 'Just set it up' — generic, omitted.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "picture quality",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "specialInstructions": "Projector type alone (DLP, 3LCD, laser) is NOT a product — only extract when attached to a brand/model. Brightness specs: extract as { \"name\": \"brightness\", \"value\": \"3000 lumens\" } when the commenter directly attributes brightness to the product being reviewed. Feature disambiguation: 'gaming' covers VRR, game mode, 4K@120Hz gaming, and overall gaming responsiveness. 'input lag' covers measured or perceived delay numbers. 'fan noise' covers acoustic noise during operation. 'brightness' covers lumen output and ambient light handling. Do not confuse gaming issues with input lag numbers. Projector model names vary widely: Epson uses EH-TW prefixes, BenQ uses HT/TK/W series, XGIMI uses product names (Horizon, Halo, Elfin), JVC uses DLA-N series, Optoma uses UHD/HD prefixes. When a comment compares a projector to a TV, keep only the clause that evaluates the projector. 'keystone & alignment' covers keystone correction, lens shift, and setup flexibility — do not split these into separate features.",
+    "searchKeywordSuffix": "projector",
+    "validationConfig": {
+      "wrongProductExamples": [
+        {
+          "mentioned": "Epson EH-TW7000",
+          "resolvedTo": "BenQ HT2050A",
+          "shouldFlag": true,
+          "reason": "Completely different brand and model"
+        },
+        {
+          "mentioned": "Epson EH-TW7100",
+          "resolvedTo": "Epson EH-TW7000",
+          "shouldFlag": true,
+          "reason": "Different model variant (7100 vs 7000)"
+        },
+        {
+          "mentioned": "XGIMI Horizon",
+          "resolvedTo": "XGIMI Horizon Ultra",
+          "shouldFlag": true,
+          "reason": "Different model (base vs Ultra)"
+        },
+        {
+          "mentioned": "V11H961040",
+          "resolvedTo": "Epson EH-TW7000",
+          "shouldFlag": false,
+          "reason": "Manufacturer part number, same product"
+        },
+        {
+          "mentioned": "the Epson",
+          "resolvedTo": "Epson EH-TW7000 (0.90)",
+          "shouldFlag": false,
+          "reason": "High-confidence implicit resolution with matching brand"
+        },
+        {
+          "mentioned": "XM13N",
+          "resolvedTo": "XGIMI Horizon Ultra",
+          "shouldFlag": false,
+          "reason": "Short model identifier, same product"
+        }
+      ],
+      "userSettingPatterns": [
+        "I use eco mode",
+        "set to cinema mode",
+        "brightness at 50%",
+        "zoom set to 1.3x",
+        "switched to game mode",
+        "fan on high speed"
+      ]
+    }
+  },
+  "subreddits": [
+    {
+      "name": "r/projectors",
+      "boost": 30
+    },
+    {
+      "name": "r/hometheater",
+      "boost": 25
+    },
+    {
+      "name": "r/4kProjectors",
+      "boost": 25
+    },
+    {
+      "name": "r/UST",
+      "boost": 20
+    },
+    {
+      "name": "r/homecinema",
+      "boost": 20
+    }
+  ],
+  "ancestorDepth": 3,
+  "negativeTerms": [
+    {
+      "keyword": "projector screen",
+      "penalty": 0.8
+    },
+    {
+      "keyword": "screen gain",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "ALR screen",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "monitor",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "TV",
+      "penalty": 0.7
+    }
+  ],
+  "matchingConfig": {
+    "tokenSeparator": "",
+    "variantSuffixes": [
+      "Pro",
+      "Cinema",
+      "UB"
+    ],
+    "tokenPriorityMap": {
+      "model": 3.5,
+      "prefix": 4
+    },
+    "preserveTokenGroups": true,
+    "strictnessOverrides": {
+      "maxScore": 1.6,
+      "tokenOverlap": 0.45,
+      "numericHitRatio": 0.75
+    },
+    "criticalTokenPatterns": [
+      "\\d{4}UB",
+      "TK\\d{3}",
+      "4K"
+    ]
+  },
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "projector"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "lumens",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "throw ratio",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "short throw",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "ultra short throw",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "contrast ratio projector",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "home cinema projector",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "4K projector",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "laser projector",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "DLP projector",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "rainbow effect",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "screen size projection"
+    },
+    {
+      "weight": 2,
+      "keyword": "Epson projector",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "BenQ projector",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "Optoma",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "lamp life",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "keystone correction",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "lens shift",
+      "exclusive": true
+    }
+  ],
+  "keywordIdentifiers": [
+    "projector screen",
+    "projection screen",
+    "throw distance",
+    "short throw",
+    "ultra short throw",
+    "ANSI lumens",
+    "brightness",
+    "contrast ratio",
+    "HDR projector",
+    "keystone correction",
+    "lens shift",
+    "zoom lens",
+    "projection mapping",
+    "home theater setup",
+    "1080p projector",
+    "4K HDR",
+    "Dolby Vision projector",
+    "gaming projector",
+    "ceiling mount projector",
+    "office projector",
+    "presentation projector",
+    "classroom projector",
+    "wireless projector",
+    "Bluetooth projector",
+    "WiFi projector",
+    "screen mirroring",
+    "HDMI projector",
+    "USB projector",
+    "projector lamp",
+    "lamp life",
+    "laser light source",
+    "LED light engine",
+    "optic engine",
+    "ambient light rejection",
+    "ALR screen",
+    "projector fan noise",
+    "home cinema",
+    "big screen setup"
+  ],
+  "useCases": [
+    {
+      "label": "home cinema",
+      "description": "Dedicated dark room movie watching — contrast, black levels, immersion, large screen, HDR content",
+      "implications": [
+        "dark room",
+        "theater",
+        "cinema",
+        "black levels",
+        "contrast",
+        "Dolby",
+        "HDR",
+        "immersive",
+        "130 inch",
+        "150 inch",
+        "screen",
+        "dedicated room"
+      ]
+    },
+    {
+      "label": "gaming",
+      "description": "PS5, Xbox, PC gaming — input lag, response time, 4K@120Hz support, game mode",
+      "implications": [
+        "PS5",
+        "PlayStation",
+        "Xbox",
+        "input lag",
+        "game mode",
+        "120Hz",
+        "VRR",
+        "controller",
+        "Series X"
+      ]
+    },
+    {
+      "label": "outdoor projection",
+      "description": "Backyard movie nights, portable setups, camping — high brightness needed for ambient light",
+      "implications": [
+        "backyard",
+        "outdoor",
+        "portable",
+        "camping",
+        "patio",
+        "movie night outdoor",
+        "battery",
+        "garden"
+      ]
+    },
+    {
+      "label": "office & presentations",
+      "description": "Business presentations, classroom, conference room — bright ambient lighting, text clarity, portability",
+      "implications": [
+        "office",
+        "conference",
+        "classroom",
+        "presentation",
+        "PowerPoint",
+        "meeting room",
+        "bright room",
+        "boardroom"
+      ]
+    },
+    {
+      "label": "living room",
+      "description": "Casual use in ambient light — smart features, ultra short throw, ceiling mount, TV replacement",
+      "implications": [
+        "living room",
+        "ambient light",
+        "ceiling mount",
+        "UST",
+        "ultra short throw",
+        "TV replacement",
+        "wall mount",
+        "smart TV",
+        "Android TV",
+        "streaming"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "label": "brightness",
+      "description": "Lumen output, ambient light handling, and HDR brightness performance",
+      "shortDescription": "Lumen output and ambient light handling, not HDR peak brightness (that's 'HDR')"
+    },
+    {
+      "label": "contrast",
+      "description": "Black levels, contrast ratio, and dark scene detail in projected image",
+      "issues": [
+        {
+          "label": "light leakage",
+          "description": "Light bleed around the lens housing in dark scenes"
+        }
+      ]
+    },
+    {
+      "label": "picture quality",
+      "description": "Overall image quality impression — clarity, processing quality, and projected image fidelity",
+      "shortDescription": "General image quality, not specific features like contrast or HDR",
+      "issues": [
+        {
+          "label": "hot spot",
+          "description": "Bright center spot with dimmer edges on projected image"
+        }
+      ]
+    },
+    {
+      "label": "colors",
+      "description": "Color accuracy, saturation, DCI-P3 coverage, and color wheel artifact visibility",
+      "issues": [
+        {
+          "label": "rainbow effect",
+          "description": "Color separation artifacts visible on DLP single-chip projectors"
+        },
+        {
+          "label": "color wheel artifacts",
+          "description": "Visible color separation from spinning color wheel (DLP)"
+        }
+      ]
+    },
+    {
+      "label": "HDR",
+      "description": "HDR10, HLG, tone mapping quality, and peak brightness in HDR mode",
+      "issues": [
+        {
+          "label": "HDR tone mapping poor",
+          "description": "HDR content looking washed out or clipped"
+        }
+      ]
+    },
+    {
+      "label": "sharpness",
+      "description": "Pixel clarity, native vs upscaled resolution, focus uniformity, and screen door effect",
+      "issues": [
+        {
+          "label": "focus uniformity",
+          "description": "Center in focus but edges soft or blurry"
+        },
+        {
+          "label": "screen door effect",
+          "description": "Visible pixel grid structure on projected image"
+        }
+      ]
+    },
+    {
+      "label": "gaming",
+      "description": "VRR, low latency mode, 4K@120Hz, game mode, and overall gaming responsiveness",
+      "shortDescription": "Gaming features and responsiveness, not input lag measurements (that's 'input lag')"
+    },
+    {
+      "label": "input lag",
+      "description": "Delay between input and on-screen response, measured or perceived",
+      "issues": [
+        {
+          "label": "input lag high",
+          "description": "Noticeable delay between input and projected image"
+        }
+      ]
+    },
+    {
+      "label": "fan noise",
+      "description": "Acoustic noise during operation, eco mode noise reduction, and fan loudness",
+      "issues": [
+        {
+          "label": "fan noise loud",
+          "description": "Excessive or distracting fan noise during operation"
+        }
+      ]
+    },
+    {
+      "label": "lamp life",
+      "description": "Lamp, laser, or LED longevity, replacement cost, and brightness degradation over time",
+      "issues": [
+        {
+          "label": "lamp dimming",
+          "description": "Noticeable brightness loss over lamp lifetime"
+        }
+      ]
+    },
+    {
+      "label": "keystone & alignment",
+      "description": "Keystone correction quality, lens shift range, focus, zoom, and overall setup flexibility",
+      "issues": [
+        {
+          "label": "keystone distortion",
+          "description": "Trapezoid image due to off-axis projection"
+        }
+      ]
+    },
+    {
+      "label": "smart features",
+      "description": "Built-in OS (Android TV, etc.), app availability, streaming, wireless casting, and Bluetooth",
+      "issues": [
+        {
+          "label": "smart platform lag",
+          "description": "Sluggish built-in OS or app crashes"
+        }
+      ]
+    },
+    {
+      "label": "speakers & audio",
+      "description": "Built-in speaker quality, volume, bass, and Bluetooth audio output",
+      "issues": [
+        {
+          "label": "speaker quality poor",
+          "description": "Weak, tinny, or insufficient built-in audio"
+        }
+      ]
+    },
+    {
+      "label": "portability",
+      "description": "Weight, size, ease of setup, carrying convenience, and battery life"
+    },
+    {
+      "label": "build quality",
+      "description": "Materials, fit and finish, lens quality, cooling design, and overall durability",
+      "issues": [
+        {
+          "label": "overheating",
+          "description": "Unit runs excessively hot or thermal throttles"
+        }
+      ]
+    },
+    {
+      "label": "value",
+      "description": "Price-to-performance ratio, deal quality, and whether the price is justified"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Get Category by Slug
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:8088/api/v1/public/categories/mechanical-keyboards
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

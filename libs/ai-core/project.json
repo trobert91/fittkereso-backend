@@ -1,0 +1,8 @@
+{
+  "name": "ai-core",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ai-core/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

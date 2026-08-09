@@ -1,0 +1,210 @@
+{
+  "type": "object",
+  "title": "Headset",
+  "properties": {
+    "type": {
+      "meta": {
+        "order": 0,
+        "examples": [
+          "In-ear",
+          "Over-ear",
+          "Open-ear"
+        ]
+      },
+      "type": "string",
+      "title": "Type"
+    },
+    "connectivity": {
+      "meta": {
+        "order": 1,
+        "examples": [
+          "Wired",
+          "Wireless"
+        ]
+      },
+      "type": "string",
+      "title": "Connectivity"
+    },
+    "connectionType": {
+      "meta": {
+        "examples": [
+          "Bluetooth",
+          "USB dongle",
+          "3.5mm jack",
+          "USB"
+        ]
+      },
+      "type": "string",
+      "title": "Connection type"
+    },
+    "bluetoothVersion": {
+      "meta": {
+        "examples": [
+          "5.0",
+          "5.2",
+          "5.3"
+        ]
+      },
+      "type": "string",
+      "title": "Bluetooth version"
+    },
+    "range": {
+      "meta": {
+        "unit": "m",
+        "examples": [
+          "10 m"
+        ]
+      },
+      "type": "number",
+      "title": "Wireless range"
+    },
+    "surroundSound": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Surround sound"
+    },
+    "driverSize": {
+      "meta": {
+        "unit": "mm",
+        "order": 2,
+        "examples": [
+          "40mm",
+          "50mm",
+          "53mm"
+        ]
+      },
+      "type": "number",
+      "title": "Driver size"
+    },
+    "frequencyResponseMin": {
+      "meta": {
+        "unit": "Hz",
+        "examples": [
+          "10 Hz",
+          "20 Hz"
+        ]
+      },
+      "type": "number",
+      "title": "Frequency response (min)"
+    },
+    "frequencyResponseMax": {
+      "meta": {
+        "unit": "Hz",
+        "examples": [
+          "20000 Hz",
+          "40000 Hz"
+        ]
+      },
+      "type": "number",
+      "title": "Frequency response (max)"
+    },
+    "impedance": {
+      "meta": {
+        "unit": "Ohm",
+        "examples": [
+          "32 Ohm",
+          "64 Ohm"
+        ]
+      },
+      "type": "number",
+      "title": "Impedance"
+    },
+    "sensitivity": {
+      "meta": {
+        "unit": "dB",
+        "examples": [
+          "98 dB",
+          "111 dB"
+        ]
+      },
+      "type": "number",
+      "title": "Sensitivity"
+    },
+    "microphone": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Microphone"
+    },
+    "volumeControl": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Volume control"
+    },
+    "microphoneType": {
+      "meta": {
+        "examples": [
+          "Boom",
+          "Detachable boom",
+          "Retractable",
+          "Built-in"
+        ]
+      },
+      "type": "string",
+      "title": "Microphone type"
+    },
+    "micNoiseCancelling": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Mic noise cancellation"
+    },
+    "noiseCancelling": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Active noise cancellation"
+    },
+    "weight": {
+      "meta": {
+        "unit": "g",
+        "examples": [
+          "280 g",
+          "350 g"
+        ]
+      },
+      "type": "number",
+      "title": "Weight"
+    },
+    "batteryLife": {
+      "meta": {
+        "unit": "hours",
+        "examples": [
+          "20 hours",
+          "60 hours"
+        ]
+      },
+      "type": "number",
+      "title": "Battery life"
+    },
+    "cableLength": {
+      "meta": {
+        "unit": "m",
+        "examples": [
+          "1.2 m",
+          "2 m"
+        ]
+      },
+      "type": "number",
+      "title": "Cable length"
+    },
+    "rgbLighting": {
+      "meta": {},
+      "type": "boolean",
+      "title": "RGB lighting"
+    },
+    "platform": {
+      "meta": {
+        "examples": [
+          "PC",
+          "PlayStation",
+          "Xbox",
+          "Switch",
+          "Mobile"
+        ]
+      },
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Platform compatibility"
+    }
+  }
+}

@@ -1,0 +1,628 @@
+{
+  "arukereso": {
+    "mappings": [
+      {
+        "key": "screenSize",
+        "labels": [
+          "Képátló (inch)"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "resolution",
+        "labels": [
+          "Felbontás"
+        ],
+        "extract": "removeWhitespace",
+        "trimSuffixes": [
+          "pixel"
+        ]
+      },
+      {
+        "key": "aspectRatio",
+        "labels": [
+          "Képarány"
+        ]
+      },
+      {
+        "key": "refreshRate",
+        "labels": [
+          "Képfrissítési frekvencia"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "brightness",
+        "labels": [
+          "Fényerő"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "contrastRatio",
+        "labels": [
+          "Statikus kontraszt"
+        ],
+        "extract": "removeWhitespace"
+      },
+      {
+        "key": "viewingAngle",
+        "labels": [
+          "Betekintési szög"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "panelType",
+        "labels": [
+          "Panel típusa",
+          "Típus",
+          "TV típusa"
+        ],
+        "trimSuffixes": [
+          "panel",
+          "TV"
+        ]
+      },
+      {
+        "key": "hdmiCount",
+        "labels": [
+          "HDMI bemenetek száma"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "usbCount",
+        "labels": [
+          "USB portok száma"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "connections",
+        "labels": [
+          "Csatlakozók"
+        ],
+        "extract": "list"
+      },
+      {
+        "key": "vesaMount",
+        "labels": [
+          "VESA szabvány"
+        ],
+        "extract": "list"
+      },
+      {
+        "key": "audioPower",
+        "labels": [
+          "Hangteljesítmény"
+        ]
+      },
+      {
+        "key": "dolbyDigital",
+        "labels": [
+          "Dolby Digital"
+        ]
+      },
+      {
+        "key": "dts",
+        "labels": [
+          "DTS"
+        ]
+      },
+      {
+        "key": "speakers",
+        "labels": [
+          "Hangszóró"
+        ]
+      },
+      {
+        "key": "operatingSystem",
+        "labels": [
+          "Operációs rendszer"
+        ]
+      },
+      {
+        "key": "powerConsumption",
+        "labels": [
+          "Fogyasztás"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "weightWithStand",
+        "labels": [
+          "Tömeg (talppal)"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "weightWithoutStand",
+        "labels": [
+          "Tömeg (talp nélkül)"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "energyClass",
+        "labels": [
+          "Energiaosztály",
+          "Energiaosztály - SDR (A-G)"
+        ],
+        "skipValues": [
+          "Termékinformációs adatlap"
+        ]
+      },
+      {
+        "key": "wifi",
+        "labels": [
+          "Wifi",
+          "Wi-Fi"
+        ]
+      },
+      {
+        "key": "bluetooth",
+        "labels": [
+          "Bluetooth"
+        ]
+      },
+      {
+        "key": "responseTime",
+        "labels": [
+          "Válaszidő"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "widthWithStand",
+        "labels": [
+          "Szélesség (talppal)"
+        ],
+        "extract": "cmToInchList"
+      },
+      {
+        "key": "heightWithStand",
+        "labels": [
+          "Magasság (talppal)"
+        ],
+        "extract": "cmToInchList"
+      },
+      {
+        "key": "depthWithStand",
+        "labels": [
+          "Mélység (talppal)"
+        ],
+        "extract": "cmToInchList"
+      },
+      {
+        "key": "widthWithoutStand",
+        "labels": [
+          "Szélesség (talp nélkül)"
+        ],
+        "extract": "cmToInchList"
+      },
+      {
+        "key": "heightWithoutStand",
+        "labels": [
+          "Magasság (talp nélkül)"
+        ],
+        "extract": "cmToInchList"
+      },
+      {
+        "key": "depthWithoutStand",
+        "labels": [
+          "Mélység (talp nélkül)"
+        ],
+        "extract": "cmToInchList"
+      }
+    ],
+    "calculated": [
+      {
+        "key": "tvTuner",
+        "rule": "presentLabels",
+        "source": [
+          "DVB-T",
+          "DVB-T2",
+          "DVB-C",
+          "DVB-C2",
+          "DVB-S",
+          "DVB-S2"
+        ]
+      },
+      {
+        "key": "hdr",
+        "rule": "presentLabels",
+        "source": [
+          "HDR10",
+          "HDR10+",
+          "HDR10+ Gaming",
+          "Dolby Vision",
+          "Dolby Vision IQ",
+          "HLG",
+          "HLG (Hybrid Log Gamma)"
+        ]
+      },
+      {
+        "key": "freesync",
+        "rule": "featureSearch",
+        "source": "description",
+        "keywords": [
+          "freesync"
+        ]
+      },
+      {
+        "key": "gsync",
+        "rule": "featureSearch",
+        "source": "description",
+        "keywords": [
+          "g-sync",
+          "gsync"
+        ]
+      },
+      {
+        "key": "vrr",
+        "rule": "featureSearch",
+        "source": "description",
+        "keywords": [
+          "vrr"
+        ]
+      }
+    ]
+  },
+  "displayspecs": {
+    "mappings": [
+      {
+        "key": "screenSize",
+        "labels": [
+          "Size class"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "resolution",
+        "labels": [
+          "Resolution"
+        ],
+        "extract": "removeWhitespace",
+        "trimSuffixes": [
+          "pixels"
+        ],
+        "replacePatterns": [
+          {
+            "from": "×",
+            "to": "x"
+          }
+        ]
+      },
+      {
+        "key": "aspectRatio",
+        "labels": [
+          "Aspect ratio"
+        ],
+        "preferredValueIndex": 1
+      },
+      {
+        "key": "panelType",
+        "labels": [
+          "Backlight",
+          "Panel type"
+        ]
+      },
+      {
+        "key": "panelBitDepth",
+        "labels": [
+          "Panel bit depth"
+        ]
+      },
+      {
+        "key": "refreshRate",
+        "labels": [
+          "Vertical frequency (digital)"
+        ],
+        "extract": "secondNumber"
+      },
+      {
+        "key": "brightness",
+        "labels": [
+          "Brightness"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "peakBrightness",
+        "labels": [
+          "Peak brightness"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "contrastRatio",
+        "labels": [
+          "Static contrast"
+        ],
+        "extract": "removeWhitespace",
+        "replacePatterns": [
+          {
+            "from": "~",
+            "to": ""
+          }
+        ]
+      },
+      {
+        "key": "dynamicContrast",
+        "labels": [
+          "Dynamic contrast"
+        ],
+        "extract": "removeWhitespace",
+        "replacePatterns": [
+          {
+            "from": "~",
+            "to": ""
+          }
+        ]
+      },
+      {
+        "key": "dciP3",
+        "labels": [
+          "DCI P3"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "rec2020",
+        "labels": [
+          "Rec. 2020"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "responseTime",
+        "labels": [
+          "Minimum response time"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "coating",
+        "labels": [
+          "Coating"
+        ]
+      },
+      {
+        "key": "tvTuner",
+        "labels": [
+          "TV tuner"
+        ],
+        "extract": "list"
+      },
+      {
+        "key": "viewingAngle",
+        "labels": [
+          "Horizontal viewing angle"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "vesaMount",
+        "labels": [
+          "VESA interface"
+        ],
+        "extract": "list"
+      },
+      {
+        "key": "hdr",
+        "labels": [
+          "HDR"
+        ],
+        "extract": "list"
+      },
+      {
+        "key": "weightWithStand",
+        "labels": [
+          "Weight with stand"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "weightWithoutStand",
+        "labels": [
+          "Weight"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "powerConsumption",
+        "labels": [
+          "Power consumption (average)"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "operatingSystem",
+        "labels": [
+          "Operating system",
+          "Operating system (OS)"
+        ]
+      },
+      {
+        "key": "hdmiCount",
+        "labels": [
+          "HDMI ports"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "usbCount",
+        "labels": [
+          "USB ports"
+        ],
+        "extract": "number"
+      },
+      {
+        "key": "audioPower",
+        "labels": [
+          "Audio power",
+          "Speakers"
+        ]
+      },
+      {
+        "key": "energyClass",
+        "labels": [
+          "Energy efficiency class"
+        ]
+      },
+      {
+        "key": "widthWithStand",
+        "labels": [
+          "Width with stand"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "heightWithStand",
+        "labels": [
+          "Height with stand"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "depthWithStand",
+        "labels": [
+          "Depth with stand"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "widthWithoutStand",
+        "labels": [
+          "Width"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "heightWithoutStand",
+        "labels": [
+          "Height"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "depthWithoutStand",
+        "labels": [
+          "Depth"
+        ],
+        "sectionTitle": "Dimensions, weight and color",
+        "extract": "regexpList",
+        "extractPatterns": [
+          "([\\d.]+)\\s*(cm)",
+          "([\\d.]+)\\s*(in)"
+        ]
+      },
+      {
+        "key": "modelYear",
+        "labels": [
+          "Model year"
+        ],
+        "extract": "number"
+      }
+    ],
+    "calculated": [
+      {
+        "key": "freesync",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "freesync"
+        ]
+      },
+      {
+        "key": "gsync",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "g-sync",
+          "gsync"
+        ]
+      },
+      {
+        "key": "wifi",
+        "rule": "featureSearch",
+        "source": "Network",
+        "keywords": [
+          "wi-fi"
+        ]
+      },
+      {
+        "key": "bluetooth",
+        "rule": "featureSearch",
+        "source": "Network",
+        "keywords": [
+          "bluetooth"
+        ]
+      },
+      {
+        "key": "dolbyAtmos",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "dolby atmos"
+        ]
+      },
+      {
+        "key": "vrr",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "vrr"
+        ]
+      },
+      {
+        "key": "allm",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "allm"
+        ]
+      },
+      {
+        "key": "eArc",
+        "rule": "featureSearch",
+        "source": "Features",
+        "keywords": [
+          "earc",
+          "e-arc"
+        ]
+      },
+      {
+        "key": "speakers",
+        "rule": "presentIfKey",
+        "source": "audioPower"
+      }
+    ]
+  }
+}

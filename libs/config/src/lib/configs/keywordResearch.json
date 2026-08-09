@@ -1,0 +1,19 @@
+{
+  "totalKeywordsPerRun": 100,
+  "maxKeywordsPerCategory": 20,
+  "minKeywordsPerCategory": 2,
+  "targetBacklog": 100,
+  "cooldownDays": 21,
+  "overFetchMultiplier": 1.5,
+  "topProductSampleSize": 12,
+  "yieldHistoryWeeks": 8,
+  "plannerModel": "deepseek-v4-flash",
+  "rateLimitBackoffSeconds": 60,
+  "schedulerBatchSize": 5,
+  "searchTime": "year",
+  "searchLimit": 400,
+  "broadSearchMinScore": 30,
+  "broadSearchMinComments": 15,
+  "broadSearchMinRelevance": 60,
+  "broadSearchAvgRelevanceThreshold": 60
+}

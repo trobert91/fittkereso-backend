@@ -1,0 +1,22 @@
+meta {
+  name: Get text relevancy for Category
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8080/api/openai-test/relevancy
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+      "category": "ultrawide monitors",
+      "text": "Been lurking for a bit and finally ready to make the jump. I'm currently on a 27\" 1440p IPS and the itch for an ultrawide is getting real bad. My budget is somewhere around the £800 mark, give or take.\n\nEDIT: I did it. I went with this one after reading [a review online](https://yourtechreview.com/raywego-27-inch-gaming-monitor-full-review-is-it-worth-your-money/#1) about it and I am very excited!\n\nI'm running a PC with a 4070 Super and mainly play single player stuff like Cyberpunk, Baldur's Gate 3, and some Starfield. I do play a bit of Apex Legends too.\n\nThe Alienware AW3423DWF keeps popping up and the idea of an OLED is tempting, but im worried about burn-in and text clarity since I also use my PC for general Browsing and WFH. Is the burn in risk overblown these days?\n\nOr should I just stick with a solid IPS panel to be safe?\n\nAny advice would be appreciated, thanks"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

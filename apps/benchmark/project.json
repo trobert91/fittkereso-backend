@@ -1,0 +1,42 @@
+{
+  "name": "benchmark",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/benchmark/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": [
+          "--node-env=production"
+        ],
+        "cwd": "apps/benchmark"
+      },
+      "configurations": {
+        "development": {
+          "args": [
+            "--node-env=development"
+          ]
+        }
+      }
+    },
+    "run": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "node dist/apps/benchmark/main.js",
+        "cwd": "{workspaceRoot}",
+        "forwardAllArgs": true
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

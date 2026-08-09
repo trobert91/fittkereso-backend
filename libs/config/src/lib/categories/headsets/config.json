@@ -1,0 +1,835 @@
+{
+  "filterSpecs": [
+    {
+      "key": "wireless",
+      "filterType": "boolean"
+    },
+    {
+      "key": "surroundSound",
+      "filterType": "boolean"
+    },
+    {
+      "key": "noiseCancelling",
+      "filterType": "boolean"
+    },
+    {
+      "key": "microphoneType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "platform",
+      "filterType": "multiselect"
+    }
+  ],
+  "primarySpecs": [
+    "wireless",
+    "driverSize",
+    "surroundSound"
+  ],
+  "promptConfig": {
+    "validSpecs": [
+      {
+        "name": "driverSize",
+        "examples": "40mm, 50mm, 53mm"
+      },
+      {
+        "name": "wireless",
+        "examples": "true, false"
+      },
+      {
+        "name": "surroundSound",
+        "examples": "true, false"
+      }
+    ],
+    "productIdExamples": [
+      {
+        "mentioned": "SteelSeries Arctis Nova Pro",
+        "brand": "SteelSeries",
+        "model": "Arctis Nova Pro"
+      },
+      {
+        "mentioned": "HyperX Cloud III",
+        "brand": "HyperX",
+        "model": "Cloud III"
+      },
+      {
+        "mentioned": "Razer BlackShark V2",
+        "brand": "Razer",
+        "model": "BlackShark V2"
+      },
+      {
+        "mentioned": "Corsair HS80",
+        "brand": "Corsair",
+        "model": "HS80"
+      },
+      {
+        "mentioned": "Logitech G Pro X 2",
+        "brand": "Logitech",
+        "model": "G Pro X 2"
+      },
+      {
+        "mentioned": "Astro A50",
+        "brand": "Astro",
+        "model": "A50"
+      }
+    ],
+    "brandCorrectnessExamples": [
+      {
+        "mentioned": "Arctis Nova Pro",
+        "brand": "SteelSeries",
+        "model": "Arctis Nova Pro",
+        "context": "in a HyperX discussion"
+      },
+      {
+        "mentioned": "Cloud III",
+        "brand": "HyperX",
+        "model": "Cloud III",
+        "context": "in a Razer thread"
+      },
+      {
+        "mentioned": "A50",
+        "brand": "Astro",
+        "model": "A50",
+        "context": "in a SteelSeries comparison"
+      }
+    ],
+    "technologyDescriptors": [
+      "7.1 virtual surround",
+      "planar magnetic",
+      "Tempest 3D Audio",
+      "Dolby Atmos for Headphones",
+      "DTS Headphone:X",
+      "2.4GHz wireless",
+      "Bluetooth",
+      "USB-C",
+      "3.5mm"
+    ],
+    "productTypeWord": "headset",
+    "quoteCategories": [
+      {
+        "label": "product_evaluation",
+        "description": "Concrete buyer-useful evaluation of sound quality, mic quality, comfort, wireless performance, or gaming experience",
+        "example": "The mic picks up my voice clearly even with a mechanical keyboard clacking in the background"
+      },
+      {
+        "label": "issue_or_concern",
+        "description": "Specific problem, limitation, or concern with a clear reason, symptom, or resolved worry",
+        "example": "The 2.4GHz dongle keeps losing connection when I move more than 6 feet from my PC"
+      },
+      {
+        "label": "comparison",
+        "description": "Direct comparison where THIS headset gets a clear verdict; keep only the clause about this product",
+        "example": "mic quality is night and day better than the Cloud II, my teammates noticed immediately"
+      },
+      {
+        "label": "personal_verdict",
+        "description": "Overall verdict only when it adds real buyer value through context, use case, or supporting detail",
+        "example": "after switching from the A50 this is my go-to for competitive FPS, footstep clarity is unreal"
+      }
+    ],
+    "quoteExamples": {
+      "good": [
+        {
+          "text": "The mic picks up my voice clearly even with a mechanical keyboard in the background",
+          "why": "Specific mic quality evaluation with context"
+        },
+        {
+          "text": "sidetone works great, I can hear myself without shouting on Discord",
+          "why": "Concrete feature evaluation"
+        },
+        {
+          "text": "footstep clarity in Valorant is exceptional, I can pinpoint direction every time",
+          "why": "Gaming-specific evaluation"
+        },
+        {
+          "text": "the USB dongle has 2.4GHz wireless with zero perceivable latency",
+          "why": "Specific wireless performance evaluation"
+        },
+        {
+          "text": "comfort is excellent for 8-hour gaming sessions, no pressure on the ears",
+          "why": "Feature evaluation with use case context"
+        },
+        {
+          "text": "software is bloated and crashes constantly, EQ settings don't save",
+          "why": "Concrete issue with specific symptoms"
+        },
+        {
+          "text": "surround sound positioning is surprisingly accurate for virtual 7.1",
+          "why": "Specific surround evaluation"
+        },
+        {
+          "text": "the boom mic is detachable which is perfect for using it as regular headphones",
+          "why": "Feature evaluation with use case"
+        }
+      ],
+      "bad": [
+        {
+          "text": "I got the white one!",
+          "why": "Ownership confirmation with no opinion"
+        },
+        {
+          "text": "it has 50mm drivers",
+          "why": "Bare spec with no judgment"
+        },
+        {
+          "text": "on sale for $80",
+          "why": "Price tag without opinion"
+        },
+        {
+          "text": "waiting for the next gen Arctis",
+          "why": "About a future product"
+        },
+        {
+          "text": "SteelSeries makes the best gaming headsets",
+          "why": "Generic brand praise"
+        },
+        {
+          "text": "just unboxed it",
+          "why": "Unboxing with no evaluation"
+        },
+        {
+          "text": "is it compatible with PS5?",
+          "why": "A question, not an evaluation"
+        }
+      ]
+    },
+    "disambiguationExamples": {
+      "suffix": [
+        [
+          "Arctis Nova Pro Wireless Xbox",
+          "SteelSeries Arctis Nova Pro Wireless"
+        ],
+        [
+          "BlackShark V2 Pro (2023)",
+          "Razer BlackShark V2 Pro"
+        ]
+      ],
+      "abbreviated": [
+        [
+          "Nova Pro",
+          "SteelSeries Arctis Nova Pro"
+        ],
+        [
+          "Cloud III",
+          "HyperX Cloud III"
+        ]
+      ],
+      "variant": [
+        [
+          "SteelSeries Arctis Nova 7",
+          "SteelSeries Arctis Nova Pro"
+        ],
+        [
+          "HyperX Cloud II",
+          "HyperX Cloud III"
+        ],
+        [
+          "Razer BlackShark V2",
+          "Razer BlackShark V2 Pro"
+        ],
+        [
+          "Logitech G Pro X",
+          "Logitech G Pro X 2"
+        ]
+      ]
+    },
+    "extractionExamples": {
+      "comments": [
+        {
+          "NOTE": "c0: Detailed owner evaluation with mic and comfort feedback.",
+          "commentId": "c0",
+          "products": [
+            {
+              "brand": "SteelSeries",
+              "model": "Arctis Nova Pro Wireless",
+              "categoryHint": "Headsets",
+              "quotes": [
+                {
+                  "text": "mic quality is the best I've used on a gaming headset, my Discord friends noticed immediately",
+                  "sentiment": "positive",
+                  "features": [
+                    "microphone quality"
+                  ]
+                },
+                {
+                  "text": "the ANC is solid for blocking out fan and AC noise",
+                  "sentiment": "positive",
+                  "features": [
+                    "noise isolation"
+                  ]
+                },
+                {
+                  "text": "the base station DAC is a nice touch but the software is buggy",
+                  "sentiment": "mixed",
+                  "features": [
+                    "software"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c1: Console gaming evaluation.",
+          "commentId": "c1",
+          "products": [
+            {
+              "brand": "Sony",
+              "model": "Pulse Elite",
+              "categoryHint": "Headsets",
+              "quotes": [
+                {
+                  "text": "3D Audio on PS5 is impressive, Helldivers sounds incredible",
+                  "sentiment": "positive",
+                  "features": [
+                    "surround sound"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c2: Comparison keeping only this product's evaluation.",
+          "commentId": "c2",
+          "products": [
+            {
+              "brand": "HyperX",
+              "model": "Cloud III Wireless",
+              "categoryHint": "Headsets",
+              "quotes": [
+                {
+                  "text": "comfort is way better than the Cloud II, lighter and less clamp",
+                  "sentiment": "positive",
+                  "features": [
+                    "comfort"
+                  ]
+                },
+                {
+                  "text": "wireless range is disappointing, cuts out past my kitchen doorway",
+                  "sentiment": "negative",
+                  "features": [
+                    "wireless performance"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c3: Settings dump without judgment — no quotes.",
+          "commentId": "c3",
+          "products": [
+            {
+              "brand": "Razer",
+              "model": "BlackShark V2 Pro",
+              "categoryHint": "Headsets",
+              "quotes": []
+            }
+          ]
+        },
+        {
+          "NOTE": "c4: Generic recommendation — no product extracted.",
+          "commentId": "c4",
+          "products": []
+        }
+      ]
+    },
+    "labelingExamples": {
+      "NOTE": "ID format: uppercase letter = comment (A, B, C…), lowercase letter = product within that comment (a, b, c…).",
+      "products": [
+        {
+          "productId": "Aa",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "microphone quality",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "features": [
+                {
+                  "label": "noise isolation",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 2,
+              "issues": [
+                {
+                  "label": "software bloat",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ba",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "surround sound",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "console gaming",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ca",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "comfort",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "issues": [
+                {
+                  "label": "wireless interference",
+                  "sentiment": "strongNegative"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "specialInstructions": "Gaming headsets have microphones — DACs, amps, and audio interfaces are separate products. Distinguish headsets from headphones: headsets emphasize microphone and gaming features. Console-specific variants (e.g. 'PlayStation Edition', 'Xbox Edition') are the same product unless they have meaningfully different hardware. Software companions (Razer Synapse, SteelSeries GG, Corsair iCUE) are not products. Standalone microphones (e.g. 'Blue Yeti') are not headsets. When a user compares their headset's mic to a standalone mic, keep only the headset evaluation.",
+    "searchKeywordSuffix": "gaming headset",
+    "validationConfig": {
+      "wrongProductExamples": [
+        {
+          "mentioned": "Arctis Nova Pro",
+          "resolvedTo": "HyperX Cloud III",
+          "shouldFlag": true,
+          "reason": "Completely different brand and model"
+        },
+        {
+          "mentioned": "Cloud II",
+          "resolvedTo": "HyperX Cloud III",
+          "shouldFlag": true,
+          "reason": "Different generation (Cloud II vs Cloud III)"
+        },
+        {
+          "mentioned": "Arctis Nova Pro Wireless Xbox",
+          "resolvedTo": "SteelSeries Arctis Nova Pro Wireless",
+          "shouldFlag": false,
+          "reason": "Platform edition suffix, same product"
+        },
+        {
+          "mentioned": "the Cloud III",
+          "resolvedTo": "HyperX Cloud III (0.92)",
+          "shouldFlag": false,
+          "reason": "High-confidence implicit resolution"
+        },
+        {
+          "mentioned": "BlackShark V2",
+          "resolvedTo": "Razer BlackShark V2 Pro",
+          "shouldFlag": true,
+          "reason": "V2 and V2 Pro are different products (wired vs wireless)"
+        }
+      ],
+      "userSettingPatterns": [
+        "I set the EQ to bass boost",
+        "surround turned on",
+        "sidetone at 50%",
+        "mic sensitivity at max",
+        "game/chat mix all the way to game"
+      ]
+    }
+  },
+  "subreddits": [
+    {
+      "name": "r/Gaming_Headsets",
+      "boost": 30
+    },
+    {
+      "name": "r/gamingaudio",
+      "boost": 25
+    },
+    {
+      "name": "r/pcgaming",
+      "boost": 15
+    },
+    {
+      "name": "r/gaming",
+      "boost": 12
+    },
+    {
+      "name": "r/pcmasterrace",
+      "boost": 10
+    },
+    {
+      "name": "r/PS5",
+      "boost": 10
+    },
+    {
+      "name": "r/XboxSeriesX",
+      "boost": 10
+    }
+  ],
+  "negativeTerms": [
+    {
+      "keyword": "audiophile",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "soundstage",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "hi-fi",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "open back",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "impedance",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "planar magnetic",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "bluetooth speaker",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "soundbar",
+      "penalty": 0.75
+    }
+  ],
+  "matchingConfig": {
+    "tokenSeparator": " ",
+    "variantSuffixes": [
+      "Pro",
+      "Plus",
+      "Wireless",
+      "X"
+    ],
+    "tokenPriorityMap": {
+      "model": 3,
+      "variant": 2
+    },
+    "preserveTokenGroups": true,
+    "strictnessOverrides": {
+      "maxScore": 1.8,
+      "tokenOverlap": 0.4,
+      "numericHitRatio": 0.75
+    },
+    "criticalTokenPatterns": [
+      "Cloud\\s*\\w+",
+      "Arctis\\s*\\w+",
+      "BlackShark\\s*\\w+"
+    ]
+  },
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "gaming headset"
+    },
+    {
+      "weight": 2,
+      "keyword": "headset"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "microphone quality",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "boom mic",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "discord",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "voice chat",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "7.1 surround",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "virtual surround",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "noise cancelling mic",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "chat mix",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "gaming audio"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "wireless headset"
+    },
+    {
+      "weight": 2,
+      "keyword": "SteelSeries",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "HyperX",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Astro headset",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "sidetone",
+      "exclusive": true
+    },
+    {
+      "weight": 1.4,
+      "keyword": "headset comfort"
+    }
+  ],
+  "keywordIdentifiers": [
+    "mic quality",
+    "wireless range",
+    "gaming audio",
+    "surround sound",
+    "boom mic"
+  ],
+  "useCases": [
+    {
+      "label": "competitive gaming",
+      "description": "Footstep clarity, positional audio, low latency, mic clarity for callouts, tournament-grade performance",
+      "implications": [
+        "competitive",
+        "ranked",
+        "FPS",
+        "footsteps",
+        "Valorant",
+        "CS2",
+        "CSGO",
+        "Apex",
+        "positioning",
+        "callouts",
+        "tournament",
+        "esports"
+      ]
+    },
+    {
+      "label": "casual gaming",
+      "description": "Immersion, bass impact, comfort for long sessions, multi-platform compatibility, overall enjoyment",
+      "implications": [
+        "gaming",
+        "immersive",
+        "RPG",
+        "single player",
+        "story games",
+        "bass",
+        "explosions",
+        "cinematic"
+      ]
+    },
+    {
+      "label": "streaming & content creation",
+      "description": "Mic quality for stream/recording, sidetone monitoring, chat/game audio mix, comfort for long broadcasts",
+      "implications": [
+        "streaming",
+        "Twitch",
+        "OBS",
+        "YouTube",
+        "content creator",
+        "recording",
+        "podcast",
+        "broadcast",
+        "chat mix"
+      ]
+    },
+    {
+      "label": "work & communication",
+      "description": "Video calls, Teams/Zoom clarity, noise cancelling mic, all-day comfort, ANC for office noise",
+      "implications": [
+        "work",
+        "office",
+        "Teams",
+        "Zoom",
+        "meetings",
+        "calls",
+        "video call",
+        "work from home",
+        "WFH"
+      ]
+    },
+    {
+      "label": "console gaming",
+      "description": "PS5/Xbox compatibility, wireless dongle, 3D audio support, chat mix, console-specific features",
+      "implications": [
+        "PS5",
+        "PlayStation",
+        "Xbox",
+        "Series X",
+        "Switch",
+        "console",
+        "3D Audio",
+        "Tempest"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "label": "sound quality",
+      "description": "Overall audio quality for gaming and media — clarity, detail, and tonal balance",
+      "shortDescription": "General sound impression, not specific features like bass or surround",
+      "issues": [
+        {
+          "label": "audio balance drift",
+          "description": "Left/right audio balance shifting over time or between sessions"
+        }
+      ]
+    },
+    {
+      "label": "microphone quality",
+      "description": "Mic clarity, noise rejection, voice naturalness, and pickup quality for comms",
+      "issues": [
+        {
+          "label": "mic static",
+          "description": "Background hiss, static, or buzzing from the microphone"
+        }
+      ]
+    },
+    {
+      "label": "comfort",
+      "description": "Wearing comfort for long sessions — clamp force, ear pad material, weight, heat buildup"
+    },
+    {
+      "label": "build quality",
+      "description": "Materials, durability, hinge strength, ear pad longevity, cable quality",
+      "issues": [
+        {
+          "label": "ear pad peeling",
+          "description": "Ear pad leather/fabric peeling or deteriorating over time"
+        },
+        {
+          "label": "hinge cracking",
+          "description": "Plastic hinges or swivel points cracking or breaking"
+        },
+        {
+          "label": "squeaking",
+          "description": "Squeaking or creaking noises from headband, ear cups, or joints"
+        }
+      ]
+    },
+    {
+      "label": "wireless performance",
+      "description": "2.4GHz/Bluetooth stability, range, latency, dongle reliability, battery life",
+      "issues": [
+        {
+          "label": "wireless interference",
+          "description": "2.4GHz or Bluetooth interference from other devices"
+        },
+        {
+          "label": "USB dongle issues",
+          "description": "USB dongle not recognized, requiring re-pairing, or occupying needed ports"
+        }
+      ]
+    },
+    {
+      "label": "surround sound",
+      "description": "Virtual 7.1/spatial audio quality, directional accuracy, and immersion",
+      "issues": [
+        {
+          "label": "surround positioning",
+          "description": "Virtual surround directional cues being inaccurate or disorienting"
+        }
+      ]
+    },
+    {
+      "label": "bass",
+      "description": "Bass impact, depth, and quality — explosions, footsteps low-end, music bass"
+    },
+    {
+      "label": "software",
+      "description": "Companion software quality — EQ settings, surround config, firmware updates, stability",
+      "issues": [
+        {
+          "label": "software bloat",
+          "description": "Required companion software being buggy, resource-heavy, or intrusive"
+        }
+      ]
+    },
+    {
+      "label": "design",
+      "description": "Visual appearance — RGB lighting, color options, aesthetics, professional look",
+      "shortDescription": "Visual design/looks only, not generic praise"
+    },
+    {
+      "label": "sidetone",
+      "description": "Mic monitoring / sidetone quality — hearing your own voice to avoid shouting",
+      "issues": [
+        {
+          "label": "mic monitoring echo",
+          "description": "Echo or feedback loop in sidetone/mic monitoring"
+        },
+        {
+          "label": "sidetone buzz",
+          "description": "Buzzing or humming in sidetone/mic monitoring feature"
+        }
+      ]
+    },
+    {
+      "label": "noise isolation",
+      "description": "Passive noise blocking — how well the headset seals out ambient noise"
+    },
+    {
+      "label": "mic noise cancellation",
+      "description": "Active mic noise cancellation — filtering keyboard clicks, fan noise, background chatter"
+    },
+    {
+      "label": "battery life",
+      "description": "Wireless battery duration, charging speed, and battery longevity over time"
+    },
+    {
+      "label": "value",
+      "description": "Price-to-performance ratio, deal quality, and whether the price is justified"
+    }
+  ]
+}

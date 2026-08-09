@@ -1,0 +1,207 @@
+{
+  "type": "object",
+  "title": "Soundbar",
+  "properties": {
+    "channels": {
+      "meta": {
+        "order": 0,
+        "examples": [
+          "2.0",
+          "2.1",
+          "3.1",
+          "5.1",
+          "5.1.2",
+          "7.1.4"
+        ]
+      },
+      "type": "string",
+      "title": "Channels"
+    },
+    "rmsPower": {
+      "meta": {
+        "unit": "W",
+        "order": 1,
+        "examples": [
+          "100 W",
+          "300 W",
+          "720 W"
+        ]
+      },
+      "type": "number",
+      "title": "RMS power"
+    },
+    "subwooferIncluded": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Subwoofer included"
+    },
+    "subwooferType": {
+      "meta": {
+        "examples": [
+          "Wireless",
+          "Wired",
+          "Built-in",
+          "None"
+        ]
+      },
+      "type": "string",
+      "title": "Subwoofer type"
+    },
+    "dolbyAtmos": {
+      "meta": {
+        "order": 2
+      },
+      "type": "boolean",
+      "title": "Dolby Atmos"
+    },
+    "dolbyDigital": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Dolby Digital"
+    },
+    "dolbySupport": {
+      "meta": {
+        "examples": [
+          "Dolby Digital Plus",
+          "Dolby Atmos",
+          "Dolby TrueHD"
+        ]
+      },
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Dolby support"
+    },
+    "dtsX": {
+      "meta": {},
+      "type": "boolean",
+      "title": "DTS:X"
+    },
+    "dts": {
+      "meta": {},
+      "type": "boolean",
+      "title": "DTS"
+    },
+    "hdmi": {
+      "meta": {},
+      "type": "boolean",
+      "title": "HDMI"
+    },
+    "hdmiArc": {
+      "meta": {},
+      "type": "boolean",
+      "title": "HDMI ARC/eARC"
+    },
+    "hdmiInputCount": {
+      "meta": {
+        "examples": [
+          "1",
+          "2"
+        ]
+      },
+      "type": "number",
+      "title": "HDMI inputs"
+    },
+    "opticalInput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Optical input"
+    },
+    "coaxialInput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Coaxial input"
+    },
+    "analogInput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Analog input"
+    },
+    "compositeOutput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Composite output"
+    },
+    "componentOutput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Component output"
+    },
+    "auxOutput": {
+      "meta": {},
+      "type": "boolean",
+      "title": "AUX output"
+    },
+    "usb": {
+      "meta": {},
+      "type": "boolean",
+      "title": "USB"
+    },
+    "bluetooth": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Bluetooth"
+    },
+    "wifi": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Wi-Fi"
+    },
+    "hdmiCec": {
+      "meta": {},
+      "type": "boolean",
+      "title": "HDMI-CEC"
+    },
+    "dlna": {
+      "meta": {},
+      "type": "boolean",
+      "title": "DLNA"
+    },
+    "wallMountable": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Wall mountable"
+    },
+    "remoteControl": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Remote control"
+    },
+    "width": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Width"
+    },
+    "height": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Height"
+    },
+    "depth": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Depth"
+    },
+    "weight": {
+      "meta": {
+        "unit": "g",
+        "examples": [
+          "2500 g",
+          "5000 g"
+        ]
+      },
+      "type": "number",
+      "title": "Weight"
+    }
+  }
+}

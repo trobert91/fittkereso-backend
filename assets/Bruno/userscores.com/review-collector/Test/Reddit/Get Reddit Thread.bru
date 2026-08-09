@@ -1,0 +1,16 @@
+meta {
+  name: Get Reddit Thread
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:8080/api/reddit-test/thread/1otx0op
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

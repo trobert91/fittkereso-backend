@@ -1,0 +1,391 @@
+{
+  "type": "object",
+  "title": "Monitor",
+  "properties": {
+    "3d": {
+      "meta": {},
+      "type": "boolean",
+      "title": "3D"
+    },
+    "hdr": {
+      "meta": {
+        "examples": [
+          "HDR10",
+          "Dolby Vision",
+          "DisplayHDR 400",
+          "DisplayHDR 600"
+        ]
+      },
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "HDR"
+    },
+    "gsync": {
+      "meta": {},
+      "type": "boolean",
+      "title": "G-Sync"
+    },
+    "weightWithStand": {
+      "meta": {
+        "unit": "kg"
+      },
+      "type": "number",
+      "title": "Weight (with stand)"
+    },
+    "weightWithoutStand": {
+      "meta": {
+        "unit": "kg"
+      },
+      "type": "number",
+      "title": "Weight (without stand)"
+    },
+    "coating": {
+      "meta": {},
+      "type": "string",
+      "title": "Coating"
+    },
+    "freesync": {
+      "meta": {},
+      "type": "boolean",
+      "title": "FreeSync"
+    },
+    "isCurved": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Curved"
+    },
+    "speakers": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Speakers"
+    },
+    "curvature": {
+      "meta": {
+        "unit": "R",
+        "examples": [
+          "1800R",
+          "800R"
+        ],
+        "unitFormat": "none"
+      },
+      "type": "number",
+      "title": "Curvature"
+    },
+    "panelType": {
+      "meta": {
+        "order": 1,
+        "examples": [
+          "IPS",
+          "VA",
+          "OLED",
+          "WOLED",
+          "QD-OLED",
+          "TN",
+          "MiniLED"
+        ]
+      },
+      "type": "string",
+      "title": "Panel type"
+    },
+    "vesaMount": {
+      "meta": {
+        "examples": [
+          "100x100mm",
+          "75x75mm"
+        ]
+      },
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "VESA mount"
+    },
+    "brightness": {
+      "meta": {
+        "unit": "nits",
+        "examples": [
+          "300 nits",
+          "450 nits"
+        ]
+      },
+      "type": "number",
+      "title": "Brightness"
+    },
+    "resolution": {
+      "meta": {
+        "order": 2,
+        "examples": [
+          "1920x1080",
+          "2560x1440"
+        ]
+      },
+      "type": "string",
+      "title": "Resolution"
+    },
+    "screenSize": {
+      "meta": {
+        "unit": "\"",
+        "order": 0,
+        "examples": [
+          "27\"",
+          "32\""
+        ],
+        "unitFormat": "none"
+      },
+      "type": "number",
+      "title": "Size"
+    },
+    "aspectRatio": {
+      "meta": {
+        "examples": [
+          "16:9",
+          "21:9"
+        ]
+      },
+      "type": "string",
+      "title": "Aspect ratio"
+    },
+    "connections": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Connections"
+    },
+    "refreshRate": {
+      "meta": {
+        "unit": "Hz",
+        "order": 3,
+        "examples": [
+          "240Hz",
+          "144Hz"
+        ]
+      },
+      "type": "number",
+      "title": "Refresh rate"
+    },
+    "touchScreen": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Touch screen"
+    },
+    "pixelDensity": {
+      "meta": {
+        "unit": "ppi"
+      },
+      "type": "number",
+      "title": "Pixel density"
+    },
+    "responseTime": {
+      "meta": {
+        "unit": "ms",
+        "examples": [
+          "1ms",
+          "0.01ms"
+        ]
+      },
+      "type": "number",
+      "title": "Response time"
+    },
+    "viewingAngle": {
+      "meta": {
+        "examples": [
+          "178"
+        ]
+      },
+      "type": "number",
+      "title": "Viewing angle"
+    },
+    "contrastRatio": {
+      "meta": {
+        "examples": [
+          "1000:1",
+          "1M:1"
+        ]
+      },
+      "type": "string",
+      "title": "Contrast ratio"
+    },
+    "panelBitDepth": {
+      "meta": {},
+      "type": "string",
+      "title": "Panel bit depth"
+    },
+    "hdmiCount": {
+      "meta": {
+        "examples": [
+          "1",
+          "2"
+        ]
+      },
+      "type": "number",
+      "title": "HDMI ports"
+    },
+    "usbCount": {
+      "meta": {
+        "examples": [
+          "2",
+          "3"
+        ]
+      },
+      "type": "number",
+      "title": "USB ports"
+    },
+    "peakBrightness": {
+      "meta": {
+        "unit": "nits"
+      },
+      "type": "number",
+      "title": "Peak brightness"
+    },
+    "heightAdjustment": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Adjustable height"
+    },
+    "powerConsumption": {
+      "meta": {
+        "unit": "W"
+      },
+      "type": "number",
+      "title": "Power consumption"
+    },
+    "backlight": {
+      "meta": {
+        "examples": [
+          "W-LED",
+          "Mini LED",
+          "OLED"
+        ]
+      },
+      "type": "string",
+      "title": "Backlight"
+    },
+    "colorGamutSrgb": {
+      "meta": {
+        "unit": "%",
+        "examples": [
+          "99",
+          "100"
+        ]
+      },
+      "type": "number",
+      "title": "sRGB coverage"
+    },
+    "colorGamutDciP3": {
+      "meta": {
+        "unit": "%",
+        "examples": [
+          "95",
+          "98.5"
+        ]
+      },
+      "type": "number",
+      "title": "DCI-P3 coverage"
+    },
+    "inputLag": {
+      "meta": {
+        "unit": "ms",
+        "examples": [
+          "2.9",
+          "5"
+        ]
+      },
+      "type": "number",
+      "title": "Input lag"
+    },
+    "frc": {
+      "meta": {},
+      "type": "boolean",
+      "title": "FRC (dithering)"
+    },
+    "portraitPivot": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Portrait pivot"
+    },
+    "hdResolution": {
+      "meta": {
+        "examples": [
+          "WQHD",
+          "4K UHD",
+          "Full HD"
+        ]
+      },
+      "type": "string",
+      "title": "HD resolution"
+    },
+    "energyClass": {
+      "meta": {
+        "examples": [
+          "A",
+          "E",
+          "G"
+        ]
+      },
+      "type": "string",
+      "title": "Energy class"
+    },
+    "swivel": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Swivel"
+    },
+    "tiltable": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Tiltable"
+    },
+    "widthWithStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Width (with stand)"
+    },
+    "heightWithStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Height (with stand)"
+    },
+    "depthWithStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Depth (with stand)"
+    },
+    "widthWithoutStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Width (without stand)"
+    },
+    "heightWithoutStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Height (without stand)"
+    },
+    "depthWithoutStand": {
+      "meta": {},
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Depth (without stand)"
+    }
+  }
+}

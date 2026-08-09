@@ -1,0 +1,246 @@
+{
+  "6548c28b-2911-4743-bdda-1e8b438d9174": {
+    "subtreeLabel": "subtree-0",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "I saw it in person and it looks absolutely stunning", "sentiment": "positive" },
+                { "text": "The price has dropped a lot since I first looked at it", "sentiment": "positive" }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": ["seeking_advice", "comparison"],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bfaee9f7-542c-41f9-99d5-3bbbb918adf2": {
+    "subtreeLabel": "subtree-1",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "the panel it's great", "sentiment": "positive" },
+                { "text": "if it had android instead of tizen os it would have been awesome", "sentiment": "negative" }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": ["experience_report"],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "the newer version(SD) has a matte panel coating", "sentiment": "neutral" }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": ["reputation_report"],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "The display is great!", "sentiment": "positive" },
+                { "text": "Software is awful. Takes for ever to get to the settings you want.", "sentiment": "negative" },
+                { "text": "Sometimes it just doesn't register correctly as a display and just blanks out.", "sentiment": "negative" }
+              ],
+              "experience": "owner",
+              "depth": "comprehensive",
+              "intents": ["experience_report", "issue_report"],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "I love it. It was $999 USD back then so $999 AUD sounds like a fantastic deal.", "sentiment": "positive" }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": ["recommendation"],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [],
+              "experience": "prospective_buyer",
+              "depth": "superficial",
+              "intents": ["seeking_advice"],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "No burn in, but I have taken preventative measures from day one.", "sentiment": "positive" }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": ["experience_report"],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bd1570d7-6a65-4bef-93f4-b6539728aeb6": {
+    "subtreeLabel": "subtree-2",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "it is a stunning monitor. One of the best I have had.", "sentiment": "positive" }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": ["recommendation"],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "Definitely worth it!", "sentiment": "positive" }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": ["recommendation"],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "if you are not into font clarity", "sentiment": "negative" }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": ["warning"],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "their is some software that fixes the issue of fringing", "sentiment": "positive" }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": ["reputation_report"],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "I have had this for a year now. Very happy with it.", "sentiment": "positive" },
+                { "text": "Only issues I've had are with monitor arm compatibility.", "sentiment": "negative" }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": ["experience_report", "issue_report"],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "The UI and OS, apparently, are infuriating.", "sentiment": "negative" },
+                { "text": "You have to connect to your PC every single time you turn on the monitor.", "sentiment": "negative" },
+                { "text": "It is not a plug and play monitor.", "sentiment": "negative" },
+                { "text": "they HATE how long it takes to start up and then manually select the PC output every single time they use it.", "sentiment": "negative" }
+              ],
+              "experience": "reference",
+              "depth": "comprehensive",
+              "intents": ["warning", "issue_report"],
+              "overallSentiment": "negative"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "51e71270-9b9c-4aa5-b01f-b0faa0607afc": {
+    "subtreeLabel": "subtree-3",
+    "output": {
+      "comments": [
+        {
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                { "text": "you can also check out MSi 341cqpx for 1371 aud … it's a 240hz version", "sentiment": "positive" }
+              ],
+              "experience": "reference",
+              "depth": "mentioned",
+              "intents": ["comparison", "recommendation"],
+              "overallSentiment": "positive"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

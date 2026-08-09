@@ -1,0 +1,22 @@
+meta {
+  name: Trigger Thread Scheduling
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8080/api/schedule-test/process-threads
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "count": 1
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

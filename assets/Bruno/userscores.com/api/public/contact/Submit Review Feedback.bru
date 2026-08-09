@@ -1,0 +1,24 @@
+meta {
+  name: Submit Review Feedback
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/v1/public/reviews/00000000-0000-0000-0000-000000000000/feedback
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "category": "incorrect_product",
+    "description": "This review is about a different product.",
+    "recaptchaToken": "test-token"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

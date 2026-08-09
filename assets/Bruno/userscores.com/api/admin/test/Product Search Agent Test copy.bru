@@ -1,0 +1,32 @@
+meta {
+  name: Product Search Agent Test copy
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:8088/api/test/search/product
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "input": {
+      "brand": "TCL",
+      "model": "85QM7K",
+      "displayName": "TCL 85QM7K",
+      "searchBefore": "2025-06-20"
+    },
+    "options": {
+      "webSearchEnabled": true,
+      "useEmbedding": true,
+      "mode": "loose"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

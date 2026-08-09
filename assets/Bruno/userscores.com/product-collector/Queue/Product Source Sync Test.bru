@@ -1,0 +1,22 @@
+meta {
+  name: Product Source Sync Test
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8081/api/product-source-test/sync
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "productSourceId": "f73b20a5-dcd4-4aa4-9b92-0cbaf8973101"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

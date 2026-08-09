@@ -1,0 +1,21 @@
+meta {
+  name: Publish Thread Extract job
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8080/api/queue-test/extract-thread
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "threadId": "9fb14594-c0d1-4358-9c7a-2d081821334e"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

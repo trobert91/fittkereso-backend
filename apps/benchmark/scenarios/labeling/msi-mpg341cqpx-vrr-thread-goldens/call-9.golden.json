@@ -1,0 +1,19 @@
+{
+  "products": [
+    {
+      "productId": "Aa",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "connectivity",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    }
+  ]
+}

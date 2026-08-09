@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "module": "commonjs",
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "es2021"
+  },
+  "include": ["src/**/*.ts", "../../libs/product-scraper/src/lib/interfaces/product-source-sync-service.interface.ts", "../../libs/product-scraper/src/lib/displayspecs/services/displayspecs-sync.service.ts", "../../libs/product-scraper/src/lib/displayspecs/displayspecs.module.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+}

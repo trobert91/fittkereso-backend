@@ -1,0 +1,102 @@
+{
+  "id": "deepseek-vs-gpt5-mini",
+  "phase": "validation",
+  "description": "Compares deepseek-v4-flash and gpt-5.4-mini on a real-thread fixture (836: Best 34'' 240 Hz OLED ultrawide). 20 PLAN comments lifted verbatim from production extraction output, organized into 6 conversation-threaded subtrees with CONTEXT ancestors — mirroring the shape the production validation pipeline emits per call. 10 PLAN comments carry seeded mistakes across all LLM-emittable validation issue types; 10 are correctly labeled. Baseline `current` prompt is the v4 catalogue-style prompt promoted to production — see `buildValidationSystemPrompt` in libs/thread-processor with the monitor-specific worked-cases catalogue in libs/config/src/lib/categories/monitors/config.json under `promptConfig.validationCases`. Measures per-subtree recall, precision, and suggestion quality.",
+  "runs": {
+    "perCandidate": 3,
+    "maxInFlight": 10
+  },
+  "reportFormats": [
+    "markdown",
+    "html"
+  ],
+  "inputs": [
+    {
+      "id": "best-34-ultrawide",
+      "kind": "fixture",
+      "path": "../../fixtures/validation/best-34-ultrawide.fixture.json"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "deepseek-v4-flash",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "deepseek-v4-flash-v3",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/validation/validation-v3-stepped.md"
+      }
+    },
+    {
+      "id": "deepseek-v4-flash-v5-catalogue-tight",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/validation/validation-v5-catalogue-tight.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "Across all 6 subtrees combined, the 10 seeded mistakes are flagged with the correct refLabel and issue type. The 10 correctly-labeled refs (m7lgml3, m9kkdnc, nqhx3zt, m7hxs8k, mfsh0st, mqwbt45, m96ejm7, m7i0s8b, m7kq62y, m7j0jia) plus the non-seeded refs on multi-ref seeded comments receive zero issues — silent approval. wrong_* issues include suggestedValue using exact schema enum vocabulary. See `seedManifest` for the programmatic per-comment expectations."
+  },
+  "seedManifest": [
+    {
+      "commentExternalId": "m7iviub",
+      "expectedIssueType": "wrong_sentiment",
+      "note": "Sentiment flipped positive → negative; quotes are clearly positive."
+    },
+    {
+      "commentExternalId": "mqwb0u3",
+      "expectedIssueType": "wrong_experience",
+      "note": "prior_owner → reference; describes hands-on G-Sync troubleshooting."
+    },
+    {
+      "commentExternalId": "m7k0kcb",
+      "expectedIssueType": "boundary_violation",
+      "note": "MSI + LG quotes merged into one ref."
+    },
+    {
+      "commentExternalId": "m7ixwe2",
+      "expectedIssueType": "wrong_intent",
+      "note": "Dropped recommendation intent; original is prescriptive."
+    },
+    {
+      "commentExternalId": "m8cne3u",
+      "expectedIssueType": "low_value_quote",
+      "note": "Bare-acquisition quote added with no evaluative content."
+    },
+    {
+      "commentExternalId": "m9k0kf0",
+      "expectedIssueType": "wrong_quote_attribution",
+      "note": "VRR-flicker MSI quote moved to the LG ref."
+    },
+    {
+      "commentExternalId": "m7zgon8",
+      "expectedIssueType": "speculative_flag_mismatch",
+      "note": "speculative=true on a concrete first-hand feature."
+    },
+    {
+      "commentExternalId": "m7k21y8",
+      "expectedIssueType": "wrong_product",
+      "note": "LG ref re-pointed to Samsung Odyssey G7."
+    },
+    {
+      "commentExternalId": "m7qc7m6",
+      "expectedIssueType": "wrong_depth",
+      "note": "comprehensive → mentioned; 4 quotes with reasoning is comprehensive."
+    },
+    {
+      "commentExternalId": "mzgpfcj",
+      "expectedIssueType": "wrong_intent",
+      "note": "Dropped recommendation intent; speaker explicitly recommends."
+    }
+  ],
+  "judge": {
+    "enabled": true,
+    "model": "deepseek-v4-flash",
+    "instructions": "You are scoring two validation-LLM candidates that critique already-labeled product references. Each candidate's output for this subtree is `{ refs: [{ refLabel, issues: [...] }] }`. Refs are labeled A, B, C... in DFS order WITHIN this subtree (labels reset per call). Score each candidate 1-10 on three dimensions: (1) recall — every seeded mistake whose comment is in this subtree is flagged with the correct refLabel AND correct issue type; (2) precision — silence on correctly-labeled refs (any issue against a correct ref is a precision miss); (3) suggestion quality — wrong_* issues include suggestedValue using exact schema enum vocabulary (sentiment: positive|neutral|negative|mixed; experience: owner|prior_owner|tested|prospective_buyer|reference; depth: comprehensive|detailed|mentioned|superficial; intents: recommendation|issue_report|comparison|experience_report|warning|seeking_advice|question|reputation_report). SEED MANIFEST (only seeds whose comment appears in this subtree count toward recall): m7iviub→wrong_sentiment; mqwb0u3→wrong_experience; m7k0kcb→boundary_violation; m7ixwe2→wrong_intent; m8cne3u q1→low_value_quote; m9k0kf0→wrong_quote_attribution; m7zgon8→speculative_flag_mismatch; m7k21y8→wrong_product; m7qc7m6→wrong_depth; mzgpfcj→wrong_intent. CORRECT REFS (silent approval expected when present): m7lgml3, m9kkdnc, nqhx3zt, m7hxs8k, mfsh0st, mqwbt45, m96ejm7, m7i0s8b, m7kq62y, m7j0jia. If this subtree contains zero seeded mistakes, score recall=10 by default. Hard penalties: missing a seeded mistake that IS present in this subtree → recall ≤5; flagging a correctly-labeled ref → precision ≤5; off-vocabulary suggestedValue → suggestion quality ≤4. Return JSON: { candidates: [{ candidateId, scores: { recall, precision, suggestionQuality }, rationale }], verdict }.",
+    "perRun": false
+  }
+}

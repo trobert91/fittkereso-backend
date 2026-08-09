@@ -1,0 +1,1034 @@
+{
+  "filterSpecs": [
+    {
+      "key": "type",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "wireless",
+      "filterType": "boolean"
+    },
+    {
+      "key": "noiseCancelling",
+      "filterType": "boolean"
+    },
+    {
+      "key": "driverType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "impedance",
+      "buckets": [
+        {
+          "max": 49,
+          "label": "Under 50 Ohm"
+        },
+        {
+          "max": 150,
+          "min": 50,
+          "label": "50–150 Ohm"
+        },
+        {
+          "max": 300,
+          "min": 151,
+          "label": "151–300 Ohm"
+        },
+        {
+          "min": 301,
+          "label": "300+ Ohm"
+        }
+      ],
+      "filterType": "multiselect"
+    }
+  ],
+  "primarySpecs": [
+    "type",
+    "wireless",
+    "driverType"
+  ],
+  "promptConfig": {
+    "validSpecs": [
+      {
+        "name": "impedance",
+        "examples": "32 Ohm, 250 Ohm, 600 Ohm"
+      },
+      {
+        "name": "driverType",
+        "examples": "dynamic, planar magnetic, balanced armature, electrostatic"
+      },
+      {
+        "name": "type",
+        "examples": "over-ear, on-ear, in-ear"
+      }
+    ],
+    "productIdExamples": [
+      {
+        "mentioned": "Sony WH-1000XM5",
+        "brand": "Sony",
+        "model": "WH-1000XM5"
+      },
+      {
+        "mentioned": "Sennheiser HD 660S2",
+        "brand": "Sennheiser",
+        "model": "HD 660S2"
+      },
+      {
+        "mentioned": "Apple AirPods Pro 2",
+        "brand": "Apple",
+        "model": "AirPods Pro 2"
+      },
+      {
+        "mentioned": "Beyerdynamic DT 900 Pro X",
+        "brand": "Beyerdynamic",
+        "model": "DT 900 Pro X"
+      },
+      {
+        "mentioned": "Hifiman Sundara",
+        "brand": "Hifiman",
+        "model": "Sundara"
+      },
+      {
+        "mentioned": "Bose QC Ultra",
+        "brand": "Bose",
+        "model": "QC Ultra"
+      }
+    ],
+    "brandCorrectnessExamples": [
+      {
+        "mentioned": "XM5",
+        "brand": "Sony",
+        "model": "WH-1000XM5",
+        "context": "in a Bose discussion"
+      },
+      {
+        "mentioned": "HD 650",
+        "brand": "Sennheiser",
+        "model": "HD 650",
+        "context": "in a Beyerdynamic thread"
+      },
+      {
+        "mentioned": "Sundara",
+        "brand": "Hifiman",
+        "model": "Sundara",
+        "context": "in a Sennheiser comparison"
+      }
+    ],
+    "technologyDescriptors": [
+      "planar magnetic",
+      "dynamic driver",
+      "balanced armature",
+      "electrostatic",
+      "bone conduction",
+      "ANC",
+      "LDAC",
+      "aptX",
+      "aptX HD",
+      "aptX Adaptive",
+      "Bluetooth",
+      "open-back",
+      "closed-back"
+    ],
+    "productTypeWord": "headphone",
+    "quoteCategories": [
+      {
+        "label": "product_evaluation",
+        "description": "Concrete buyer-useful evaluation of sound quality, comfort, noise cancellation, build quality, or day-to-day ownership experience",
+        "example": "The soundstage on these is incredibly wide for closed-backs, instruments have real separation"
+      },
+      {
+        "label": "issue_or_concern",
+        "description": "Specific problem, limitation, or concern with a clear reason, symptom, or resolved worry",
+        "example": "The clamp force out of the box is brutal, gave me a headache after an hour"
+      },
+      {
+        "label": "comparison",
+        "description": "Direct comparison where THIS headphone gets a clear verdict; keep only the clause about this product",
+        "example": "coming from the HD 650, the Sundara has noticeably better detail retrieval in the treble"
+      },
+      {
+        "label": "personal_verdict",
+        "description": "Overall verdict only when it adds real buyer value through context, use case, or supporting detail",
+        "example": "after six months of daily commuting these are the best ANC headphones I've owned"
+      }
+    ],
+    "quoteExamples": {
+      "good": [
+        {
+          "text": "The soundstage is incredibly wide for closed-backs, instruments have real separation",
+          "why": "Specific sound quality evaluation"
+        },
+        {
+          "text": "ANC is class-leading, completely blocks out airplane engine noise",
+          "why": "Concrete feature evaluation with context"
+        },
+        {
+          "text": "clamp force out of the box is brutal, gave me a headache after an hour",
+          "why": "Specific comfort issue with trigger condition"
+        },
+        {
+          "text": "bass response is tight and punchy without bleeding into the mids",
+          "why": "Detailed sound signature evaluation"
+        },
+        {
+          "text": "I was worried about the plastic build but after a year of daily use they're holding up great",
+          "why": "Resolved concern — extract as positive"
+        },
+        {
+          "text": "the LDAC connection drops constantly when my phone is in my pocket",
+          "why": "Concrete wireless issue with trigger"
+        },
+        {
+          "text": "pad comfort is excellent for long mixing sessions, no hotspot on the crown",
+          "why": "Feature evaluation with use case context"
+        },
+        {
+          "text": "multipoint works flawlessly between my laptop and phone",
+          "why": "Specific feature evaluation"
+        }
+      ],
+      "bad": [
+        {
+          "text": "I have the black version!",
+          "why": "Ownership confirmation with no opinion"
+        },
+        {
+          "text": "they're 32 ohm",
+          "why": "Bare spec with no judgment"
+        },
+        {
+          "text": "Sony XM5 for $350",
+          "why": "Price tag without opinion"
+        },
+        {
+          "text": "waiting for the XM6 to come out",
+          "why": "About a future product — not an evaluation"
+        },
+        {
+          "text": "planar is better than dynamic",
+          "why": "Generic technology comparison, not about a specific product"
+        },
+        {
+          "text": "Sennheiser makes great headphones",
+          "why": "Generic brand praise with no product evaluation"
+        },
+        {
+          "text": "just got mine delivered",
+          "why": "Delivery chatter with no evaluation"
+        },
+        {
+          "text": "probably the best headphones you can buy",
+          "why": "Generic recommendation with no supporting evidence"
+        },
+        {
+          "text": "I'm coming from AirPods Pro",
+          "why": "Describes the previous headphone — not an evaluation"
+        },
+        {
+          "text": "does it support LDAC?",
+          "why": "A question about specs — asking is not evaluating"
+        }
+      ]
+    },
+    "disambiguationExamples": {
+      "suffix": [
+        [
+          "WH-1000XM5/B",
+          "Sony WH-1000XM5"
+        ],
+        [
+          "HD660S2",
+          "Sennheiser HD 660S2"
+        ]
+      ],
+      "abbreviated": [
+        [
+          "XM5",
+          "Sony WH-1000XM5"
+        ],
+        [
+          "HD 650",
+          "Sennheiser HD 650"
+        ],
+        [
+          "QC Ultra",
+          "Bose QC Ultra"
+        ]
+      ],
+      "variant": [
+        [
+          "Sony WH-1000XM4",
+          "Sony WH-1000XM5"
+        ],
+        [
+          "Sennheiser HD 650",
+          "Sennheiser HD 660S2"
+        ],
+        [
+          "Bose QC45",
+          "Bose QC Ultra"
+        ],
+        [
+          "AirPods Pro 1",
+          "Apple AirPods Pro 2"
+        ]
+      ]
+    },
+    "extractionExamples": {
+      "comments": [
+        {
+          "NOTE": "c0: Strong owner report with multiple feature evaluations.",
+          "commentId": "c0",
+          "products": [
+            {
+              "brand": "Sony",
+              "model": "WH-1000XM5",
+              "categoryHint": "Headphones",
+              "quotes": [
+                {
+                  "text": "ANC is class-leading, completely blocks out airplane engine noise",
+                  "sentiment": "positive",
+                  "features": [
+                    "noise cancellation"
+                  ]
+                },
+                {
+                  "text": "the sound signature is warm and bassy, great for pop and hip-hop",
+                  "sentiment": "positive",
+                  "features": [
+                    "sound quality",
+                    "bass"
+                  ]
+                },
+                {
+                  "text": "the ear cups get uncomfortably warm after two hours",
+                  "sentiment": "negative",
+                  "features": [
+                    "comfort"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c1: Audiophile comparison — keep only this product's evaluation.",
+          "commentId": "c1",
+          "products": [
+            {
+              "brand": "Hifiman",
+              "model": "Sundara",
+              "categoryHint": "Headphones",
+              "quotes": [
+                {
+                  "text": "detail retrieval in the treble is noticeably better than the HD 650",
+                  "sentiment": "positive",
+                  "features": [
+                    "detail & clarity"
+                  ]
+                },
+                {
+                  "text": "the stock cable is terrible, stiff and microphonic",
+                  "sentiment": "negative",
+                  "features": [
+                    "build quality"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c2: Resolved concern about build quality.",
+          "commentId": "c2",
+          "products": [
+            {
+              "brand": "Sennheiser",
+              "model": "Momentum 4",
+              "categoryHint": "Headphones",
+              "quotes": [
+                {
+                  "text": "I was worried about the plastic build but after a year of daily use they're holding up great",
+                  "sentiment": "positive",
+                  "features": [
+                    "build quality"
+                  ]
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "NOTE": "c3: Delivery/unboxing chatter — no evaluative quotes.",
+          "commentId": "c3",
+          "products": [
+            {
+              "brand": "Apple",
+              "model": "AirPods Pro 2",
+              "categoryHint": "Headphones",
+              "quotes": []
+            }
+          ]
+        },
+        {
+          "NOTE": "c4: Mixed evaluation across features.",
+          "commentId": "c4",
+          "products": [
+            {
+              "brand": "Beyerdynamic",
+              "model": "DT 900 Pro X",
+              "categoryHint": "Headphones",
+              "quotes": [
+                {
+                  "text": "soundstage is excellent for gaming, footstep positioning is pin-point accurate",
+                  "sentiment": "positive",
+                  "features": [
+                    "soundstage",
+                    "imaging"
+                  ]
+                },
+                {
+                  "text": "clamp force is too tight even after months of stretching",
+                  "sentiment": "negative",
+                  "features": [
+                    "comfort"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c5: Non-cheat-sheet product with search keyword.",
+          "commentId": "c5",
+          "products": [
+            {
+              "brand": "Moondrop",
+              "model": "Blessing 3",
+              "categoryHint": "Headphones",
+              "quotes": [
+                {
+                  "text": "tuning is incredibly balanced, best IEM I've heard under $300",
+                  "sentiment": "positive",
+                  "features": [
+                    "sound quality"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "NOTE": "c6: Generic technology opinion — no product extracted.",
+          "commentId": "c6",
+          "products": []
+        }
+      ]
+    },
+    "labelingExamples": {
+      "NOTE": "ID format: uppercase letter = comment (A, B, C…), lowercase letter = product within that comment (a, b, c…).",
+      "products": [
+        {
+          "productId": "Aa",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "noise cancellation",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "commuting & travel",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "features": [
+                {
+                  "label": "sound quality",
+                  "sentiment": "positive"
+                },
+                {
+                  "label": "bass",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "music listening",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 2,
+              "issues": [
+                {
+                  "label": "ear pad heat",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ba",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "detail & clarity",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "issues": [
+                {
+                  "label": "cable microphonics",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ca",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "build quality",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Da",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "soundstage",
+                  "sentiment": "positive"
+                },
+                {
+                  "label": "imaging",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "gaming",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "issues": [
+                {
+                  "label": "clamp force",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ea",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "features": [
+                {
+                  "label": "sound quality",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "music listening",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "specialInstructions": "DACs, amps, and audio interfaces are separate products — do not merge them with headphones. IEMs (in-ear monitors) are headphones. Driver type alone (planar magnetic, dynamic) is NOT a product — only extract when attached to a brand/model. Wired and wireless versions of the same model are different products if the user specifies (e.g. 'WH-1000XM5' vs 'MDR-MV1'). When a user mentions impedance or sensitivity, extract as specs only if they directly attribute them to the product. Do not confuse headphone model numbers with amp/DAC model numbers (e.g. 'Schiit Magni' is an amp, not a headphone). Earbud tips and replacement pads are accessories, not products.",
+    "searchKeywordSuffix": "headphones",
+    "validationConfig": {
+      "wrongProductExamples": [
+        {
+          "mentioned": "Sony WH-1000XM5",
+          "resolvedTo": "Bose QC Ultra",
+          "shouldFlag": true,
+          "reason": "Completely different brand and model"
+        },
+        {
+          "mentioned": "XM4",
+          "resolvedTo": "Sony WH-1000XM5",
+          "shouldFlag": true,
+          "reason": "Different generation (XM4 vs XM5)"
+        },
+        {
+          "mentioned": "WH-1000XM5/B",
+          "resolvedTo": "Sony WH-1000XM5",
+          "shouldFlag": false,
+          "reason": "Color suffix, same product"
+        },
+        {
+          "mentioned": "the XM5",
+          "resolvedTo": "Sony WH-1000XM5 (0.90)",
+          "shouldFlag": false,
+          "reason": "High-confidence implicit resolution"
+        },
+        {
+          "mentioned": "HD 600",
+          "resolvedTo": "Sennheiser HD 660S2",
+          "shouldFlag": true,
+          "reason": "Different model in the HD 6xx line"
+        }
+      ],
+      "userSettingPatterns": [
+        "I use the EQ app",
+        "set bass to +3",
+        "ANC on high",
+        "I listen at low volume",
+        "switched to foam tips"
+      ]
+    }
+  },
+  "subreddits": [
+    {
+      "name": "r/headphones",
+      "boost": 30
+    },
+    {
+      "name": "r/HeadphoneAdvice",
+      "boost": 30
+    },
+    {
+      "name": "r/audiophile",
+      "boost": 20
+    },
+    {
+      "name": "r/budgetaudiophile",
+      "boost": 20
+    },
+    {
+      "name": "r/headphoneadvice",
+      "boost": 30
+    },
+    {
+      "name": "r/oratory1990",
+      "boost": 15
+    }
+  ],
+  "ancestorDepth": 3,
+  "negativeTerms": [
+    {
+      "keyword": "microphone",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "boom mic",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "discord",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "gaming chat",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "surround sound",
+      "penalty": 0.75
+    },
+    {
+      "keyword": "soundbar",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "bluetooth speaker",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "subwoofer",
+      "penalty": 0.75
+    }
+  ],
+  "matchingConfig": {
+    "tokenSeparator": " ",
+    "variantSuffixes": [
+      "Pro",
+      "Plus",
+      "Max",
+      "S",
+      "X"
+    ],
+    "tokenPriorityMap": {
+      "model": 3,
+      "variant": 2
+    },
+    "preserveTokenGroups": true,
+    "strictnessOverrides": {
+      "maxScore": 1.8,
+      "tokenOverlap": 0.4,
+      "numericHitRatio": 0.75
+    },
+    "criticalTokenPatterns": [
+      "HD\\s*\\d+",
+      "WH-\\d+",
+      "QC\\d+"
+    ]
+  },
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "headphone"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "soundstage",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "audiophile",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "open back",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "closed back",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "impedance",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "hi-fi",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "wired headphone",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "noise cancelling"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "wireless headphone"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "over ear",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "on ear",
+      "exclusive": true
+    },
+    {
+      "weight": 1.4,
+      "keyword": "bass"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "driver size",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "planar magnetic",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "dynamic driver",
+      "exclusive": true
+    },
+    {
+      "weight": 1.2,
+      "keyword": "comfort"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "ANC headphone",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Sony WH",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Sennheiser",
+      "exclusive": true
+    }
+  ],
+  "keywordIdentifiers": [
+    "soundstage",
+    "bass",
+    "noise isolation",
+    "wired audio",
+    "headphone comfort",
+    "hi-fi headphones"
+  ],
+  "useCases": [
+    {
+      "label": "music listening",
+      "description": "General music enjoyment — genres, audio quality preferences, soundstage, detail retrieval, bass/treble balance",
+      "implications": [
+        "music",
+        "listening",
+        "album",
+        "genres",
+        "vinyl",
+        "hi-fi",
+        "audiophile",
+        "lossless",
+        "Tidal",
+        "Spotify",
+        "FLAC",
+        "soundstage",
+        "tonality",
+        "frequency response"
+      ]
+    },
+    {
+      "label": "commuting & travel",
+      "description": "Noise cancellation, portability, battery life, Bluetooth stability, folding design, ambient mode",
+      "implications": [
+        "commute",
+        "commuting",
+        "travel",
+        "airplane",
+        "train",
+        "bus",
+        "subway",
+        "ANC",
+        "noise cancelling",
+        "portable",
+        "battery",
+        "folding",
+        "ambient mode"
+      ]
+    },
+    {
+      "label": "gaming",
+      "description": "Spatial audio, positional accuracy, low latency, immersion, soundstage for competitive advantage",
+      "implications": [
+        "gaming",
+        "FPS",
+        "footsteps",
+        "positional audio",
+        "spatial",
+        "low latency",
+        "competitive",
+        "Valorant",
+        "CS2",
+        "surround"
+      ]
+    },
+    {
+      "label": "studio & production",
+      "description": "Flat frequency response, accuracy, monitoring, mixing, reference sound, critical listening",
+      "implications": [
+        "studio",
+        "mixing",
+        "mastering",
+        "monitoring",
+        "reference",
+        "flat response",
+        "critical listening",
+        "DAW",
+        "recording",
+        "production"
+      ]
+    },
+    {
+      "label": "exercise & sports",
+      "description": "Sweat/water resistance, secure fit, wireless stability, durability, lightweight design",
+      "implications": [
+        "gym",
+        "running",
+        "workout",
+        "exercise",
+        "sweat",
+        "IP rating",
+        "waterproof",
+        "sport",
+        "fitness",
+        "secure fit"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "label": "sound quality",
+      "description": "Overall audio quality impression — tonal balance, clarity, naturalness, and musical enjoyment",
+      "shortDescription": "General sound impression, not specific features like bass or soundstage",
+      "issues": [
+        {
+          "label": "driver imbalance",
+          "description": "Left/right volume or frequency imbalance between drivers"
+        },
+        {
+          "label": "hissing",
+          "description": "Audible hiss or static noise in quiet passages"
+        },
+        {
+          "label": "treble harshness",
+          "description": "Sibilant, fatiguing, or overly bright treble response"
+        }
+      ]
+    },
+    {
+      "label": "bass",
+      "description": "Bass quantity, quality, extension, and impact — sub-bass rumble, mid-bass punch, tightness",
+      "issues": [
+        {
+          "label": "bass bloat",
+          "description": "Excessive, muddy, or uncontrolled bass that bleeds into mids"
+        }
+      ]
+    },
+    {
+      "label": "noise cancellation",
+      "description": "Active noise cancellation effectiveness, ambient mode quality, and ANC-related artifacts",
+      "issues": [
+        {
+          "label": "ANC artifacts",
+          "description": "Hissing, white noise, or pressure sensation from active noise cancellation"
+        }
+      ]
+    },
+    {
+      "label": "comfort",
+      "description": "Wearing comfort — clamp force, pad softness, weight distribution, heat, headband pressure",
+      "issues": [
+        {
+          "label": "headband pressure",
+          "description": "Excessive clamp force or hot spot on top of head"
+        },
+        {
+          "label": "ear pad heat",
+          "description": "Ear cups getting uncomfortably warm during extended use"
+        },
+        {
+          "label": "clamp force",
+          "description": "Too tight or too loose fit affecting comfort and seal"
+        }
+      ]
+    },
+    {
+      "label": "build quality",
+      "description": "Materials, durability, hinge quality, cable quality, overall construction",
+      "issues": [
+        {
+          "label": "cable microphonics",
+          "description": "Cable rubbing noise transmitted to the ear cups"
+        },
+        {
+          "label": "build creak",
+          "description": "Creaking or flexing noises from headband or hinges during movement"
+        }
+      ]
+    },
+    {
+      "label": "soundstage",
+      "description": "Width, depth, and spaciousness of the sound — how 'out of head' the audio feels"
+    },
+    {
+      "label": "imaging",
+      "description": "Positional accuracy and instrument separation within the soundstage"
+    },
+    {
+      "label": "detail & clarity",
+      "description": "Micro-detail retrieval, resolution, and transparency in the sound"
+    },
+    {
+      "label": "microphone",
+      "description": "Built-in microphone quality for calls — clarity, noise rejection, voice pickup"
+    },
+    {
+      "label": "wireless performance",
+      "description": "Bluetooth stability, range, codec quality, multipoint reliability, latency",
+      "issues": [
+        {
+          "label": "bluetooth dropouts",
+          "description": "Audio cutting out or stuttering over Bluetooth"
+        },
+        {
+          "label": "connectivity issues",
+          "description": "Pairing failures, multipoint problems, or codec negotiation issues"
+        }
+      ]
+    },
+    {
+      "label": "battery life",
+      "description": "Battery duration, charging speed, battery longevity over time",
+      "issues": [
+        {
+          "label": "battery degradation",
+          "description": "Battery life declining significantly over time"
+        }
+      ]
+    },
+    {
+      "label": "design",
+      "description": "Visual appearance, color options, aesthetics, and form factor",
+      "shortDescription": "Visual design/looks only, not generic praise"
+    },
+    {
+      "label": "portability",
+      "description": "Folding mechanism, carrying case, travel-friendliness, weight for on-the-go use"
+    },
+    {
+      "label": "fit",
+      "description": "How well the headphone stays in place — seal quality, ear tip fit, stability during movement"
+    },
+    {
+      "label": "isolation",
+      "description": "Passive noise isolation — how well the headphone blocks outside noise without ANC"
+    },
+    {
+      "label": "value",
+      "description": "Price-to-performance ratio, deal quality, and whether the price is justified"
+    }
+  ]
+}

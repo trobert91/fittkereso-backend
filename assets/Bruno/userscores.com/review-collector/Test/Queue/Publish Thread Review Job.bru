@@ -1,0 +1,21 @@
+meta {
+  name: Publish Thread Review Job
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8080/api/queue-test/review-thread
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "threadId": "9c21ec71-6e1b-48d8-985e-8435b40cae6a"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

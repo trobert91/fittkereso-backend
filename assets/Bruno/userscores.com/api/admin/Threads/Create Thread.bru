@@ -1,0 +1,22 @@
+meta {
+  name: Create Thread
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/admin-thread/create
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "externalId": "1mv9ah9"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

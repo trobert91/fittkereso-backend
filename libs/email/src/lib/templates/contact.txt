@@ -1,0 +1,6 @@
+Contact Form Submission
+
+Name: {{senderName}}
+Email: {{senderEmail}}
+
+{{message}}

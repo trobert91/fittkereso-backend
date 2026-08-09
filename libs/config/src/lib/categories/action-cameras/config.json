@@ -1,0 +1,111 @@
+{
+  "negativeTerms": [
+    {
+      "keyword": "mirrorless",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "DSLR",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "focal length",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "optical viewfinder",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "EVF",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "lens mount",
+      "penalty": 0.7
+    }
+  ],
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "action camera"
+    },
+    {
+      "weight": 2.5,
+      "keyword": "GoPro",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "waterproof camera",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "helmet camera",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "4K action",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "stabilization"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "wide angle action",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "DJI Action",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "mounting accessories",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "loop recording",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "dashcam",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "GoPro HERO",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Insta360",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "HyperSmooth",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "rugged camera",
+      "exclusive": true
+    }
+  ],
+  "keywordIdentifiers": [
+    "stabilization",
+    "4k60",
+    "waterproof camera",
+    "mounts",
+    "wide angle",
+    "slow motion"
+  ]
+}

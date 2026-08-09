@@ -1,0 +1,22 @@
+meta {
+  name: Resolve Product
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8080/api/product-test/resolve
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+      "referenceId": "494ca697-fd4b-4875-9c00-ec18e855d1af"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

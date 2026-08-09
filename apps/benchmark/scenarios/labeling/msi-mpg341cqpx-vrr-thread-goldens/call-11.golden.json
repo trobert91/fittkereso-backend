@@ -1,0 +1,162 @@
+{
+  "products": [
+    {
+      "productId": "Aa",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "coating",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 1,
+          "useCases": [
+            {
+              "label": "pc gaming",
+              "verdict": "pro"
+            }
+          ],
+          "issues": [
+            {
+              "label": "curve distortion",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 2,
+          "features": [
+            {
+              "label": "design",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 3,
+          "features": [
+            {
+              "label": "production quality",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 4,
+          "features": [
+            {
+              "label": "VRR",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Ab",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "issues": [
+            {
+              "label": "grey tint",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 1,
+          "features": [
+            {
+              "label": "colors",
+              "verdict": "pro"
+            },
+            {
+              "label": "text clarity",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 2,
+          "features": [
+            {
+              "label": "curvature",
+              "verdict": "neutral"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 3,
+          "features": [
+            {
+              "label": "production quality",
+              "verdict": "con"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 4,
+          "issues": [
+            {
+              "label": "vrr incompatibility",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Ac",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "design",
+              "verdict": "pro"
+            },
+            {
+              "label": "coating",
+              "verdict": "neutral"
+            },
+            {
+              "label": "value",
+              "verdict": "con"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Ad",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "value",
+              "verdict": "con"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    }
+  ]
+}

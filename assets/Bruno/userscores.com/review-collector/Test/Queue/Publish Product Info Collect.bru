@@ -1,0 +1,21 @@
+meta {
+  name: Publish Product Info Collect
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:8080/api/queue-test/product-info-collect
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "productId": "1da20d83-2266-4068-baf9-714e7ac296ea"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

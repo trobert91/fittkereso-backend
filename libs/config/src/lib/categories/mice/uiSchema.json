@@ -1,0 +1,43 @@
+{
+  "ui:order": [
+    "sensorType",
+    "sensitivity",
+    "connectionMode",
+    "connectionInterface",
+    "buttons",
+    "lighting",
+    "rgb",
+    "weight",
+    "color"
+  ],
+  "sensorType": {
+    "ui:placeholder": "e.g. Optical"
+  },
+  "sensitivity": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 12000"
+  },
+  "connectionMode": {
+    "ui:placeholder": "e.g. Wireless"
+  },
+  "connectionInterface": {
+    "ui:placeholder": "e.g. USB"
+  },
+  "buttons": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 6"
+  },
+  "lighting": {
+    "ui:placeholder": "e.g. LED lighting"
+  },
+  "rgb": {
+    "ui:widget": "checkbox"
+  },
+  "weight": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 80"
+  },
+  "color": {
+    "ui:placeholder": "e.g. Black"
+  }
+}

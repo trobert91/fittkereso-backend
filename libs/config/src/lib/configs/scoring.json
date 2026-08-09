@@ -1,0 +1,58 @@
+{
+  "quoteScoring": {
+    "positiveNegativeRoleScore": 1.0,
+    "neutralRoleScore": 0.35,
+    "lowInfoPenalty": 0.5,
+    "lowInfoMinLength": 40,
+    "phraseScoreMultiplier": 0.6,
+    "lengthFactorDivisor": 40,
+    "quoteCountLogBase": 7,
+    "quoteBlendWeight": 0.75,
+    "expectedMax": 3,
+    "fuzzyThreshold": 0.85
+  },
+  "textScoring": {
+    "expectedMax": 4
+  },
+  "deliberation": {
+    "fuzzyThreshold": 0.88,
+    "phraseBoostMultiplier": 1.3,
+    "saturationDivisor": 4,
+    "maxMultiplierBoost": 0.25
+  },
+  "categoryRelevance": {
+    "topKeywordCount": 8,
+    "fuzzyThreshold": 0.9,
+    "categoryNameWeight": 4,
+    "categoryAliasWeight": 3,
+    "keywordIdentifierWeight": 1,
+    "phraseBoostBase": 1.5,
+    "referenceMatchesPerTerm": 3,
+    "referenceWeightPerTerm": 2,
+    "referenceCorpusDivisor": 20,
+    "exclusiveTermBoost": 0.05,
+    "negativeTermFloor": 0.4
+  },
+  "priorityConfig": {
+    "distanceDecay": 1.0,
+    "relevanceWeight": 1.2,
+    "mentionWeight": 0.8,
+    "recencyBoostEnabled": false,
+    "recencyBoost24h": 1.1,
+    "recencyBoost7d": 1.05,
+    "parentPriorityRelevanceBlend": 0.6,
+    "relativeBoostMinRatio": 2.0,
+    "relativeBoostTarget": 0.45
+  },
+  "labelConsolidation": {
+    "strongThreshold": 1.5,
+    "positiveThreshold": 0.5,
+    "minStrongMixed": 1.0,
+    "qualityWeights": {
+      "high": 1.0,
+      "medium": 0.6,
+      "low": 0.25
+    },
+    "refLevelQualityWeight": 1.0
+  }
+}

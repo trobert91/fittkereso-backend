@@ -1,0 +1,92 @@
+{
+  "id": "explicit-token-blocks-context-v2",
+  "phase": "identification",
+  "description": "v2 of the explicit-token-blocks-context candidate, addressing the regressions seen in v1. v1 won the targeted issue 1B case (subtree 9 went 8 → 10 on judge faithfulness) but lost overall (8.67 vs baseline 9.30) because it over-applied path 2.3 to comments without explicit tokens, hallucinating the parent's product into one-word replies (subtree 11 c1 'Nah' got resolved to LG 34GS95QE-B; subtree 7 c2/c7/c8 generic disclaimers got resolved to parent products). v2 keeps the GUARD for explicit-token comments unchanged, but: (a) splits path 2.3 vs 2.4 explicitly — 2.3 only applies when the comment IS substantively about a product (anaphor + topical content); 2.4 applies to content-free reactions, generic questions/disclaimers, and meta-replies even within a product-discussion chain; (b) replaces v1's misleading c2 example ('Got this one being delivered today' → parent product) with two NEW counter-examples — c2b ('Nah') and c2c ('Do HDR and G Sync work together?') — that demonstrate path 2.4 fires for content-free / generic replies; (c) keeps the c2 positive example but rewrites it to make the anaphor ('this one') and topical continuity (logistics + ownership) the EXPLICIT justification for inheritance; (d) drops v1's redundant c14 example (LG 34GP83A-B specific case) since c6 (LG 34GN850 verbatim) already covers the explicit-unfamiliar-token shape generically; (e) adds an explicit 'when in doubt prefer 2.4' tiebreaker line. Net prompt length: 19.5KB (v1: 26.5KB, ~26% reduction → expect ~5% candidate-call cost reduction). Subtree-level mustContain/mustNotContain assertions also tightened: subtree 5 drops the strict `MSI MAG 341CQP` requirement (verbatim '341CQP' is acceptable since downstream resolution can disambiguate) and the over-broad mustNotContain regex (which fired on legitimate c1 emissions); subtree 11 ('agounerie-mpg-rog') adds a mustNotContain for LG 34GS95QE-B to catch the v1 'Nah' hallucination regression. Goals: (1) match or beat baseline judge score (≥9.30); (2) keep the subtree 9 win; (3) eliminate the subtree 11 hallucination regression; (4) cost-per-run within 5% of baseline.",
+  "runs": {
+    "perCandidate": 3,
+    "maxInFlight": 10
+  },
+  "candidates": [
+    {
+      "id": "baseline",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "explicit-token-blocks-context-v2",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/identification/explicit-token-blocks-context-v2.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "Schema-valid JSON conforming to subtree-identification.schema for every subtree. Every PLAN comment receives an entry, even when products is empty. Per-subtree expectations below pin: (a) the issue 1B case (subtree 9 — must emit LG 34GP83A-B and LG 34GN850 verbatim, not parent's MSI); (b) the v1 hallucination regression (subtree 11 — c1 'Nah' must NOT be resolved to LG 34GS95QE-B). For all other subtrees the default expectation applies: existing baseline behavior is preserved.",
+    "schemaCheck": "subtree-identification.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "deepseek-v4-flash",
+    "instructions": "Score each candidate on three dimensions, each 1-10. (1) faithfulness — every real product reference is surfaced and no products are hallucinated. Two failure shapes carry extra weight: (i) comments with explicit alphanumeric model tokens (LG 34GP83A-B, LG 34GN850, MSI 341CQP, MSI MPG431CQPX) must emit those products, not silently substitute a parent-chain product; (ii) content-free replies ('Nah', 'lol', 'thanks', short generic questions, meta-disclaimers) must produce empty products — inheriting the parent chain's product into them is hallucination. Verbatim model preservation continues to count: '34GS9QE' must NOT be silently upgraded to '34GS95QE-B'. (2) calibration — contentQuality matches depth per the schema enum: high = substantive evaluation with specifics; medium = verdict or preference without depth; low = product named but not evaluated. Borderline cases err lower. Variant accuracy (MAG 341CQP at 175Hz vs MPG 341CQPX at 240Hz) counts here. (3) completeness — every PLAN comment has an entry even when products is empty; jokes, thanks, meta-replies correctly produce empty arrays without inventing products. Return JSON {candidates:[{candidateId, scores:{faithfulness,calibration,completeness}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'. In rationale, call out subtree-5 (the 175Hz MSI 341CQP case), subtree-9 (the LG 34GP83A-B / 34GN850 case), and subtree-11 (the 'Nah' content-free reply case) specifically and report what each candidate emitted there.",
+    "perRun": false
+  },
+  "inputs": [
+    {
+      "id": "best-34-ultrawide",
+      "kind": "fixture",
+      "path": "../../fixtures/identification/monitors-thread-736-identification-full-with-affinity.fixture.json",
+      "subtrees": [
+        { "index": 0, "label": "op" },
+        { "index": 1, "label": "msi-mpg-chain" },
+        { "index": 2, "label": "mpg-rog-comparison" },
+        { "index": 3, "label": "lg-curve-anaphor" },
+        { "index": 4, "label": "msi-purchase" },
+        {
+          "index": 5,
+          "label": "msi-341cqp-sibling-sku",
+          "expectations": {
+            "desiredOutcome": "Cheat sheet has both 'MSI MPG 341CQPX' (240Hz) and 'MSI MAG 341CQP' (175Hz). c5 ('I literally just received my MSI 341CQP') and c7 ('I have the 175Hz non \"X\" model, the 341CQP') must NOT collapse to MPG 341CQPX in c5 specifically. Either emitting verbatim '341CQP' OR resolving to cheat-sheet 'MAG 341CQP' is acceptable — both leave downstream resolution well-positioned to land on the MAG entry via the 175Hz spec. The hard regression is silently substituting MPG 341CQPX for the user's 341CQP token. c1 (No_Committee8856 worrying about G-sync on the MSI from the OP context) IS legitimately about MPG 341CQPX — that emission is correct. c2/c3 (generic G-sync questions and disclaimers without product context) should be empty products under v2's path 2.4 rule. Judged on faithfulness across all comments.",
+            "schemaCheck": "subtree-identification.schema",
+            "mustContain": [
+              {
+                "kind": "regex",
+                "pattern": "\"model\"\\s*:\\s*\"(MAG\\s*)?341CQP\"(?!X)"
+              }
+            ]
+          }
+        },
+        { "index": 6, "label": "anti-rec-debate" },
+        { "index": 7, "label": "msi-mpg-experience" },
+        { "index": 8, "label": "g-sync-followup" },
+        {
+          "index": 9,
+          "label": "lg-34gp83a-context-aside",
+          "expectations": {
+            "desiredOutcome": "Subtree's parent chain has been discussing 'MSI MPG 341CQPX' for several depths, with [used: MSI MPG341CQPX] markers on the AnurinXx PLAN comments. Two PLAN comments name explicit non-cheat-sheet LG products: AnurinXx's 'So I stayed with my LG 34GN850 until now' (c3) and demi9od's reply 'Ha, I am on a LG 34GP83A-B since 2020. Sister monitor to yours.' (c4). Both LG products must be surfaced (verbatim emission is correct since neither is in the cheat sheet). The phrase 'Sister monitor to yours' is an anaphor pointing AT the parent's MSI but does NOT relabel the explicit '34GP83A-B' token. c4 must NOT include MSI MPG 341CQPX as a co-emitted product (this was v1-baseline's failure mode for c4).",
+            "schemaCheck": "subtree-identification.schema",
+            "mustContain": [
+              { "kind": "productMention", "brand": "LG", "model": "34GP83A-B" },
+              { "kind": "productMention", "brand": "LG", "model": "34GN850" }
+            ]
+          }
+        },
+        { "index": 10, "label": "lg-curve-experience" },
+        {
+          "index": 11,
+          "label": "agounerie-mpg-rog",
+          "expectations": {
+            "desiredOutcome": "Subtree contains c0 ('I actually have the LG 45GX950A and the MSI MPG 321URX') with two explicit-token products that must be surfaced — both LG 45GX950A and MSI MPG 321URX (verbatim, neither is in the cheat sheet). c1 is the regression sentinel: just the word 'Nah' as a reply to a longer LG-recommendation chain. c1 must produce empty products — inheriting LG 34GS95QE-B (or any other product) from the parent chain is the v1 hallucination this scenario aims to catch. The mustNotContain regex catches LG 34GS95QE-B emissions across the full subtree output.",
+            "schemaCheck": "subtree-identification.schema",
+            "mustContain": [
+              { "kind": "productMention", "brand": "LG", "model": "45GX950A" },
+              { "kind": "productMention", "brand": "MSI", "model": "MPG 321URX" }
+            ],
+            "mustNotContain": [
+              { "kind": "productMention", "brand": "LG", "model": "34GS95QE-B" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

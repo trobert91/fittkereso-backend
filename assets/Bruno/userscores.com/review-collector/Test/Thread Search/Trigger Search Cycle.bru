@@ -1,0 +1,16 @@
+meta {
+  name: Trigger Search Cycle
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8080/api/thread-search-test/trigger-cycle
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

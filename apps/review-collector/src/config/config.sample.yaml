@@ -1,0 +1,51 @@
+environment: "development"
+port: 8088
+service_type: webserver
+
+mongo:
+  url: mongodb://root:root@localhost:27017/?authMechanism=DEFAULT
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: ebike
+  password: ebike
+  database: ebike
+  sync: true
+  run_migrations: true
+  ssl: false
+
+app_settings:
+  app_url: https://app.ebike.com
+
+  api:
+    api_key: ebike-test
+    api_secret: testApiKey
+
+task:
+  max_attempts: 3
+  process_comments_parallel: true
+
+reddit:
+  user_agent: ebike.com
+  client_id: your-reddit-client-id
+  client_secret: your-reddit-client-secret
+  refresh_token: your-reddit-refresh-token
+
+openai:
+  api_key: your-openai-api-key-here
+  debug: false
+
+exa:
+  api_key: your-exa-api-key-here
+  api_url: https://api.exa.ai
+
+dataforseo:
+  api_url: https://api.dataforseo.com/v3
+  email: your-dataforseo-email
+  password: your-dataforseo-password
+
+logging:
+  app_name: review-collector
+  url: http://localhost:3100
+  environment: "dev"

@@ -1,0 +1,16 @@
+{
+  "pricing": {
+    "deepseek-v4-flash": {
+      "inputPerMillion": 0.14,
+      "cachedInputPerMillion": 0.0028,
+      "outputPerMillion": 0.28
+    },
+    "deepseek-v4-pro": {
+      "inputPerMillion": 1.74,
+      "cachedInputPerMillion": 0.0145,
+      "outputPerMillion": 3.48
+    }
+  },
+  "maxRetries": 3,
+  "fallbackModel": "deepseek-v4-flash"
+}

@@ -1,0 +1,27 @@
+environment: "development"
+port: 8088
+service_type: webserver
+
+mongo:
+  url: mongodb://root:root@localhost:27017/?authMechanism=DEFAULT
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: ebike
+  password: ebike
+  database: ebike
+  sync: true
+  run_migrations: true
+  ssl: false
+
+app_settings:
+  app_url: https://app.ebike.com
+
+  api:
+    api_key: ebike-test
+    api_secret: testApiKey
+
+exa:
+  api_key: your-exa-api-key-here
+  api_url: https://api.exa.ai

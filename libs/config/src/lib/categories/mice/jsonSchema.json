@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "title": "Mouse",
+  "properties": {
+    "sensorType": {
+      "meta": {
+        "order": 0,
+        "examples": ["Optical", "Laser"],
+        "useForExtraction": true
+      },
+      "type": "string",
+      "title": "Sensor type"
+    },
+    "sensitivity": {
+      "meta": {
+        "unit": "DPI",
+        "order": 1,
+        "examples": ["12000", "18000", "25600"],
+        "useForExtraction": true
+      },
+      "type": "number",
+      "title": "Sensitivity"
+    },
+    "connectionMode": {
+      "meta": {
+        "order": 2,
+        "examples": ["Wired", "Wireless"],
+        "useForExtraction": true
+      },
+      "type": "string",
+      "title": "Connection"
+    },
+    "connectionInterface": {
+      "meta": {
+        "order": 3,
+        "examples": ["USB", "Radio frequency", "Bluetooth"]
+      },
+      "type": "string",
+      "title": "Interface"
+    },
+    "buttons": {
+      "meta": {
+        "order": 4,
+        "examples": ["6", "8", "11"]
+      },
+      "type": "number",
+      "title": "Buttons"
+    },
+    "lighting": {
+      "meta": {
+        "order": 5,
+        "examples": ["LED lighting", "RGB", "No lighting"]
+      },
+      "type": "string",
+      "title": "Lighting"
+    },
+    "rgb": {
+      "meta": {},
+      "type": "boolean",
+      "title": "RGB"
+    },
+    "weight": {
+      "meta": {
+        "unit": "g",
+        "order": 6,
+        "examples": ["63g", "80g", "99g"]
+      },
+      "type": "number",
+      "title": "Weight"
+    },
+    "color": {
+      "meta": {},
+      "type": "string",
+      "title": "Color"
+    }
+  }
+}

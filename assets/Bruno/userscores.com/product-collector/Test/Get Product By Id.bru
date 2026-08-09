@@ -1,0 +1,16 @@
+meta {
+  name: Get Product By Id
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:8081/api/product-test/c88e4e28-2853-4f12-9ca9-22c52ba84c6e
+  body: json
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

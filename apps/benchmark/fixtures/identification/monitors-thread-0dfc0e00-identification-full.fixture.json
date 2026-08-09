@@ -1,0 +1,279 @@
+{
+  "thread": {
+    "id": "fixture-monitors-thread-0dfc0e00",
+    "title": "Samsung Odyssey OLED G8 megathread",
+    "topic": "r/ultrawidemasterrace",
+    "subreddit": "r/ultrawidemasterrace"
+  },
+  "categoryConfigs": [
+    {
+      "categoryId": "fixture-monitors",
+      "categoryName": "Monitors",
+      "confidence": 0.95,
+      "promptConfig": {
+        "validSpecs": [
+          {
+            "name": "refreshRate",
+            "examples": "240Hz, 144Hz"
+          },
+          {
+            "name": "panelType",
+            "examples": "OLED, QD-OLED, WOLED, IPS, VA"
+          },
+          {
+            "name": "resolution",
+            "examples": "3440x1440, 4K"
+          },
+          {
+            "name": "screenSize",
+            "examples": "34\", 39\", 27\""
+          },
+          {
+            "name": "curvature",
+            "examples": "800R, 1800R, 1500R"
+          }
+        ],
+        "productIdExamples": [
+          {
+            "mentioned": "MSI MPG 341CQPX",
+            "brand": "MSI",
+            "model": "MPG 341CQPX"
+          },
+          {
+            "mentioned": "LG 34GS95QE",
+            "brand": "LG",
+            "model": "34GS95QE-B"
+          }
+        ],
+        "technologyDescriptors": [
+          "OLED",
+          "QD-OLED",
+          "WOLED"
+        ],
+        "specialInstructions": "",
+        "productTypeWord": "monitor"
+      },
+      "useCases": [],
+      "features": [
+        {
+          "label": "color accuracy"
+        },
+        {
+          "label": "HDR"
+        },
+        {
+          "label": "response time"
+        },
+        {
+          "label": "burn-in"
+        },
+        {
+          "label": "text clarity"
+        }
+      ]
+    }
+  ],
+  "subtrees": [
+    {
+      "id": "fixture-thread-sweep-merged-0dfc-0",
+      "isOpSubtree": true,
+      "nodes": [
+        {
+          "externalId": "st0dfc0-c0",
+          "authorName": "Significant_Drop_870",
+          "body": "I've been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I'm willing to spend up to $1,500 AUD on a monitor, and I'm open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999",
+          "nodeType": "PLAN",
+          "depth": 0
+        }
+      ],
+      "cheatSheet": "",
+      "opSummary": ""
+    },
+    {
+      "id": "fixture-thread-sweep-merged-0dfc-1",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "st0dfc1-c0",
+          "body": "There's a newer version of this model with full size ports.\nG8sd I think it's called, it has a black remote. \nI bought it 3 days ago. When I first set it up it asked me for an update. \nMy initial impression is that the panel it's great, if it had android instead of tizen os it would have been awesome",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc1-c1",
+          "authorName": "Significant_Drop_870",
+          "body": "Yea not a fan of tizen but I mean it's not gonna be used as a tv because I've already got a 86inch qned from lg",
+          "parentExternalId": "st0dfc1-c0",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc1-c2",
+          "body": "important to keep in mind is the newer version(SD) has a matte panel coating. thats the exact reason i myself bought the older version (SB). depends on his preference",
+          "parentExternalId": "st0dfc1-c0",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc1-c3",
+          "body": "If you have ebay plus you can buy it from Samsung's ebay store and use code NOVSAVE for another $70 off.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc1-c4",
+          "body": "I've had mine for almost a year. The display is great! Software is awful. Takes for ever to get to the settings you want. Sometimes it just doesn't register correctly as a display and just blanks out. Common issues.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc1-c5",
+          "authorName": "ClamatoDiver",
+          "body": "I've had mine since July of 2023, and I love it. It was $999 USD back then so $999 AUD sounds like a fantastic deal.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc1-c6",
+          "authorName": "Significant_Drop_870",
+          "body": "Makes me wanna buy it even more I was reading some reviews saying it's good but their is a lot better and so on",
+          "parentExternalId": "st0dfc1-c5",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc1-c7",
+          "authorName": "Prestigious_Swing303",
+          "body": "Hey, have you faced issues like burn-ins or anything else so far and how is the text clarity?\n\nI'm planning to get it (G85SD model) for 80% coding, 20% gaming",
+          "parentExternalId": "st0dfc1-c5",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc1-c8",
+          "authorName": "ClamatoDiver",
+          "body": "No burn in, but I have taken preventative measures from day one. \n\nAuto hide the tool bar, auto hide the Icons, use Wallpaper Engine, run the monitor health on occasion. \n\nI wear glasses now because my eyes aren't the better than normal that they used to be, and sometimes I upscale the UI in games a little and the same in browsers, but that's a me thing for when I want to take the glasses off sometimes, not the monitor itself.",
+          "parentExternalId": "st0dfc1-c7",
+          "nodeType": "PLAN",
+          "depth": 3
+        },
+        {
+          "externalId": "st0dfc1-c9",
+          "authorName": "Prestigious_Swing303",
+          "body": "Alright, thanks for sharing",
+          "parentExternalId": "st0dfc1-c8",
+          "nodeType": "PLAN",
+          "depth": 4
+        }
+      ],
+      "cheatSheet": "── Monitors ──\nSamsung:\n  - Samsung Odyssey OLED G8 (Odyssey OLED G8 S34DG850SU) — 34\", oled, 3440x1440, 175 Hz, 1800R  [secondary]",
+      "opSummary": "@Significant_Drop_870: \"I've been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I'm willing to spend up to $1,500 AUD on a monitor, and I'm open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    },
+    {
+      "id": "fixture-thread-sweep-merged-0dfc-2",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "st0dfc2-c0",
+          "body": "I am currently using one and it is a stunning monitor. One of the best I have had. \n\nIm guessing you are in Perth (assuming thats PLE website)? I could sell you mine as I am looking to upgrade lol. Send me a DM",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc2-c1",
+          "authorName": "Significant_Drop_870",
+          "body": "Nah man I am in NSW with I was over your ways also website is centrecom",
+          "parentExternalId": "st0dfc2-c0",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc2-c2",
+          "body": "Yup!  Definitely worth it!",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc2-c3",
+          "body": "if you are not into font clarity.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc2-c4",
+          "authorName": "Significant_Drop_870",
+          "body": "Their is actually a fix I was looking at a video and their is some software that fixes the issue of fringing",
+          "parentExternalId": "st0dfc2-c3",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "st0dfc2-c5",
+          "authorName": "NotQuiteAngryHunt",
+          "body": "Could you link the video please. I have had this for a year now. Very happy with it. Only issues I've had are with monitor arm compatibility. Found a seller on eBay who prints a clean vesa mount adapter in UK.",
+          "parentExternalId": "st0dfc2-c4",
+          "nodeType": "PLAN",
+          "depth": 3
+        },
+        {
+          "externalId": "st0dfc2-c6",
+          "authorName": "Significant_Drop_870",
+          "body": "I'll try to find it again as I'll be needing it soon too hahaha",
+          "parentExternalId": "st0dfc2-c5",
+          "nodeType": "PLAN",
+          "depth": 4
+        },
+        {
+          "externalId": "st0dfc2-c7",
+          "authorName": "Significant_Drop_870",
+          "body": "https://www.reddit.com/r/OLED_Gaming/s/A3yXwVtyvW turns out it was a post lol not a video",
+          "parentExternalId": "st0dfc2-c5",
+          "nodeType": "PLAN",
+          "depth": 4
+        },
+        {
+          "externalId": "st0dfc2-c8",
+          "authorName": "NotQuiteAngryHunt",
+          "body": "Thank you 🙏",
+          "parentExternalId": "st0dfc2-c7",
+          "nodeType": "PLAN",
+          "depth": 5
+        },
+        {
+          "externalId": "st0dfc2-c9",
+          "body": "The UI and OS, apparently, are infuriating.  You have to connect to your PC every single time you turn on the monitor.  It's more a tv/monitor hybrid.   It is not a plug and play monitor.   \n\nI have a couple homies who have this monitor and they HATE how long it takes to start up and then manually select the PC output every single time they use it.  I went Alienware 34\" OLED because of it",
+          "nodeType": "PLAN",
+          "depth": 1
+        }
+      ],
+      "cheatSheet": "── Monitors ──\nSamsung:\n  - Samsung G85SD  [secondary] (unresolved)\n  - Samsung Odyssey OLED G8 (Odyssey OLED G8 S34DG850SU) — 34\", oled, 3440x1440, 175 Hz, 1800R  [primary]\n  - Samsung Odyssey OLED G8 S32DG802SU — 32\", oled, 3840x2160, 240 Hz  [primary]\n  - Samsung Odyssey OLED G8 SB  [primary] (unresolved)",
+      "opSummary": "@Significant_Drop_870: \"I've been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I'm willing to spend up to $1,500 AUD on a monitor, and I'm open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    },
+    {
+      "id": "fixture-thread-sweep-merged-0dfc-3",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "st0dfc3-c0",
+          "body": "I own this, its great! I recommend",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc3-c1",
+          "body": "The price is in the more reasonable side… you can also check out MSi 341cqpx for 1371 aud … it's a 240hz version.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "st0dfc3-c2",
+          "body": "Just ordered it in Italy for 600 EUR",
+          "nodeType": "PLAN",
+          "depth": 1
+        }
+      ],
+      "cheatSheet": "── Monitors ──\nSamsung:\n  - Samsung G85SD  [secondary] (unresolved)\n  - Samsung Odyssey OLED G8 (Odyssey OLED G8 S34DG850SU) — 34\", oled, 3440x1440, 175 Hz, 1800R  [primary]\n  - Samsung Odyssey OLED G8 S32DG802SU  [primary]",
+      "opSummary": "@Significant_Drop_870: \"I've been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I'm willing to spend up to $1,500 AUD on a monitor, and I'm open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    }
+  ]
+}

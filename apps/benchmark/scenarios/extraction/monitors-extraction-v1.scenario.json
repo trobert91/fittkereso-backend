@@ -1,0 +1,55 @@
+{
+  "id": "monitors-extraction-v1",
+  "phase": "extraction",
+  "description": "Tiny synthetic monitors subtree exercising the extraction prompt against pre-resolved products. c_reply1 is a hands-on owner with detailed first-hand impressions across multiple attributes (color, HDR, text clarity, motion). c_reply2 is a prospective buyer making a reasoned recommendation grounded in named attributes (matte finish, G-sync). c_reply3 is the most subtle: a vague 'both are solid' verdict for LG and MSI (anaphoric, no named attribute → quotes should be empty for those two under the QUOTE GATE) plus an anti-recommendation for Corsair with a named attribute (overpriced → quote should land on Corsair). Tests three subtle behaviors: (1) the QUOTE GATE — non-hands-on speakers (prospective_buyer) need a verdict attached to a named attribute to retain quotes; (2) experience tier calibration — owner vs prospective_buyer; (3) per-product attribution — the Corsair anti-rec must NOT bleed onto LG or MSI. Backed by a fixture so it runs offline (no DB / Reddit).",
+  "runs": {
+    "perCandidate": 1,
+    "maxInFlight": 4
+  },
+  "candidates": [
+    {
+      "id": "baseline",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "baseline-on-nano",
+      "model": "gpt-5.4-nano",
+      "systemPromptSource": "current"
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "c0 (OledFan, owner of MSI MPG 341CQPX) must produce experience='owner', depth='detailed' or 'comprehensive', overallSentiment='positive', and at least 2 quotes whose sentiment is positive — the comment has multiple substantive verdicts grounded in named attributes (color, HDR, text clarity, motion clarity from a 144Hz IPS baseline). c1 (MatteLover, prospective_buyer leaning toward LG 34GS95QE-B) must produce experience='prospective_buyer', overallSentiment='positive', and at least 1 quote tied to a named attribute (matte finish handling bright rooms, OR G-sync compatibility). c2 (BalancedBuyer) is the subtle case. For LG (productIndex 0) and MSI (productIndex 1) the speaker is a prospective_buyer with the verdict 'both are solid' — no named attribute attaches to either, so under the QUOTE GATE quotes should be empty for both. For Corsair (productIndex 2) the verdict 'overpriced for what you get' attaches to a named attribute (price/value), so a quote should be retained with negative sentiment. Schema-valid JSON conforming to subtree-extraction.schema. Every PLAN comment must appear in the response.",
+    "mustContain": [
+      {
+        "kind": "regex",
+        "pattern": "\"experience\"\\s*:\\s*\"owner\"",
+        "appliesTo": "stringifiedParsed"
+      },
+      {
+        "kind": "regex",
+        "pattern": "\"experience\"\\s*:\\s*\"prospective_buyer\"",
+        "appliesTo": "stringifiedParsed"
+      }
+    ],
+    "schemaCheck": "subtree-extraction.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "claude-haiku-4-5-20251001",
+    "instructions": "Score each candidate on three dimensions, each 1-10. Read the desiredOutcome carefully — c2 is intentionally subtle. (1) faithfulness — quotes must be verbatim substrings from the source comment, with no fabrication. Anti-recommendations are valid signal: the Corsair quote in c2 is negative sentiment but is buyer-relevant. (2) quote-gate compliance — for prospective_buyer / reference experience, quotes are only retained when attached to a named attribute (price, panel finish, refresh rate, etc.). 'Both are solid' alone (c2 LG, c2 MSI) does NOT pass the gate; quotes for those products should be empty. 'Overpriced for what you get' (c2 Corsair) passes the gate (price IS the attribute). For owner / prior_owner / tested experience, a verdict alone is sufficient — no named attribute required. (3) classification calibration — does experience match the speaker's relationship (owner vs prospective_buyer), does depth reflect the substance of the evaluation, are intents appropriate (recommendation vs experience_report vs warning)? Return JSON {candidates:[{candidateId, scores:{faithfulness, quoteGate, classification}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'.",
+    "perRun": false,
+    "goldenOutput": {
+      "path": "monitors-extraction-v1.golden.json",
+      "role": "reference",
+      "note": "Hand-curated reference for the fixture. Authoritative parts: (a) c0 owner with positive multi-quote evidence; (b) c1 prospective_buyer with at least one quote anchored on a named attribute; (c) c2 must surface all three products — LG and MSI with empty quotes (verdict alone, no named attribute, prospective_buyer fails quote gate), Corsair with a negative quote tied to price. Exact quote substrings, depth labels, and intent ordering are illustrative — small differences should not be punished. The single most important signal: c2 product 0 (LG) and c2 product 1 (MSI) must NOT carry quotes that include 'both are solid' (no named attribute), and c2 product 2 (Corsair) MUST carry a negative quote about price/value."
+    }
+  },
+  "inputs": [
+    {
+      "id": "default",
+      "kind": "fixture",
+      "path": "../../fixtures/extraction/monitors-extraction-tiny.fixture.json"
+    }
+  ]
+}

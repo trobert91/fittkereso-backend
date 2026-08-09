@@ -1,0 +1,10 @@
+{
+  "threadProcessingPerDay": 0,
+  "redditSearchThreadLimit": 30,
+  "redditThreadExpiryInDays": 180,
+  "adminContactEmail": "",
+  "amazonAffiliateTag": "",
+  "debug": {
+    "traceEnabled": true
+  }
+}

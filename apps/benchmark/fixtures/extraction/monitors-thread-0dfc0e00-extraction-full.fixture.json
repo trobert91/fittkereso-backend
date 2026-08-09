@@ -1,0 +1,531 @@
+{
+  "thread": {
+    "id": "0dfc0e00-14ee-43db-9c22-c20d232d569c",
+    "title": "Samsung Odyssey OLED G8 — Megathread",
+    "topic": "r/Monitors",
+    "subreddit": "r/Monitors"
+  },
+  "cheatSheet": "── Monitors ──\nSamsung:\n  - Samsung Odyssey OLED G8 (Odyssey OLED G8 S34DG850SU) — 34\", oled, 3440x1440, 175 Hz, 1800R  [mentioned]",
+  "subtrees": [
+    {
+      "id": "6548c28b-2911-4743-bdda-1e8b438d9174",
+      "isOpSubtree": true,
+      "nodes": [
+        {
+          "externalId": "OP",
+          "body": "I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999",
+          "nodeType": "PLAN",
+          "depth": 0
+        }
+      ],
+      "resolvedProducts": {
+        "OP": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bfaee9f7-542c-41f9-99d5-3bbbb918adf2",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "no8bzh1",
+          "body": "There's a newer version of this model with full size ports.\nG8sd I think it's called, it has a black remote. \nI bought it 3 days ago. When I first set it up it asked me for an update. \nMy initial impression is that the panel it's great, if it had android instead of tizen os it would have been awesome",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "noajj1p",
+          "body": "important to keep in mind is the newer version(SD) has a matte panel coating. thats the exact reason i myself bought the older version (SB). depends on his preference",
+          "parentExternalId": "no8bzh1",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "no7thya",
+          "body": "I’ve had mine for almost a year. The display is great! Software is awful. Takes for ever to get to the settings you want. Sometimes it just doesn’t register correctly as a display and just blanks out. Common issues.",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "no7sec1",
+          "authorId": "t2_clamatodiver",
+          "authorName": "ClamatoDiver",
+          "body": "I've had mine since July of 2023, and I love it. It was $999 USD back then so $999 AUD sounds like a fantastic deal.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "no9g6yh",
+          "authorId": "t2_prestigious_swing303",
+          "authorName": "Prestigious_Swing303",
+          "body": "Hey, have you faced issues like burn-ins or anything else so far and how is the text clarity?\n\nI'm planning to get it (G85SD model) for 80% coding, 20% gaming",
+          "parentExternalId": "no7sec1",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "noabtjk",
+          "authorId": "t2_clamatodiver",
+          "authorName": "ClamatoDiver",
+          "body": "No burn in, but I have taken preventative measures from day one. \n\nAuto hide the tool bar, auto hide the Icons, use Wallpaper Engine, run the monitor health on occasion. \n\nI wear glasses now because my eyes aren't the better than normal that they used to be, and sometimes I upscale the UI in games a little and the same in browsers, but that's a me thing for when I want to take the glasses off sometimes, not the monitor itself.",
+          "parentExternalId": "no9g6yh",
+          "nodeType": "PLAN",
+          "depth": 3
+        },
+        {
+          "externalId": "OP",
+          "authorId": "t2_significant_drop_870",
+          "authorName": "Significant_Drop_870",
+          "body": "I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.",
+          "nodeType": "CONTEXT",
+          "depth": 0
+        }
+      ],
+      "resolvedProducts": {
+        "no8bzh1": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S32DG802SU",
+            "displayName": "Samsung Odyssey OLED G8 S32DG802SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "32\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3840x2160"
+              },
+              {
+                "name": "refreshRate",
+                "value": "240 Hz"
+              }
+            ]
+          }
+        ],
+        "noajj1p": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 SB",
+            "displayName": "Samsung Odyssey OLED G8 SB",
+            "categorySlug": "monitors",
+            "specs": [],
+            "unresolved": true
+          }
+        ],
+        "no7thya": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "no7sec1": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "no9g6yh": [
+          {
+            "brand": "Samsung",
+            "model": "G85SD",
+            "displayName": "Samsung G85SD",
+            "categorySlug": "monitors",
+            "specs": [],
+            "unresolved": true
+          }
+        ],
+        "noabtjk": [
+          {
+            "brand": "Samsung",
+            "model": "G85SD",
+            "displayName": "Samsung G85SD",
+            "categorySlug": "monitors",
+            "specs": [],
+            "unresolved": true
+          }
+        ]
+      },
+      "opSummary": "@Significant_Drop_870: \"I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    },
+    {
+      "id": "bd1570d7-6a65-4bef-93f4-b6539728aeb6",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "no9yi2p",
+          "body": "I am currently using one and it is a stunning monitor. One of the best I have had. \n\nIm guessing you are in Perth (assuming thats PLE website)? I could sell you mine as I am looking to upgrade lol. Send me a DM",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "nodabar",
+          "body": "Yup!  Definitely worth it!",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "no88wgi",
+          "body": "if you are not into font clarity.",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "no8e6yi",
+          "authorId": "t2_significant_drop_870",
+          "authorName": "Significant_Drop_870",
+          "body": "Their is actually a fix I was looking at a video and their is some software that fixes the issue of fringing",
+          "parentExternalId": "no88wgi",
+          "nodeType": "PLAN",
+          "depth": 2
+        },
+        {
+          "externalId": "no8thf1",
+          "authorId": "t2_notquiteangryhunt",
+          "authorName": "NotQuiteAngryHunt",
+          "body": "Could you link the video please. I have had this for a year now. Very happy with it. Only issues I’ve had are with monitor arm compatibility. Found a seller on eBay who prints a clean vesa mount adapter in UK.",
+          "parentExternalId": "no8e6yi",
+          "nodeType": "PLAN",
+          "depth": 3
+        },
+        {
+          "externalId": "noe3ird",
+          "body": "The UI and OS, apparently, are infuriating.  You have to connect to your PC every single time you turn on the monitor.  It’s more a tv/monitor hybrid.   It is not a plug and play monitor.   \n\nI have a couple homies who have this monitor and they HATE how long it takes to start up and then manually select the PC output every single time they use it.  I went Alienware 34” OLED because of it",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "OP",
+          "authorId": "t2_significant_drop_870",
+          "authorName": "Significant_Drop_870",
+          "body": "I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.",
+          "nodeType": "CONTEXT",
+          "depth": 0
+        }
+      ],
+      "resolvedProducts": {
+        "no9yi2p": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "nodabar": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "no88wgi": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "no8e6yi": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "no8thf1": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ],
+        "noe3ird": [
+          {
+            "brand": "Samsung",
+            "model": "Odyssey OLED G8 S34DG850SU",
+            "displayName": "Samsung Odyssey OLED G8 S34DG850SU",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34\""
+              },
+              {
+                "name": "panelType",
+                "value": "oled"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "175 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ]
+      },
+      "opSummary": "@Significant_Drop_870: \"I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    },
+    {
+      "id": "51e71270-9b9c-4aa5-b01f-b0faa0607afc",
+      "isOpSubtree": false,
+      "nodes": [
+        {
+          "externalId": "no80ykn",
+          "body": "The price is in the more reasonable side… you can also check out MSi 341cqpx for 1371 aud … it’s a 240hz version.",
+          "parentExternalId": "OP",
+          "nodeType": "PLAN",
+          "depth": 1
+        },
+        {
+          "externalId": "OP",
+          "authorId": "t2_significant_drop_870",
+          "authorName": "Significant_Drop_870",
+          "body": "I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.",
+          "nodeType": "CONTEXT",
+          "depth": 0
+        }
+      ],
+      "resolvedProducts": {
+        "no80ykn": [
+          {
+            "brand": "MSI",
+            "model": "MPG341CQPX",
+            "displayName": "MSI MPG341CQPX",
+            "categorySlug": "monitors",
+            "specs": [
+              {
+                "name": "screenSize",
+                "value": "34.18\""
+              },
+              {
+                "name": "panelType",
+                "value": "QD-OLED"
+              },
+              {
+                "name": "resolution",
+                "value": "3440x1440"
+              },
+              {
+                "name": "refreshRate",
+                "value": "240 Hz"
+              },
+              {
+                "name": "curvature",
+                "value": "1800R"
+              }
+            ]
+          }
+        ]
+      },
+      "opSummary": "@Significant_Drop_870: \"I’ve been thinking about getting the Samsung G8 — I saw it in person and it looks absolutely stunning. The price has dropped a lot since I first looked at it. This is in AUD, by the way. I’m willing to spend up to $1,500 AUD on a monitor, and I’m open to other recommendations.\nSamsung Odyssey OLED G8 34\" WQHD 175Hz FreeSync Curved Gaming Monitor\nOdyssey OLED G8\n175Hz\n0.03ms\nGaming Hub\nCurved\nDon't Pay $1,659\n$999\""
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "staleTaskTimeoutMinutes": 240,
+  "staleScrapeTaskTimeoutMinutes": 240,
+  "productRating": {
+    "batchLimit": 100
+  },
+  "productReviewAnalysis": {
+    "batchLimit": 25,
+    "minimumTotalReviews": 1,
+    "minimumNewReviewsToTrigger": 20,
+    "topFeatureLabels": 6,
+    "topUseCaseLabels": 10,
+    "topIssueLabels": 6,
+    "quotesPerLabel": 20,
+    "reviewSampleSize": 200,
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "commentReview": {
+    "batchLimit": 100,
+    "approvedDelayHours": 0,
+    "revocationDelayHours": 2
+  },
+  "searchQueryProcessing": {
+    "chunkSize": 30,
+    "avgRelevanceThreshold": 45
+  },
+  "duplicateDetection": {
+    "enabled": true,
+    "minSimilarityThreshold": 60,
+    "autoMergeThreshold": 80,
+    "minPendingReviewThreshold": 60,
+    "maxNonPrimaryMismatches": 2,
+    "batchSize": 100,
+    "maxMergesPerRun": 50,
+    "highActivityThreshold": 10
+  },
+  "resolutionBackfill": {
+    "enabled": true,
+    "scoredResolution": {
+      "topN": 50,
+      "retryMaxAgeDays": 365,
+      "cooldown": {
+        "baseCooldownHours": 168,
+        "backoffBase": 2,
+        "maxCooldownHours": 2160
+      }
+    }
+  }
+}

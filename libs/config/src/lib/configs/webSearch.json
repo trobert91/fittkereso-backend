@@ -1,0 +1,22 @@
+{
+  "defaultProvider": null,
+  "providerSelection": {
+    "useExaForOp": true,
+    "minRelevanceForExa": 0.8
+  },
+  "cache": {
+    "enabled": true,
+    "similarityThreshold": 0.7,
+    "dateToleranceDays": 7,
+    "ttlDays": 90
+  },
+  "dataforseo": {
+    "maxResults": 15
+  },
+  "exa": {
+    "numResults": 10,
+    "useAutoprompt": true,
+    "type": "neural",
+    "includeContent": true
+  }
+}

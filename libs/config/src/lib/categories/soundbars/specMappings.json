@@ -1,0 +1,97 @@
+{
+  "arukereso": {
+    "mappings": [
+      {
+        "key": "channels",
+        "labels": ["Csatornák száma"]
+      },
+      {
+        "key": "bluetooth",
+        "labels": ["Bluetooth"]
+      },
+      {
+        "key": "hdmiCec",
+        "labels": ["HDMI-CEC támogatás"]
+      },
+      {
+        "key": "dlna",
+        "labels": ["DLNA támogatás"]
+      },
+      {
+        "key": "remoteControl",
+        "labels": ["Távirányítás"]
+      },
+      {
+        "key": "rmsPower",
+        "labels": ["RMS teljesítmény"],
+        "extract": "number"
+      },
+      {
+        "key": "hdmi",
+        "labels": ["HDMI"]
+      },
+      {
+        "key": "usb",
+        "labels": ["USB"]
+      },
+      {
+        "key": "compositeOutput",
+        "labels": ["Kompozit kimenet"]
+      },
+      {
+        "key": "componentOutput",
+        "labels": ["Komponens kimenet"]
+      },
+      {
+        "key": "opticalInput",
+        "labels": ["Digitális audió bemenet (Optikai)"]
+      },
+      {
+        "key": "coaxialInput",
+        "labels": ["Digitális audió bemenet (Koaxiális)"]
+      },
+      {
+        "key": "analogInput",
+        "labels": ["Analóg audió bemenet"]
+      },
+      {
+        "key": "auxOutput",
+        "labels": ["AUX kimenet"]
+      },
+      {
+        "key": "dolbyDigital",
+        "labels": ["Dolby Digital"]
+      },
+      {
+        "key": "dolbySupport",
+        "labels": ["Dolby verziók"],
+        "extract": "list"
+      },
+      {
+        "key": "dts",
+        "labels": ["DTS"]
+      },
+      {
+        "key": "width",
+        "labels": ["Szélesség"],
+        "extract": "mmToCmAndInchList"
+      },
+      {
+        "key": "height",
+        "labels": ["Magasság"],
+        "extract": "mmToCmAndInchList"
+      },
+      {
+        "key": "depth",
+        "labels": ["Mélység"],
+        "extract": "mmToCmAndInchList"
+      },
+      {
+        "key": "weight",
+        "labels": ["Tömeg"],
+        "extract": "number"
+      }
+    ],
+    "calculated": []
+  }
+}

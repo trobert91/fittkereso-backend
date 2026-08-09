@@ -1,0 +1,19 @@
+{
+  "keywords": [
+    "best projector",
+    "best 4K projector",
+    "best projector for home theater",
+    "best projector for gaming",
+    "best ultra short throw projector",
+    "best budget projector",
+    "projector vs TV",
+    "best laser projector"
+  ],
+  "platforms": {
+    "reddit": {
+      "subreddits": ["projectors", "hometheater", "4kProjectors", "UST", "homecinema"],
+      "time": "year",
+      "limit": 100
+    }
+  }
+}

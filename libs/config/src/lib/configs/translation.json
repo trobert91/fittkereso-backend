@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "model": "deepseek-v4-flash",
+  "defaultSourceLanguage": "hu",
+  "defaultTargetLanguage": "en",
+  "cacheTtlDays": 365,
+  "maxBatchSize": 50,
+  "dictionary": {
+    "hu": {
+      "analóg audio bemenet": "Analog audio input",
+      "analóg audio kimenet": "Analog audio output",
+      "antennabemenet": "Antenna input",
+      "ci+ interfész": "CI+",
+      "digitális audio kimenet": "Digital audio output",
+      "digitális audió bemenet (koaxiális)": "Coaxial audio input",
+      "digitális audió bemenet (optikai)": "Optical audio input",
+      "fejhallgató": "headphones",
+      "fejhallgató kimenet": "Headphone output",
+      "fülhallgató": "earbuds",
+      "hangprojektor": "soundbar",
+      "igen": "yes",
+      "koaxiális digitális kimenet": "Coaxial digital output",
+      "komponens videó": "Component video",
+      "kompozit videó": "Composite video",
+      "műholdas bemenet": "Satellite input",
+      "nem": "no",
+      "nincs": "no",
+      "optikai hang kimenet": "Optical audio output",
+      "usb csatlakozó": "USB",
+      "van": "yes",
+      "vezeték nélküli": "wireless",
+      "vezetékes": "wired"
+    }
+  }
+}

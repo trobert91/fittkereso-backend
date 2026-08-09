@@ -1,0 +1,79 @@
+groups:
+  - name: pipeline_alerts
+    rules:
+      # Re-moderation failure rate above 20%
+      - alert: ReModerationFailureRateHigh
+        expr: |
+          (
+            increase(pipeline_moderation_outcome_total{outcome="in_review"}[1h])
+            / (
+              increase(pipeline_moderation_outcome_total{outcome="approved"}[1h])
+              + increase(pipeline_moderation_outcome_total{outcome="in_review"}[1h])
+              + increase(pipeline_moderation_outcome_total{outcome="deleted"}[1h])
+            )
+          ) > 0.40
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Moderation in_review rate above 40%"
+          description: "More than 40% of moderated comments are routed to manual review. Check fix strategies and relevance thresholds."
+
+      # Relevance skip rate anomaly (too many comments being skipped)
+      - alert: RelevanceSkipRateHigh
+        expr: |
+          (
+            increase(pipeline_relevance_outcome_total{outcome="skipped"}[1h])
+            / (
+              increase(pipeline_relevance_outcome_total{outcome="passed"}[1h])
+              + increase(pipeline_relevance_outcome_total{outcome="skipped"}[1h])
+            )
+          ) > 0.85
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Relevance skip rate above 85%"
+          description: "More than 85% of comments are being skipped by relevance. Check relevance scoring algorithm and thresholds."
+
+  - name: thread_search_alerts
+    rules:
+      # No searches executed in 2 hours
+      - alert: ThreadSearchStalled
+        expr: increase(thread_search_executed_total[2h]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No thread searches executed in 2 hours"
+          description: "The thread search scheduler has not produced any search executions in the last 2 hours. Check scheduler health and task queue."
+
+      # High platform error rate
+      - alert: ThreadSearchPlatformErrors
+        expr: rate(thread_search_platform_api_error_total[15m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated platform API error rate"
+          description: "Thread search platform API error rate is above 0.1/s for 10 minutes. Platform: {{ $labels.platform }}, error: {{ $labels.error_type }}."
+
+      # Budget consistently underutilized
+      - alert: ThreadSearchBudgetUnderutilized
+        expr: thread_search_budget_utilization < 0.3
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Thread search budget utilization below 30%"
+          description: "Budget utilization has been below 30% for 1 hour. Check category eligibility and keyword availability."
+
+      # Zero discovery rate for a category over 24h
+      - alert: ThreadSearchZeroDiscovery
+        expr: increase(thread_search_discovered_total[24h]) == 0 and increase(thread_search_executed_total[24h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Category {{ $labels.category_slug }} has zero discovery in 24h despite active searches"
+          description: "Category {{ $labels.category_slug }} has had active searches but discovered zero new threads in 24 hours. Review keyword effectiveness and quality gates."

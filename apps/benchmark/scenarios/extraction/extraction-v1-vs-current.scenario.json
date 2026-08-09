@@ -1,0 +1,41 @@
+{
+  "id": "extraction-v1-vs-current",
+  "phase": "extraction",
+  "description": "Coverage-focused A/B between the current production extraction prompt and the rewritten extraction-v1 candidate, both running on deepseek-v4-flash against the full thread-736 fixture (11 subtrees, 52 PLAN comments). The hypothesis driving v1: the current prompt's QUOTE GATE is too strict for buyer-deliberation language ('concerned about grey tint', 'torn between 800R and 1800R', 'TFT says it's the MSI', 'wow / absolutely insane / wish I had bought it sooner') and drops 50%+ of buyer-useful content on this thread when run on a smaller model. v1 replaces the verdict-vocabulary gate with a buyer-utility test, requires per-attribute extraction when a comment names multiple attributes, and adds explicit recall-positive examples (multi-bullet OP-style deliberations, reference-tier informational claims, owner reports without strong adjectives). Success looks like: candidate-v1 quote count materially closer to the gpt-5-4-mini baseline of ~120 quotes/thread (vs ~53 for current-on-deepseek), without false positives like settings dumps or pure logistics. Run cost is ~$0.04 (44 deepseek extraction calls + 11 judge calls). The judge rubric is identical to monitors-thread-736-extraction so scores are comparable across runs.",
+  "runs": {
+    "perCandidate": 2,
+    "maxInFlight": 8
+  },
+  "candidates": [
+    {
+      "id": "current-deepseek",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "v1-deepseek",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/extraction/extraction-v1.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "v1 should produce materially more quotes than current on the same comments, especially on (1) OP-style buyer-deliberation comments listing multiple attributes (target: one quote per distinct attribute, not one quote total); (2) owner endorsements using informal language ('wow', 'absolutely insane', 'wish I had bought it sooner', 'feels just right'); (3) reasoned concerns from prospective buyers ('concerned about grey tint', 'torn between 800R and 1800R', 'biggest concern is G-sync', 'feels like a huge gamble'); (4) reference-tier informational claims about real attributes ('TFT says it's the MSI', 'they released firmware which fixes the HDR', 'Rtings favors the MSI'); (5) per-product attribution in multi-product comparison comments — each side that evaluates a product should retain a quote on that product. v1 should NOT produce false positives on (a) bare logistics/acquisition ('I bought X', 'arrives Wednesday', 'for $750' with no comparison), (b) settings dumps with no judgment ('brightness 54, contrast 70'), (c) intent-to-test ('I'll let you know', 'will report back'), (d) pure questions to other users, (e) fabricated quotes (every quote MUST be a verbatim substring). Schema-valid JSON conforming to subtree-extraction.schema.",
+    "schemaCheck": "subtree-extraction.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "deepseek-v4-flash",
+    "instructions": "Score each candidate on five dimensions, each 1-10. (1) recall — does the candidate surface the buyer-useful clauses a future buyer would want to read? Multi-attribute comments should yield multiple quotes (one per attribute), not one. Reference-tier informational claims about real product attributes count as buyer-useful. Owner endorsements using informal language ('wow', 'absolutely insane') count. Reasoned concerns from prospective buyers ('concerned about grey tint', 'torn between A and B') count. (2) faithfulness — every quote must be a verbatim substring of the comment body. No paraphrasing, no fabrication. (3) precision — drops should be obvious non-evidence: bare ownership/logistics, settings dumps, intent-to-test, single-word reactions, questions to others, comparison-baseline clauses ('coming from a 165Hz IPS'). False positives in these categories cost points. (4) attribution accuracy — multi-product comments must keep each quote on the correct product. Comparison-baseline leakage ('coming from X') must NOT attach to the resolved product. (5) classification calibration — does experience match the speaker's relationship (owner with purchase evidence vs prospective_buyer researching), does depth reflect substance, are intents appropriate? Return JSON {candidates:[{candidateId, scores:{recall, faithfulness, precision, attribution, calibration}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'. The most important dimension here is recall — under-extraction on this thread is the failure mode v1 was designed to fix.",
+    "perRun": false
+  },
+  "inputs": [
+    {
+      "id": "default",
+      "kind": "fixture",
+      "path": "../../fixtures/extraction/monitors-thread-736-extraction-full.fixture.json",
+      "subtrees": "all"
+    }
+  ]
+}

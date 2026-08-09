@@ -1,0 +1,8 @@
+Review Feedback Report
+
+Category: {{category}}
+Product: {{productSlug}}
+Review ID: {{reviewId}}
+
+Description:
+{{description}}

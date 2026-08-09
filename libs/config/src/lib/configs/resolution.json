@@ -1,0 +1,34 @@
+{
+  "embeddingSimilarityThreshold": 0.4,
+  "embeddingResultLimit": 5,
+  "webSearchRelevanceGate": 70,
+  "matching": {
+    "acceptThreshold": 70,
+    "acceptThresholdStrict": 80,
+    "ambiguityGap": 5,
+    "minCandidateScore": 50,
+    "maxLlmPicks": 6,
+    "defaultStrictness": "moderate",
+    "defaultNumericTokenWeight": 2.5,
+    "importantTokenWeightThreshold": 2.0
+  },
+  "aliasAutoCreate": {
+    "enabled": false,
+    "minScore": 80
+  },
+  "search": {
+    "maxModelVariants": 20,
+    "maxCandidates": 50,
+    "decisionModel": "deepseek-v4-flash",
+    "webSearch": {
+      "extractionModel": "deepseek-v4-flash",
+      "minProductConfidence": 0.5,
+      "minVariantConfidence": 0.6
+    },
+    "crossMarket": {
+      "topCandidates": 5,
+      "minCandidateConfidence": 0.6,
+      "minMatchConfidence": 0.7
+    }
+  }
+}

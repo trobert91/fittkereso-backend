@@ -1,0 +1,115 @@
+{
+  "products": [
+    {
+      "productId": "Aa",
+      "quotes": [
+        {
+          "quoteIndex": 1,
+          "features": [
+            {
+              "label": "HDR",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Ba",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "value",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 1,
+          "issues": [
+            {
+              "label": "vrr incompatibility",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 2,
+          "features": [
+            {
+              "label": "production quality",
+              "verdict": "con"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Ca",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "issues": [
+            {
+              "label": "vrr flickering",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        },
+        {
+          "quoteIndex": 1,
+          "issues": [
+            {
+              "label": "coil whine",
+              "sentiment": "negative"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Cb",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "curvature",
+              "verdict": "con"
+            }
+          ],
+          "useCases": [
+            {
+              "label": "pc gaming",
+              "verdict": "pro"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    },
+    {
+      "productId": "Da",
+      "quotes": [
+        {
+          "quoteIndex": 0,
+          "features": [
+            {
+              "label": "refresh rate",
+              "verdict": "neutral"
+            }
+          ],
+          "speculative": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "module": "commonjs",
+    "types": ["node", "Multer"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "es2021"
+  },
+  "include": ["src/**/*.ts", "../../libs/thread/src/lib/services/thread-creator.service.ts", "../../libs/thread/src/lib/models/thread-create.dto.ts", "../../libs/config/typeorm.config.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+}

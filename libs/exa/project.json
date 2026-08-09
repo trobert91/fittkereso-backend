@@ -1,0 +1,8 @@
+{
+  "name": "exa",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/exa/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}

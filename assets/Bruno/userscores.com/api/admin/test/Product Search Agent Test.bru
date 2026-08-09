@@ -1,0 +1,38 @@
+meta {
+  name: Product Search Agent Test
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8088/api/test/resolve/product
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "context": {
+      "input": {
+        "brand": "TCL",
+        "model": "TCL 75QM7K",
+        "categories": [
+          "TV"
+        ],
+        "displayName": "TCL 75QM7K",
+        "searchBefore": "2026-02-14T04:07:50.000Z"
+      }
+    },
+    "options": {
+      "useEmbedding": true,
+      "webSearchEnabled": true,
+      "crossMarketSearchEnabled": true,
+      "mode": "loose"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,33 @@
+{
+  "pricing": {
+    "gpt-5-nano": {
+      "inputPerMillion": 0.05,
+      "outputPerMillion": 0.4
+    },
+    "gpt-5.4-nano": {
+      "inputPerMillion": 0.2,
+      "outputPerMillion": 1.25
+    },
+    "gpt-5-mini": {
+      "inputPerMillion": 0.25,
+      "outputPerMillion": 2.0
+    },
+    "gpt-5.4-mini": {
+      "inputPerMillion": 0.75,
+      "outputPerMillion": 4.5
+    },
+    "gpt-5": {
+      "inputPerMillion": 1.25,
+      "outputPerMillion": 10.0
+    },
+    "gpt-5.4": {
+      "inputPerMillion": 2.5,
+      "outputPerMillion": 15.0
+    },
+    "gpt-5.5": {
+      "inputPerMillion": 5,
+      "outputPerMillion": 30
+    }
+  },
+  "maxRetries": 3
+}

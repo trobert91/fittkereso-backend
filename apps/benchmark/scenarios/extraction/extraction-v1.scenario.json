@@ -1,0 +1,64 @@
+{
+  "id": "extraction-v1",
+  "phase": "extraction",
+  "description": "Regression test for the extraction-v1 prompt across two monitor threads (thread-736: 11 subtrees, 52 PLAN comments; Samsung G8 thread: 4 subtrees, 14 PLAN comments — 15 subtrees total, 66 PLAN comments). The extraction-v1 prompt is buyer-utility-first: keep everything a future buyer would want to read (verdicts, named-attribute observations, comparisons, reasoned concerns, price/value signals, reliability claims, reference-tier informational claims), drop everything else. Each input has its own golden output (gpt-5.4-mini reference run); the judge uses it to calibrate candidate quality.",
+  "runs": {
+    "perCandidate": 1,
+    "maxInFlight": 8
+  },
+  "inputs": [
+    {
+      "id": "best-34-ultrawide",
+      "kind": "fixture",
+      "path": "../../fixtures/extraction/monitors-thread-736-extraction-full.fixture.json",
+      "subtrees": "all",
+      "goldenOutput": {
+        "path": "extraction-v1-736.golden.json",
+        "role": "reference",
+        "note": "gpt-5.4-mini reference run on the thread-736 monitors fixture (11 subtrees). The golden is keyed by subtreeId — find the entry matching the current subtree's id to get the reference output. Treat it as a quality floor: the candidate should match or exceed this recall level with no more false positives."
+      }
+    },
+    {
+      "id": "samsung-g8",
+      "kind": "fixture",
+      "path": "../../fixtures/extraction/monitors-thread-0dfc0e00-extraction-full.fixture.json",
+      "subtrees": "all",
+      "goldenOutput": {
+        "path": "extraction-v1-samsung-g8.golden.json",
+        "role": "reference",
+        "note": "gpt-5.4-mini reference run on the Samsung Odyssey OLED G8 thread fixture (4 subtrees). Keyed by subtreeId. Treat it as a quality floor: the candidate should match or exceed this recall level with no more false positives."
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "id": "gpt-5.4-mini-current",
+      "model": "gpt-5.4-mini",
+      "systemPromptSource": "current"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "model": "gpt-5.4-mini",
+      "systemPromptSource": {
+        "file": "../../candidates/extraction/extraction-v1.md"
+      }
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "model": "deepseek-v4-flash",
+      "systemPromptSource": {
+        "file": "../../candidates/extraction/extraction-v1.md"
+      }
+    }
+  ],
+  "expectations": {
+    "desiredOutcome": "The candidate should extract ONLY buyer-useful quotes and AS MANY of them as possible. Buyer-useful means: a future buyer would learn something actionable from the quote — a verdict on a named attribute, a reasoned concern, a comparison, a price/value signal, a reliability claim, or a reference-tier informational claim (e.g. 'TFT says it's the MSI', 'Rtings favors the MSI', 'firmware update fixes the HDR'). Precision failures (junk that slips through): bare logistics/acquisition with no judgment ('I bought X', 'arrives Wednesday'), settings dumps ('brightness 54, contrast 70'), intent-to-test ('I'll let you know', 'will report back'), pure questions to other users, single-word reactions without context, comparison-baseline clauses ('coming from a 165Hz IPS'). Fabrication is an automatic disqualifier — every quote must be a verbatim substring of the comment body. Recall expectations: (1) OP-style buyer-deliberation comments listing multiple attributes → one quote per distinct attribute, not one quote total; (2) owner endorsements using informal language ('wow', 'absolutely insane', 'wish I had bought it sooner', 'feels just right') → retained; (3) reasoned concerns from prospective buyers ('concerned about grey tint', 'torn between 800R and 1800R', 'biggest concern is G-sync', 'feels like a huge gamble') → retained; (4) reference-tier informational claims about real product attributes → retained; (5) per-product attribution in multi-product comparison comments — each product that receives a substantive evaluation should have its own quote(s). Schema-valid JSON conforming to subtree-extraction.schema.",
+    "schemaCheck": "subtree-extraction.schema"
+  },
+  "judge": {
+    "enabled": true,
+    "model": "deepseek-v4-flash",
+    "instructions": "Score the candidate on five dimensions, each 1-10. The two most important dimensions are faithfulness and recall — a candidate that fabricates quotes is immediately disqualified regardless of recall score. (1) faithfulness (weight: highest) — every quote must be a verbatim substring of the comment body. Any paraphrased or fabricated quote drops this score to 1. If faithfulness < 5, set all other scores to 0 and mark as none-acceptable. (2) recall (weight: high) — does the candidate surface everything a future buyer would want to read? Score based on: (a) multi-attribute comments yield one quote per distinct attribute, not one quote total; (b) informal owner endorsements ('wow', 'absolutely insane', 'wish I had bought it sooner') are retained; (c) reasoned concerns from prospective buyers ('concerned about grey tint', 'torn between 800R and 1800R', 'biggest concern is G-sync') are retained; (d) reference-tier informational claims about real product attributes ('TFT says it's the MSI', 'firmware update fixes the HDR', 'Rtings favors the MSI') are retained; (e) each product in a multi-product comparison that receives substantive evaluation has its own quote(s). (3) precision (weight: medium) — false positives cost points. Obvious non-evidence that must not appear: bare logistics/acquisition ('I bought X', 'arrives Wednesday') with no judgment, settings dumps ('brightness 54, contrast 70'), intent-to-test ('I'll let you know', 'will report back'), pure questions to other users, single-word reactions without context, comparison-baseline clauses ('coming from a 165Hz IPS'). (4) attribution accuracy (weight: medium) — in multi-product comments, each quote must be attached to the correct product. Comparison-baseline leakage ('coming from X') must NOT attach to the resolved product. (5) classification calibration (weight: low) — experience matches the speaker's relationship (owner with purchase evidence vs prospective_buyer researching), depth reflects substance, intents are appropriate. Return JSON {candidates:[{candidateId, scores:{recall, faithfulness, precision, attribution, calibration}, rationale}], verdict}. Verdict format: 'best=<id>' | 'tie' | 'none-acceptable'.",
+    "perRun": false
+  }
+}

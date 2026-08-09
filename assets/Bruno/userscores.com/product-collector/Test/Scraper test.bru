@@ -1,0 +1,21 @@
+meta {
+  name: Scraper test
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8081/api/product-source-test/sync
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "productSourceId": "0f333bfc-7536-4379-9d2a-138d5b915eb2"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

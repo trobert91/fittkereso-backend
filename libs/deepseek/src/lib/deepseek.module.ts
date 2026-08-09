@@ -1,0 +1,17 @@
+import { Module } from "@nestjs/common";
+import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
+import { AiProviderRegistryModule } from "@ebike-backend/ai-core";
+import { DeepSeekClientService } from "./services/deepseek-client.service";
+import { DeepSeekConfigService } from "./services/deepseek-config.service";
+import { DeepSeekChatProvider } from "./services/deepseek-chat.provider";
+
+@Module({
+  imports: [DynamicConfigModule, AiProviderRegistryModule],
+  providers: [
+    DeepSeekClientService,
+    DeepSeekConfigService,
+    DeepSeekChatProvider,
+  ],
+  exports: [DeepSeekClientService, DeepSeekConfigService, DeepSeekChatProvider],
+})
+export class DeepSeekModule {}

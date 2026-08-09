@@ -1,0 +1,22 @@
+meta {
+  name: Search Products
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/admin-product/search
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "sort": "createdAt"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

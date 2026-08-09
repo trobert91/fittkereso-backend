@@ -1,0 +1,26 @@
+{
+  "baseUrl": "https://www.arukereso.hu",
+  "fullSyncStartUrl": "https://www.arukereso.hu/MainCategories.php",
+  "categories": {
+    "monitors":   { "enabled": true, "sourceTitle": "Monitor" },
+    "tvs":        { "enabled": true, "sourceTitle": "LED TV, LCD TV, OLED TV" },
+    "projectors": { "enabled": true, "sourceTitle": "Projektor" },
+    "mice":       { "enabled": true, "sourceTitle": "Egér" },
+    "keyboards":  { "enabled": true, "sourceTitle": "Billentyűzet" },
+    "headphones": { "enabled": true, "sourceTitle": "Fülhallgató, fejhallgató" },
+    "headsets":   { "enabled": true, "sourceTitle": "Fülhallgató, fejhallgató" },
+    "soundbars":  { "enabled": true, "sourceTitle": "Hangprojektor" }
+  },
+  "incrementalSync": {
+    "searchKeywords": [
+      "monitor",
+      "tv",
+      "projektor",
+      "egér",
+      "billentyűzet",
+      "fejhallgató",
+      "hangprojektor"
+    ],
+    "numResults": 60
+  }
+}

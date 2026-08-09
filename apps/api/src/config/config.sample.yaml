@@ -1,0 +1,27 @@
+environment: "dev"
+port: 8088
+
+mongo:
+  url: mongodb://root:root@localhost:27017/?authMechanism=DEFAULT
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: ebike
+  password: ebike
+  database: ebike
+  sync: true
+  run_migrations: true
+  ssl: false
+
+dataforseo:
+  api_url: https://api.dataforseo.com/v3
+  email: your-dataforseo-email
+  password: your-dataforseo-password
+
+app_settings:
+  app_url: https://api.ebike.com
+
+  api:
+    api_key: ebike-test
+    api_secret: testApiKey

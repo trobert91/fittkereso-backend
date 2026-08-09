@@ -1,0 +1,113 @@
+{
+  "ui:order": [
+    "channels",
+    "rmsPower",
+    "subwooferIncluded",
+    "subwooferType",
+    "dolbyAtmos",
+    "dolbyDigital",
+    "dolbySupport",
+    "dtsX",
+    "dts",
+    "hdmi",
+    "hdmiArc",
+    "hdmiInputCount",
+    "opticalInput",
+    "coaxialInput",
+    "analogInput",
+    "compositeOutput",
+    "componentOutput",
+    "auxOutput",
+    "usb",
+    "bluetooth",
+    "wifi",
+    "hdmiCec",
+    "dlna",
+    "wallMountable",
+    "remoteControl",
+    "width",
+    "height",
+    "depth",
+    "weight"
+  ],
+  "channels": {
+    "ui:placeholder": "e.g. 5.1.2"
+  },
+  "rmsPower": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 300"
+  },
+  "subwooferIncluded": {
+    "ui:widget": "checkbox"
+  },
+  "subwooferType": {
+    "ui:placeholder": "e.g. Wireless"
+  },
+  "dolbyAtmos": {
+    "ui:widget": "checkbox"
+  },
+  "dolbyDigital": {
+    "ui:widget": "checkbox"
+  },
+  "dolbySupport": {},
+  "dtsX": {
+    "ui:widget": "checkbox"
+  },
+  "dts": {
+    "ui:widget": "checkbox"
+  },
+  "hdmi": {
+    "ui:widget": "checkbox"
+  },
+  "hdmiArc": {
+    "ui:widget": "checkbox"
+  },
+  "hdmiInputCount": {
+    "ui:widget": "updown"
+  },
+  "opticalInput": {
+    "ui:widget": "checkbox"
+  },
+  "coaxialInput": {
+    "ui:widget": "checkbox"
+  },
+  "analogInput": {
+    "ui:widget": "checkbox"
+  },
+  "compositeOutput": {
+    "ui:widget": "checkbox"
+  },
+  "componentOutput": {
+    "ui:widget": "checkbox"
+  },
+  "auxOutput": {
+    "ui:widget": "checkbox"
+  },
+  "usb": {
+    "ui:widget": "checkbox"
+  },
+  "bluetooth": {
+    "ui:widget": "checkbox"
+  },
+  "wifi": {
+    "ui:widget": "checkbox"
+  },
+  "hdmiCec": {
+    "ui:widget": "checkbox"
+  },
+  "dlna": {
+    "ui:widget": "checkbox"
+  },
+  "wallMountable": {
+    "ui:widget": "checkbox"
+  },
+  "remoteControl": {
+    "ui:widget": "checkbox"
+  },
+  "width": {},
+  "height": {},
+  "depth": {},
+  "weight": {
+    "ui:widget": "updown"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "pricing": {
+    "gemini-3.1-pro-preview": {
+      "inputPerMillion": 2.00,
+      "outputPerMillion": 12.00
+    },
+    "gemini-3-flash-preview": {
+      "inputPerMillion": 0.50,
+      "outputPerMillion": 3.00
+    },
+    "gemini-3.1-flash-lite-preview": {
+      "inputPerMillion": 0.25,
+      "outputPerMillion": 1.50
+    }
+  },
+  "maxRetries": 3,
+  "fallbackModel": "gemini-3-flash-preview"
+}

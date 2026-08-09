@@ -1,0 +1,133 @@
+{
+  "ancestorDepth": 3,
+  "negativeTerms": [
+    {
+      "keyword": "smartphone",
+      "penalty": 0.8
+    },
+    {
+      "keyword": "tablet",
+      "penalty": 0.8
+    },
+    {
+      "keyword": "e-reader",
+      "penalty": 0.8
+    }
+  ],
+  "matchingConfig": {
+    "tokenSeparator": " ",
+    "variantSuffixes": [
+      "Ultra",
+      "SE",
+      "Pro",
+      "Classic"
+    ],
+    "tokenPriorityMap": {
+      "model": 3,
+      "variant": 2,
+      "generation": 4
+    },
+    "preserveTokenGroups": true,
+    "strictnessOverrides": {
+      "maxScore": 1.7,
+      "tokenOverlap": 0.4,
+      "numericHitRatio": 0.75
+    },
+    "criticalTokenPatterns": [
+      "Series\\s*\\d+",
+      "\\d+mm"
+    ]
+  },
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "smartwatch"
+    },
+    {
+      "weight": 2.5,
+      "keyword": "fitness tracker"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "Apple Watch",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "Garmin",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "heart rate monitor",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "GPS watch",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "sleep tracking",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "step counter",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Fitbit",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "watch battery life",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "SpO2",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "wearable"
+    },
+    {
+      "weight": 2,
+      "keyword": "Samsung Galaxy Watch",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "Polar watch",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "running watch",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "ECG watch",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "always-on display watch",
+      "exclusive": true
+    }
+  ],
+  "keywordIdentifiers": [
+    "heart rate",
+    "gps watch",
+    "fitness tracking",
+    "sleep tracking",
+    "step tracking",
+    "smartwatch battery life"
+  ]
+}

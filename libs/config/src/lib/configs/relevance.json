@@ -1,0 +1,17 @@
+{
+  "fuzzyThreshold": 0.7,
+  "productTermCap": 0.45,
+  "searchSimilarityThreshold": 0.1,
+  "quoteQualityWeights": {
+    "high": 1.0,
+    "medium": 0.85,
+    "low": 0.4
+  },
+  "experienceConfig": {
+    "owner": { "multiplier": 1.10, "floor": 3 },
+    "priorOwner": { "multiplier": 1.05, "floor": 2 },
+    "tested": { "multiplier": 1.00, "floor": 1 },
+    "prospectiveBuyer": { "multiplier": 0.85, "floor": 0 },
+    "reference": { "multiplier": 0.80, "floor": 0 }
+  }
+}

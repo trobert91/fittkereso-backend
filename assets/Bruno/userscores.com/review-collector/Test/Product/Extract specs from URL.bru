@@ -1,0 +1,21 @@
+meta {
+  name: Extract specs from URL
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:8080/api/product-test/create
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+      "productReferenceId": "b6d254e9-127d-4370-9f32-b08a18fd9c5d"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

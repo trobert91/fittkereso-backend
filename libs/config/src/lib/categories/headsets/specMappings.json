@@ -1,0 +1,65 @@
+{
+  "arukereso": {
+    "mappings": [
+      {
+        "key": "type",
+        "labels": ["Típus"],
+        "valueMap": {
+          "Fülhallgató": "In-ear",
+          "Fejhallgató": "Over-ear",
+          "Fül mögé helyezhető": "Open-ear"
+        }
+      },
+      {
+        "key": "connectivity",
+        "labels": ["Adatátvitel"]
+      },
+      {
+        "key": "connectionType",
+        "labels": ["Csatlakozás"]
+      },
+      {
+        "key": "bluetoothVersion",
+        "labels": ["Bluetooth verziószám"]
+      },
+      {
+        "key": "range",
+        "labels": ["Hatótávolság"],
+        "extract": "number"
+      },
+      {
+        "key": "frequencyResponseMin",
+        "labels": ["Min. frekvencia"],
+        "extract": "number"
+      },
+      {
+        "key": "frequencyResponseMax",
+        "labels": ["Max. frekvencia"],
+        "extract": "number"
+      },
+      {
+        "key": "impedance",
+        "labels": ["Névleges impedancia"],
+        "extract": "number"
+      },
+      {
+        "key": "sensitivity",
+        "labels": ["Érzékenység"],
+        "extract": "number"
+      },
+      {
+        "key": "microphone",
+        "labels": ["Mikrofon"]
+      },
+      {
+        "key": "volumeControl",
+        "labels": ["Hangerőszabályzó"]
+      },
+      {
+        "key": "weight",
+        "labels": ["Tömeg"],
+        "extract": "number"
+      }
+    ]
+  }
+}

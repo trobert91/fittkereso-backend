@@ -1,0 +1,20 @@
+meta {
+  name: Get Product by ID
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:8088/api/admin-product/751c157b-1be5-4330-8473-be787cd85cc6
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

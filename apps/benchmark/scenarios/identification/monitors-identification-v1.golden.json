@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "commentId": "c0",
+      "products": [
+        {
+          "brand": "MSI",
+          "model": "MPG 341CQPX",
+          "categoryHint": "monitor",
+          "specs": [
+            { "name": "panelType", "value": "QD-OLED" }
+          ],
+          "contentQuality": "high"
+        }
+      ]
+    },
+    {
+      "commentId": "c1",
+      "products": [
+        {
+          "brand": "LG",
+          "model": "34GS95QE-B",
+          "categoryHint": "monitor",
+          "specs": [
+            { "name": "panelType", "value": "WOLED" }
+          ],
+          "contentQuality": "high"
+        }
+      ]
+    },
+    {
+      "commentId": "c2",
+      "products": [
+        {
+          "brand": "LG",
+          "model": "34GS95QE-B",
+          "categoryHint": "monitor",
+          "contentQuality": "medium"
+        },
+        {
+          "brand": "MSI",
+          "model": "MPG 341CQPX",
+          "categoryHint": "monitor",
+          "contentQuality": "medium"
+        },
+        {
+          "brand": "Corsair",
+          "model": "Xeneon 34WQHD240-C",
+          "categoryHint": "monitor",
+          "contentQuality": "low"
+        }
+      ]
+    }
+  ]
+}

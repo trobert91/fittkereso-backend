@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "commentId": "c0",
+      "products": [
+        {
+          "productIndex": 0,
+          "quotes": [
+            {
+              "text": "the colors are absolutely stunning",
+              "sentiment": "positive",
+              "features": ["color accuracy"]
+            },
+            {
+              "text": "The QD-OLED panel really shines in HDR content",
+              "sentiment": "positive",
+              "features": ["HDR"]
+            },
+            {
+              "text": "the motion clarity is night and day",
+              "sentiment": "positive",
+              "features": ["response time"]
+            }
+          ],
+          "experience": "owner",
+          "depth": "detailed",
+          "intents": ["experience_report"],
+          "overallSentiment": "positive"
+        }
+      ]
+    },
+    {
+      "commentId": "c1",
+      "products": [
+        {
+          "productIndex": 0,
+          "quotes": [
+            {
+              "text": "The matte WOLED finish handles bright rooms way better than glossy panels",
+              "sentiment": "positive"
+            },
+            {
+              "text": "it's certified G-sync compatible which is a plus",
+              "sentiment": "positive"
+            }
+          ],
+          "experience": "prospective_buyer",
+          "depth": "mentioned",
+          "intents": ["recommendation", "comparison"],
+          "overallSentiment": "positive"
+        }
+      ]
+    },
+    {
+      "commentId": "c2",
+      "products": [
+        {
+          "productIndex": 0,
+          "quotes": [],
+          "experience": "prospective_buyer",
+          "depth": "superficial",
+          "intents": ["recommendation"],
+          "overallSentiment": "positive"
+        },
+        {
+          "productIndex": 1,
+          "quotes": [],
+          "experience": "prospective_buyer",
+          "depth": "superficial",
+          "intents": ["recommendation"],
+          "overallSentiment": "positive"
+        },
+        {
+          "productIndex": 2,
+          "quotes": [
+            {
+              "text": "overpriced for what you get",
+              "sentiment": "negative"
+            }
+          ],
+          "experience": "prospective_buyer",
+          "depth": "mentioned",
+          "intents": ["warning"],
+          "overallSentiment": "negative"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,565 @@
+{
+  "promptConfig": {
+    "examples": [],
+    "abbreviations": {
+      "Hz": "Hertz",
+      "TN": "Twisted Nematic",
+      "UW": "ultrawide",
+      "VA": "Vertical Alignment",
+      "FPS": "Frames Per Second",
+      "HDR": "High Dynamic Range",
+      "IPS": "In-Plane Switching",
+      "PPI": "Pixels Per Inch",
+      "VRR": "Variable Refresh Rate",
+      "OLED": "Organic Light-Emitting Diode",
+      "WOLED": "White OLED",
+      "QD-OLED": "Quantum Dot OLED"
+    },
+    "acceptedSpecs": [
+      "inch",
+      "inches",
+      "\"",
+      "Hz",
+      "hertz",
+      "ms",
+      "milliseconds",
+      "nits",
+      "p",
+      "1080p",
+      "1440p",
+      "4K",
+      "8K",
+      "R",
+      "800R",
+      "1000R",
+      "1800R"
+    ],
+    "rejectedTerms": [
+      "modes",
+      "settings",
+      "app",
+      "software",
+      "driver",
+      "cable",
+      "stand",
+      "box",
+      "shipping",
+      "OLED",
+      "WOLED",
+      "QD-OLED",
+      "AMOLED",
+      "Mini-LED",
+      "QLED"
+    ],
+    "specialInstructions": "Focus on panel technology, refresh rate, resolution, and color accuracy."
+  },
+  "matchingConfig": {
+    "strictness": "moderate",
+    "numericTokenRules": [
+      {
+        "weight": 4,
+        "pattern": "^\\d{2,3}$",
+        "critical": true,
+        "description": "Screen size"
+      },
+      {
+        "weight": 3.5,
+        "pattern": "\\d{3,4}(?:hz)?$",
+        "critical": true,
+        "description": "Refresh rate"
+      }
+    ]
+  },
+  "relevanceTerms": [
+    {
+      "weight": 1.2,
+      "keyword": "monitor"
+    },
+    {
+      "weight": 1.2,
+      "keyword": "display"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "gaming monitor"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "ultrawide"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "21:9"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "16:9"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "240hz"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "144hz"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "refresh rate"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "g-sync"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "gsync"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "freesync"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "vrr"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "hdr"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "hdr mode"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "1440p"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "4k"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "resolution"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "pixel density"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "ppi"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "text clarity"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "fringing"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "oled"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "qd-oled"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "qled"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "matte display"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "glossy finish"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "purple tint"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "grey tint"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "curve"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "curved"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "800r"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "800mm radius"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "immersive"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "field of view"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "wider view"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "34 inch"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "39 inch"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "27 inch"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "screen size"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "too big"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "too small"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "brightness"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "colors look great"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "color accuracy"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "fuzzy"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "gpu"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "rtx"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "graphics card"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "bandwidth limitation"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "not getting the most out"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "cannot be enabled"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "enabled together"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "hdr and g-sync"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "at 240hz"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "feature limitation"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "concerned about"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "concern"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "worried about"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "might make more sense"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "tradeoff"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "trade off"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "not sure if"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "well-lit environment"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "bright room"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "dark room"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "regular content"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "videos or photos"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "not centered"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "too distorted"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "excellent gaming monitor"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "love it"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "great upgrade"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "no issue"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "no complaints"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "worth it"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "amazing colors"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "text is clear"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "perfectly readable"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "text readability"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "hdr is amazing"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "hdr in games"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "hdr gaming"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "response time"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "pixel response time"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "motion clarity"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "smooth gameplay"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "feels smoother"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "fast pixel response"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "1800r"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "aggressive curve"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "curve feels right"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "curve was too much"
+    },
+    {
+      "weight": 1.3,
+      "keyword": "takes getting used to"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "motion sickness"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "nauseous"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "distortion"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "no distortion"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "vrr flicker"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "oled flicker"
+    },
+    {
+      "weight": 1.5,
+      "keyword": "black screen flicker"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "firmware update"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "settings conflict"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "oled text fringing"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "text fringing"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "quality control"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "qc"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "panel manufacturer"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "huge upgrade over"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "jumping from ips"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "ips panel"
+    }
+  ],
+  "keywordIdentifiers": [
+    "refresh rate",
+    "response time",
+    "aspect ratio",
+    "resolution",
+    "color accuracy",
+    "G-Sync",
+    "FreeSync",
+    "HDR",
+    "IPS panel",
+    "ultrawide",
+    "brightness",
+    "ppi",
+    "gaming",
+    "WOLED",
+    "IPS",
+    "VA panel",
+    "VA",
+    "OLED",
+    "low ppi",
+    "pixel response",
+    "motion clarity"
+  ],
+  "normalizationConfig": {
+    "removeSpaces": true,
+    "stripPattern": "[^\\w\\s-]",
+    "tokenPattern": "[a-z]+|\\d+[a-z]*|\\d+",
+    "tokenWeights": [
+      {
+        "weight": 4,
+        "pattern": "^\\d{2,3}$",
+        "description": "Screen size (27, 34, etc.)"
+      },
+      {
+        "weight": 2.5,
+        "pattern": "\\d",
+        "description": "Model numbers containing digits"
+      },
+      {
+        "weight": 1,
+        "pattern": "[a-z]+",
+        "description": "Letter sequences"
+      }
+    ],
+    "prefixPattern": "^(\\d{2,3})([a-z].*)$"
+  }
+}

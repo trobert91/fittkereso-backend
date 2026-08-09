@@ -1,0 +1,147 @@
+{
+  "3d": {
+    "ui:widget": "checkbox"
+  },
+  "hdr": {
+    "ui:widget": "select"
+  },
+  "gsync": {
+    "ui:widget": "checkbox"
+  },
+  "weightWithStand": {
+    "ui:widget": "updown"
+  },
+  "weightWithoutStand": {
+    "ui:widget": "updown"
+  },
+  "coating": {},
+  "freesync": {
+    "ui:widget": "checkbox"
+  },
+  "isCurved": {
+    "ui:widget": "checkbox"
+  },
+  "speakers": {
+    "ui:widget": "checkbox"
+  },
+  "ui:order": [
+    "screenSize",
+    "panelType",
+    "backlight",
+    "resolution",
+    "refreshRate",
+    "curvature",
+    "brightness",
+    "peakBrightness",
+    "aspectRatio",
+    "responseTime",
+    "inputLag",
+    "heightAdjustment",
+    "contrastRatio",
+    "isCurved",
+    "3d",
+    "viewingAngle",
+    "touchScreen",
+    "connections",
+    "freesync",
+    "gsync",
+    "speakers",
+    "weightWithStand",
+    "weightWithoutStand",
+    "powerConsumption",
+    "panelBitDepth",
+    "frc",
+    "pixelDensity",
+    "colorGamutSrgb",
+    "colorGamutDciP3",
+    "coating",
+    "hdmiCount",
+    "usbCount",
+    "vesaMount",
+    "portraitPivot",
+    "swivel",
+    "tiltable",
+    "hdr",
+    "hdResolution",
+    "energyClass"
+  ],
+  "curvature": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 1800R"
+  },
+  "panelType": {},
+  "hdmiCount": {
+    "ui:widget": "updown"
+  },
+  "usbCount": {
+    "ui:widget": "updown"
+  },
+  "vesaMount": {},
+  "brightness": {
+    "ui:widget": "updown"
+  },
+  "resolution": {
+    "ui:placeholder": "e.g. 2560x1440"
+  },
+  "screenSize": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 27"
+  },
+  "aspectRatio": {
+    "ui:widget": "select"
+  },
+  "connections": {},
+  "refreshRate": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 144"
+  },
+  "touchScreen": {
+    "ui:widget": "checkbox"
+  },
+  "pixelDensity": {
+    "ui:widget": "updown"
+  },
+  "responseTime": {
+    "ui:widget": "updown"
+  },
+  "viewingAngle": {
+    "ui:placeholder": "e.g. 178°"
+  },
+  "contrastRatio": {
+    "ui:placeholder": "e.g. 1000:1"
+  },
+  "panelBitDepth": {},
+  "peakBrightness": {
+    "ui:widget": "updown"
+  },
+  "heightAdjustment": {
+    "ui:widget": "checkbox"
+  },
+  "powerConsumption": {
+    "ui:widget": "updown"
+  },
+  "backlight": {},
+  "colorGamutSrgb": {
+    "ui:widget": "updown"
+  },
+  "colorGamutDciP3": {
+    "ui:widget": "updown"
+  },
+  "inputLag": {
+    "ui:widget": "updown"
+  },
+  "frc": {
+    "ui:widget": "checkbox"
+  },
+  "portraitPivot": {
+    "ui:widget": "checkbox"
+  },
+  "hdResolution": {},
+  "energyClass": {},
+  "swivel": {
+    "ui:widget": "checkbox"
+  },
+  "tiltable": {
+    "ui:widget": "checkbox"
+  }
+}
