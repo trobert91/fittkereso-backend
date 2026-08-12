@@ -47,3 +47,6 @@ docs/examples
 
 # Benchmark app run outputs (JSON + Markdown reports)
 apps/benchmark/runs
+
+# Local app config containing secrets (API keys, DB credentials) — see config.sample.yaml for the template
+apps/*/src/config/config.yaml
