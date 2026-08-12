@@ -4,7 +4,6 @@
   "license": "MIT",
   "scripts": {
     "start:api": "nx run api:serve",
-    "start:reviews:scheduler": "nx run review-collector:serve:scheduler",
     "start:products": "nx run product-collector:serve",
     "build:mcp": "nx run mcp:build",
     "start:mcp": "nx run mcp:serve",
@@ -96,6 +95,7 @@
     "@types/json-schema": "^7.0.15",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/lodash": "^4.17.20",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.7",
     "@types/pino": "^7.0.5",
     "@types/supertest": "^6.0.2",

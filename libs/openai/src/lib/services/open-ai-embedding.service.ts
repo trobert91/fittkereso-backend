@@ -6,10 +6,6 @@ import { OpenAiClientService } from './open-ai-client.service';
 export class OpenAiEmbeddingService {
   constructor(private readonly openAiService: OpenAiClientService) {}
 
-  public createCategoryEmbedding(name: string): Promise<number[]> {
-    return this.createEmbedding(name);
-  }
-
   /**
    * Generate an embedding vector for the given text input.
    * @param input The text to embed

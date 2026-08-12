@@ -11,7 +11,6 @@ import { ProductAliasRepository } from './postgres/repositories/product-alias-re
 import { Task } from './postgres/models/task.entity';
 import { TaskRepository } from './postgres/repositories/task-repository';
 import { ProductEmbedding } from './postgres/models/product-embedding.entity';
-import { ProductCategoryEmbedding } from './postgres/models/product-category-embedding.entity';
 import { Brand } from './postgres/models/brand.entity';
 import { BrandAlias } from './postgres/models/brand-alias.entity';
 import { BrandAliasRepository } from './postgres/repositories/brand-alias.repository';
@@ -24,8 +23,6 @@ import {
   ScrapeTaskRepository,
 } from './postgres';
 import { ProductSource } from './postgres/models/product-source.entity';
-import { WebSearchCache } from './postgres/models/web-search-cache.entity';
-import { WebSearchCacheRepository } from './postgres/repositories/web-search-cache.repository';
 import { ProductDuplicate } from './postgres/models/product-duplicate.entity';
 import { ProductDuplicateRepository } from './postgres/repositories/product-duplicate-repository';
 import { TranslationCache } from './postgres/models/translation-cache.entity';
@@ -36,7 +33,6 @@ export const entityList = [
   BrandAlias,
   ProductAlias,
   ProductCategory,
-  ProductCategoryEmbedding,
   ProductModel,
   ProductModelSource,
   ProductEmbedding,
@@ -44,7 +40,6 @@ export const entityList = [
   ProductSource,
   ScrapeTask,
   Task,
-  WebSearchCache,
   ProductDuplicate,
   TranslationCache,
 ];
@@ -62,7 +57,6 @@ export const entityList = [
     ProductSourceRepository,
     ScrapeTaskRepository,
     TaskRepository,
-    WebSearchCacheRepository,
     ProductDuplicateRepository,
     TranslationCacheRepository,
   ],
@@ -77,7 +71,6 @@ export const entityList = [
     ProductSourceRepository,
     ScrapeTaskRepository,
     TaskRepository,
-    WebSearchCacheRepository,
     ProductDuplicateRepository,
     TranslationCacheRepository,
   ],

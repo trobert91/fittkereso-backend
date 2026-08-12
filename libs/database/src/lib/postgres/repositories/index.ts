@@ -9,6 +9,5 @@ export * from './product-model-source-repository';
 export * from './product-source-repository';
 export * from './scrape-task-repository';
 export * from './task-repository';
-export * from './web-search-cache.repository';
 export * from './product-duplicate-repository';
 export * from './translation-cache.repository';

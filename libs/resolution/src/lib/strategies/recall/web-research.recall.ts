@@ -124,7 +124,7 @@ export class WebResearchRecallStrategy implements RecallStrategy {
         intent: query.intent,
         keyword: query.keyword,
         provider,
-        cacheHit: response.cacheHit ?? false,
+        cacheHit: false,
         serpResultCount: response.results.length,
       });
       for (const result of response.results) {

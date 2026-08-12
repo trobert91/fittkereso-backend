@@ -7,14 +7,6 @@ const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 export class AiEmbeddingService {
   constructor(private readonly registry: AiProviderRegistry) {}
 
-  /**
-   * Brand-rich category embedding helper preserved from the OpenAI service
-   * for caller compatibility.
-   */
-  createCategoryEmbedding(name: string): Promise<number[]> {
-    return this.createEmbedding(name);
-  }
-
   createEmbedding(input: string, model?: string): Promise<number[]> {
     const targetModel = model ?? DEFAULT_EMBEDDING_MODEL;
     const provider = this.registry.resolveEmbedding(targetModel);

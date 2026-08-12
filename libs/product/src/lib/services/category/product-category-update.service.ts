@@ -9,7 +9,7 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductSpecSortService } from '../product-spec/product-spec-sort.service';
 import { CategoryUpdateDto } from '../../models';
 import { CategoryUpdateMapperService } from './category-update-mapper.service';
-import { generateSlug, nameOf } from '@fittkereso-backend/utils';
+import { generateSlug } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class ProductCategoryUpdateService {
@@ -27,7 +27,6 @@ export class ProductCategoryUpdateService {
   ): Promise<ProductCategory> {
     const category = await this.categoryRepo.findOneOrFail({
       where: { id },
-      relations: [nameOf<ProductCategory>('embedding')],
     });
 
     // --- Detect schema change BEFORE applying updates ---
@@ -36,7 +35,7 @@ export class ProductCategoryUpdateService {
       : undefined;
 
     // Apply DTO changes (entity fields only — name, enabled)
-    await this.mapper.mapDtoToEntity(dto, category);
+    this.mapper.mapDtoToEntity(dto, category);
 
     // Write schema/uiSchema to config files if provided in DTO
     if (category.slug) {

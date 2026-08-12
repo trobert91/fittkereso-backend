@@ -89,15 +89,6 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       token: Joi.string().optional(),
     }).required(),
 
-    reddit: Joi.object({
-      client_id: Joi.string().required(),
-      client_secret: Joi.string().required(),
-      user_agent: Joi.string().required(),
-      refresh_token: Joi.string().required(),
-      username: Joi.string(),
-      password: Joi.string(),
-    }).required(),
-
     mailgun: Joi.object({
       api_key: Joi.string().required(),
       domain: Joi.string().required(),

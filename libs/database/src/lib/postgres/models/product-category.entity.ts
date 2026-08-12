@@ -1,14 +1,6 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  OneToMany,
-  OneToOne,
-} from 'typeorm';
+import { Column, Entity, Index, OneToMany } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
-import { ProductCategoryEmbedding } from './product-category-embedding.entity';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 import { Expose } from 'class-transformer';
 import type {
@@ -62,12 +54,4 @@ export class ProductCategory extends BasePostgresEntity {
   @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   aliases?: string[];
-
-  @OneToOne(() => ProductCategoryEmbedding, {
-    onDelete: 'SET NULL',
-    nullable: true,
-    cascade: true,
-  })
-  @JoinColumn()
-  embedding?: ProductCategoryEmbedding;
 }

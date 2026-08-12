@@ -2,10 +2,6 @@
 import { Injectable } from '@nestjs/common';
 import { chain } from 'lodash';
 import { format } from 'date-fns';
-import {
-  WebSearchProvider,
-  WebSearchCacheRepository,
-} from '@fittkereso-backend/database';
 import { ExaSearchService } from '@fittkereso-backend/exa';
 import { SerpApiService } from '@fittkereso-backend/dataforseo';
 import {
@@ -15,6 +11,12 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductSearchMetricsService } from '@fittkereso-backend/metrics';
 import { DataForSeoLocationCode } from '@fittkereso-backend/dataforseo';
+
+export type WebSearchProvider = 'dataforseo' | 'exa';
+export const WebSearchProvider = {
+  DataForSEO: 'dataforseo',
+  Exa: 'exa',
+} as const;
 
 /**
  * Request interface for product web search
@@ -59,26 +61,12 @@ export interface ProductWebSearchResponse {
     | 'op_priority'
     | 'high_relevance'
     | 'fallback_dataforseo';
-  /** Whether results came from cache or API */
-  source: 'cache' | 'api';
-  /** Cache hit flag */
-  cacheHit?: boolean;
-  /** Cache metadata */
-  metadata?: {
-    /** Keyword similarity score (if cache hit) */
-    similarity?: number;
-    /** Days difference from cached date (if cache hit) */
-    cacheDateDiff?: number;
-    /** Cache entry ID when served from cache */
-    cacheEntryId?: string;
-  };
 }
 
 /**
  * Unified Product Web Search Service
  *
- * Provides cache-first web search with intelligent provider selection:
- * - Cache layer: PostgreSQL trigram similarity + date tolerance
+ * Provides web search with intelligent provider selection:
  * - Provider selection: Exa.ai for high-value, DataForSEO for routine
  * - Common interface: Abstracts provider differences
  */
@@ -87,7 +75,6 @@ export class ProductWebSearchService {
   private readonly logger = new CustomLogger(ProductWebSearchService.name);
 
   constructor(
-    private readonly cacheRepository: WebSearchCacheRepository,
     private readonly exaSearchService: ExaSearchService,
     private readonly serpApiService: SerpApiService,
     private readonly dynamicConfigService: DynamicConfigService,
@@ -95,69 +82,25 @@ export class ProductWebSearchService {
   ) {}
 
   /**
-   * Perform web search with cache-first strategy
+   * Perform web search with provider selection
    *
    * Flow:
-   * 1. Check cache (keyword similarity + date tolerance)
-   * 2. If miss, select provider based on relevance
-   * 3. Execute provider search
-   * 4. Store in cache
-   * 5. Return results
+   * 1. Select provider based on relevance
+   * 2. Execute provider search
+   * 3. Return results
    */
   public async search(
     request: ProductWebSearchRequest,
   ): Promise<ProductWebSearchResponse> {
-    const cacheConfig = this.dynamicConfigService.webSearch?.cache;
-
-    // Normalize keyword for cache lookup
-    const normalizedKeyword = this.normalizeKeyword(request.keyword);
-
-    // Step 1: Check cache
-    if (cacheConfig?.enabled ?? true) {
-      const cacheHit = await this.cacheRepository.findCacheHit(
-        normalizedKeyword,
-        request.searchDate,
-        cacheConfig?.similarityThreshold ?? 0.7,
-        cacheConfig?.dateToleranceDays ?? 7,
-      );
-
-      if (cacheHit) {
-        this.logger.debug('Web search cache HIT', {
-          keyword: request.keyword,
-          provider: cacheHit.entry.provider,
-        });
-
-        this.metricsService.recordWebSearchCache('hit');
-
-        return {
-          results: cacheHit.entry.results,
-          provider: cacheHit.entry.provider,
-          providerSelectionReason: 'fallback_dataforseo',
-          source: 'cache',
-          cacheHit: true,
-          metadata: {
-            similarity: cacheHit.similarity,
-            cacheDateDiff: this.calculateDateDiff(
-              request.searchDate,
-              cacheHit.entry.searchDate,
-            ),
-            cacheEntryId: cacheHit.entry.id,
-          },
-        };
-      }
-    }
-
-    this.metricsService.recordWebSearchCache('miss');
-
     const webSearchConfig = this.dynamicConfigService.webSearch;
 
-    // Step 2: Select provider based on relevance/context
+    // Step 1: Select provider based on relevance/context
     const { provider, reason: providerSelectionReason } = this.selectProvider(
       request,
       webSearchConfig,
     );
 
-    this.logger.debug('Web search cache MISS, calling provider', {
+    this.logger.debug('Calling web search provider', {
       keyword: request.keyword,
       provider,
       providerSelectionReason,
@@ -165,7 +108,7 @@ export class ProductWebSearchService {
       isOp: request.isOp,
     });
 
-    // Step 3: Execute provider search
+    // Step 2: Execute provider search
     const searchStartTime = Date.now();
     let results: ProductWebSearchResult[];
     try {
@@ -188,24 +131,10 @@ export class ProductWebSearchService {
       throw error;
     }
 
-    // Step 4: Store in cache
-    if (cacheConfig?.enabled ?? true) {
-      await this.cacheRepository.storeCache(
-        request.keyword,
-        normalizedKeyword,
-        request.searchDate,
-        provider,
-        results,
-        cacheConfig?.ttlDays ?? 90,
-      );
-    }
-
     return {
       results,
       provider,
       providerSelectionReason,
-      source: 'api',
-      cacheHit: false,
     };
   }
 
@@ -358,29 +287,4 @@ export class ProductWebSearchService {
     }));
   }
 
-  /**
-   * Normalize keyword for cache matching
-   *
-   * - Lowercase
-   * - Trim whitespace
-   * - Remove extra spaces
-   */
-  private normalizeKeyword(keyword: string): string {
-    return keyword.toLowerCase().trim().replace(/\s+/g, ' ');
-  }
-
-  /**
-   * Calculate date difference in days
-   */
-  private calculateDateDiff(
-    date1: Date | undefined,
-    date2: Date | undefined,
-  ): number | undefined {
-    if (!date1 || !date2) {
-      return undefined;
-    }
-
-    const diffMs = Math.abs(date1.getTime() - date2.getTime());
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  }
 }
