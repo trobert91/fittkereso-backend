@@ -1,7 +1,7 @@
-import { ConflictException, Injectable } from "@nestjs/common";
-import { Brand, BrandRepository } from "@ebike-backend/database";
-import { generateSlug } from "@ebike-backend/utils";
-import { BrandCreateDto } from "../../models";
+import { ConflictException, Injectable } from '@nestjs/common';
+import { Brand, BrandRepository } from '@fittkereso-backend/database';
+import { generateSlug } from '@fittkereso-backend/utils';
+import { BrandCreateDto } from '../../models';
 
 @Injectable()
 export class BrandCreateService {
@@ -10,7 +10,7 @@ export class BrandCreateService {
   public async createBrand(dto: BrandCreateDto): Promise<Brand> {
     const existing = await this.brandRepo.findOne({
       where: { name: dto.name },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing) {
       throw new ConflictException(
@@ -33,10 +33,10 @@ export class BrandCreateService {
     let slug = generateSlug(entity.id, entity.name);
     const existing = await this.brandRepo.findOne({
       where: { slug },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing && existing.id !== entity.id) {
-      slug = slug + "-" + entity.id.slice(-6);
+      slug = slug + '-' + entity.id.slice(-6);
     }
     entity.slug = slug;
   }

@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryEmbedding,
-} from "@ebike-backend/database";
-import { isUndefined } from "lodash";
-import { AiEmbeddingService } from "@ebike-backend/ai";
-import { CategoryUpdateDto } from "../../models";
+} from '@fittkereso-backend/database';
+import { isUndefined } from 'lodash';
+import { AiEmbeddingService } from '@fittkereso-backend/ai';
+import { CategoryUpdateDto } from '../../models';
 
 @Injectable()
 export class CategoryUpdateMapperService {

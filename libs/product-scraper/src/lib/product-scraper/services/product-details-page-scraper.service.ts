@@ -1,10 +1,10 @@
-import { ScrapeTask } from "@ebike-backend/database";
-import { ScraperService } from "@ebike-backend/scraper";
-import * as cheerio from "cheerio";
-import { ProductDetailsPageExtractor } from "../interfaces/product-details-page-extractor.interface";
-import { Injectable } from "@nestjs/common";
-import { ProductScrapeUpdaterService } from "./product-scrape-updater.service";
-import { ProductScrapingMetricsService } from "@ebike-backend/metrics";
+import { ScrapeTask } from '@fittkereso-backend/database';
+import { ScraperService } from '@fittkereso-backend/scraper';
+import * as cheerio from 'cheerio';
+import { ProductDetailsPageExtractor } from '../interfaces/product-details-page-extractor.interface';
+import { Injectable } from '@nestjs/common';
+import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
+import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 
 @Injectable()
 export class ProductDetailsPageScraperService {
@@ -33,7 +33,7 @@ export class ProductDetailsPageScraperService {
       );
 
       if (!scrapedProduct) {
-        this.scrapingMetrics.recordExtractionOutcome(sourceType, "skipped");
+        this.scrapingMetrics.recordExtractionOutcome(sourceType, 'skipped');
         return;
       }
 
@@ -43,15 +43,15 @@ export class ProductDetailsPageScraperService {
       );
 
       if (result) {
-        this.scrapingMetrics.recordExtractionOutcome(sourceType, "success");
+        this.scrapingMetrics.recordExtractionOutcome(sourceType, 'success');
       } else {
         this.scrapingMetrics.recordExtractionOutcome(
           sourceType,
-          "skipped_brand_failed",
+          'skipped_brand_failed',
         );
       }
     } catch (error) {
-      this.scrapingMetrics.recordExtractionOutcome(sourceType, "error");
+      this.scrapingMetrics.recordExtractionOutcome(sourceType, 'error');
       throw error;
     } finally {
       this.scrapingMetrics.recordScrapeDuration(

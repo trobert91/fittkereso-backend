@@ -1,11 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { SlimCandidate, CandidateFunnel } from "../models/slim-types";
+import { Inject, Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { SlimCandidate, CandidateFunnel } from '../models/slim-types';
 import {
   RECALL_STRATEGIES,
   type RecallStrategy,
-} from "../models/strategy-types";
+} from '../models/strategy-types';
 
 const MAX_CANDIDATES_DEFAULT = 50;
 
@@ -43,7 +43,7 @@ export class RecallService {
       this.dynamicConfig.search?.maxCandidates ?? MAX_CANDIDATES_DEFAULT;
     // Initialize from the prior funnel (when present) so hits accumulate across
     // calls. A strategy that fires N times adds to its bucket N times.
-    const hitsBySource: Record<RecallStrategy["name"], number> = {
+    const hitsBySource: Record<RecallStrategy['name'], number> = {
       fuzzy: context.recallFunnel?.fuzzyHits ?? 0,
       embedding: context.recallFunnel?.embeddingHits ?? 0,
       web: context.recallFunnel?.webHits ?? 0,
@@ -81,7 +81,7 @@ export class RecallService {
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         context.errors.push({
-          phase: "recall",
+          phase: 'recall',
           message,
           detail: strategy.name,
           timestamp: new Date().toISOString(),

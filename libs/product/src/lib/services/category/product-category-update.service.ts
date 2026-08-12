@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryRepository,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { ProductSpecSortService } from "../product-spec/product-spec-sort.service";
-import { CategoryUpdateDto } from "../../models";
-import { CategoryUpdateMapperService } from "./category-update-mapper.service";
-import { generateSlug, nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { ProductSpecSortService } from '../product-spec/product-spec-sort.service';
+import { CategoryUpdateDto } from '../../models';
+import { CategoryUpdateMapperService } from './category-update-mapper.service';
+import { generateSlug, nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class ProductCategoryUpdateService {
@@ -27,7 +27,7 @@ export class ProductCategoryUpdateService {
   ): Promise<ProductCategory> {
     const category = await this.categoryRepo.findOneOrFail({
       where: { id },
-      relations: [nameOf<ProductCategory>("embedding")],
+      relations: [nameOf<ProductCategory>('embedding')],
     });
 
     // --- Detect schema change BEFORE applying updates ---
@@ -75,10 +75,10 @@ export class ProductCategoryUpdateService {
     let slug = generateSlug(entity.id, entity.name);
     const existing = await this.categoryRepo.findOne({
       where: { slug },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing && existing.id !== entity.id) {
-      slug = slug + "-" + entity.id.slice(-6);
+      slug = slug + '-' + entity.id.slice(-6);
     }
     entity.slug = slug;
   }

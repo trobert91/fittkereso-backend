@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { ZyteScraperService } from "@ebike-backend/zyte";
+import { Injectable } from '@nestjs/common';
+import { ZyteScraperService } from '@fittkereso-backend/zyte';
 
 @Injectable()
 export class ScraperService {

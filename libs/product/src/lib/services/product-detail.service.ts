@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductModelRepository,
   ScrapeTask,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { nameOf } from "@ebike-backend/utils";
-import { ProductImageDtoService } from "./product-image-dto.service";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ProductImageDtoService } from './product-image-dto.service';
 
 @Injectable()
 export class ProductDetailService {
@@ -20,19 +20,17 @@ export class ProductDetailService {
     const product = await this.productRepo.findOneOrFail({
       where: { id: productId },
       relations: [
-        nameOf<ProductModel>("brand"),
-        nameOf<ProductModel>("productCategory"),
-        nameOf<ProductModel>("aliases"),
-        nameOf<ProductModel>("reviews"),
-        nameOf<ProductModel>("images"),
-        nameOf<ProductModel>("mainImage"),
-        nameOf<ProductModel>("rating"),
-        nameOf<ProductModel>("sources"),
-        nameOf<ProductModel>("scrapeTasks"),
-        `scrapeTasks.${nameOf<ScrapeTask>("source")}`,
+        nameOf<ProductModel>('brand'),
+        nameOf<ProductModel>('productCategory'),
+        nameOf<ProductModel>('aliases'),
+        nameOf<ProductModel>('images'),
+        nameOf<ProductModel>('mainImage'),
+        nameOf<ProductModel>('sources'),
+        nameOf<ProductModel>('scrapeTasks'),
+        `scrapeTasks.${nameOf<ScrapeTask>('source')}`,
       ],
       order: {
-        scrapeTasks: { createdAt: "DESC" },
+        scrapeTasks: { createdAt: 'DESC' },
       },
     });
 

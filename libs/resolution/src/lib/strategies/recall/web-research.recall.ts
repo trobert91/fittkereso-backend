@@ -1,18 +1,18 @@
-import { Injectable } from "@nestjs/common";
-import { ProductWebSearchService } from "@ebike-backend/product";
-import { normalize } from "@ebike-backend/utils";
-import { uniqBy } from "lodash";
-import type { RecallStrategy } from "../../models/strategy-types";
-import type { ResolutionContext } from "../../models/resolution-context";
-import type { SlimCandidate } from "../../models/slim-types";
+import { Injectable } from '@nestjs/common';
+import { ProductWebSearchService } from '@fittkereso-backend/product';
+import { normalize } from '@fittkereso-backend/utils';
+import { uniqBy } from 'lodash';
+import type { RecallStrategy } from '../../models/strategy-types';
+import type { ResolutionContext } from '../../models/resolution-context';
+import type { SlimCandidate } from '../../models/slim-types';
 import type {
   SearchEvidence,
   WebQueryIntent,
   WebQueryRecord,
-} from "../../models/search-evidence";
-import { WebSearchKeywordBuilder } from "../../web-search/web-search-keyword.builder";
-import { SerpSkusExtractor } from "../../web-search/serp-skus.extractor";
-import { CatalogResolver } from "../../web-search/catalog-resolver";
+} from '../../models/search-evidence';
+import { WebSearchKeywordBuilder } from '../../web-search/web-search-keyword.builder';
+import { SerpSkusExtractor } from '../../web-search/serp-skus.extractor';
+import { CatalogResolver } from '../../web-search/catalog-resolver';
 
 /**
  * Single web-research recall strategy. Replaces the three-way branch in the
@@ -37,7 +37,7 @@ import { CatalogResolver } from "../../web-search/catalog-resolver";
  */
 @Injectable()
 export class WebResearchRecallStrategy implements RecallStrategy {
-  readonly name = "web" as const;
+  readonly name = 'web' as const;
 
   constructor(
     private readonly webSearch: ProductWebSearchService,
@@ -50,7 +50,7 @@ export class WebResearchRecallStrategy implements RecallStrategy {
     if (!context.options.webSearchEnabled) return false;
     // Single-shot — the orchestrator's fixed-point loop re-invokes recall after
     // filter+score; this guard stops web from re-firing on the rescue iteration.
-    if (context.strategiesRun.includes("web")) return false;
+    if (context.strategiesRun.includes('web')) return false;
     // Reference-product variant search always benefits from a SERP — the
     // reference is in the catalog already and we need sibling SKU evidence.
     if (context.referenceProduct) return true;
@@ -103,13 +103,13 @@ export class WebResearchRecallStrategy implements RecallStrategy {
     for (let index = 0; index < serpOutcomes.length; index++) {
       const outcome = serpOutcomes[index];
       const query = prepared[index];
-      if (outcome.status === "rejected") {
+      if (outcome.status === 'rejected') {
         const message =
           outcome.reason instanceof Error
             ? outcome.reason.message
             : String(outcome.reason);
         context.errors.push({
-          phase: "recall",
+          phase: 'recall',
           message,
           detail: `web:${query.intent}`,
           timestamp: new Date().toISOString(),
@@ -118,8 +118,8 @@ export class WebResearchRecallStrategy implements RecallStrategy {
       }
       const response = outcome.value;
       const provider = (
-        response.provider === "exa" ? "exa" : "dataforseo"
-      ) as SearchEvidence["provider"];
+        response.provider === 'exa' ? 'exa' : 'dataforseo'
+      ) as SearchEvidence['provider'];
       queryRecords.push({
         intent: query.intent,
         keyword: query.keyword,
@@ -130,7 +130,7 @@ export class WebResearchRecallStrategy implements RecallStrategy {
       for (const result of response.results) {
         evidence.push({
           title: result.title,
-          description: result.description ?? result.content ?? "",
+          description: result.description ?? result.content ?? '',
           url: result.url,
           provider,
           queryIntent: query.intent,
@@ -156,14 +156,14 @@ export class WebResearchRecallStrategy implements RecallStrategy {
     // One SKU-extraction LLM call over the union.
     try {
       await this.serpExtractor.extract(context, deduped, undefined, {
-        component: "WebResearchRecallStrategy",
+        component: 'WebResearchRecallStrategy',
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "recall",
+        phase: 'recall',
         message,
-        detail: "web:serp_extraction",
+        detail: 'web:serp_extraction',
         timestamp: new Date().toISOString(),
       });
       // Continue — records may still carry empty modelNumbers and catalog
@@ -192,13 +192,13 @@ export class WebResearchRecallStrategy implements RecallStrategy {
 
   private pickIntents(context: ResolutionContext): WebQueryIntent[] {
     if (context.referenceProduct) {
-      return ["reference_sibling_sku"];
+      return ['reference_sibling_sku'];
     }
-    const intents: WebQueryIntent[] = ["model_with_specs"];
+    const intents: WebQueryIntent[] = ['model_with_specs'];
     const hasBrand = (context.brand?.name ?? context.input.brand)?.trim();
     const hasModel = context.input.model?.trim();
     if (hasBrand && hasModel) {
-      intents.push("cross_market");
+      intents.push('cross_market');
     }
     return intents;
   }

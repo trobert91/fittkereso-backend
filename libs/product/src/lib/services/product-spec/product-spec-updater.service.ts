@@ -1,19 +1,19 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductModelRepository,
   ProductModelSource,
   ProductSourceType,
   ProductSpecs,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ProductSpecMergeService } from "./product-spec-merge.service";
-import { ProductSpecSortService } from "./product-spec-sort.service";
-import { chain, groupBy, isBoolean, isEmpty, isNumber, maxBy } from "lodash";
-import { nameOf } from "@ebike-backend/utils";
-import { ProductSpecValidatorService } from "./product-spec-validator.service";
-import { ProductMetricsService } from "@ebike-backend/metrics";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ProductSpecMergeService } from './product-spec-merge.service';
+import { ProductSpecSortService } from './product-spec-sort.service';
+import { chain, groupBy, isBoolean, isEmpty, isNumber, maxBy } from 'lodash';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ProductSpecValidatorService } from './product-spec-validator.service';
+import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 @Injectable()
 export class ProductSpecUpdaterService {
@@ -62,8 +62,8 @@ export class ProductSpecUpdaterService {
     const product = await this.productRepo.findOneOrFail({
       where: { id },
       relations: [
-        nameOf<ProductModel>("productCategory"),
-        nameOf<ProductModel>("sources"),
+        nameOf<ProductModel>('productCategory'),
+        nameOf<ProductModel>('sources'),
       ],
     });
 

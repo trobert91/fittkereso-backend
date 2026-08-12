@@ -1,5 +1,5 @@
-import { Expose, Type } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
+import { Expose, Type } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 import {
   IsInt,
   IsNotEmpty,
@@ -7,7 +7,7 @@ import {
   IsString,
   Max,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
 export class SearchProductDto {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })

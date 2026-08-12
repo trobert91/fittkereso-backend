@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import Anthropic from "@anthropic-ai/sdk";
-import { ClaudeConfigService as AppClaudeConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import Anthropic from '@anthropic-ai/sdk';
+import { ClaudeConfigService as AppClaudeConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class ClaudeClientService {

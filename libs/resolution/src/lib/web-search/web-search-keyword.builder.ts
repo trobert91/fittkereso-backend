@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { StructuredSpec } from "@ebike-backend/database";
-import { compact } from "lodash";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { WebQueryIntent } from "../models/search-evidence";
+import { Injectable } from '@nestjs/common';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { StructuredSpec } from '@fittkereso-backend/database';
+import { compact } from 'lodash';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { WebQueryIntent } from '../models/search-evidence';
 
-const CROSS_MARKET_REGIONS = "US EU UK";
+const CROSS_MARKET_REGIONS = 'US EU UK';
 
 /**
  * Deterministic SERP-query compiler.
@@ -35,13 +35,13 @@ export class WebSearchKeywordBuilder {
   ): string | undefined {
     const categorySlug = this.resolveCategorySlug(context);
     switch (intent) {
-      case "exact_model":
+      case 'exact_model':
         return this.buildExactModel(context, categorySlug);
-      case "model_with_specs":
+      case 'model_with_specs':
         return this.buildModelWithSpecs(context, categorySlug);
-      case "reference_sibling_sku":
+      case 'reference_sibling_sku':
         return this.buildReferenceSiblingSku(context, categorySlug);
-      case "cross_market":
+      case 'cross_market':
         return this.buildCrossMarket(context, categorySlug);
     }
   }
@@ -55,7 +55,7 @@ export class WebSearchKeywordBuilder {
     const suffix = this.resolveSuffix(categorySlug);
     const quoted = quoteBrandModel(context.input.brand, context.input.model);
     if (!quoted) return undefined;
-    return compact([quoted, suffix]).join(" ");
+    return compact([quoted, suffix]).join(' ');
   }
 
   private buildModelWithSpecs(
@@ -69,7 +69,7 @@ export class WebSearchKeywordBuilder {
       context.effectiveMatchSpecs ?? context.input.specs,
       2,
     );
-    return compact([quoted, specValues, suffix]).join(" ");
+    return compact([quoted, specValues, suffix]).join(' ');
   }
 
   private buildReferenceSiblingSku(
@@ -93,11 +93,11 @@ export class WebSearchKeywordBuilder {
 
     return compact([
       quoted,
-      modelClues.join(" "),
+      modelClues.join(' '),
       specValues,
-      variantClues.join(" "),
+      variantClues.join(' '),
       suffix,
-    ]).join(" ");
+    ]).join(' ');
   }
 
   private buildCrossMarket(
@@ -112,7 +112,7 @@ export class WebSearchKeywordBuilder {
       `"${brand} ${model}"`,
       `equivalent model name ${CROSS_MARKET_REGIONS}`,
       suffix,
-    ]).join(" ");
+    ]).join(' ');
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -171,5 +171,5 @@ function firstSpecValues(
       if (str.length > 0) values.push(str);
     }
   }
-  return values.length > 0 ? values.join(" ") : undefined;
+  return values.length > 0 ? values.join(' ') : undefined;
 }

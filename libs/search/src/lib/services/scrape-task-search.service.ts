@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductSource,
   ScrapeTask,
   ScrapeTaskRepository,
-} from "@ebike-backend/database";
-import { SelectQueryBuilder } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { ScrapeTaskSearchParams } from "../models/scrape-task-search-params";
-import { ScrapeTaskSearchResult } from "../models/scrape-task-search-result";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { SelectQueryBuilder } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ScrapeTaskSearchParams } from '../models/scrape-task-search-params';
+import { ScrapeTaskSearchResult } from '../models/scrape-task-search-result';
+import { isEmpty } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -22,8 +22,8 @@ export class ScrapeTaskSearchService {
   ): Promise<ScrapeTaskSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? "createdAt",
-      order: params.order ?? ("DESC" as const),
+      sort: params.sort ?? 'createdAt',
+      order: params.order ?? ('DESC' as const),
     };
 
     const query = this.buildQuery(finalParams);
@@ -36,31 +36,31 @@ export class ScrapeTaskSearchService {
     params: ScrapeTaskSearchParams,
   ): SelectQueryBuilder<ScrapeTask> {
     let query = this.scrapeTaskRepo.repo
-      .createQueryBuilder("scrapeTask")
-      .leftJoinAndSelect(`scrapeTask.${nameOf<ScrapeTask>("source")}`, "source")
+      .createQueryBuilder('scrapeTask')
+      .leftJoinAndSelect(`scrapeTask.${nameOf<ScrapeTask>('source')}`, 'source')
       .leftJoinAndSelect(
-        `scrapeTask.${nameOf<ScrapeTask>("product")}`,
-        "product",
+        `scrapeTask.${nameOf<ScrapeTask>('product')}`,
+        'product',
       )
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("brand")}`, "brand");
+      .leftJoinAndSelect(`product.${nameOf<ProductModel>('brand')}`, 'brand');
 
     if (!isEmpty(params.statuses)) {
       query = query.andWhere(
-        `scrapeTask.${nameOf<ScrapeTask>("status")} IN (:...statuses)`,
+        `scrapeTask.${nameOf<ScrapeTask>('status')} IN (:...statuses)`,
         { statuses: params.statuses },
       );
     }
 
     if (!isEmpty(params.queues)) {
       query = query.andWhere(
-        `scrapeTask.${nameOf<ScrapeTask>("queue")} IN (:...queues)`,
+        `scrapeTask.${nameOf<ScrapeTask>('queue')} IN (:...queues)`,
         { queues: params.queues },
       );
     }
 
     if (!isEmpty(params.sourceTypes)) {
       query = query.andWhere(
-        `source.${nameOf<ProductSource>("type")} IN (:...sourceTypes)`,
+        `source.${nameOf<ProductSource>('type')} IN (:...sourceTypes)`,
         { sourceTypes: params.sourceTypes },
       );
     }
@@ -68,7 +68,7 @@ export class ScrapeTaskSearchService {
     query = query.orderBy(
       `scrapeTask.${params.sort}`,
       params.order,
-      "NULLS LAST",
+      'NULLS LAST',
     );
 
     const page = params.page ?? 1;

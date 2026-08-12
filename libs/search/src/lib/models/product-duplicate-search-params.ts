@@ -1,6 +1,6 @@
-import { IsOptional, IsString, IsNumber, IsEnum, Min } from "class-validator";
-import { Type } from "class-transformer";
-import { ProductDuplicateDecision } from "@ebike-backend/database";
+import { IsOptional, IsString, IsNumber, IsEnum, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ProductDuplicateDecision } from '@fittkereso-backend/database';
 
 export class ProductDuplicateSearchParams {
   @IsOptional()

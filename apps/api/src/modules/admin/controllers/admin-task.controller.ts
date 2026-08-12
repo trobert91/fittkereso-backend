@@ -4,25 +4,25 @@ import {
   Post,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
-import { UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { UserRole } from '@fittkereso-backend/database';
 import {
   TaskSearchParams,
   TaskSearchResult,
   TaskSearchService,
-} from "@ebike-backend/search";
-import { SerializeGroup } from "@ebike-backend/utils";
+} from '@fittkereso-backend/search';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 
-@Controller("admin-task")
+@Controller('admin-task')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminTaskController {
   constructor(private readonly searchService: TaskSearchService) {}
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,

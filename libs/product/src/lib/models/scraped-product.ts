@@ -1,4 +1,4 @@
-import { ProductCategory, ProductSpecs } from "@ebike-backend/database";
+import { ProductCategory, ProductSpecs } from '@fittkereso-backend/database';
 
 export interface ScrapedProduct {
   category: ProductCategory;

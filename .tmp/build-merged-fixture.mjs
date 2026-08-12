@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT = "e:/Work/ebike/repos/ebike-backend";
+const ROOT = "e:/Work/fittkereso/repos/fittkereso-backend";
 const SOURCE_FIXTURE = path.join(
   ROOT,
   "apps/benchmark/fixtures/monitors-thread-sweep-full.fixture.json",

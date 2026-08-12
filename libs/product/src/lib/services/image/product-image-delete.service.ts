@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductImageRepository,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
-import { ProductImageOrderService } from "./product-image-order.service";
-import { ProductImageStorageService } from "./product-image-storage.service";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ProductImageOrderService } from './product-image-order.service';
+import { ProductImageStorageService } from './product-image-storage.service';
 
 @Injectable()
 export class ProductImageDeleteService {
@@ -20,7 +20,7 @@ export class ProductImageDeleteService {
   public async deleteImage(productId: string, imageId: string): Promise<void> {
     const model = await this.productRepo.findOneOrFail({
       where: { id: productId },
-      relations: [nameOf<ProductModel>("images")],
+      relations: [nameOf<ProductModel>('images')],
     });
     const image = model.images.find((img) => img.id === imageId);
     if (!image) {

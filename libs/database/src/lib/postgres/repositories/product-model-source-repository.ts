@@ -1,16 +1,16 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { BasePostgresRepository } from "./base-postgres-repository";
-import { ProductModelSource } from "../models/product-model-source.entity";
-import { ProductModel } from "../models/product-model.entity";
-import { isEmpty } from "lodash";
-import { nameOf } from "@ebike-backend/utils";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { BasePostgresRepository } from './base-postgres-repository';
+import { ProductModelSource } from '../models/product-model-source.entity';
+import { ProductModel } from '../models/product-model.entity';
+import { isEmpty } from 'lodash';
+import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class ProductModelSourceRepository extends BasePostgresRepository<ProductModelSource> {
   constructor(
-    @InjectRepository(ProductModelSource, "postgres")
+    @InjectRepository(ProductModelSource, 'postgres')
     repository: Repository<ProductModelSource>,
   ) {
     super(repository, ProductModelSource);
@@ -19,7 +19,7 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
   async findByUrl(url: string): Promise<ProductModelSource | null> {
     return this.repo.findOne({
       where: { url },
-      relations: [nameOf<ProductModelSource>("model")],
+      relations: [nameOf<ProductModelSource>('model')],
     });
   }
 
@@ -27,9 +27,9 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
     if (isEmpty(urls)) return new Set();
 
     const results = await this.repo
-      .createQueryBuilder("source")
-      .select(`source.${nameOf<ProductModelSource>("url")}`)
-      .where(`source.${nameOf<ProductModelSource>("url")} IN (:...urls)`, {
+      .createQueryBuilder('source')
+      .select(`source.${nameOf<ProductModelSource>('url')}`)
+      .where(`source.${nameOf<ProductModelSource>('url')} IN (:...urls)`, {
         urls,
       })
       .getMany();
@@ -42,30 +42,30 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
     categoryId: string,
   ): Promise<ProductModelSource[]> {
     return this.repo
-      .createQueryBuilder("source")
+      .createQueryBuilder('source')
       .innerJoinAndSelect(
-        `source.${nameOf<ProductModelSource>("model")}`,
-        "model",
+        `source.${nameOf<ProductModelSource>('model')}`,
+        'model',
       )
       .innerJoinAndSelect(
-        `model.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `model.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
       .leftJoinAndSelect(
-        `model.${nameOf<ProductModel>("mainImage")}`,
-        "mainImage",
+        `model.${nameOf<ProductModel>('mainImage')}`,
+        'mainImage',
       )
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>("images")}`, "images")
+      .leftJoinAndSelect(`model.${nameOf<ProductModel>('images')}`, 'images')
       .leftJoinAndSelect(
-        `model.${nameOf<ProductModel>("embedding")}`,
-        "embedding",
+        `model.${nameOf<ProductModel>('embedding')}`,
+        'embedding',
       )
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>("sources")}`, "sources")
+      .leftJoinAndSelect(`model.${nameOf<ProductModel>('sources')}`, 'sources')
       .where(
-        `source.${nameOf<ProductModelSource>("normalizedSourceName")} = :normalizedSourceName`,
+        `source.${nameOf<ProductModelSource>('normalizedSourceName')} = :normalizedSourceName`,
         { normalizedSourceName },
       )
-      .andWhere("category.id = :categoryId", { categoryId })
+      .andWhere('category.id = :categoryId', { categoryId })
       .getMany();
   }
 }

@@ -11,20 +11,13 @@ export class DynamicConfigService {
     return this.fileLoader.getData();
   }
 
-  /** Top-level general settings (threadProcessingPerDay, redditSearchThreadLimit, etc.) */
+  /** Top-level general settings. */
   get general(): GeneralConfig {
     const data = this.fileLoader.getData();
     return {
-      threadProcessingPerDay: data.threadProcessingPerDay,
-      redditSearchThreadLimit: data.redditSearchThreadLimit,
-      redditThreadExpiryInDays: data.redditThreadExpiryInDays,
       adminContactEmail: data.adminContactEmail,
       amazonAffiliateTag: data.amazonAffiliateTag,
     };
-  }
-
-  get processor(): DynamicConfigData['processor'] {
-    return this.fileLoader.getData().processor;
   }
 
   get debug(): DynamicConfigData['debug'] {
@@ -35,28 +28,12 @@ export class DynamicConfigService {
     return this.fileLoader.getData().scheduling;
   }
 
-  get rating(): DynamicConfigData['rating'] {
-    return this.fileLoader.getData().rating;
-  }
-
-  get review(): DynamicConfigData['review'] {
-    return this.fileLoader.getData().review;
-  }
-
   get resolution(): DynamicConfigData['resolution'] {
     return this.fileLoader.getData().resolution;
   }
 
   get enrichment(): DynamicConfigData['enrichment'] {
     return this.fileLoader.getData().enrichment;
-  }
-
-  get relevance(): DynamicConfigData['relevance'] {
-    return this.fileLoader.getData().relevance;
-  }
-
-  get scoring(): DynamicConfigData['scoring'] {
-    return this.fileLoader.getData().scoring;
   }
 
   get search(): ProductSearchAgentConfig | undefined {
@@ -87,19 +64,7 @@ export class DynamicConfigService {
     return this.fileLoader.getData().webSearch;
   }
 
-  get preprocessing(): DynamicConfigData['preprocessing'] {
-    return this.fileLoader.getData().preprocessing;
-  }
-
-  get reprocessing(): DynamicConfigData['reprocessing'] {
-    return this.fileLoader.getData().reprocessing;
-  }
-
   get translation(): DynamicConfigData['translation'] {
     return this.fileLoader.getData().translation;
-  }
-
-  get keywordResearch(): DynamicConfigData['keywordResearch'] {
-    return this.fileLoader.getData().keywordResearch;
   }
 }

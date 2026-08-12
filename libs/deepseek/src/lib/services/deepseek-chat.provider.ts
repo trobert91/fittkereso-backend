@@ -1,33 +1,33 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import {
   AiChatProvider,
   AiChatRequest,
   AiProviderConfig,
   AiProviderRegistry,
   RawProviderResult,
-} from "@ebike-backend/ai-core";
-import { DeepSeekConfigService as AppDeepSeekConfigService } from "@ebike-backend/config";
+} from '@fittkereso-backend/ai-core';
+import { DeepSeekConfigService as AppDeepSeekConfigService } from '@fittkereso-backend/config';
 import {
   DeepSeekApiError,
   DeepSeekChatMessage,
   DeepSeekChatRequestBody,
   DeepSeekClientService,
   DeepSeekThinkingConfig,
-} from "./deepseek-client.service";
-import { DeepSeekConfigService } from "./deepseek-config.service";
+} from './deepseek-client.service';
+import { DeepSeekConfigService } from './deepseek-config.service';
 
 function messagesMentionJson(messages: DeepSeekChatMessage[]): boolean {
   for (const message of messages) {
     const content = message.content;
-    if (typeof content === "string") {
+    if (typeof content === 'string') {
       if (/json/i.test(content)) return true;
       continue;
     }
     if (!Array.isArray(content)) continue;
     for (const part of content) {
-      if (typeof part === "string" && /json/i.test(part)) return true;
+      if (typeof part === 'string' && /json/i.test(part)) return true;
       const text = (part as { text?: string }).text;
-      if (typeof text === "string" && /json/i.test(text)) return true;
+      if (typeof text === 'string' && /json/i.test(text)) return true;
     }
   }
   return false;
@@ -35,7 +35,7 @@ function messagesMentionJson(messages: DeepSeekChatMessage[]): boolean {
 
 @Injectable()
 export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
-  readonly name = "deepseek" as const;
+  readonly name = 'deepseek' as const;
 
   constructor(
     private readonly registry: AiProviderRegistry,
@@ -63,11 +63,11 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
     if (
       anyError.status === 429 ||
       anyError.code === 429 ||
-      anyError.code === "rate_limit_error"
+      anyError.code === 'rate_limit_error'
     ) {
       return true;
     }
-    return /rate.?limit|quota/i.test(anyError.message ?? "");
+    return /rate.?limit|quota/i.test(anyError.message ?? '');
   }
 
   getConfig(): AiProviderConfig {
@@ -93,14 +93,14 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
     // already mentions JSON we trust they've handled both — otherwise we
     // prepend a system message containing the word + the JSON schema serving
     // as the structural example.
-    let responseFormat: DeepSeekChatRequestBody["response_format"] | undefined;
+    let responseFormat: DeepSeekChatRequestBody['response_format'] | undefined;
     if (request.schema) {
-      responseFormat = { type: "json_object" };
+      responseFormat = { type: 'json_object' };
       if (!messagesMentionJson(messages)) {
         const schemaJson = JSON.stringify(request.schema);
         messages = [
           {
-            role: "system",
+            role: 'system',
             content: `Respond with valid JSON matching this JSON schema:\n${schemaJson}`,
           },
           ...messages,
@@ -123,7 +123,7 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
 
     const response = await this.client.createChatCompletion(body);
 
-    const content = response.choices[0]?.message?.content ?? "";
+    const content = response.choices[0]?.message?.content ?? '';
     const usage = response.usage;
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
@@ -150,9 +150,9 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
     effort: string | undefined,
   ): DeepSeekThinkingConfig | undefined {
     if (thinking === undefined && effort === undefined) return undefined;
-    if (thinking === false) return { type: "disabled" };
+    if (thinking === false) return { type: 'disabled' };
     return {
-      type: "enabled",
+      type: 'enabled',
       ...(effort !== undefined && { reasoning_effort: effort }),
     };
   }

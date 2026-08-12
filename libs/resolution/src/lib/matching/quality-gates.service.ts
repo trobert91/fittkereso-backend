@@ -1,14 +1,14 @@
-import { Injectable } from "@nestjs/common";
-import { MatchResult } from "@ebike-backend/database";
-import { distance as levenshtein } from "fastest-levenshtein";
-import { MatchingConfigService } from "./matching-config.service";
-import { isEmpty, sortBy } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { MatchResult } from '@fittkereso-backend/database';
+import { distance as levenshtein } from 'fastest-levenshtein';
+import { MatchingConfigService } from './matching-config.service';
+import { isEmpty, sortBy } from 'lodash';
 import {
   InputNormalizationService,
   CategoryMatchConfig,
   ParsedModelCode,
-} from "./input-normalization.service";
-import type { ResolutionOptions } from "../models/resolution-options";
+} from './input-normalization.service';
+import type { ResolutionOptions } from '../models/resolution-options';
 
 export interface QualityGateResult {
   passed: boolean;
@@ -42,38 +42,38 @@ export class QualityGatesService {
     if (best.components.stringSimilarity === 1.0) {
       const hasSpecMismatch =
         best.specMatchDetails && best.specMatchDetails.primaryMismatches > 0;
-      if (!hasSpecMismatch || options.mode !== "strict") {
+      if (!hasSpecMismatch || options.mode !== 'strict') {
         return { passed: true, failedGates: [] };
       }
     }
 
     // 2. Score threshold (mode-dependent)
     const threshold =
-      options.mode === "strict"
+      options.mode === 'strict'
         ? this.matchingConfig.config.acceptThresholdStrict
         : this.matchingConfig.config.acceptThreshold;
 
     if (best.score < threshold) {
-      return { passed: false, failedGates: ["low_confidence"] };
+      return { passed: false, failedGates: ['low_confidence'] };
     }
 
     // 3. Strict mode: reject any primary spec mismatch
     if (
-      options.mode === "strict" &&
+      options.mode === 'strict' &&
       best.specMatchDetails &&
       best.specMatchDetails.primaryMismatches > 0
     ) {
-      return { passed: false, failedGates: ["primary_spec_mismatch"] };
+      return { passed: false, failedGates: ['primary_spec_mismatch'] };
     }
 
     // 3b. Strict mode: reject when matcher spec mismatches exceed category threshold
     const maxMatcherMismatches = config.maxMatcherSpecMismatches ?? 2;
     if (
-      options.mode === "strict" &&
+      options.mode === 'strict' &&
       best.specMatchDetails &&
       best.specMatchDetails.matcherSpecMismatches > maxMatcherMismatches
     ) {
-      return { passed: false, failedGates: ["matcher_spec_mismatch"] };
+      return { passed: false, failedGates: ['matcher_spec_mismatch'] };
     }
 
     // 4. Ambiguity check with tiebreakers.
@@ -92,7 +92,7 @@ export class QualityGatesService {
           ? gap < 2
           : !bestWinsSpec && !bestWinsString;
         if (isAmbiguous) {
-          return { passed: false, failedGates: ["ambiguous_match"] };
+          return { passed: false, failedGates: ['ambiguous_match'] };
         }
       }
     }
@@ -113,7 +113,7 @@ export class QualityGatesService {
         const specConfirmed = this.hasSpecConfirmation(best, second);
 
         if (!specConfirmed) {
-          return { passed: false, failedGates: ["critical_numeric_mismatch"] };
+          return { passed: false, failedGates: ['critical_numeric_mismatch'] };
         }
       }
     }
@@ -122,14 +122,14 @@ export class QualityGatesService {
     // In strict mode, suffix alpha mismatches are definitive — do NOT allow
     // spec confirmation to override, since product families can share identical
     // specs while suffix tokens are explicit product differentiators.
-    if (options.mode === "strict" && !isEmpty(inputParsed.suffixAlphaTokens)) {
+    if (options.mode === 'strict' && !isEmpty(inputParsed.suffixAlphaTokens)) {
       const candidateSuffixSet = new Set(candidateParsed.suffixAlphaTokens);
       const allSuffixAlphasMatch = inputParsed.suffixAlphaTokens.every(
         (token) => candidateSuffixSet.has(token),
       );
 
       if (!allSuffixAlphasMatch) {
-        return { passed: false, failedGates: ["suffix_alpha_mismatch"] };
+        return { passed: false, failedGates: ['suffix_alpha_mismatch'] };
       }
     }
 
@@ -162,7 +162,7 @@ export class QualityGatesService {
 
     const cfg = this.matchingConfig.config;
     const threshold =
-      options.mode === "strict"
+      options.mode === 'strict'
         ? cfg.acceptThresholdStrict
         : cfg.acceptThreshold;
     const ambiguityGap = cfg.ambiguityGap;
@@ -180,7 +180,7 @@ export class QualityGatesService {
         const hasSpecMismatch =
           candidate.specMatchDetails &&
           candidate.specMatchDetails.primaryMismatches > 0;
-        if (!hasSpecMismatch || options.mode !== "strict") {
+        if (!hasSpecMismatch || options.mode !== 'strict') {
           return true;
         }
         return false;
@@ -190,7 +190,7 @@ export class QualityGatesService {
       if (candidate.score < effectiveFloor) return false;
 
       // Strict-mode per-candidate side conditions.
-      if (options.mode === "strict") {
+      if (options.mode === 'strict') {
         if (
           candidate.specMatchDetails &&
           candidate.specMatchDetails.primaryMismatches > 0
@@ -225,7 +225,7 @@ export class QualityGatesService {
 
       // Strict-mode suffix-alpha gate (matches `evaluate` rule 6).
       if (
-        options.mode === "strict" &&
+        options.mode === 'strict' &&
         !isEmpty(inputParsed.suffixAlphaTokens)
       ) {
         const candidateParsed = this.parseCandidate(
@@ -282,14 +282,14 @@ export class QualityGatesService {
     // absolute floor. The `low_confidence_anchored` gate name is preserved so
     // traces still distinguish anchored-mode rejections from regular ones.
     if (best.score < this.matchingConfig.config.acceptThreshold) {
-      return { passed: false, failedGates: ["low_confidence_anchored"] };
+      return { passed: false, failedGates: ['low_confidence_anchored'] };
     }
 
     // Wider ambiguity gap for reference-product variant resolution
     if (second) {
       const gap = best.score - second.score;
       if (gap < this.matchingConfig.config.ambiguityGapAnchored) {
-        return { passed: false, failedGates: ["ambiguous_match_anchored"] };
+        return { passed: false, failedGates: ['ambiguous_match_anchored'] };
       }
     }
 

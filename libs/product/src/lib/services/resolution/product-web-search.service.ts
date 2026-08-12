@@ -1,20 +1,20 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { Injectable } from "@nestjs/common";
-import { chain } from "lodash";
-import { format } from "date-fns";
+import { Injectable } from '@nestjs/common';
+import { chain } from 'lodash';
+import { format } from 'date-fns';
 import {
   WebSearchProvider,
   WebSearchCacheRepository,
-} from "@ebike-backend/database";
-import { ExaSearchService } from "@ebike-backend/exa";
-import { SerpApiService } from "@ebike-backend/dataforseo";
+} from '@fittkereso-backend/database';
+import { ExaSearchService } from '@fittkereso-backend/exa';
+import { SerpApiService } from '@fittkereso-backend/dataforseo';
 import {
   DynamicConfigService,
   DynamicConfigData,
-} from "@ebike-backend/dynamic-config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ProductSearchMetricsService } from "@ebike-backend/metrics";
-import { DataForSeoLocationCode } from "@ebike-backend/dataforseo";
+} from '@fittkereso-backend/dynamic-config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ProductSearchMetricsService } from '@fittkereso-backend/metrics';
+import { DataForSeoLocationCode } from '@fittkereso-backend/dataforseo';
 
 /**
  * Request interface for product web search
@@ -53,14 +53,14 @@ export interface ProductWebSearchResponse {
   provider: WebSearchProvider;
   /** Why this provider was selected */
   providerSelectionReason:
-    | "request_override"
-    | "default_provider_exa"
-    | "default_provider_dataforseo"
-    | "op_priority"
-    | "high_relevance"
-    | "fallback_dataforseo";
+    | 'request_override'
+    | 'default_provider_exa'
+    | 'default_provider_dataforseo'
+    | 'op_priority'
+    | 'high_relevance'
+    | 'fallback_dataforseo';
   /** Whether results came from cache or API */
-  source: "cache" | "api";
+  source: 'cache' | 'api';
   /** Cache hit flag */
   cacheHit?: boolean;
   /** Cache metadata */
@@ -122,18 +122,18 @@ export class ProductWebSearchService {
       );
 
       if (cacheHit) {
-        this.logger.debug("Web search cache HIT", {
+        this.logger.debug('Web search cache HIT', {
           keyword: request.keyword,
           provider: cacheHit.entry.provider,
         });
 
-        this.metricsService.recordWebSearchCache("hit");
+        this.metricsService.recordWebSearchCache('hit');
 
         return {
           results: cacheHit.entry.results,
           provider: cacheHit.entry.provider,
-          providerSelectionReason: "fallback_dataforseo",
-          source: "cache",
+          providerSelectionReason: 'fallback_dataforseo',
+          source: 'cache',
           cacheHit: true,
           metadata: {
             similarity: cacheHit.similarity,
@@ -147,7 +147,7 @@ export class ProductWebSearchService {
       }
     }
 
-    this.metricsService.recordWebSearchCache("miss");
+    this.metricsService.recordWebSearchCache('miss');
 
     const webSearchConfig = this.dynamicConfigService.webSearch;
 
@@ -157,7 +157,7 @@ export class ProductWebSearchService {
       webSearchConfig,
     );
 
-    this.logger.debug("Web search cache MISS, calling provider", {
+    this.logger.debug('Web search cache MISS, calling provider', {
       keyword: request.keyword,
       provider,
       providerSelectionReason,
@@ -178,13 +178,13 @@ export class ProductWebSearchService {
       const searchDuration = (Date.now() - searchStartTime) / 1000;
       this.metricsService.recordWebSearch(
         provider,
-        "success",
+        'success',
         searchDuration,
         results.length,
       );
     } catch (error) {
       const searchDuration = (Date.now() - searchStartTime) / 1000;
-      this.metricsService.recordWebSearch(provider, "error", searchDuration, 0);
+      this.metricsService.recordWebSearch(provider, 'error', searchDuration, 0);
       throw error;
     }
 
@@ -204,7 +204,7 @@ export class ProductWebSearchService {
       results,
       provider,
       providerSelectionReason,
-      source: "api",
+      source: 'api',
       cacheHit: false,
     };
   }
@@ -221,50 +221,50 @@ export class ProductWebSearchService {
    */
   private selectProvider(
     request: ProductWebSearchRequest,
-    webSearchConfig: DynamicConfigData["webSearch"],
+    webSearchConfig: DynamicConfigData['webSearch'],
   ): {
     provider: WebSearchProvider;
     reason:
-      | "request_override"
-      | "default_provider_exa"
-      | "default_provider_dataforseo"
-      | "op_priority"
-      | "high_relevance"
-      | "fallback_dataforseo";
+      | 'request_override'
+      | 'default_provider_exa'
+      | 'default_provider_dataforseo'
+      | 'op_priority'
+      | 'high_relevance'
+      | 'fallback_dataforseo';
   } {
     // Explicit override
     if (request.provider) {
-      return { provider: request.provider, reason: "request_override" };
+      return { provider: request.provider, reason: 'request_override' };
     }
 
     const strategy = webSearchConfig?.providerSelection;
 
     // Force single provider if configured
-    if (webSearchConfig?.defaultProvider === "exa") {
+    if (webSearchConfig?.defaultProvider === 'exa') {
       return {
         provider: WebSearchProvider.Exa,
-        reason: "default_provider_exa",
+        reason: 'default_provider_exa',
       };
     }
-    if (webSearchConfig?.defaultProvider === "dataforseo") {
+    if (webSearchConfig?.defaultProvider === 'dataforseo') {
       return {
         provider: WebSearchProvider.DataForSEO,
-        reason: "default_provider_dataforseo",
+        reason: 'default_provider_dataforseo',
       };
     }
 
     // Hybrid strategy: relevance-based routing
     if (request.isOp && (strategy?.useExaForOp ?? true)) {
-      return { provider: WebSearchProvider.Exa, reason: "op_priority" };
+      return { provider: WebSearchProvider.Exa, reason: 'op_priority' };
     }
 
     if ((request.relevance ?? 0) >= (strategy?.minRelevanceForExa ?? 0.8)) {
-      return { provider: WebSearchProvider.Exa, reason: "high_relevance" };
+      return { provider: WebSearchProvider.Exa, reason: 'high_relevance' };
     }
 
     return {
       provider: WebSearchProvider.DataForSEO,
-      reason: "fallback_dataforseo",
+      reason: 'fallback_dataforseo',
     };
   }
 
@@ -278,12 +278,12 @@ export class ProductWebSearchService {
    */
   private async searchWithDataForSEO(
     request: ProductWebSearchRequest,
-    webSearchConfig: DynamicConfigData["webSearch"],
+    webSearchConfig: DynamicConfigData['webSearch'],
   ): Promise<ProductWebSearchResult[]> {
     // Build keyword with temporal filter
     let keyword = request.keyword;
     if (request.searchDate) {
-      const formatted = format(request.searchDate, "yyyy-MM-dd");
+      const formatted = format(request.searchDate, 'yyyy-MM-dd');
       keyword = `${keyword} before:${formatted}`;
     }
 
@@ -291,8 +291,8 @@ export class ProductWebSearchService {
     const response = await this.serpApiService.getLiveGoogleOrganicData({
       keyword,
       locationCode: DataForSeoLocationCode.US,
-      languageCode: "en",
-      device: "desktop",
+      languageCode: 'en',
+      device: 'desktop',
       depth: webSearchConfig?.dataforseo?.maxResults ?? 15,
     });
 
@@ -320,7 +320,7 @@ export class ProductWebSearchService {
    */
   private async searchWithExa(
     request: ProductWebSearchRequest,
-    webSearchConfig: DynamicConfigData["webSearch"],
+    webSearchConfig: DynamicConfigData['webSearch'],
   ): Promise<ProductWebSearchResult[]> {
     const exaConfig = webSearchConfig?.exa;
 
@@ -336,7 +336,7 @@ export class ProductWebSearchService {
       endPublishedDate,
       numResults: exaConfig?.numResults ?? 10,
       useAutoprompt: exaConfig?.useAutoprompt ?? true,
-      type: exaConfig?.type ?? "neural",
+      type: exaConfig?.type ?? 'neural',
       contents:
         (exaConfig?.includeContent ?? true)
           ? {
@@ -366,7 +366,7 @@ export class ProductWebSearchService {
    * - Remove extra spaces
    */
   private normalizeKeyword(keyword: string): string {
-    return keyword.toLowerCase().trim().replace(/\s+/g, " ");
+    return keyword.toLowerCase().trim().replace(/\s+/g, ' ');
   }
 
   /**

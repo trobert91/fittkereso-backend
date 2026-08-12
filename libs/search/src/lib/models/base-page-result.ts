@@ -1,5 +1,5 @@
-import { SerializeGroup } from "@ebike-backend/utils";
-import { Expose } from "class-transformer";
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { Expose } from 'class-transformer';
 
 export abstract class BasePageResult<T> {
   @Expose({ groups: [SerializeGroup.list] })
@@ -21,5 +21,5 @@ export abstract class BasePageResult<T> {
   sort?: string;
 
   @Expose({ groups: [SerializeGroup.list] })
-  order?: "ASC" | "DESC";
+  order?: 'ASC' | 'DESC';
 }

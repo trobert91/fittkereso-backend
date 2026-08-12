@@ -1,6 +1,10 @@
-import { Injectable } from "@nestjs/common";
-import { CustomLogger } from "@ebike-backend/logger";
-import { AiPricingMap, AiProviderName, AiUsage } from "@ebike-backend/ai-core";
+import { Injectable } from '@nestjs/common';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import {
+  AiPricingMap,
+  AiProviderName,
+  AiUsage,
+} from '@fittkereso-backend/ai-core';
 
 @Injectable()
 export class AiCostCalculationService {
@@ -54,7 +58,7 @@ export class AiCostCalculationService {
     this.costSum += cost;
 
     this.logger.debug(
-      `AI token usage [${provider}:${model}]${costLabel ? ` (${costLabel})` : ""}: ${inputTokens} input (${cachedTokens} cached) + ${outputTokens} output = $${cost.toFixed(4)}, $${this.costSum.toFixed(4)} since service started`,
+      `AI token usage [${provider}:${model}]${costLabel ? ` (${costLabel})` : ''}: ${inputTokens} input (${cachedTokens} cached) + ${outputTokens} output = $${cost.toFixed(4)}, $${this.costSum.toFixed(4)} since service started`,
     );
 
     return cost;

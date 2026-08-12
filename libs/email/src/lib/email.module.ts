@@ -1,10 +1,9 @@
-import { Module } from "@nestjs/common";
-import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
-import { MailgunConfigService } from "@ebike-backend/config";
-import { EmailService } from "./email.service";
-import { EmailTemplateService } from "./email-template.service";
-import { ContactEmailService } from "./contact-email.service";
-import { ReviewFeedbackEmailService } from "./review-feedback-email.service";
+import { Module } from '@nestjs/common';
+import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
+import { MailgunConfigService } from '@fittkereso-backend/config';
+import { EmailService } from './email.service';
+import { EmailTemplateService } from './email-template.service';
+import { ContactEmailService } from './contact-email.service';
 
 @Module({
   imports: [DynamicConfigModule],
@@ -13,8 +12,7 @@ import { ReviewFeedbackEmailService } from "./review-feedback-email.service";
     EmailService,
     EmailTemplateService,
     ContactEmailService,
-    ReviewFeedbackEmailService,
   ],
-  exports: [ContactEmailService, ReviewFeedbackEmailService],
+  exports: [ContactEmailService],
 })
 export class EmailModule {}

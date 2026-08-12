@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { chain, isEmpty } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { chain, isEmpty } from 'lodash';
 import {
   Brand,
   ProductAlias,
@@ -7,10 +7,14 @@ import {
   ProductAliasRepository,
   WithSimilarity,
   ProductModel,
-} from "@ebike-backend/database";
-import { nameOf, normalize, normalizeModelName } from "@ebike-backend/utils";
-import { ProductNormalizerService } from "../product-normalizer.service";
-import type { CandidateSearchInput } from "./candidate-search-input";
+} from '@fittkereso-backend/database';
+import {
+  nameOf,
+  normalize,
+  normalizeModelName,
+} from '@fittkereso-backend/utils';
+import { ProductNormalizerService } from '../product-normalizer.service';
+import type { CandidateSearchInput } from './candidate-search-input';
 
 @Injectable()
 export class ProductFuzzySearchService {
@@ -37,7 +41,7 @@ export class ProductFuzzySearchService {
 
     // Deduplicate by ID in case multiple inputs overlap
     return chain(results)
-      .orderBy((c) => c.similarity, "desc")
+      .orderBy((c) => c.similarity, 'desc')
       .sortedUniqBy((c) => c.entity.id)
       .take(4)
       .value();
@@ -61,27 +65,27 @@ export class ProductFuzzySearchService {
       displayName: input.displayName,
     });
     const aliasInput = normalize(
-      normalizeModelName(input.model ?? input.displayName ?? "unknown"),
+      normalizeModelName(input.model ?? input.displayName ?? 'unknown'),
     );
-    const modelInput = input.model ?? input.displayName ?? "unknown";
+    const modelInput = input.model ?? input.displayName ?? 'unknown';
 
-    const normalizedNameColumn = `product.${nameOf<ProductModel>("normalizedName")}`;
-    const aliasColumn = `alias.${nameOf<ProductAlias>("alias")}`;
-    const modelColumn = `product.${nameOf<ProductModel>("model")}`;
+    const normalizedNameColumn = `product.${nameOf<ProductModel>('normalizedName')}`;
+    const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
+    const modelColumn = `product.${nameOf<ProductModel>('model')}`;
     let queryBuilder = this.productRepo.repo
-      .createQueryBuilder("product")
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("brand")}`, "brand")
+      .createQueryBuilder('product')
+      .leftJoinAndSelect(`product.${nameOf<ProductModel>('brand')}`, 'brand')
       .leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `product.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("aliases")}`, "alias")
+      .leftJoinAndSelect(`product.${nameOf<ProductModel>('aliases')}`, 'alias')
       .addSelect(
         `similarity(${normalizedNameColumn}, :normalizedName)`,
-        "similarity",
+        'similarity',
       )
-      .addSelect(`similarity(${aliasColumn}, :aliasInput)`, "alias_similarity")
-      .addSelect(`similarity(${modelColumn}, :modelInput)`, "model_similarity")
+      .addSelect(`similarity(${aliasColumn}, :aliasInput)`, 'alias_similarity')
+      .addSelect(`similarity(${modelColumn}, :modelInput)`, 'model_similarity')
       .where(`similarity(${normalizedNameColumn}, :normalizedName) > 0.4`)
       .orWhere(`similarity(${aliasColumn}, :aliasInput) > 0.4`)
       .orWhere(`similarity(${modelColumn}, :modelInput) > 0.4`)
@@ -89,7 +93,7 @@ export class ProductFuzzySearchService {
 
     if (searchInput.brand) {
       queryBuilder = queryBuilder.andWhere(
-        `brand.${nameOf<Brand>("id")} = :brandId`,
+        `brand.${nameOf<Brand>('id')} = :brandId`,
         {
           brandId: searchInput.brand?.id,
         },
@@ -98,7 +102,7 @@ export class ProductFuzzySearchService {
 
     if (useCategories && !isEmpty(categoryIds)) {
       queryBuilder = queryBuilder.andWhere(
-        "product.productCategoryId IN (:...categoryIds)",
+        'product.productCategoryId IN (:...categoryIds)',
         {
           categoryIds,
         },
@@ -106,7 +110,7 @@ export class ProductFuzzySearchService {
     }
 
     const { entities, raw } = await queryBuilder
-      .orderBy("similarity", "DESC")
+      .orderBy('similarity', 'DESC')
       .limit(5)
       .getRawAndEntities();
 

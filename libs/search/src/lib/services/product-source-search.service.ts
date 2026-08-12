@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSource,
   ProductSourceRepository,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
-import { isEmpty, isNil } from "lodash";
-import { SelectQueryBuilder } from "typeorm";
-import { ProductSourceSearchParams } from "../models/product-source-search-params";
-import { ProductSourceSearchResult } from "../models/product-source-search-result";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import { isEmpty, isNil } from 'lodash';
+import { SelectQueryBuilder } from 'typeorm';
+import { ProductSourceSearchParams } from '../models/product-source-search-params';
+import { ProductSourceSearchResult } from '../models/product-source-search-result';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -20,8 +20,8 @@ export class ProductSourceSearchService {
   ): Promise<ProductSourceSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? "createdAt",
-      order: params.order ?? "DESC",
+      sort: params.sort ?? 'createdAt',
+      order: params.order ?? 'DESC',
     };
 
     const query = this.buildQuery(finalParams);
@@ -33,11 +33,11 @@ export class ProductSourceSearchService {
   private buildQuery(
     params: ProductSourceSearchParams,
   ): SelectQueryBuilder<ProductSource> {
-    let query = this.productSourceRepo.repo.createQueryBuilder("productSource");
+    let query = this.productSourceRepo.repo.createQueryBuilder('productSource');
 
     if (!isEmpty(params.searchTerm)) {
       query = query.andWhere(
-        `productSource.${nameOf<ProductSource>("name")} ILIKE :searchTerm`,
+        `productSource.${nameOf<ProductSource>('name')} ILIKE :searchTerm`,
         {
           searchTerm: `%${params.searchTerm}%`,
         },
@@ -46,14 +46,14 @@ export class ProductSourceSearchService {
 
     if (!isNil(params.schedulingEnabled)) {
       query = query.andWhere(
-        `productSource.${nameOf<ProductSource>("schedulingEnabled")} = :schedulingEnabled`,
+        `productSource.${nameOf<ProductSource>('schedulingEnabled')} = :schedulingEnabled`,
         { schedulingEnabled: params.schedulingEnabled },
       );
     }
 
     if (!isEmpty(params.types)) {
       query = query.andWhere(
-        `productSource.${nameOf<ProductSource>("type")} IN (:...types)`,
+        `productSource.${nameOf<ProductSource>('type')} IN (:...types)`,
         {
           types: params.types,
         },
@@ -63,7 +63,7 @@ export class ProductSourceSearchService {
     query = query.orderBy(
       `productSource.${params.sort}`,
       params.order,
-      "NULLS LAST",
+      'NULLS LAST',
     );
 
     const page = params.page ?? 1;

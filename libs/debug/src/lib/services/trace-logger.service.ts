@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { LoggerConfigService } from "@ebike-backend/config";
-import * as winston from "winston";
-import LokiTransport from "winston-loki";
+import { Injectable } from '@nestjs/common';
+import { LoggerConfigService } from '@fittkereso-backend/config';
+import * as winston from 'winston';
+import LokiTransport from 'winston-loki';
 
 /**
  * winston-loki ignores winston's `format` setting and builds the line as
@@ -16,14 +16,14 @@ export class TraceLoggerService {
 
   constructor(private readonly config: LoggerConfigService) {
     this.logger = winston.createLogger({
-      level: "info",
+      level: 'info',
       transports: [
         new LokiTransport({
-          host: config.url || "http://localhost:3100",
+          host: config.url || 'http://localhost:3100',
           labels: {
             service: config.appName,
             env: config.environment,
-            log_type: "processing_trace",
+            log_type: 'processing_trace',
           },
           json: true,
           batching: true,
@@ -34,12 +34,12 @@ export class TraceLoggerService {
   }
 
   writeTrace(data: Record<string, any>): void {
-    this.emit({ ...data, traceType: "processing_trace" });
+    this.emit({ ...data, traceType: 'processing_trace' });
   }
 
   writeSystemPrompt(hash: string, content: string, step: string): void {
     this.emit({
-      traceType: "system_prompt",
+      traceType: 'system_prompt',
       hash,
       step,
       content,

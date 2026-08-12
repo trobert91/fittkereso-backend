@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { Brand, BrandRepository } from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
+import { Injectable } from '@nestjs/common';
+import { Brand, BrandRepository } from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class BrandDetailService {
@@ -9,7 +9,7 @@ export class BrandDetailService {
   public async getById(brandId: string): Promise<Brand> {
     return this.brandRepo.findOneOrFail({
       where: { id: brandId },
-      relations: [nameOf<Brand>("aliases")],
+      relations: [nameOf<Brand>('aliases')],
     });
   }
 }

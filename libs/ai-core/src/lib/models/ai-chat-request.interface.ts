@@ -1,5 +1,5 @@
-import { ChatTraceData } from "@ebike-backend/debug";
-import { AiMessage } from "./ai-message.interface";
+import { ChatTraceData } from '@fittkereso-backend/debug';
+import { AiMessage } from './ai-message.interface';
 
 export interface AiChatRequest {
   model: string;
@@ -30,14 +30,6 @@ export interface AiChatRequest {
   // ─── Orchestration / observability ─────────────────────────────────────────
   costLabel?: string;
   logContext?: Record<string, string>;
-  entityId?: string;
-  entityType?: "thread" | "userComment" | "productModel";
-  /**
-   * Optional thread context for analytics. When set, the chat service emits
-   * one canonical LLM-call accounting entry to DebugTraceService. Drives the
-   * per-run cost / per-model usage recorded on ThreadRun.
-   */
-  threadId?: string;
   traceCollector?: (data: ChatTraceData) => void;
   maxRetries?: number;
   retryCount?: number;

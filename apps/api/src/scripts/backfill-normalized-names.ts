@@ -1,13 +1,13 @@
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "../app.module";
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from '../app.module';
 import {
   ProductModel,
   ProductModelRepository,
   ProductModelSource,
   ProductModelSourceRepository,
-} from "@ebike-backend/database";
-import { ProductNormalizerService } from "@ebike-backend/product";
-import { nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { ProductNormalizerService } from '@fittkereso-backend/product';
+import { nameOf } from '@fittkereso-backend/utils';
 
 const BATCH_SIZE = 100;
 
@@ -19,9 +19,9 @@ async function bootstrap() {
   const normalizer = app.get(ProductNormalizerService);
 
   // 1. Backfill ProductModel.normalizedName
-  console.log("Backfilling ProductModel.normalizedName...");
+  console.log('Backfilling ProductModel.normalizedName...');
   const models = await productRepo.find({
-    relations: [nameOf<ProductModel>("brand")],
+    relations: [nameOf<ProductModel>('brand')],
   });
 
   let modelsUpdated = 0;
@@ -31,7 +31,7 @@ async function bootstrap() {
     const batch = models.slice(i, i + BATCH_SIZE);
     const toSave: ProductModel[] = [];
     for (const model of batch) {
-      const brandName = model.brand?.name ?? "";
+      const brandName = model.brand?.name ?? '';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
@@ -72,11 +72,11 @@ async function bootstrap() {
   );
 
   // 2. Backfill ProductModelSource.normalizedSourceName
-  console.log("Backfilling ProductModelSource.normalizedSourceName...");
+  console.log('Backfilling ProductModelSource.normalizedSourceName...');
   const sources = await sourceRepo.find({
     relations: [
-      nameOf<ProductModelSource>("model"),
-      `${nameOf<ProductModelSource>("model")}.${nameOf<ProductModel>("brand")}`,
+      nameOf<ProductModelSource>('model'),
+      `${nameOf<ProductModelSource>('model')}.${nameOf<ProductModel>('brand')}`,
     ],
   });
 
@@ -87,7 +87,7 @@ async function bootstrap() {
     const batch = sources.slice(i, i + BATCH_SIZE);
     const toSave: ProductModelSource[] = [];
     for (const source of batch) {
-      const brandName = source.model?.brand?.name ?? "";
+      const brandName = source.model?.brand?.name ?? '';
       const displayName = source.sourceName ?? source.model?.displayName;
       if (!displayName) {
         sourcesSkipped++;
@@ -132,11 +132,11 @@ async function bootstrap() {
     `  ProductModelSource: ${sourcesUpdated} updated, ${sourcesSkipped} unchanged, ${sourcesFailed} failed.`,
   );
 
-  console.log("Normalized-name backfill complete.");
+  console.log('Normalized-name backfill complete.');
   await app.close();
 }
 
 bootstrap().catch((err) => {
-  console.error("Backfill failed:", err);
+  console.error('Backfill failed:', err);
   process.exit(1);
 });

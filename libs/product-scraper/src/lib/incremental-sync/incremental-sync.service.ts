@@ -1,20 +1,20 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSource,
   ProductSourceType,
   ScrapeQueueName,
   ScrapeTask,
-} from "@ebike-backend/database";
-import { SourceConfigService } from "@ebike-backend/config";
-import { ExaSearchService } from "@ebike-backend/exa";
-import { ScrapeTaskPublisherService } from "@ebike-backend/task";
-import { CustomLogger } from "@ebike-backend/logger";
-import { IncrementalSyncMetricsService } from "@ebike-backend/metrics";
-import { compact, isEmpty, uniq } from "lodash";
-import { UrlClassifier } from "../interfaces/url-classifier.interface";
-import { ArukeresoUrlClassifier } from "./classifiers/arukereso-url-classifier";
-import { DisplayspecsUrlClassifier } from "./classifiers/displayspecs-url-classifier";
-import { ScrapeUrlDeduplicationService } from "../product-scraper";
+} from '@fittkereso-backend/database';
+import { SourceConfigService } from '@fittkereso-backend/config';
+import { ExaSearchService } from '@fittkereso-backend/exa';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { IncrementalSyncMetricsService } from '@fittkereso-backend/metrics';
+import { compact, isEmpty, uniq } from 'lodash';
+import { UrlClassifier } from '../interfaces/url-classifier.interface';
+import { ArukeresoUrlClassifier } from './classifiers/arukereso-url-classifier';
+import { DisplayspecsUrlClassifier } from './classifiers/displayspecs-url-classifier';
+import { ScrapeUrlDeduplicationService } from '../product-scraper';
 
 const DEFAULT_NUM_RESULTS = 40;
 const DEFAULT_LOOKBACK_DAYS = 30;
@@ -88,7 +88,7 @@ export class IncrementalSyncService {
         try {
           const response = await this.exaSearchService.search({
             query: keyword,
-            type: "keyword",
+            type: 'keyword',
             numResults,
             includeDomains: [domain],
             startPublishedDate,
@@ -132,7 +132,7 @@ export class IncrementalSyncService {
       );
 
       if (isEmpty(classifiedUrls)) {
-        this.logger.debug("No product detail URLs found after classification");
+        this.logger.debug('No product detail URLs found after classification');
         this.incrementalSyncMetrics.syncCompleted(source.type);
         this.incrementalSyncMetrics.recordSyncDuration(
           source.type,
@@ -163,7 +163,7 @@ export class IncrementalSyncService {
 
       if (isEmpty(newClassifications)) {
         this.logger.debug(
-          "All discovered URLs already have pending/processing tasks",
+          'All discovered URLs already have pending/processing tasks',
         );
         this.incrementalSyncMetrics.syncCompleted(source.type);
         this.incrementalSyncMetrics.recordSyncDuration(

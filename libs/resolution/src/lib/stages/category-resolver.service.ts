@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { CategoryNameMatcherService } from "@ebike-backend/product";
-import type { ResolutionContext } from "../models/resolution-context";
+import { Injectable } from '@nestjs/common';
+import { CategoryNameMatcherService } from '@fittkereso-backend/product';
+import type { ResolutionContext } from '../models/resolution-context';
 
 /**
  * Stage 2 category resolution.
@@ -50,7 +50,7 @@ export class CategoryResolverService {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "category_resolution",
+        phase: 'category_resolution',
         message,
         timestamp: new Date().toISOString(),
       });

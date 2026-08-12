@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductSource,
   ProductImage,
-} from "@ebike-backend/database";
-import { UploadedFile } from "@ebike-backend/storage";
+} from '@fittkereso-backend/database';
+import { UploadedFile } from '@fittkereso-backend/storage';
 
 @Injectable()
 export class ProductImageFactory {

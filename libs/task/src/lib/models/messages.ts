@@ -1,8 +1,4 @@
-import { ProductSourceSyncMode } from "@ebike-backend/database";
-
-export interface ThreadMessage {
-  threadId: string;
-}
+import { ProductSourceSyncMode } from '@fittkereso-backend/database';
 
 export interface ProductMessage {
   productId: string;

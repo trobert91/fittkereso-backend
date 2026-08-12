@@ -1,16 +1,16 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ScrapeTask,
   ScrapeTaskRepository,
   ScrapeQueueName,
   ProductSourceType,
-} from "@ebike-backend/database";
-import { TaskConfigService } from "@ebike-backend/config";
-import { BaseScrapeTaskManagerService } from "@ebike-backend/task";
-import { DisplayspecsQueueProcessorService } from "./displayspecs-queue-processor.service";
-import { ArukeresoQueueProcessorService } from "./arukereso-queue-processor.service";
-import { ScrapeTaskMetricsService } from "@ebike-backend/metrics";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
+} from '@fittkereso-backend/database';
+import { TaskConfigService } from '@fittkereso-backend/config';
+import { BaseScrapeTaskManagerService } from '@fittkereso-backend/task';
+import { DisplayspecsQueueProcessorService } from './displayspecs-queue-processor.service';
+import { ArukeresoQueueProcessorService } from './arukereso-queue-processor.service';
+import { ScrapeTaskMetricsService } from '@fittkereso-backend/metrics';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 
 @Injectable()
 export class ScrapeTaskManagerService extends BaseScrapeTaskManagerService {

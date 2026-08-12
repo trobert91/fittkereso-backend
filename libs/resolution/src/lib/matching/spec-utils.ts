@@ -2,8 +2,8 @@ import {
   OrderedSpec,
   ProductSpecs,
   StructuredSpec,
-} from "@ebike-backend/database";
-import { isNil, isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { isNil, isEmpty } from 'lodash';
 
 /**
  * Returns true when the specs record is nil or has no keys with defined values.
@@ -63,14 +63,14 @@ export function productSpecsToStructuredSpecs(
 
     let stringValue: string;
     if (Array.isArray(value)) {
-      stringValue = value.join(", ");
-    } else if (typeof value === "boolean") {
-      stringValue = value ? "yes" : "no";
+      stringValue = value.join(', ');
+    } else if (typeof value === 'boolean') {
+      stringValue = value ? 'yes' : 'no';
     } else {
       stringValue = String(value);
     }
 
-    if (stringValue === "") continue;
+    if (stringValue === '') continue;
 
     result.push({ name: key, value: stringValue });
   }
@@ -89,20 +89,20 @@ export function productSpecsSummary(
 ): string[] {
   if (!specs || isSpecsEmpty(specs)) return [];
 
-  const priorityKeys = ["screenSize", "panelType", "resolution"];
+  const priorityKeys = ['screenSize', 'panelType', 'resolution'];
   const parts: string[] = [];
 
   for (const key of priorityKeys) {
     if (parts.length >= maxItems) break;
     const value = specs[key];
     if (isNil(value)) continue;
-    parts.push(`${key}:${Array.isArray(value) ? value.join(", ") : value}`);
+    parts.push(`${key}:${Array.isArray(value) ? value.join(', ') : value}`);
   }
 
   for (const [key, value] of Object.entries(specs)) {
     if (parts.length >= maxItems) break;
     if (priorityKeys.includes(key) || isNil(value)) continue;
-    parts.push(`${key}:${Array.isArray(value) ? value.join(", ") : value}`);
+    parts.push(`${key}:${Array.isArray(value) ? value.join(', ') : value}`);
   }
 
   return parts;

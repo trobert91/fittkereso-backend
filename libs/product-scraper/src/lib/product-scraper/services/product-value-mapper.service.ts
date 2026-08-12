@@ -1,7 +1,13 @@
-import { Injectable } from "@nestjs/common";
-import { ProductSpecs, SpecValueTranslator } from "@ebike-backend/database";
-import { compact } from "lodash";
-import { ProductSpecMapping, ScrapedProductSpec } from "@ebike-backend/product";
+import { Injectable } from '@nestjs/common';
+import {
+  ProductSpecs,
+  SpecValueTranslator,
+} from '@fittkereso-backend/database';
+import { compact } from 'lodash';
+import {
+  ProductSpecMapping,
+  ScrapedProductSpec,
+} from '@fittkereso-backend/product';
 
 @Injectable()
 export class ProductValueMapperService {
@@ -81,7 +87,7 @@ export class ProductValueMapperService {
 
       const opts: MappingOptions = {
         specs,
-        label: "",
+        label: '',
         transformer: mapping.transformer,
         translator,
         toLowerCase: mapping.toLowerCase,
@@ -103,7 +109,7 @@ export class ProductValueMapperService {
           .map((label) => this.mapSingleValue({ ...opts, label }))
           .find((v) => v !== undefined);
 
-        if (value !== undefined && value !== "") {
+        if (value !== undefined && value !== '') {
           result[mapping.key] = value;
         }
       }
@@ -133,7 +139,7 @@ export class ProductValueMapperService {
 
     const cleaned = spec.values
       .map((v) => v?.trim())
-      .filter((v) => v && v !== "") as string[];
+      .filter((v) => v && v !== '') as string[];
 
     return cleaned.length ? cleaned : undefined;
   }
@@ -174,7 +180,7 @@ export class ProductValueMapperService {
     }
 
     if (removeWhiteSpace && v) {
-      v = v.replace(/\s+/g, "");
+      v = v.replace(/\s+/g, '');
     }
 
     return v?.trim() || undefined;

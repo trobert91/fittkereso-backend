@@ -1,14 +1,14 @@
-import { Injectable } from "@nestjs/common";
-import Exa from "exa-js";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ExaConfigService } from "@ebike-backend/config";
-import { isEmpty } from "lodash";
+import { Injectable } from '@nestjs/common';
+import Exa from 'exa-js';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ExaConfigService } from '@fittkereso-backend/config';
+import { isEmpty } from 'lodash';
 import {
   ExaSearchOptions,
   ExaSearchResponse,
   ExaGetContentsOptions,
   ExaContentsResponse,
-} from "../models/exa-search.types";
+} from '../models/exa-search.types';
 
 @Injectable()
 export class ExaSearchService {
@@ -28,7 +28,7 @@ export class ExaSearchService {
     const {
       query,
       numResults = 10,
-      type = "auto",
+      type = 'auto',
       contents,
       includeDomains,
       excludeDomains,
@@ -39,7 +39,7 @@ export class ExaSearchService {
       useAutoprompt = false,
     } = options;
 
-    this.logger.debug("Exa search request", {
+    this.logger.debug('Exa search request', {
       query,
       numResults,
       type,
@@ -85,7 +85,7 @@ export class ExaSearchService {
 
       const result = await this.exa.searchAndContents(query, searchOptions);
 
-      this.logger.debug("Exa search response", {
+      this.logger.debug('Exa search response', {
         resultCount: result.results.length,
         autoDate: result.autoDate,
       });
@@ -105,7 +105,7 @@ export class ExaSearchService {
         autoDate: result.autoDate,
       };
     } catch (error: any) {
-      this.logger.error("Exa search failed", error, { query, type });
+      this.logger.error('Exa search failed', error, { query, type });
       throw new Error(`Exa search failed: ${error.message}`);
     }
   }
@@ -120,7 +120,7 @@ export class ExaSearchService {
     urls: string[],
     options?: ExaGetContentsOptions,
   ): Promise<ExaContentsResponse> {
-    this.logger.debug("Exa getContents request", {
+    this.logger.debug('Exa getContents request', {
       urlCount: urls.length,
       hasText: !!options?.text,
       hasHighlights: !!options?.highlights,
@@ -130,7 +130,7 @@ export class ExaSearchService {
     try {
       const result = await this.exa.getContents(urls, options as any);
 
-      this.logger.debug("Exa getContents response", {
+      this.logger.debug('Exa getContents response', {
         resultCount: result.results.length,
       });
 
@@ -148,7 +148,7 @@ export class ExaSearchService {
         })),
       };
     } catch (error: any) {
-      this.logger.error("Exa getContents failed", error, {
+      this.logger.error('Exa getContents failed', error, {
         urlCount: urls.length,
       });
       throw new Error(`Exa getContents failed: ${error.message}`);

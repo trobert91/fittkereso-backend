@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductImage,
   ProductImageRepository,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import * as fs from "fs";
-import { ProductImageFactory } from "./product-image-factory";
-import { ProductImageStorageService } from "./product-image-storage.service";
-import { nameOf } from "@ebike-backend/utils";
-import { maxBy } from "lodash";
+} from '@fittkereso-backend/database';
+import * as fs from 'fs';
+import { ProductImageFactory } from './product-image-factory';
+import { ProductImageStorageService } from './product-image-storage.service';
+import { nameOf } from '@fittkereso-backend/utils';
+import { maxBy } from 'lodash';
 
 @Injectable()
 export class ProductImageUploadService {
@@ -27,7 +27,7 @@ export class ProductImageUploadService {
   ): Promise<ProductImage> {
     const model = await this.productRepo.findOneOrFail({
       where: { id: productId },
-      relations: [nameOf<ProductModel>("images")],
+      relations: [nameOf<ProductModel>('images')],
     });
     const maxCurrentOrder =
       maxBy(model.images ?? [], (img) => img.order)?.order ?? -1;

@@ -1,17 +1,20 @@
-import { Injectable } from "@nestjs/common";
-import { SpecComparisonService } from "@ebike-backend/product";
-import type { ProductSpecs, StructuredSpec } from "@ebike-backend/database";
-import { isEmpty, isNil } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { SpecComparisonService } from '@fittkereso-backend/product';
+import type {
+  ProductSpecs,
+  StructuredSpec,
+} from '@fittkereso-backend/database';
+import { isEmpty, isNil } from 'lodash';
 import {
   InputNormalizationService,
   type CategoryMatchConfig,
-} from "../matching/input-normalization.service";
-import { computeEffectiveMatchSpecs } from "../matching/effective-match-specs";
+} from '../matching/input-normalization.service';
+import { computeEffectiveMatchSpecs } from '../matching/effective-match-specs';
 import type {
   ResolutionContext,
   FilterOutcome,
-} from "../models/resolution-context";
-import type { SlimCandidate } from "../models/slim-types";
+} from '../models/resolution-context';
+import type { SlimCandidate } from '../models/slim-types';
 
 export interface FilterResult {
   qualifyingCandidates: SlimCandidate[];
@@ -48,7 +51,7 @@ export class FilterService {
     const effectiveBrand = context.brand;
 
     const qualifyingCandidates: SlimCandidate[] = [];
-    const filteredCandidates: FilterOutcome["filteredCandidates"] = [];
+    const filteredCandidates: FilterOutcome['filteredCandidates'] = [];
 
     for (const candidate of candidates) {
       const brandRejection = this.checkBrand(candidate, effectiveBrand);
@@ -118,7 +121,7 @@ export class FilterService {
     candidate: SlimCandidate,
     matchSpecs: ProductSpecs,
     matchConfig: CategoryMatchConfig,
-  ): FilterOutcome["filteredCandidates"][number] | undefined {
+  ): FilterOutcome['filteredCandidates'][number] | undefined {
     if (isEmpty(matchSpecs)) return undefined;
 
     const primarySpecs = Object.keys(matchSpecs);
@@ -129,7 +132,7 @@ export class FilterService {
       return {
         candidateId: candidate.productId,
         candidateName: candidateLabel(candidate),
-        reason: "match_specs",
+        reason: 'match_specs',
         detail: `${missingKey} (unset) ≠ ${formatSpecValue(matchSpecs[missingKey])}`,
       };
     }
@@ -151,7 +154,7 @@ export class FilterService {
     return {
       candidateId: candidate.productId,
       candidateName: candidateLabel(candidate),
-      reason: "match_specs",
+      reason: 'match_specs',
       detail,
     };
   }
@@ -170,7 +173,7 @@ export class FilterService {
   private checkBrand(
     candidate: SlimCandidate,
     effectiveBrand: { id: string; name: string } | undefined,
-  ): FilterOutcome["filteredCandidates"][number] | undefined {
+  ): FilterOutcome['filteredCandidates'][number] | undefined {
     if (!effectiveBrand) return undefined;
 
     const candidateBrandId = candidate.brandId;
@@ -182,7 +185,7 @@ export class FilterService {
       return {
         candidateId: candidate.productId,
         candidateName: candidateLabel(candidate),
-        reason: "brand",
+        reason: 'brand',
         detail: `brand '${candidateBrandName ?? candidateBrandId}' (${candidateBrandId}) ≠ '${effectiveBrand.name}' (${effectiveBrand.id})`,
       };
     }
@@ -197,8 +200,8 @@ export class FilterService {
     return {
       candidateId: candidate.productId,
       candidateName: candidateLabel(candidate),
-      reason: "brand",
-      detail: `brand '${candidateBrandName ?? "(unset)"}' ≠ '${effectiveBrand.name}'`,
+      reason: 'brand',
+      detail: `brand '${candidateBrandName ?? '(unset)'}' ≠ '${effectiveBrand.name}'`,
     };
   }
 
@@ -217,7 +220,7 @@ export class FilterService {
   private checkCategory(
     candidate: SlimCandidate,
     effectiveCategory: { id: string; name: string } | undefined,
-  ): FilterOutcome["filteredCandidates"][number] | undefined {
+  ): FilterOutcome['filteredCandidates'][number] | undefined {
     if (!effectiveCategory) return undefined;
     const candidateCategory = candidate.productCategory;
     if (!candidateCategory) return undefined;
@@ -228,7 +231,7 @@ export class FilterService {
       return {
         candidateId: candidate.productId,
         candidateName: candidateLabel(candidate),
-        reason: "category",
+        reason: 'category',
         detail: `category '${candidateCategory.name}' (${candidateCategory.id}) ≠ '${effectiveCategory.name}' (${effectiveCategory.id})`,
       };
     }
@@ -243,7 +246,7 @@ export class FilterService {
     return {
       candidateId: candidate.productId,
       candidateName: candidateLabel(candidate),
-      reason: "category",
+      reason: 'category',
       detail: `category '${candidateCategory.name}' ≠ '${effectiveCategory.name}'`,
     };
   }
@@ -264,21 +267,21 @@ export class FilterService {
     const firstMismatch = result.details.find(
       (entry) =>
         entry.isPrimary &&
-        entry.match !== "match" &&
-        entry.match !== "compatible",
+        entry.match !== 'match' &&
+        entry.match !== 'compatible',
     );
     if (firstMismatch) {
       const expected = formatSpecValue(matchSpecs[firstMismatch.key]);
       const actual = formatSpecValue(candidateSpecs[firstMismatch.key]);
       return `${firstMismatch.key} ${actual} ≠ ${expected}`;
     }
-    return "primary spec mismatch";
+    return 'primary spec mismatch';
   }
 }
 
 function formatSpecValue(value: unknown): string {
-  if (isNil(value)) return "(unset)";
-  if (Array.isArray(value)) return value.join(", ");
+  if (isNil(value)) return '(unset)';
+  if (Array.isArray(value)) return value.join(', ');
   return String(value);
 }
 

@@ -7,9 +7,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SOURCE =
-  "e:/Work/ebike/repos/ebike-backend/.tmp/identification-subtrees.json";
+  "e:/Work/fittkereso/repos/fittkereso-backend/.tmp/identification-subtrees.json";
 const TARGET =
-  "e:/Work/ebike/repos/ebike-backend/apps/benchmark/fixtures/monitors-thread-sweep-full.fixture.json";
+  "e:/Work/fittkereso/repos/fittkereso-backend/apps/benchmark/fixtures/monitors-thread-sweep-full.fixture.json";
 
 const THREAD = {
   id: "fixture-monitors-thread-sweep-full",

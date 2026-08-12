@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { OpenAiConfigService } from "@ebike-backend/config";
-import OpenAI from "openai";
+import { Injectable } from '@nestjs/common';
+import { OpenAiConfigService } from '@fittkereso-backend/config';
+import OpenAI from 'openai';
 
 @Injectable()
 export class OpenAiClientService {

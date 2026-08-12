@@ -13,8 +13,8 @@ try:
 except OverflowError:
     csv.field_size_limit(2**30)
 
-CSV_PATH = r"e:/Work/ebike/repos/ebike-backend/docs/thread-extraction/736b1b30-d7da-4ddf-8504-a6957b64c789-logs.csv"
-OUT_PATH = r"e:/Work/ebike/repos/ebike-backend/.tmp/identification-subtrees.json"
+CSV_PATH = r"e:/Work/fittkereso/repos/fittkereso-backend/docs/thread-extraction/736b1b30-d7da-4ddf-8504-a6957b64c789-logs.csv"
+OUT_PATH = r"e:/Work/fittkereso/repos/fittkereso-backend/.tmp/identification-subtrees.json"
 
 IDENTIFICATION_PROMPT_PREFIX = "You identify which products each Reddit comment references."
 RECEIVED_MARKER = "AI chat response received [openai:gpt-5.4-mini]"

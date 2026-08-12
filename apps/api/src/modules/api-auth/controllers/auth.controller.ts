@@ -8,18 +8,18 @@ import {
   SerializeOptions,
   UnauthorizedException,
   UseGuards,
-} from "@nestjs/common";
-import { Response, Request } from "express";
+} from '@nestjs/common';
+import { Response, Request } from 'express';
 import {
   AuthenticatedUser,
   AuthGuard,
   LoginService,
   UserAuthService,
-} from "@ebike-backend/auth";
-import { CustomLogger } from "@ebike-backend/logger";
+} from '@fittkereso-backend/auth';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
-@Controller("auth")
-@SerializeOptions({ strategy: "exposeAll" })
+@Controller('auth')
+@SerializeOptions({ strategy: 'exposeAll' })
 export class AuthController {
   private readonly logger = new CustomLogger(AuthController.name);
 
@@ -28,7 +28,7 @@ export class AuthController {
     private readonly userAuthService: UserAuthService,
   ) {}
 
-  @Post("login")
+  @Post('login')
   async login(
     @Body() body: { email: string; password: string },
     @Res({ passthrough: true }) res: Response, // allows you to modify response but still return JSON
@@ -41,20 +41,20 @@ export class AuthController {
 
     // Assume result contains { access_token, user, ... }
     if (result.access_token) {
-      res.cookie("access_token", result.access_token, {
+      res.cookie('access_token', result.access_token, {
         httpOnly: true, // can't be accessed by JS (security)
-        secure: process.env.NODE_ENV === "production", // only HTTPS in prod
-        sameSite: "lax", // protects against CSRF
-        path: "/", // cookie available for all routes
+        secure: process.env.NODE_ENV === 'production', // only HTTPS in prod
+        sameSite: 'lax', // protects against CSRF
+        path: '/', // cookie available for all routes
         maxAge: 60 * 60 * 1000, // 1 hour
       });
     }
     if (result.refresh_token) {
-      res.cookie("refresh_token", result.refresh_token, {
+      res.cookie('refresh_token', result.refresh_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
       });
     }
@@ -68,7 +68,7 @@ export class AuthController {
     };
   }
 
-  @Post("refresh-token")
+  @Post('refresh-token')
   async refresh(
     @Req() req: Request,
     @Body() body: { refreshToken: string },
@@ -78,26 +78,26 @@ export class AuthController {
     access_token: string;
     refresh_token: string;
   }> {
-    const refreshToken = body?.refreshToken ?? req.cookies?.["refresh_token"];
-    if (!refreshToken) throw new UnauthorizedException("No refresh token");
+    const refreshToken = body?.refreshToken ?? req.cookies?.['refresh_token'];
+    if (!refreshToken) throw new UnauthorizedException('No refresh token');
 
     const result = await this.loginService.refresh(refreshToken);
     if (!result?.access_token || !result?.refresh_token)
-      throw new UnauthorizedException("Failed to refresh");
+      throw new UnauthorizedException('Failed to refresh');
 
     // Set new cookies
-    res.cookie("access_token", result.access_token, {
+    res.cookie('access_token', result.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
       maxAge: 60 * 60 * 1000, // 1 hour
     });
-    res.cookie("refresh_token", result.refresh_token, {
+    res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
       maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
     });
 
@@ -111,16 +111,16 @@ export class AuthController {
     };
   }
 
-  @Post("logout")
+  @Post('logout')
   async logout(@Res({ passthrough: true }) res: Response) {
     // Clear cookies
-    res.clearCookie("access_token", { path: "/" });
-    res.clearCookie("refresh_token", { path: "/" });
+    res.clearCookie('access_token', { path: '/' });
+    res.clearCookie('refresh_token', { path: '/' });
 
-    return { message: "Logged out" };
+    return { message: 'Logged out' };
   }
 
-  @Get("user")
+  @Get('user')
   @UseGuards(AuthGuard)
   getUser(@Req() req: Request): AuthenticatedUser {
     return (req as any).user;

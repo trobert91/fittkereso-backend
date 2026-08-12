@@ -13,27 +13,27 @@ services:
   #     - backend
 
   postgres:
-    container_name: ebike_postgres
+    container_name: fittkereso_postgres
     image: ankane/pgvector:latest
     environment:
-      POSTGRES_USER: ebike
-      POSTGRES_PASSWORD: ebike
-      POSTGRES_DB: ebike
+      POSTGRES_USER: fittkereso
+      POSTGRES_PASSWORD: fittkereso
+      POSTGRES_DB: fittkereso
       PGDATA: /data/postgres
     volumes:
-      - "E://Work/ebike/docker_data/ebike_postgres:/data/postgres"
+      - 'E://Work/fittkereso/docker_data/fittkereso_postgres:/data/postgres'
     ports:
-      - "5432:5432"
+      - '5432:5432'
 
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3101:3000"
+      - '3101:3000'
     environment:
       - GF_SECURITY_ADMIN_USER=admin # default user
       - GF_SECURITY_ADMIN_PASSWORD=J8v!s7QpLz#2wXrT
     volumes:
-      - E://Work/ebike/docker_data/ebike_grafana:/var/lib/grafana
+      - E://Work/fittkereso/docker_data/fittkereso_grafana:/var/lib/grafana
     depends_on:
       - loki
     networks:
@@ -42,9 +42,9 @@ services:
   loki:
     image: grafana/loki:3.6.2
     ports:
-      - "3100:3100"
+      - '3100:3100'
     volumes:
-      - E://Work/ebike/docker_data/ebike_loki:/data
+      - E://Work/fittkereso/docker_data/fittkereso_loki:/data
       - ./loki-config.yml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
     networks:
@@ -52,13 +52,13 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: ebike_prometheus
+    container_name: fittkereso_prometheus
     ports:
-      - "9090:9090"
+      - '9090:9090'
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./pipeline_alerts.yml:/etc/prometheus/pipeline_alerts.yml:ro
-      - E://Work/ebike/docker_data/ebike_prometheus:/prometheus
+      - E://Work/fittkereso/docker_data/fittkereso_prometheus:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus

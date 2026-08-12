@@ -4,21 +4,21 @@ import {
   Post,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
-import { ScrapeTask, UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { ScrapeTask, UserRole } from '@fittkereso-backend/database';
 import {
   ScrapeTaskSearchParams,
   ScrapeTaskSearchResult,
   ScrapeTaskSearchService,
-} from "@ebike-backend/search";
+} from '@fittkereso-backend/search';
 import {
   ScrapeTaskCreateDto,
   ScrapeTaskCreatorService,
-} from "@ebike-backend/task";
-import { SerializeGroup } from "@ebike-backend/utils";
+} from '@fittkereso-backend/task';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 
-@Controller("admin-scrape-task")
+@Controller('admin-scrape-task')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminScrapeTaskController {
@@ -27,9 +27,9 @@ export class AdminScrapeTaskController {
     private readonly scrapeTaskCreatorService: ScrapeTaskCreatorService,
   ) {}
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,
@@ -42,9 +42,9 @@ export class AdminScrapeTaskController {
     return this.searchService.search(searchParams);
   }
 
-  @Post("create")
+  @Post('create')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,

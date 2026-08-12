@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import type {
   ProductSpecs,
   SpecMatchDetails,
   SpecMatchDetail,
   SpecMatchResult,
-} from "@ebike-backend/database";
-import { compact, isNil, isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { compact, isNil, isEmpty } from 'lodash';
 
 const NUMERIC_TOLERANCE_PERCENT = 5;
 
@@ -93,7 +93,7 @@ export class SpecComparisonService {
           isMatcher,
           valueA,
           valueB: undefined,
-          match: "mismatch",
+          match: 'mismatch',
         });
         continue;
       }
@@ -101,7 +101,7 @@ export class SpecComparisonService {
       const specHierarchy = matcherSpecHierarchies?.[key];
       const matchResult = this.compareValues(valueA, valueB, specHierarchy);
 
-      if (matchResult === "match" || matchResult === "compatible") {
+      if (matchResult === 'match' || matchResult === 'compatible') {
         matchingCount++;
       } else if (isPrimary) {
         primaryMismatches++;
@@ -174,7 +174,7 @@ export class SpecComparisonService {
       const specHierarchy = matcherSpecHierarchies?.[key];
       const result = this.compareValues(valueA, valueB, specHierarchy);
 
-      if (result === "match" || result === "compatible") {
+      if (result === 'match' || result === 'compatible') {
         confirmed++;
       } else {
         contradictions++;
@@ -207,20 +207,20 @@ export class SpecComparisonService {
     hierarchy?: Record<string, string[]>,
   ): SpecMatchResult {
     // Both numbers — use tolerance
-    if (typeof valueA === "number" && typeof valueB === "number") {
+    if (typeof valueA === 'number' && typeof valueB === 'number') {
       return this.isNumberWithinTolerance(valueA, valueB)
-        ? "match"
-        : "mismatch";
+        ? 'match'
+        : 'mismatch';
     }
 
     // Both booleans — exact
-    if (typeof valueA === "boolean" && typeof valueB === "boolean") {
-      return valueA === valueB ? "match" : "mismatch";
+    if (typeof valueA === 'boolean' && typeof valueB === 'boolean') {
+      return valueA === valueB ? 'match' : 'mismatch';
     }
 
     // Both arrays — subset match
     if (Array.isArray(valueA) && Array.isArray(valueB)) {
-      return this.isArraySubsetMatch(valueA, valueB) ? "match" : "mismatch";
+      return this.isArraySubsetMatch(valueA, valueB) ? 'match' : 'mismatch';
     }
 
     // At least one is a string (or mixed types) — coerce to string and apply full matching
@@ -231,20 +231,20 @@ export class SpecComparisonService {
     const numA = this.extractStandaloneNumber(stringA);
     const numB = this.extractStandaloneNumber(stringB);
     if (numA !== null && numB !== null) {
-      return this.isNumberWithinTolerance(numA, numB) ? "match" : "mismatch";
+      return this.isNumberWithinTolerance(numA, numB) ? 'match' : 'mismatch';
     }
 
     // Hierarchy compatibility check
     if (hierarchy && this.isHierarchyCompatible(stringA, stringB, hierarchy)) {
-      return "compatible";
+      return 'compatible';
     }
 
     // Fuzzy string match
     if (this.fuzzyStringMatch(stringA, stringB)) {
-      return "match";
+      return 'match';
     }
 
-    return "mismatch";
+    return 'mismatch';
   }
 
   // ─── Numeric Helpers ──────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ export class SpecComparisonService {
     if (
       !isEmpty(words) &&
       words.every((word) =>
-        new RegExp(`\\b${this.escapeRegex(word)}\\b`, "i").test(
+        new RegExp(`\\b${this.escapeRegex(word)}\\b`, 'i').test(
           normalizedCandidate,
         ),
       )
@@ -394,15 +394,15 @@ export class SpecComparisonService {
   private normalizeSpecValue(value: string): string {
     return value
       .toLowerCase()
-      .replace(/\b(variant|version|model|inch|mm|gb|hz|nits?)\b/gi, "")
-      .replace(/"/g, "")
-      .replace(/-/g, " ")
+      .replace(/\b(variant|version|model|inch|mm|gb|hz|nits?)\b/gi, '')
+      .replace(/"/g, '')
+      .replace(/-/g, ' ')
       .trim()
-      .replace(/\s+/g, " ");
+      .replace(/\s+/g, ' ');
   }
 
   private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private levenshtein(a: string, b: string): number {
@@ -425,7 +425,7 @@ export class SpecComparisonService {
   // ─── Utility ──────────────────────────────────────────────────────────────
 
   private toStringValue(value: string | number | boolean | string[]): string {
-    if (Array.isArray(value)) return value.join(", ");
+    if (Array.isArray(value)) return value.join(', ');
     return String(value).toLowerCase().trim();
   }
 

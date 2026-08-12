@@ -8,9 +8,9 @@ import {
   Query,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
-import { ProductCategory, UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { ProductCategory, UserRole } from '@fittkereso-backend/database';
 import {
   CategorySearchParams,
   CategoryUpdateDto,
@@ -18,12 +18,12 @@ import {
   CategoryWithConfigSearchResultDto,
   ProductCategoryDetailService,
   ProductCategoryUpdateService,
-} from "@ebike-backend/product";
-import { ProductCategorySearchService } from "@ebike-backend/search";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { CategoryConfigService } from "@ebike-backend/config";
+} from '@fittkereso-backend/product';
+import { ProductCategorySearchService } from '@fittkereso-backend/search';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 
-@Controller("admin-category")
+@Controller('admin-category')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminCategoryController {
@@ -34,7 +34,7 @@ export class AdminCategoryController {
     private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
-  @Get(":id")
+  @Get(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -45,14 +45,14 @@ export class AdminCategoryController {
   })
   @Roles([UserRole.admin])
   async getCategory(
-    @Param("id") id: string,
-    @Query("includeConfig") includeConfig?: string,
+    @Param('id') id: string,
+    @Query('includeConfig') includeConfig?: string,
   ): Promise<CategoryWithConfigDto> {
     const category = await this.detailService.getById(id);
-    return this.wrap(category, includeConfig === "true");
+    return this.wrap(category, includeConfig === 'true');
   }
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
@@ -75,7 +75,7 @@ export class AdminCategoryController {
     return wrapped;
   }
 
-  @Put(":id")
+  @Put(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -86,13 +86,13 @@ export class AdminCategoryController {
   })
   @Roles([UserRole.admin])
   async updateCategory(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateDto: CategoryUpdateDto,
-    @Query("includeConfig") includeConfig?: string,
+    @Query('includeConfig') includeConfig?: string,
   ): Promise<CategoryWithConfigDto> {
     await this.categoryUpdateService.updateCategory(id, updateDto);
     const category = await this.detailService.getById(id);
-    return this.wrap(category, includeConfig === "true");
+    return this.wrap(category, includeConfig === 'true');
   }
 
   private wrap(

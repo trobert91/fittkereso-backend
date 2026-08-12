@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
-import { CustomLogger } from "@ebike-backend/logger";
-import { differenceInSeconds } from "date-fns";
+} from '@fittkereso-backend/database';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { differenceInSeconds } from 'date-fns';
 
 @Injectable()
 export class CategoryCacheService {

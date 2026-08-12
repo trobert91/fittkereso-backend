@@ -1,7 +1,7 @@
-import { OrderedSpec, ProductSpecs } from "@ebike-backend/database";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { Expose, Type } from "class-transformer";
-import { BasePageResult } from "./base-page-result";
+import { OrderedSpec, ProductSpecs } from '@fittkereso-backend/database';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { Expose, Type } from 'class-transformer';
+import { BasePageResult } from './base-page-result';
 
 export class DuplicatePairItem {
   @Expose({ groups: [SerializeGroup.list] })
@@ -18,9 +18,6 @@ export class DuplicatePairItem {
 
   @Expose({ groups: [SerializeGroup.list] })
   brandId?: string;
-
-  @Expose({ groups: [SerializeGroup.list] })
-  reviewCount: number;
 
   @Expose({ groups: [SerializeGroup.list] })
   orderedSpecs?: OrderedSpec[];

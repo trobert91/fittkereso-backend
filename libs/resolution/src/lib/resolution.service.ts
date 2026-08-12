@@ -1,22 +1,21 @@
-import { Injectable } from "@nestjs/common";
-import { CustomLogger } from "@ebike-backend/logger";
-import type { ChatTraceData } from "@ebike-backend/debug";
-import type { CallerContext } from "./models/caller-context";
-import type { ResolutionContext } from "./models/resolution-context";
-import type { ProductResolutionInput } from "./models/resolution-input";
-import type { ResolutionOptions } from "./models/resolution-options";
-import type { ResolutionResult } from "./models/resolution-result";
-import { ResolutionStatus } from "./models/resolution-status";
-import { ReferenceProductResolver } from "./stages/reference-product-resolver";
-import { BrandResolverService } from "./stages/brand-resolver.service";
-import { CategoryResolverService } from "./stages/category-resolver.service";
-import { RecallService } from "./stages/recall.service";
-import { FilterService } from "./stages/filter.service";
-import { ScoringService } from "./stages/scoring.service";
-import { DecisionService } from "./stages/decision.service";
-import { FinalizeService } from "./stages/finalize.service";
-import { productSpecsSummary } from "./matching/spec-utils";
-import type { SlimResolvedModel } from "./models/slim-types";
+import { Injectable } from '@nestjs/common';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import type { ChatTraceData } from '@fittkereso-backend/debug';
+import type { ResolutionContext } from './models/resolution-context';
+import type { ProductResolutionInput } from './models/resolution-input';
+import type { ResolutionOptions } from './models/resolution-options';
+import type { ResolutionResult } from './models/resolution-result';
+import { ResolutionStatus } from './models/resolution-status';
+import { ReferenceProductResolver } from './stages/reference-product-resolver';
+import { BrandResolverService } from './stages/brand-resolver.service';
+import { CategoryResolverService } from './stages/category-resolver.service';
+import { RecallService } from './stages/recall.service';
+import { FilterService } from './stages/filter.service';
+import { ScoringService } from './stages/scoring.service';
+import { DecisionService } from './stages/decision.service';
+import { FinalizeService } from './stages/finalize.service';
+import { productSpecsSummary } from './matching/spec-utils';
+import type { SlimResolvedModel } from './models/slim-types';
 
 /**
  * Safety net for the recall fixed-point loop. Correct strategies converge
@@ -62,22 +61,20 @@ export class ResolutionService {
   async search(
     input: ProductResolutionInput,
     options: ResolutionOptions,
-    callerContext: CallerContext = {},
     traceCollector?: (data: ChatTraceData) => void,
     logContext?: Record<string, string>,
   ): Promise<ResolutionResult> {
     const startedAt = Date.now();
     const context = createInitialContext(input, options);
-    context.threadId = callerContext.threadId;
 
     // ── Stage 1 — reference-product resolver ────────────────────────────────
     const referenceResult = await this.referenceResolver.resolve(context);
 
-    if (referenceResult?.kind === "resolved") {
+    if (referenceResult?.kind === 'resolved') {
       // Short-circuit: input names the same product as the reference.
       const product = referenceResult.product;
       context.decision = {
-        kind: "matcher_accept",
+        kind: 'matcher_accept',
         confidence: referenceResult.confidence,
         reason: referenceResult.reason,
         selectedCandidates: [
@@ -87,7 +84,7 @@ export class ResolutionService {
             reason: referenceResult.reason,
           },
         ],
-        evidenceSummary: "reference product matched directly (relation=same)",
+        evidenceSummary: 'reference product matched directly (relation=same)',
       };
       context.resolvedProduct = toSlimResolved(product);
       context.status = ResolutionStatus.RESOLVED;
@@ -129,7 +126,7 @@ export class ResolutionService {
 
       if (iteration === MAX_RECALL_ITERATIONS - 1) {
         context.errors.push({
-          phase: "recall",
+          phase: 'recall',
           message: `recall loop hit max iterations (${MAX_RECALL_ITERATIONS}) without converging`,
           timestamp: new Date().toISOString(),
         });
@@ -137,12 +134,7 @@ export class ResolutionService {
     }
 
     // ── Stage 6 — decide ────────────────────────────────────────────────────
-    await this.decisionService.decide(
-      context,
-      callerContext.threadContext,
-      traceCollector,
-      logContext,
-    );
+    await this.decisionService.decide(context, traceCollector, logContext);
 
     // ── Stage 7 — finalize ──────────────────────────────────────────────────
     const result = await this.finalizeService.finalize(context);
@@ -216,8 +208,8 @@ export class ResolutionService {
 
     const headline =
       context.status === ResolutionStatus.RESOLVED
-        ? `Product resolution resolved → ${context.resolvedProduct?.displayName ?? context.resolvedProduct?.id ?? "unknown"}`
-        : `Product resolution unresolved (${context.decision?.reason ?? "no_decision"})`;
+        ? `Product resolution resolved → ${context.resolvedProduct?.displayName ?? context.resolvedProduct?.id ?? 'unknown'}`
+        : `Product resolution unresolved (${context.decision?.reason ?? 'no_decision'})`;
 
     if (context.status === ResolutionStatus.RESOLVED) {
       this.logger.log(headline, summary);
@@ -246,7 +238,7 @@ function createInitialContext(
 }
 
 function toSlimResolved(
-  model: import("@ebike-backend/database").ProductModel,
+  model: import('@fittkereso-backend/database').ProductModel,
 ): SlimResolvedModel {
   return {
     id: model.id,

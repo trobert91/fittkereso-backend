@@ -4,9 +4,9 @@ import readline from "node:readline";
 import path from "node:path";
 
 const CSV_PATH =
-  "e:/Work/ebike/repos/ebike-backend/docs/thread-extraction/736b1b30-d7da-4ddf-8504-a6957b64c789-logs.csv";
+  "e:/Work/fittkereso/repos/fittkereso-backend/docs/thread-extraction/736b1b30-d7da-4ddf-8504-a6957b64c789-logs.csv";
 const OUT_PATH =
-  "e:/Work/ebike/repos/ebike-backend/.tmp/identification-subtrees.json";
+  "e:/Work/fittkereso/repos/fittkereso-backend/.tmp/identification-subtrees.json";
 
 const IDENTIFICATION_PROMPT_PREFIX =
   "You identify which products each Reddit comment references.";

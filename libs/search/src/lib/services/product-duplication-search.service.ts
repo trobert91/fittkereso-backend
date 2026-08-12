@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
-import { ProductModelRepository } from "@ebike-backend/database";
-import { plainToInstance } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { DuplicateSearchParams } from "../models/duplicate-search-params";
+import { Injectable } from '@nestjs/common';
+import { ProductModelRepository } from '@fittkereso-backend/database';
+import { plainToInstance } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { DuplicateSearchParams } from '../models/duplicate-search-params';
 import {
   DuplicatePair,
   DuplicatePairItem,
   DuplicateSearchResult,
-} from "../models/duplicate-search-result";
+} from '../models/duplicate-search-result';
 
 const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_SIMILARITY_THRESHOLD = 40;
@@ -28,14 +28,14 @@ export class ProductDuplicationSearchService {
     const queryParams: any[] = [threshold];
     let paramIndex = 2;
 
-    let categoryFilter = "";
+    let categoryFilter = '';
     if (params.categoryId) {
       categoryFilter = `AND a."productCategoryId" = $${paramIndex}`;
       queryParams.push(params.categoryId);
       paramIndex++;
     }
 
-    let brandFilter = "";
+    let brandFilter = '';
     if (params.brandId) {
       brandFilter = `AND a."brandId" = $${paramIndex}`;
       queryParams.push(params.brandId);
@@ -52,8 +52,6 @@ export class ProductDuplicationSearchService {
       LEFT JOIN brand ba ON a."brandId" = ba.id
       LEFT JOIN brand bb ON b."brandId" = bb.id
       LEFT JOIN product_category category ON a."productCategoryId" = category.id
-      LEFT JOIN product_rating ra ON ra."modelId" = a.id
-      LEFT JOIN product_rating rb ON rb."modelId" = b.id
       WHERE similarity(a."normalizedName", b."normalizedName") >= $1
         AND NOT EXISTS (
           SELECT 1
@@ -75,7 +73,7 @@ export class ProductDuplicationSearchService {
       countQuery,
       queryParams,
     );
-    const totalItems = parseInt(countResult[0]?.count ?? "0", 10);
+    const totalItems = parseInt(countResult[0]?.count ?? '0', 10);
 
     const dataQuery = `
       SELECT
@@ -88,7 +86,6 @@ export class ProductDuplicationSearchService {
         a."releaseYear" AS "releaseYearA",
         a."createdAt" AS "createdAtA",
         ba.name AS "brandAName",
-        COALESCE(ra."totalReviewCount", 0) AS "reviewCountA",
         a."orderedSpecs" AS "orderedSpecsA",
         b.id AS "productBId",
         b."displayName" AS "productBDisplayName",
@@ -99,7 +96,6 @@ export class ProductDuplicationSearchService {
         b."releaseYear" AS "releaseYearB",
         b."createdAt" AS "createdAtB",
         bb.name AS "brandBName",
-        COALESCE(rb."totalReviewCount", 0) AS "reviewCountB",
         b."orderedSpecs" AS "orderedSpecsB",
         similarity(a."normalizedName", b."normalizedName") AS "similarityScore",
         category.name AS "categoryName",
@@ -121,9 +117,8 @@ export class ProductDuplicationSearchService {
           id: row.productAId,
           displayName: row.productADisplayName,
           normalizedName: row.productANormalizedName,
-          brandName: row.brandAName ?? "",
+          brandName: row.brandAName ?? '',
           brandId: row.brandAId,
-          reviewCount: parseInt(row.reviewCountA, 10),
           orderedSpecs: row.orderedSpecsA,
           specs: row.specsA,
           model: row.modelA,
@@ -138,9 +133,8 @@ export class ProductDuplicationSearchService {
           id: row.productBId,
           displayName: row.productBDisplayName,
           normalizedName: row.productBNormalizedName,
-          brandName: row.brandBName ?? "",
+          brandName: row.brandBName ?? '',
           brandId: row.brandBId,
-          reviewCount: parseInt(row.reviewCountB, 10),
           orderedSpecs: row.orderedSpecsB,
           specs: row.specsB,
           model: row.modelB,
@@ -150,8 +144,8 @@ export class ProductDuplicationSearchService {
         transformOptions,
       );
       pair.similarityScore = Math.round(parseFloat(row.similarityScore) * 100);
-      pair.categoryName = row.categoryName ?? "";
-      pair.categoryId = row.categoryId ?? "";
+      pair.categoryName = row.categoryName ?? '';
+      pair.categoryId = row.categoryId ?? '';
       return pair;
     });
 

@@ -1,7 +1,7 @@
-import { AiPricingMap, AiUsage } from "@ebike-backend/ai-core";
-import { AiCostCalculationService } from "./ai-cost-calculation.service";
+import { AiPricingMap, AiUsage } from '@fittkereso-backend/ai-core';
+import { AiCostCalculationService } from './ai-cost-calculation.service';
 
-describe("AiCostCalculationService", () => {
+describe('AiCostCalculationService', () => {
   let service: AiCostCalculationService;
 
   beforeEach(() => {
@@ -15,16 +15,16 @@ describe("AiCostCalculationService", () => {
     cachedTokens: 500_000,
   };
 
-  it("falls back to 50% of input rate when cachedInputPerMillion is not set", () => {
+  it('falls back to 50% of input rate when cachedInputPerMillion is not set', () => {
     const pricing: AiPricingMap = {
-      "gpt-5.4-mini": { inputPerMillion: 1, outputPerMillion: 2 },
+      'gpt-5.4-mini': { inputPerMillion: 1, outputPerMillion: 2 },
     };
 
     const cost = service.calculateAndAddUsage(
-      "openai",
-      "gpt-5.4-mini",
+      'openai',
+      'gpt-5.4-mini',
       pricing,
-      "gpt-5.4-mini",
+      'gpt-5.4-mini',
       undefined,
       usage,
     );
@@ -36,9 +36,9 @@ describe("AiCostCalculationService", () => {
     expect(cost).toBeCloseTo(2.75, 4);
   });
 
-  it("uses cachedInputPerMillion when set", () => {
+  it('uses cachedInputPerMillion when set', () => {
     const pricing: AiPricingMap = {
-      "deepseek-v4-flash": {
+      'deepseek-v4-flash': {
         inputPerMillion: 0.14,
         cachedInputPerMillion: 0.0028,
         outputPerMillion: 0.28,
@@ -46,10 +46,10 @@ describe("AiCostCalculationService", () => {
     };
 
     const cost = service.calculateAndAddUsage(
-      "deepseek",
-      "deepseek-v4-flash",
+      'deepseek',
+      'deepseek-v4-flash',
       pricing,
-      "deepseek-v4-flash",
+      'deepseek-v4-flash',
       undefined,
       usage,
     );

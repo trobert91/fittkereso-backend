@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { GoogleGenAI } from "@google/genai";
-import { GeminiConfigService as AppGeminiConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { GoogleGenAI } from '@google/genai';
+import { GeminiConfigService as AppGeminiConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class GeminiClientService {

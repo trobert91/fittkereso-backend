@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { ProductModelUpdateDto } from "../../models/product-update.dto";
+import { Injectable } from '@nestjs/common';
+import { ProductModelUpdateDto } from '../../models/product-update.dto';
 import {
   BrandRepository,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { generateSlug, nameOf } from "@ebike-backend/utils";
-import { ProductUpdateMapperService } from "./product-update-mapper.service";
+} from '@fittkereso-backend/database';
+import { generateSlug, nameOf } from '@fittkereso-backend/utils';
+import { ProductUpdateMapperService } from './product-update-mapper.service';
 
 @Injectable()
 export class ProductUpdateService {
@@ -39,10 +39,10 @@ export class ProductUpdateService {
     );
     const existing = await this.productRepo.findOne({
       where: { slug },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing && existing.id !== entity.id) {
-      slug = slug + "-" + entity.id.slice(-6);
+      slug = slug + '-' + entity.id.slice(-6);
     }
     entity.slug = slug;
   }
@@ -51,10 +51,10 @@ export class ProductUpdateService {
     return this.productRepo.findOneOrFail({
       where: { id },
       relations: [
-        nameOf<ProductModel>("brand"),
-        nameOf<ProductModel>("productCategory"),
-        nameOf<ProductModel>("aliases"),
-        nameOf<ProductModel>("embedding"),
+        nameOf<ProductModel>('brand'),
+        nameOf<ProductModel>('productCategory'),
+        nameOf<ProductModel>('aliases'),
+        nameOf<ProductModel>('embedding'),
       ],
     });
   }

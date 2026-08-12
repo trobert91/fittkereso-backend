@@ -1,5 +1,5 @@
-import { ProductSource, ProductSourceType } from "@ebike-backend/database";
-import { BasePageResult } from "./base-page-result";
+import { ProductSource, ProductSourceType } from '@fittkereso-backend/database';
+import { BasePageResult } from './base-page-result';
 
 export class ProductSourceSearchResult extends BasePageResult<ProductSource> {
   searchTerm?: string;

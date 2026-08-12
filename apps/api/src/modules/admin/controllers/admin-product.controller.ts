@@ -12,8 +12,8 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
 import {
   ProductAlias,
   ProductAliasRepository,
@@ -25,11 +25,10 @@ import {
   ProductModelSourceRepository,
   ProductSourceRepository,
   ProductSourceType,
-  Review,
   ScrapeQueueName,
   ScrapeTask,
   UserRole,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   ProductDetailService,
   ProductImageDeleteService,
@@ -37,33 +36,29 @@ import {
   ProductImageOrderService,
   ProductImageUploadService,
   ProductMergeService,
-  ProductRatingUpdaterService,
   ProductSearchParams,
   ProductSearchResult,
   ProductUpdateService,
-} from "@ebike-backend/product";
-import { nameOf, SerializeGroup } from "@ebike-backend/utils";
-import { ProductModelUpdateDto } from "@ebike-backend/product";
-import { FileInterceptor } from "@nestjs/platform-express";
-import { Express } from "express";
-import { ProductSpecUpdateDto } from "@ebike-backend/product";
-import { ProductSpecUpdaterService } from "@ebike-backend/product";
+} from '@fittkereso-backend/product';
+import { nameOf, SerializeGroup } from '@fittkereso-backend/utils';
+import { ProductModelUpdateDto } from '@fittkereso-backend/product';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
+import { ProductSpecUpdateDto } from '@fittkereso-backend/product';
+import { ProductSpecUpdaterService } from '@fittkereso-backend/product';
 import {
   DuplicateSearchParams,
   DuplicateSearchResult,
   ProductDuplicationSearchService,
   ProductSearchService,
-} from "@ebike-backend/search";
-import {
-  QueuePublisherService,
-  ScrapeTaskPublisherService,
-} from "@ebike-backend/task";
-import { QueueStatusDto } from "../dtos/product-source-sync.dto";
-import { ProductMergeDto } from "../dtos/product-merge.dto";
-import { ResyncProductSourceDto } from "../dtos/resync-product-source.dto";
-import { ProductAliasDto } from "../dtos/product-alias.dto";
+} from '@fittkereso-backend/search';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { QueueStatusDto } from '../dtos/product-source-sync.dto';
+import { ProductMergeDto } from '../dtos/product-merge.dto';
+import { ResyncProductSourceDto } from '../dtos/resync-product-source.dto';
+import { ProductAliasDto } from '../dtos/product-alias.dto';
 
-@Controller("admin-product")
+@Controller('admin-product')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminProductController {
@@ -80,14 +75,12 @@ export class AdminProductController {
     private readonly productModelSourceRepo: ProductModelSourceRepository,
     private readonly productSourceRepo: ProductSourceRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
-    private readonly queuePublisher: QueuePublisherService,
-    private readonly ratingUpdater: ProductRatingUpdaterService,
     private readonly mergeService: ProductMergeService,
     private readonly duplicationSearchService: ProductDuplicationSearchService,
     private readonly aliasRepo: ProductAliasRepository,
   ) {}
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchProducts(
     @Body() searchParams: ProductSearchParams,
@@ -97,7 +90,7 @@ export class AdminProductController {
     return result;
   }
 
-  @Post("duplicates")
+  @Post('duplicates')
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async findDuplicates(
     @Body() params: DuplicateSearchParams,
@@ -105,7 +98,7 @@ export class AdminProductController {
     return this.duplicationSearchService.findDuplicates(params);
   }
 
-  @Get(":id")
+  @Get(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -115,11 +108,11 @@ export class AdminProductController {
     ],
   })
   @Roles([UserRole.admin])
-  async getProduct(@Param("id") id: string) {
+  async getProduct(@Param('id') id: string) {
     return this.detailService.getProductById(id);
   }
 
-  @Put(":id")
+  @Put(':id')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -130,7 +123,7 @@ export class AdminProductController {
     ],
   })
   async updateProduct(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateDto: ProductModelUpdateDto,
   ) {
     await this.updateService.updateProduct(id, updateDto);
@@ -138,7 +131,7 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Post(":id/update-manual-specs")
+  @Post(':id/update-manual-specs')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -149,7 +142,7 @@ export class AdminProductController {
     ],
   })
   async updateProductSpecs(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateDto: ProductSpecUpdateDto,
   ) {
     await this.specUpdaterService.updateManualSpecs(id, updateDto.specs);
@@ -160,9 +153,9 @@ export class AdminProductController {
   // ---------------------------------------------------
   // 📸 Upload product image
   // ---------------------------------------------------
-  @Post(":id/images")
+  @Post(':id/images')
   @Roles([UserRole.admin])
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor('file'))
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -172,11 +165,11 @@ export class AdminProductController {
     ],
   })
   async uploadProductImage(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<ProductImage> {
     if (!file) {
-      throw new Error("No file uploaded");
+      throw new Error('No file uploaded');
     }
 
     const image = await this.imageUploadService.uploadImage(
@@ -193,7 +186,7 @@ export class AdminProductController {
   // ---------------------------------------------------
   // 🔢 Update image order
   // ---------------------------------------------------
-  @Post(":id/image-order")
+  @Post(':id/image-order')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -204,7 +197,7 @@ export class AdminProductController {
     ],
   })
   async updateImageOrder(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() newOrder: { id: string; order: number }[],
   ): Promise<ProductModel> {
     await this.imageOrderService.updateImageOrderForId(id, newOrder);
@@ -212,7 +205,7 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Delete(":id/images/:imageId")
+  @Delete(':id/images/:imageId')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -223,58 +216,15 @@ export class AdminProductController {
     ],
   })
   async deleteImage(
-    @Param("id") id: string,
-    @Param("imageId") imageId: string,
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
   ): Promise<ProductModel> {
     await this.imageDeleteService.deleteImage(id, imageId);
 
     return this.detailService.getProductById(id);
   }
 
-  @Post(":id/recalculate-rating")
-  @SerializeOptions({
-    groups: [
-      SerializeGroup.adminList,
-      SerializeGroup.list,
-      SerializeGroup.adminDetails,
-      SerializeGroup.details,
-    ],
-  })
-  async recalculateRating(@Param("id") id: string): Promise<ProductModel> {
-    const product = await this.productRepo.repo
-      .createQueryBuilder("model")
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>("rating")}`, "rating")
-      .leftJoinAndSelect(
-        `model.${nameOf<ProductModel>("productCategory")}`,
-        "productCategory",
-      )
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>("reviews")}`, "review")
-      .leftJoinAndSelect(`review.${nameOf<Review>("labels")}`, "reviewLabels")
-      .where(`model.${nameOf<ProductModel>("id")} = :id`, { id })
-      .getOne();
-
-    if (!product) {
-      throw new NotFoundException(`Product ${id} not found`);
-    }
-
-    await this.ratingUpdater.updateProductRating(product);
-
-    return this.detailService.getProductById(id);
-  }
-
-  @Post(":id/queue-review-analysis")
-  async queueReviewAnalysis(@Param("id") id: string): Promise<QueueStatusDto> {
-    const product = await this.productRepo.findOne({ where: { id } });
-    if (!product) {
-      throw new NotFoundException(`Product ${id} not found`);
-    }
-
-    await this.queuePublisher.addProductReviewAnalysisTask({ productId: id });
-
-    return { status: "queued" };
-  }
-
-  @Post(":id/merge")
+  @Post(':id/merge')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -284,7 +234,7 @@ export class AdminProductController {
     ],
   })
   async mergeProduct(
-    @Param("id") sourceId: string,
+    @Param('id') sourceId: string,
     @Body() body: ProductMergeDto,
   ): Promise<ProductModel> {
     return this.mergeService.mergeProducts({
@@ -297,7 +247,7 @@ export class AdminProductController {
   // 🏷️ Alias management
   // ---------------------------------------------------
 
-  @Post(":id/aliases")
+  @Post(':id/aliases')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -308,7 +258,7 @@ export class AdminProductController {
     ],
   })
   async createAlias(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() body: ProductAliasDto,
   ): Promise<ProductModel> {
     const alias = new ProductAlias();
@@ -319,7 +269,7 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Put(":id/aliases/:aliasId")
+  @Put(':id/aliases/:aliasId')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -330,13 +280,13 @@ export class AdminProductController {
     ],
   })
   async updateAlias(
-    @Param("id") id: string,
-    @Param("aliasId") aliasId: string,
+    @Param('id') id: string,
+    @Param('aliasId') aliasId: string,
     @Body() body: ProductAliasDto,
   ): Promise<ProductModel> {
     const alias = await this.aliasRepo.findOne({
       where: { id: aliasId },
-      relations: [nameOf<ProductAlias>("model")],
+      relations: [nameOf<ProductAlias>('model')],
     });
 
     if (!alias || alias.model.id !== id) {
@@ -350,7 +300,7 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Delete(":id/aliases/:aliasId")
+  @Delete(':id/aliases/:aliasId')
   @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
@@ -361,12 +311,12 @@ export class AdminProductController {
     ],
   })
   async deleteAlias(
-    @Param("id") id: string,
-    @Param("aliasId") aliasId: string,
+    @Param('id') id: string,
+    @Param('aliasId') aliasId: string,
   ): Promise<ProductModel> {
     const alias = await this.aliasRepo.findOne({
       where: { id: aliasId },
-      relations: [nameOf<ProductAlias>("model")],
+      relations: [nameOf<ProductAlias>('model')],
     });
 
     if (!alias || alias.model.id !== id) {
@@ -379,7 +329,7 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Delete(":id/sources/:sourceId")
+  @Delete(':id/sources/:sourceId')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -389,12 +339,12 @@ export class AdminProductController {
     ],
   })
   async deleteSource(
-    @Param("id") id: string,
-    @Param("sourceId") sourceId: string,
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
   ): Promise<ProductModel> {
     const source = await this.productModelSourceRepo.findOne({
       where: { id: sourceId },
-      relations: [nameOf<ProductModelSource>("model")],
+      relations: [nameOf<ProductModelSource>('model')],
     });
 
     if (!source || source.model.id !== id) {
@@ -407,26 +357,26 @@ export class AdminProductController {
     return this.detailService.getProductById(id);
   }
 
-  @Post(":id/resync-source")
+  @Post(':id/resync-source')
   async resyncSource(
-    @Param("id") productId: string,
+    @Param('id') productId: string,
     @Body() body: ResyncProductSourceDto,
   ): Promise<QueueStatusDto> {
     const modelSource = await this.productModelSourceRepo.findOne({
       where: { id: body.productModelSourceId },
-      relations: [nameOf<ProductModelSource>("model")],
+      relations: [nameOf<ProductModelSource>('model')],
     });
 
     if (!modelSource || modelSource.model.id !== productId) {
-      throw new NotFoundException("Product source not found for product");
+      throw new NotFoundException('Product source not found for product');
     }
 
     if (modelSource.type === ProductSourceType.manual) {
-      throw new BadRequestException("Manual source cannot be resynced");
+      throw new BadRequestException('Manual source cannot be resynced');
     }
 
     if (!modelSource.url) {
-      throw new BadRequestException("Product source url is missing");
+      throw new BadRequestException('Product source url is missing');
     }
 
     const productSource = await this.productSourceRepo.findOne({
@@ -447,6 +397,6 @@ export class AdminProductController {
 
     await this.scrapeTaskPublisher.addTask(task);
 
-    return { status: "queued" };
+    return { status: 'queued' };
   }
 }

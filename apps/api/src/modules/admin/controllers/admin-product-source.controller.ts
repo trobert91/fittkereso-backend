@@ -9,29 +9,29 @@ import {
   Put,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
 import {
   ProductSource,
   ProductSourceRepository,
   ProductSourceSyncMode,
   UserRole,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   ProductSourceSearchParams,
   ProductSourceSearchResult,
   ProductSourceSearchService,
-} from "@ebike-backend/search";
-import { QueuePublisherService } from "@ebike-backend/task";
-import { SerializeGroup } from "@ebike-backend/utils";
-import ms from "ms";
-import { UpdateProductSourceDto } from "../dtos/update-product-source.dto";
+} from '@fittkereso-backend/search';
+import { QueuePublisherService } from '@fittkereso-backend/task';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import ms from 'ms';
+import { UpdateProductSourceDto } from '../dtos/update-product-source.dto';
 import {
   QueueStatusDto,
   TriggerProductSourceFullSyncDto,
-} from "../dtos/product-source-sync.dto";
+} from '../dtos/product-source-sync.dto';
 
-@Controller("admin-product-source")
+@Controller('admin-product-source')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminProductSourceController {
@@ -41,9 +41,9 @@ export class AdminProductSourceController {
     private readonly queuePublisher: QueuePublisherService,
   ) {}
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,
@@ -56,9 +56,9 @@ export class AdminProductSourceController {
     return await this.searchService.search(searchParams);
   }
 
-  @Get(":id")
+  @Get(':id')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,
@@ -67,22 +67,22 @@ export class AdminProductSourceController {
     ],
   })
   async getProductSource(
-    @Param("id") productSourceId: string,
+    @Param('id') productSourceId: string,
   ): Promise<ProductSource> {
     const source = await this.productSourceRepo.findOne({
       where: { id: productSourceId },
     });
 
     if (!source) {
-      throw new NotFoundException("Product source not found");
+      throw new NotFoundException('Product source not found');
     }
 
     return source;
   }
 
-  @Put(":id")
+  @Put(':id')
   @SerializeOptions({
-    strategy: "exposeAll",
+    strategy: 'exposeAll',
     groups: [
       SerializeGroup.adminList,
       SerializeGroup.list,
@@ -91,7 +91,7 @@ export class AdminProductSourceController {
     ],
   })
   async updateProductSource(
-    @Param("id") productSourceId: string,
+    @Param('id') productSourceId: string,
     @Body() updateDto: UpdateProductSourceDto,
   ): Promise<ProductSource> {
     const source = await this.productSourceRepo.findOne({
@@ -99,7 +99,7 @@ export class AdminProductSourceController {
     });
 
     if (!source) {
-      throw new NotFoundException("Product source not found");
+      throw new NotFoundException('Product source not found');
     }
 
     if (updateDto.name !== undefined) {
@@ -129,12 +129,12 @@ export class AdminProductSourceController {
     if (updateDto.fullSyncInterval !== undefined) {
       if (
         updateDto.fullSyncInterval !== null &&
-        updateDto.fullSyncInterval.trim() !== ""
+        updateDto.fullSyncInterval.trim() !== ''
       ) {
         const parsedInterval = ms(updateDto.fullSyncInterval as ms.StringValue);
 
         if (parsedInterval === undefined) {
-          throw new BadRequestException("Invalid fullSyncInterval format");
+          throw new BadRequestException('Invalid fullSyncInterval format');
         }
 
         source.fullSyncInterval = updateDto.fullSyncInterval as ms.StringValue;
@@ -146,7 +146,7 @@ export class AdminProductSourceController {
     if (updateDto.incrementalSyncInterval !== undefined) {
       if (
         updateDto.incrementalSyncInterval !== null &&
-        updateDto.incrementalSyncInterval.trim() !== ""
+        updateDto.incrementalSyncInterval.trim() !== ''
       ) {
         const parsedInterval = ms(
           updateDto.incrementalSyncInterval as ms.StringValue,
@@ -154,7 +154,7 @@ export class AdminProductSourceController {
 
         if (parsedInterval === undefined) {
           throw new BadRequestException(
-            "Invalid incrementalSyncInterval format",
+            'Invalid incrementalSyncInterval format',
           );
         }
 
@@ -170,9 +170,9 @@ export class AdminProductSourceController {
     return source;
   }
 
-  @Post(":id/full-sync")
+  @Post(':id/full-sync')
   async triggerFullSync(
-    @Param("id") productSourceId: string,
+    @Param('id') productSourceId: string,
     @Body() body: TriggerProductSourceFullSyncDto,
   ): Promise<QueueStatusDto> {
     const source = await this.productSourceRepo.findOne({
@@ -180,7 +180,7 @@ export class AdminProductSourceController {
     });
 
     if (!source) {
-      throw new NotFoundException("Product source not found");
+      throw new NotFoundException('Product source not found');
     }
 
     await this.queuePublisher.addProductSourceSyncTask({
@@ -190,19 +190,19 @@ export class AdminProductSourceController {
       brandNames: body?.brandNames,
     });
 
-    return { status: "queued" };
+    return { status: 'queued' };
   }
 
-  @Post(":id/incremental-sync")
+  @Post(':id/incremental-sync')
   async triggerIncrementalSync(
-    @Param("id") productSourceId: string,
+    @Param('id') productSourceId: string,
   ): Promise<QueueStatusDto> {
     const source = await this.productSourceRepo.findOne({
       where: { id: productSourceId },
     });
 
     if (!source) {
-      throw new NotFoundException("Product source not found");
+      throw new NotFoundException('Product source not found');
     }
 
     await this.queuePublisher.addProductSourceSyncTask({
@@ -210,6 +210,6 @@ export class AdminProductSourceController {
       syncMode: ProductSourceSyncMode.incremental,
     });
 
-    return { status: "queued" };
+    return { status: 'queued' };
   }
 }

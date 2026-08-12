@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   OrderedSpec,
   ProductCategory,
   ProductSpecs,
   UnitFormat,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import _ from "lodash";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import _ from 'lodash';
 
 @Injectable()
 export class ProductSpecSortService {
@@ -41,7 +41,7 @@ export class ProductSpecSortService {
     //
     const sortedDefinitions = _.sortBy(defined, [
       (d) => (_.isNil(d.order) ? Number.MAX_SAFE_INTEGER : d.order),
-      "key",
+      'key',
     ]);
 
     //
@@ -80,9 +80,9 @@ export class ProductSpecSortService {
     unit?: string,
     unitFormat?: UnitFormat,
   ): string {
-    const valueStr = value?.toString() ?? "";
+    const valueStr = value?.toString() ?? '';
     if (!unit) return valueStr;
 
-    return unitFormat === "none" ? `${valueStr}${unit}` : `${valueStr} ${unit}`;
+    return unitFormat === 'none' ? `${valueStr}${unit}` : `${valueStr} ${unit}`;
   }
 }

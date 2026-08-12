@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { SupabaseConfigService } from "@ebike-backend/config";
-import { UserRole } from "@ebike-backend/database";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { Injectable } from '@nestjs/common';
+import { SupabaseConfigService } from '@fittkereso-backend/config';
+import { UserRole } from '@fittkereso-backend/database';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 export interface DecodedToken {
   sub: string; // Supabase user ID
@@ -15,9 +15,9 @@ export class SupabaseJwtService {
   private readonly jwkSet;
 
   constructor(supabaseConfig: SupabaseConfigService) {
-    this.jwtIssuer = supabaseConfig.url + "/auth/v1";
+    this.jwtIssuer = supabaseConfig.url + '/auth/v1';
     this.jwkSet = createRemoteJWKSet(
-      new URL(this.jwtIssuer + "/.well-known/jwks.json"),
+      new URL(this.jwtIssuer + '/.well-known/jwks.json'),
     );
   }
 

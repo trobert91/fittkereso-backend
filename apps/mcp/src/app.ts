@@ -1,7 +1,7 @@
-import { NestFactory } from "@nestjs/core";
-import { INestApplication } from "@nestjs/common";
-import { AppModule } from "./app.module";
-import { LoggerService } from "@ebike-backend/logger";
+import { NestFactory } from '@nestjs/core';
+import { INestApplication } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { LoggerService } from '@fittkereso-backend/logger';
 
 export const createApp = async (): Promise<INestApplication> => {
   const app = await NestFactory.create(AppModule, {

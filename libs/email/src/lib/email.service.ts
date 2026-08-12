@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { MailgunConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { MailgunConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 export interface SendEmailOptions {
   to: string;
@@ -23,16 +23,16 @@ export class EmailService {
     const url = `${apiUrl}/${domain}/messages`;
 
     const formData = new FormData();
-    formData.append("from", from);
-    formData.append("to", to);
-    formData.append("subject", subject);
-    formData.append("html", html);
-    formData.append("text", text);
+    formData.append('from', from);
+    formData.append('to', to);
+    formData.append('subject', subject);
+    formData.append('html', html);
+    formData.append('text', text);
 
-    const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`;
+    const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
 
     const response = await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers: { Authorization: authHeader },
       body: formData,
     });

@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
   ProductModel,
-} from "@ebike-backend/database";
-import { normalize } from "@ebike-backend/utils";
-import { CustomLogger } from "@ebike-backend/logger";
-import { BrandCacheService } from "../brand/brand-cache.service";
+} from '@fittkereso-backend/database';
+import { normalize } from '@fittkereso-backend/utils';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { BrandCacheService } from '../brand/brand-cache.service';
 
 const MIN_ALIAS_LENGTH = 2;
 
@@ -63,7 +63,7 @@ export class ProductAliasAutoCreateService {
       return;
     }
 
-    const canonicalNormalized = normalize(resolvedModel.model ?? "");
+    const canonicalNormalized = normalize(resolvedModel.model ?? '');
     if (normalizedAlias === canonicalNormalized) {
       return;
     }
@@ -73,7 +73,7 @@ export class ProductAliasAutoCreateService {
       resolvedModel,
     );
     if (rejectionReason) {
-      this.logger.debug("Alias rejected by safeguard", {
+      this.logger.debug('Alias rejected by safeguard', {
         alias: normalizedAlias,
         productId: resolvedModel.id,
         productModel: resolvedModel.model,
@@ -99,11 +99,11 @@ export class ProductAliasAutoCreateService {
 
     await this.productAliasRepository.save(alias);
 
-    this.logger.debug("Auto-created product alias", {
+    this.logger.debug('Auto-created product alias', {
       alias: normalizedAlias,
       productId: resolvedModel.id,
       productModel: resolvedModel.model,
-      region: region ?? "unknown",
+      region: region ?? 'unknown',
       ...logContext,
     });
   }
@@ -118,20 +118,20 @@ export class ProductAliasAutoCreateService {
     normalizedAlias: string,
     resolvedModel: ProductModel,
   ): Promise<string | undefined> {
-    const productModelName = normalize(resolvedModel.model ?? "");
-    const productNormalizedName = resolvedModel.normalizedName ?? "";
+    const productModelName = normalize(resolvedModel.model ?? '');
+    const productNormalizedName = resolvedModel.normalizedName ?? '';
 
     // Numeric token overlap: check against both model and normalizedName
     if (
       !this.hasNumericTokenOverlap(normalizedAlias, productModelName) &&
       !this.hasNumericTokenOverlap(normalizedAlias, productNormalizedName)
     ) {
-      return "no_numeric_overlap";
+      return 'no_numeric_overlap';
     }
 
     // Brand-only guard: alias must not be just a brand name
     if (await this.isBrandName(normalizedAlias)) {
-      return "alias_is_brand_name";
+      return 'alias_is_brand_name';
     }
 
     return undefined;

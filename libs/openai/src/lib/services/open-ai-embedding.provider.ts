@@ -1,15 +1,15 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import {
   AiEmbeddingProvider,
   AiProviderRegistry,
-} from "@ebike-backend/ai-core";
-import { OpenAiEmbeddingService } from "./open-ai-embedding.service";
+} from '@fittkereso-backend/ai-core';
+import { OpenAiEmbeddingService } from './open-ai-embedding.service';
 
 @Injectable()
 export class OpenAiEmbeddingProvider
   implements AiEmbeddingProvider, OnModuleInit
 {
-  readonly name = "openai" as const;
+  readonly name = 'openai' as const;
 
   constructor(
     private readonly registry: AiProviderRegistry,

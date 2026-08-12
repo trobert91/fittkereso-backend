@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductAlias,
   ProductAliasRepository,
@@ -10,25 +10,25 @@ import {
   ProductModelSourceRepository,
   ScrapeTask,
   ScrapeTaskRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   ResolutionContext,
   ResolutionResult,
   ResolutionService,
   productSpecsToStructuredSpecs,
-} from "@ebike-backend/resolution";
-import { generateSlug, nameOf, normalize } from "@ebike-backend/utils";
-import { CustomLogger } from "@ebike-backend/logger";
+} from '@fittkereso-backend/resolution';
+import { generateSlug, nameOf, normalize } from '@fittkereso-backend/utils';
+import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   BrandResolutionService,
   ProductEmbeddingService,
   ProductImageCopyService,
   ProductNormalizerService,
   ProductSpecUpdaterService,
-} from "@ebike-backend/product";
-import { ScrapedProduct } from "@ebike-backend/product";
-import { isEmpty, minBy } from "lodash";
-import { ProductMetricsService } from "@ebike-backend/metrics";
+} from '@fittkereso-backend/product';
+import { ScrapedProduct } from '@fittkereso-backend/product';
+import { isEmpty, minBy } from 'lodash';
+import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 interface ResolvedIdentity {
   model?: ProductModel;
@@ -45,7 +45,7 @@ interface PersistResult {
 export class ProductScrapeUpdaterService {
   private readonly logger = new CustomLogger(ProductScrapeUpdaterService.name);
   private readonly normalizedNameConstraint =
-    "UQ_product_brand_normalized_name";
+    'UQ_product_brand_normalized_name';
 
   constructor(
     private readonly productSearch: ResolutionService,
@@ -68,9 +68,9 @@ export class ProductScrapeUpdaterService {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.type,
-        "skipped_no_category",
+        'skipped_no_category',
       );
-      this.logger.warn("Skipping scrape — no category identified", {
+      this.logger.warn('Skipping scrape — no category identified', {
         taskId: task.id,
         url: task.url,
         displayName: scrapedProduct.displayName,
@@ -100,7 +100,7 @@ export class ProductScrapeUpdaterService {
       return persisted.model;
     } catch (error) {
       // do not fail the whole scraping if brand resolution fails
-      if ((error as Error).message?.includes("Brand could not be identified")) {
+      if ((error as Error).message?.includes('Brand could not be identified')) {
         this.productMetricsService.productBrandResolutionFailed(
           task.source.type,
         );
@@ -149,7 +149,7 @@ export class ProductScrapeUpdaterService {
     if (path1Match) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.type,
-        "path1_hit",
+        'path1_hit',
       );
       return { model: path1Match.model, isExistingMatch: true };
     }
@@ -167,10 +167,10 @@ export class ProductScrapeUpdaterService {
       // this scrape is a distinct product by the source catalog's own definition.
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.type,
-        "cross_source_rejected_same_source",
+        'cross_source_rejected_same_source',
       );
       this.logger.debug(
-        "Path 2 candidate rejected — source already has a row on this product",
+        'Path 2 candidate rejected — source already has a row on this product',
         {
           taskId: task.id,
           url: task.url,
@@ -185,7 +185,7 @@ export class ProductScrapeUpdaterService {
     if (candidate) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.type,
-        "cross_source_merge",
+        'cross_source_merge',
       );
       this.productMetricsService.productMatched(task.source.type);
       return { model: candidate, isExistingMatch: true, resolutionContext };
@@ -211,7 +211,7 @@ export class ProductScrapeUpdaterService {
       );
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.type,
-        "new_product",
+        'new_product',
       );
     }
 
@@ -325,7 +325,7 @@ export class ProductScrapeUpdaterService {
       .into(ProductAlias)
       .values(candidates)
       .orIgnore()
-      .returning("id")
+      .returning('id')
       .execute();
 
     return result.generatedMaps.length || result.identifiers.length;
@@ -379,9 +379,8 @@ export class ProductScrapeUpdaterService {
       {
         useEmbedding: true,
         webSearchEnabled: false,
-        mode: "strict",
+        mode: 'strict',
       },
-      {},
       undefined,
       logContext,
     );
@@ -441,7 +440,7 @@ export class ProductScrapeUpdaterService {
       }
 
       this.logger.debug(
-        "Reusing product created by concurrent worker after normalizedName conflict",
+        'Reusing product created by concurrent worker after normalizedName conflict',
         {
           taskId: task.id,
           productId: existingModel.id,
@@ -487,24 +486,24 @@ export class ProductScrapeUpdaterService {
 
   private getProductRelations(): string[] {
     return [
-      nameOf<ProductModel>("productCategory"),
-      nameOf<ProductModel>("mainImage"),
-      nameOf<ProductModel>("images"),
-      nameOf<ProductModel>("embedding"),
-      nameOf<ProductModel>("sources"),
+      nameOf<ProductModel>('productCategory'),
+      nameOf<ProductModel>('mainImage'),
+      nameOf<ProductModel>('images'),
+      nameOf<ProductModel>('embedding'),
+      nameOf<ProductModel>('sources'),
     ];
   }
 
   private isNormalizedNameConflict(error: unknown): boolean {
     return (
       error instanceof Error &&
-      error.message.includes("duplicate key value") &&
+      error.message.includes('duplicate key value') &&
       error.message.includes(this.normalizedNameConstraint)
     );
   }
 
   private async generateProductSlug(entity: ProductModel): Promise<void> {
-    const brandName = entity.brand?.name ?? "";
+    const brandName = entity.brand?.name ?? '';
     let slug = generateSlug(
       entity.id,
       brandName,
@@ -512,10 +511,10 @@ export class ProductScrapeUpdaterService {
     );
     const existing = await this.productRepo.findOne({
       where: { slug },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing && existing.id !== entity.id) {
-      slug = slug + "-" + entity.id.slice(-6);
+      slug = slug + '-' + entity.id.slice(-6);
     }
     entity.slug = slug;
   }
@@ -532,7 +531,7 @@ export class ProductScrapeUpdaterService {
 
     if (!brand?.entity) {
       this.logger.warn(
-        "Brand could not be identified, skipping product creation",
+        'Brand could not be identified, skipping product creation',
         {
           taskId: task.id,
           url: task.url,
@@ -540,7 +539,7 @@ export class ProductScrapeUpdaterService {
         },
       );
 
-      throw new Error("Brand could not be identified");
+      throw new Error('Brand could not be identified');
     }
 
     const model = new ProductModel();

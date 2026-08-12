@@ -2,7 +2,7 @@
 
 Google Gemini SDK adapter. Wraps `@google/genai` and exposes
 `GeminiChatProvider`, which implements the `AiChatProvider` interface from
-`@ebike-backend/ai`. Self-registers into `AiProviderRegistry` on module
+`@fittkereso-backend/ai`. Self-registers into `AiProviderRegistry` on module
 init so requests with a `gemini-*` model name route here automatically.
 
 Schema translation from OpenAI JSON Schema dialect to Gemini's OpenAPI subset

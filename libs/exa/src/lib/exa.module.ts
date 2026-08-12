@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { ExaSearchService } from "./services/exa-search.service";
-import { ExaConfigService } from "@ebike-backend/config";
+import { Module } from '@nestjs/common';
+import { ExaSearchService } from './services/exa-search.service';
+import { ExaConfigService } from '@fittkereso-backend/config';
 
 @Module({
   providers: [ExaConfigService, ExaSearchService],

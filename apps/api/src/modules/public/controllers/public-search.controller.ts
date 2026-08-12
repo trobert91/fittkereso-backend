@@ -1,16 +1,16 @@
-import { Controller, Get, Query, SerializeOptions } from "@nestjs/common";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { PublicAutocompleteService } from "../services/public-autocomplete.service";
-import { PublicSearchService } from "../services/public-search.service";
-import { SearchAnalyticsService } from "../services/search-analytics.service";
+import { Controller, Get, Query, SerializeOptions } from '@nestjs/common';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { PublicAutocompleteService } from '../services/public-autocomplete.service';
+import { PublicSearchService } from '../services/public-search.service';
+import { SearchAnalyticsService } from '../services/search-analytics.service';
 import {
   AutocompleteResultDto,
   SearchResultDto,
   SearchQueryDto,
-} from "../dto/search.dto";
-import { SkipThrottle } from "@nestjs/throttler";
+} from '../dto/search.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
-@Controller("v1/public/search")
+@Controller('v1/public/search')
 @SkipThrottle()
 @SerializeOptions({ groups: [SerializeGroup.list, SerializeGroup.details] })
 export class PublicSearchController {
@@ -20,13 +20,13 @@ export class PublicSearchController {
     private readonly analyticsService: SearchAnalyticsService,
   ) {}
 
-  @Get("autocomplete")
-  async autocomplete(@Query("q") q: string): Promise<AutocompleteResultDto> {
+  @Get('autocomplete')
+  async autocomplete(@Query('q') q: string): Promise<AutocompleteResultDto> {
     const start = Date.now();
-    const result = await this.autocompleteService.autocomplete(q ?? "");
+    const result = await this.autocompleteService.autocomplete(q ?? '');
     this.analyticsService.logSearchEvent({
-      endpoint: "autocomplete",
-      query: q ?? "",
+      endpoint: 'autocomplete',
+      query: q ?? '',
       resultCount: result.products.length + result.categories.length,
       hasProductResults: result.products.length > 0,
       hasCategoryResults: result.categories.length > 0,
@@ -45,7 +45,7 @@ export class PublicSearchController {
       query.pageSize ?? 20,
     );
     this.analyticsService.logSearchEvent({
-      endpoint: "full",
+      endpoint: 'full',
       query: query.q,
       resultCount: result.products.length + result.categories.length,
       hasProductResults: result.products.length > 0,

@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   QueueName,
   Task,
   TaskRepository,
   TaskStatus,
-} from "@ebike-backend/database";
-import { SelectQueryBuilder } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { TaskSearchParams } from "../models/task-search-params";
-import { TaskSearchResult } from "../models/task-search-result";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { SelectQueryBuilder } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { TaskSearchParams } from '../models/task-search-params';
+import { TaskSearchResult } from '../models/task-search-result';
+import { isEmpty } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -20,8 +20,8 @@ export class TaskSearchService {
   public async search(params: TaskSearchParams): Promise<TaskSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? "createdAt",
-      order: params.order ?? "DESC",
+      sort: params.sort ?? 'createdAt',
+      order: params.order ?? 'DESC',
     };
 
     const query = this.buildQuery(finalParams);
@@ -32,22 +32,22 @@ export class TaskSearchService {
   }
 
   private buildQuery(params: TaskSearchParams): SelectQueryBuilder<Task> {
-    let query = this.taskRepo.repo.createQueryBuilder("task");
+    let query = this.taskRepo.repo.createQueryBuilder('task');
 
     if (!isEmpty(params.statuses)) {
       query = query.andWhere(
-        `task.${nameOf<Task>("status")} IN (:...statuses)`,
+        `task.${nameOf<Task>('status')} IN (:...statuses)`,
         { statuses: params.statuses },
       );
     }
 
     if (!isEmpty(params.queues)) {
-      query = query.andWhere(`task.${nameOf<Task>("queue")} IN (:...queues)`, {
+      query = query.andWhere(`task.${nameOf<Task>('queue')} IN (:...queues)`, {
         queues: params.queues,
       });
     }
 
-    query = query.orderBy(`task.${params.sort}`, params.order, "NULLS LAST");
+    query = query.orderBy(`task.${params.sort}`, params.order, 'NULLS LAST');
 
     const page = params.page ?? 1;
     const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;

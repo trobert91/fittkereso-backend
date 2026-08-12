@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSpecs,
   SpecDefinitionJsonSchema,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 @Injectable()
 export class ProductSpecNormalizationService {
@@ -23,19 +23,19 @@ export class ProductSpecNormalizationService {
       }
 
       switch (prop.type) {
-        case "number":
+        case 'number':
           result[key] = this.toNumber(rawValue);
           break;
 
-        case "boolean":
+        case 'boolean':
           result[key] = this.toBoolean(rawValue);
           break;
 
-        case "string":
+        case 'string':
           result[key] = this.toStringValue(rawValue);
           break;
 
-        case "array":
+        case 'array':
           result[key] = this.toArray(rawValue, prop);
           break;
 
@@ -60,7 +60,7 @@ export class ProductSpecNormalizationService {
    * Extract the first number from the value.
    */
   private toNumber(value: any): number | undefined {
-    if (typeof value === "number") return value;
+    if (typeof value === 'number') return value;
 
     const str = String(value);
     const match = str.match(/-?\d+(\.\d+)?/); // first number
@@ -75,19 +75,19 @@ export class ProductSpecNormalizationService {
    * Accept only "true" / "false" or real booleans.
    */
   private toBoolean(value: any): boolean | undefined {
-    if (typeof value === "boolean") return value;
+    if (typeof value === 'boolean') return value;
 
     const str = String(value).trim().toLowerCase();
     switch (str) {
-      case "true":
-      case "yes":
-      case "y":
-      case "1":
+      case 'true':
+      case 'yes':
+      case 'y':
+      case '1':
         return true;
-      case "false":
-      case "no":
-      case "n":
-      case "0":
+      case 'false':
+      case 'no':
+      case 'n':
+      case '0':
         return false;
     }
 
@@ -96,7 +96,7 @@ export class ProductSpecNormalizationService {
 
   private toStringValue(value: any): string {
     if (Array.isArray(value)) {
-      return value.length === 1 ? String(value[0]) : value.join(", ");
+      return value.length === 1 ? String(value[0]) : value.join(', ');
     }
     return String(value).trim();
   }
@@ -110,12 +110,12 @@ export class ProductSpecNormalizationService {
   private toArray(value: any, prop: any): string[] {
     const arr = Array.isArray(value) ? value : [value];
     return arr
-      .map((v) => (typeof v === "string" ? v.trim() : String(v)))
-      .filter((v) => v !== "");
+      .map((v) => (typeof v === 'string' ? v.trim() : String(v)))
+      .filter((v) => v !== '');
   }
 
   private toObject(value: any): Record<string, any> | undefined {
-    if (typeof value === "object" && !Array.isArray(value)) {
+    if (typeof value === 'object' && !Array.isArray(value)) {
       return value;
     }
     return undefined;

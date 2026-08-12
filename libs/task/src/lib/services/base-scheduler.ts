@@ -1,5 +1,5 @@
-import { CustomLogger } from "@ebike-backend/logger";
-import { SchedulerMetricsService } from "@ebike-backend/metrics";
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { SchedulerMetricsService } from '@fittkereso-backend/metrics';
 
 export abstract class BaseScheduler {
   protected readonly logger: CustomLogger;

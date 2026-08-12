@@ -7,9 +7,9 @@ import {
   IsString,
   Max,
   Min,
-} from "class-validator";
-import type { SpecDefinitionUiSchema } from "@ebike-backend/database";
-import { SpecDefinitionJsonSchema } from "@ebike-backend/database";
+} from 'class-validator';
+import type { SpecDefinitionUiSchema } from '@fittkereso-backend/database';
+import { SpecDefinitionJsonSchema } from '@fittkereso-backend/database';
 
 export class CategoryUpdateDto {
   @IsOptional()

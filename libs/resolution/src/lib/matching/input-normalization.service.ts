@@ -1,24 +1,24 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   CategoryMatchingConfig,
   NumericTokenRule,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   basicNormalization as sharedBasicNormalization,
   removeBrand as sharedRemoveBrand,
   parseTokens,
   getTokenWeights as sharedGetTokenWeights,
   TokenParserConfig,
-} from "@ebike-backend/product";
-import { isEmpty } from "lodash";
-import { MatchingConfigService } from "./matching-config.service";
-import type { ProductResolutionInput } from "../models/resolution-input";
+} from '@fittkereso-backend/product';
+import { isEmpty } from 'lodash';
+import { MatchingConfigService } from './matching-config.service';
+import type { ProductResolutionInput } from '../models/resolution-input';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 export interface CategoryMatchConfig {
-  strictness: "strict" | "moderate" | "loose";
+  strictness: 'strict' | 'moderate' | 'loose';
   numericTokenRules: Array<{
     pattern: RegExp;
     weight: number;
@@ -90,10 +90,10 @@ export class InputNormalizationService {
     matcherSpecs?: string[],
   ): CategoryMatchConfig {
     return {
-      strictness: config.strictness ?? "moderate",
+      strictness: config.strictness ?? 'moderate',
       numericTokenRules: (config.numericTokenRules ?? []).map(
         (rule: NumericTokenRule) => ({
-          pattern: new RegExp(rule.pattern, "i"),
+          pattern: new RegExp(rule.pattern, 'i'),
           weight: rule.weight,
           description: rule.description,
           critical: rule.critical,
@@ -114,7 +114,7 @@ export class InputNormalizationService {
         {
           pattern: /\d+/,
           weight: mc.defaultNumericTokenWeight,
-          description: "Any numeric token",
+          description: 'Any numeric token',
           critical: false,
         },
       ],
@@ -132,10 +132,10 @@ export class InputNormalizationService {
     input: ProductResolutionInput,
     config: CategoryMatchConfig,
   ): string {
-    const modelText = input.model || "";
-    const displayText = input.displayName || "";
+    const modelText = input.model || '';
+    const displayText = input.displayName || '';
 
-    if (!modelText && !displayText) return "";
+    if (!modelText && !displayText) return '';
 
     const strippedModel = this.removeBrand(modelText, input.brand);
     const strippedDisplay = this.removeBrand(displayText, input.brand);
@@ -145,7 +145,7 @@ export class InputNormalizationService {
         ? strippedDisplay
         : strippedModel;
 
-    if (!text) return "";
+    if (!text) return '';
 
     return this.basicNormalization(text);
   }

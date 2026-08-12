@@ -7,9 +7,9 @@ mongo:
 postgres:
   host: 127.0.0.1
   port: 5432
-  user: ebike
-  password: ebike
-  database: ebike
+  user: fittkereso
+  password: fittkereso
+  database: fittkereso
   sync: true
   run_migrations: true
   ssl: false
@@ -20,8 +20,8 @@ dataforseo:
   password: your-dataforseo-password
 
 app_settings:
-  app_url: https://api.ebike.com
+  app_url: https://api.fittkereso.com
 
   api:
-    api_key: ebike-test
+    api_key: fittkereso-test
     api_secret: testApiKey

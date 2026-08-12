@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   OrderedSpec,
   ProductCategory,
   ProductModel,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class ProductSpecContextService {

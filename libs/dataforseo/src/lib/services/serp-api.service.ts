@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { GoogleSerpResponse } from "../models/serp-models";
-import { HttpService } from "@nestjs/axios";
-import { BaseDataForSeoService } from "./base-dataforseo.service";
-import { DataForSeoConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { GoogleSerpResponse } from '../models/serp-models';
+import { HttpService } from '@nestjs/axios';
+import { BaseDataForSeoService } from './base-dataforseo.service';
+import { DataForSeoConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class SerpApiService extends BaseDataForSeoService {
@@ -43,7 +43,7 @@ export class SerpApiService extends BaseDataForSeoService {
     ];
 
     const response = await this.post<GoogleSerpResponse>(
-      "/serp/google/organic/live/advanced",
+      '/serp/google/organic/live/advanced',
       data,
     );
 

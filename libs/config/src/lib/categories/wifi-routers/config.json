@@ -1,23 +1,5 @@
 {
   "ancestorDepth": 3,
-  "negativeTerms": [
-    {
-      "keyword": "mesh system",
-      "penalty": 0.65
-    },
-    {
-      "keyword": "mesh node",
-      "penalty": 0.65
-    },
-    {
-      "keyword": "network switch",
-      "penalty": 0.7
-    },
-    {
-      "keyword": "access point",
-      "penalty": 0.7
-    }
-  ],
   "matchingConfig": {
     "tokenSeparator": "",
     "variantSuffixes": [
@@ -41,89 +23,6 @@
       "WiFi\\s*[56]"
     ]
   },
-  "relevanceTerms": [
-    {
-      "weight": 2.5,
-      "keyword": "router"
-    },
-    {
-      "weight": 2.5,
-      "keyword": "WiFi router"
-    },
-    {
-      "weight": 2.2,
-      "keyword": "WiFi 6",
-      "exclusive": true
-    },
-    {
-      "weight": 2.2,
-      "keyword": "WiFi 6E",
-      "exclusive": true
-    },
-    {
-      "weight": 2.2,
-      "keyword": "WiFi 7",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "network speed"
-    },
-    {
-      "weight": 1.6,
-      "keyword": "range extender",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "QoS",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "DD-WRT",
-      "exclusive": true
-    },
-    {
-      "weight": 2,
-      "keyword": "gaming router",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "Asus router",
-      "exclusive": true
-    },
-    {
-      "weight": 1.6,
-      "keyword": "throughput"
-    },
-    {
-      "weight": 1.8,
-      "keyword": "TP-Link router",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "Netgear router",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "router coverage",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "dual band",
-      "exclusive": true
-    },
-    {
-      "weight": 1.8,
-      "keyword": "tri band",
-      "exclusive": true
-    }
-  ],
   "keywordIdentifiers": [
     "wifi 6",
     "wifi 6e",

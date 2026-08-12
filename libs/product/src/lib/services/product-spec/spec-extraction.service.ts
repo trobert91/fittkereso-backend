@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSpecs,
   SourceSpecConfig,
@@ -7,10 +7,10 @@ import {
   SpecExtractMode,
   SpecValueTranslator,
   CalculatedSpecRule,
-} from "@ebike-backend/database";
-import type { ScrapedProductSpec } from "../../models/scraped-product";
-import { ProductSpecNormalizationService } from "./product-spec-normalization.service";
-import { compact } from "lodash";
+} from '@fittkereso-backend/database';
+import type { ScrapedProductSpec } from '../../models/scraped-product';
+import { ProductSpecNormalizationService } from './product-spec-normalization.service';
+import { compact } from 'lodash';
 
 @Injectable()
 export class SpecExtractionService {
@@ -56,10 +56,10 @@ export class SpecExtractionService {
 
     for (const mapping of mappings) {
       const fetchAllValues =
-        mapping.extract === "list" ||
-        mapping.extract === "standardRatio" ||
-        mapping.extract === "regexpList" ||
-        mapping.extract === "shuffledList";
+        mapping.extract === 'list' ||
+        mapping.extract === 'standardRatio' ||
+        mapping.extract === 'regexpList' ||
+        mapping.extract === 'shuffledList';
       const rawValue = this.findRawValue(
         specs,
         mapping.labels,
@@ -188,7 +188,7 @@ export class SpecExtractionService {
 
     let result = value;
     for (const suffix of suffixes) {
-      result = result.replace(new RegExp(`\\s*${suffix}\\s*$`, "i"), "").trim();
+      result = result.replace(new RegExp(`\\s*${suffix}\\s*$`, 'i'), '').trim();
     }
     return result;
   }
@@ -211,36 +211,36 @@ export class SpecExtractionService {
     mode?: SpecExtractMode,
     extractPatterns?: string[],
   ): string | number | string[] | undefined {
-    if (mode === "shuffledList") return this.extractShuffledList(value);
-    if (mode === "standardRatio") return this.extractStandardRatio(value);
-    if (mode === "regexpList")
+    if (mode === 'shuffledList') return this.extractShuffledList(value);
+    if (mode === 'standardRatio') return this.extractStandardRatio(value);
+    if (mode === 'regexpList')
       return this.extractRegexpList(value, extractPatterns);
-    if (mode === "cmToInchList") return this.extractCmToInchList(value);
-    if (mode === "mmToCmAndInchList")
+    if (mode === 'cmToInchList') return this.extractCmToInchList(value);
+    if (mode === 'mmToCmAndInchList')
       return this.extractMmToCmAndInchList(value);
-    if (mode === "list") return this.extractList(value);
+    if (mode === 'list') return this.extractList(value);
     if (Array.isArray(value)) return value;
-    if (!mode || mode === "raw") return value;
+    if (!mode || mode === 'raw') return value;
 
     switch (mode) {
-      case "number":
+      case 'number':
         return this.extractFirstNumber(value);
 
-      case "secondNumber":
+      case 'secondNumber':
         return this.extractSecondNumber(value);
 
-      case "roundedNumber": {
+      case 'roundedNumber': {
         const number = this.extractFirstNumber(value);
         return number !== undefined ? Math.round(number) : undefined;
       }
 
-      case "ceiledNumber": {
+      case 'ceiledNumber': {
         const number = this.extractFirstNumber(value);
         return number !== undefined ? Math.ceil(number) : undefined;
       }
 
-      case "removeWhitespace":
-        return value.replace(/\s+/g, "");
+      case 'removeWhitespace':
+        return value.replace(/\s+/g, '');
 
       default:
         return value;
@@ -250,7 +250,7 @@ export class SpecExtractionService {
   private extractList(value: string | string[]): string[] | undefined {
     const items = Array.isArray(value) ? value : [value];
     const split = items.flatMap((item) =>
-      item.split(",").map((part) => part.trim()),
+      item.split(',').map((part) => part.trim()),
     );
     const cleaned = compact(split);
     return cleaned.length > 0 ? cleaned : undefined;
@@ -259,9 +259,9 @@ export class SpecExtractionService {
   private extractShuffledList(value: string | string[]): string[] | undefined {
     const items = Array.isArray(value)
       ? value
-      : compact(value.split(",").map((item) => item.trim()));
+      : compact(value.split(',').map((item) => item.trim()));
     const cleaned = compact(
-      items.map((item) => item.replace(/\s*\(.*?\)\s*/g, "").trim()),
+      items.map((item) => item.replace(/\s*\(.*?\)\s*/g, '').trim()),
     );
     if (cleaned.length === 0) return undefined;
 
@@ -292,7 +292,7 @@ export class SpecExtractionService {
     const results: string[] = [];
 
     for (const pattern of patterns) {
-      const regex = new RegExp(pattern, "i");
+      const regex = new RegExp(pattern, 'i');
 
       for (const candidate of candidates) {
         const match = candidate.match(regex);
@@ -301,7 +301,7 @@ export class SpecExtractionService {
         const groups = match.slice(1);
         const output = groups
           .map((group) => this.roundIfNumeric(group))
-          .join(" ");
+          .join(' ');
 
         results.push(output);
         break;
@@ -361,11 +361,11 @@ export class SpecExtractionService {
 
     for (const rule of rules) {
       switch (rule.rule) {
-        case "presentIfKey":
+        case 'presentIfKey':
           result[rule.key] = mapped[rule.source as string] !== undefined;
           break;
 
-        case "featureSearch":
+        case 'featureSearch':
           result[rule.key] = this.evaluateFeatureSearch(
             specs,
             rule.source as string,
@@ -373,7 +373,7 @@ export class SpecExtractionService {
           );
           break;
 
-        case "presentLabels":
+        case 'presentLabels':
           result[rule.key] = this.evaluatePresentLabels(
             specs,
             rule.source as string[],
@@ -419,7 +419,7 @@ export class SpecExtractionService {
       const rawValue = spec.values[0].toLowerCase().trim();
       const translated = translator ? translator(rawValue) : rawValue;
 
-      if (translated === "yes") {
+      if (translated === 'yes') {
         presentLabels.push(label);
       }
     }

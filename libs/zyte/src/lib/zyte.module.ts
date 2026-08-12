@@ -1,7 +1,7 @@
-import { Module } from "@nestjs/common";
-import { ZyteScraperService } from "./services/zyte-scraper.service";
-import { HttpModule } from "@nestjs/axios";
-import { MetricsModule } from "@ebike-backend/metrics";
+import { Module } from '@nestjs/common';
+import { ZyteScraperService } from './services/zyte-scraper.service';
+import { HttpModule } from '@nestjs/axios';
+import { MetricsModule } from '@fittkereso-backend/metrics';
 
 @Module({
   imports: [HttpModule, MetricsModule],

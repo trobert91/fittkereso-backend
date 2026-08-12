@@ -1,11 +1,11 @@
-import { HttpService } from "@nestjs/axios";
-import { Injectable } from "@nestjs/common";
-import { AxiosResponse } from "axios";
-import { RawHtmlResponse } from "../models/raw-html.model";
-import { isEmpty } from "lodash";
-import { BaseDataForSeoService } from "./base-dataforseo.service";
-import { DataForSeoConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { AxiosResponse } from 'axios';
+import { RawHtmlResponse } from '../models/raw-html.model';
+import { isEmpty } from 'lodash';
+import { BaseDataForSeoService } from './base-dataforseo.service';
+import { DataForSeoConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class DataforSeoRawHtmlService extends BaseDataForSeoService {
@@ -49,7 +49,7 @@ export class DataforSeoRawHtmlService extends BaseDataForSeoService {
     let retries = 0;
     do {
       response = await this.post<RawHtmlResponse>(
-        "https://api.dataforseo.com/v3/on_page/raw_html",
+        'https://api.dataforseo.com/v3/on_page/raw_html',
         data,
       );
       retries++;
@@ -65,15 +65,15 @@ export class DataforSeoRawHtmlService extends BaseDataForSeoService {
 
   private isTaskFinished(response: RawHtmlResponse): boolean {
     if (isEmpty(response.tasks)) {
-      throw new Error("No tasks found");
+      throw new Error('No tasks found');
     }
     const task = response.tasks[0];
     const result = task.result;
 
     return (
-      task.status_message === "Ok." &&
+      task.status_message === 'Ok.' &&
       !isEmpty(result) &&
-      result[0].crawl_progress === "finished" &&
+      result[0].crawl_progress === 'finished' &&
       result[0].items_count > 0
     );
   }
@@ -93,7 +93,7 @@ export class DataforSeoRawHtmlService extends BaseDataForSeoService {
     ];
 
     const response = await this.post<RawHtmlResponse>(
-      "https://api.dataforseo.com/v3/on_page/task_post",
+      'https://api.dataforseo.com/v3/on_page/task_post',
       data,
     );
 

@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { Brand, BrandRepository } from "@ebike-backend/database";
-import { CustomLogger } from "@ebike-backend/logger";
-import { normalize } from "@ebike-backend/utils";
-import { differenceInSeconds } from "date-fns";
-import { uniq } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { Brand, BrandRepository } from '@fittkereso-backend/database';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { normalize } from '@fittkereso-backend/utils';
+import { differenceInSeconds } from 'date-fns';
+import { uniq } from 'lodash';
 
 @Injectable()
 export class BrandCacheService {
@@ -21,7 +21,7 @@ export class BrandCacheService {
       return this.brandsCache ?? [];
     }
 
-    const brands = await this.brandRepo.getAll({ order: { name: "ASC" } });
+    const brands = await this.brandRepo.getAll({ order: { name: 'ASC' } });
 
     this.logger.debug(
       `Updating brand cache, fetched ${brands.length} brands from the database.`,

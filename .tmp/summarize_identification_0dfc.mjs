@@ -2,7 +2,7 @@
 import fs from "node:fs";
 
 const PATH =
-  "e:/Work/ebike/repos/ebike-backend/.tmp/identification-subtrees-0dfc.json";
+  "e:/Work/fittkereso/repos/fittkereso-backend/.tmp/identification-subtrees-0dfc.json";
 const data = JSON.parse(fs.readFileSync(PATH, "utf-8"));
 
 console.log(`subtreeCount: ${data.subtreeCount}`);

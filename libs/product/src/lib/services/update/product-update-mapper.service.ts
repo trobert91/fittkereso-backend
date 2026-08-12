@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { ProductModelUpdateDto } from "../../models/product-update.dto";
+import { Injectable } from '@nestjs/common';
+import { ProductModelUpdateDto } from '../../models/product-update.dto';
 import {
   BrandRepository,
   ProductCategoryRepository,
@@ -9,10 +9,10 @@ import {
   ProductModelSource,
   ProductSourceType,
   ProductSpecs,
-} from "@ebike-backend/database";
-import { isUndefined } from "lodash";
-import { ProductEmbeddingService } from "../product-embedding.service";
-import { ProductNormalizerService } from "../product-normalizer.service";
+} from '@fittkereso-backend/database';
+import { isUndefined } from 'lodash';
+import { ProductEmbeddingService } from '../product-embedding.service';
+import { ProductNormalizerService } from '../product-normalizer.service';
 
 @Injectable()
 export class ProductUpdateMapperService {
@@ -57,7 +57,7 @@ export class ProductUpdateMapperService {
 
     if (!isUndefined(dto.releaseYear)) {
       entity.releaseYear = dto.releaseYear;
-    } else if (dto.releaseYear === "") {
+    } else if (dto.releaseYear === '') {
       entity.releaseYear = undefined;
     }
 

@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModelSource,
   ProductSource,
   ProductSourceRepository,
   ProductSpecs,
-} from "@ebike-backend/database";
-import { chain, defaults, orderBy } from "lodash";
+} from '@fittkereso-backend/database';
+import { chain, defaults, orderBy } from 'lodash';
 
 @Injectable()
 export class ProductSpecMergeService {
@@ -27,7 +27,7 @@ export class ProductSpecMergeService {
       specs: sourceSpec.specs,
     }));
 
-    const sorted = orderBy(specsBySource, "priority", "desc");
+    const sorted = orderBy(specsBySource, 'priority', 'desc');
 
     for (const entry of sorted) {
       defaults(mergedSpecs, entry.specs);

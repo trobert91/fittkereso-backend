@@ -1,11 +1,11 @@
-import { Column, Entity, Index, OneToMany } from "typeorm";
-import { BasePostgresEntity } from "./base-postgres-entity";
-import { Expose } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { ProductSourceType } from "../types/product-source";
-import { ScrapeTask } from "./scrape-task.entity";
-import { ProductImage } from "./product-image.entity";
-import ms from "ms";
+import { Column, Entity, Index, OneToMany } from 'typeorm';
+import { BasePostgresEntity } from './base-postgres-entity';
+import { Expose } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { ProductSourceType } from '../types/product-source';
+import { ScrapeTask } from './scrape-task.entity';
+import { ProductImage } from './product-image.entity';
+import ms from 'ms';
 
 @Entity()
 export class ProductSource extends BasePostgresEntity {
@@ -14,7 +14,7 @@ export class ProductSource extends BasePostgresEntity {
   name: string;
 
   @Expose({ groups: [SerializeGroup.list] })
-  @Column({ type: "enum", enum: ProductSourceType, nullable: false })
+  @Column({ type: 'enum', enum: ProductSourceType, nullable: false })
   type: ProductSourceType;
 
   @OneToMany(() => ScrapeTask, (task) => task.source)
@@ -23,16 +23,16 @@ export class ProductSource extends BasePostgresEntity {
   @OneToMany(() => ProductImage, (image) => image.source)
   images: ProductImage[];
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastRunAt?: Date;
 
-  @Column({ type: "int", nullable: false, default: 1 })
+  @Column({ type: 'int', nullable: false, default: 1 })
   maxConcurrent: number;
 
-  @Column({ type: "int", nullable: false, default: 60 })
+  @Column({ type: 'int', nullable: false, default: 60 })
   requestsPerHour: number;
 
-  @Column({ type: "int", nullable: false, default: 10 })
+  @Column({ type: 'int', nullable: false, default: 10 })
   priority: number;
 
   @Index()
@@ -42,21 +42,21 @@ export class ProductSource extends BasePostgresEntity {
   @Column({ nullable: false, default: true })
   processingEnabled: boolean;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: 'text', nullable: true })
   fullSyncInterval?: ms.StringValue;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   nextFullSyncAt?: Date;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastFullSyncAt?: Date;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: 'text', nullable: true })
   incrementalSyncInterval?: ms.StringValue;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   nextIncrementalSyncAt?: Date;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastIncrementalSyncAt?: Date;
 }

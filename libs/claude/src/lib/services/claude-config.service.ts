@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { CLAUDE_DEFAULTS } from "@ebike-backend/config";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
+import { Injectable } from '@nestjs/common';
+import { CLAUDE_DEFAULTS } from '@fittkereso-backend/config';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 
 @Injectable()
 export class ClaudeConfigService {

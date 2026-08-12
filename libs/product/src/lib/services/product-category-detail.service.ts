@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 @Injectable()
 export class ProductCategoryDetailService {

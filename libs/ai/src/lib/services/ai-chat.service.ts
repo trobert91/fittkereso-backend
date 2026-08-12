@@ -1,16 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import { v4 as uuidv4 } from "uuid";
-import { CustomLogger } from "@ebike-backend/logger";
-import { AiMetricsService } from "@ebike-backend/metrics";
+import { Injectable } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { AiMetricsService } from '@fittkereso-backend/metrics';
 import {
   AiChatRequest,
   AiChatResponse,
   AiProviderName,
   AiProviderRegistry,
-} from "@ebike-backend/ai-core";
-import { DebugTraceService } from "@ebike-backend/debug";
-import { AiCostCalculationService } from "./ai-cost-calculation.service";
-import { AiSchemaValidatorService } from "./ai-schema-validator.service";
+} from '@fittkereso-backend/ai-core';
+import { AiCostCalculationService } from './ai-cost-calculation.service';
+import { AiSchemaValidatorService } from './ai-schema-validator.service';
 
 @Injectable()
 export class AiChatService {
@@ -21,7 +20,6 @@ export class AiChatService {
     private readonly costService: AiCostCalculationService,
     private readonly validator: AiSchemaValidatorService,
     private readonly metricsService: AiMetricsService,
-    private readonly debugTrace: DebugTraceService,
   ) {}
 
   async createChat(request: AiChatRequest): Promise<AiChatResponse> {
@@ -34,8 +32,6 @@ export class AiChatService {
     const debugContext = {
       chatId,
       provider: provider.name,
-      entityId: request.entityId,
-      entityType: request.entityType,
       model: request.model,
       thinking: request.thinking,
       effort: request.effort,
@@ -45,9 +41,9 @@ export class AiChatService {
     if (config.debug) {
       const firstMessageContent = request.messages[0]?.content;
       const preview =
-        typeof firstMessageContent === "string"
+        typeof firstMessageContent === 'string'
           ? firstMessageContent.slice(0, 200)
-          : "[multimodal content]";
+          : '[multimodal content]';
       this.logger.debug(
         `Creating AI chat [${provider.name}:${request.model}]: ${preview}`,
         {
@@ -73,31 +69,18 @@ export class AiChatService {
       this.metricsService.recordCompletion(
         provider.name,
         request.model,
-        request.costLabel ?? "unknown",
+        request.costLabel ?? 'unknown',
         durationSeconds,
         raw.usage.promptTokens,
         raw.usage.completionTokens,
-        "success",
+        'success',
       );
-
-      if (request.threadId) {
-        this.debugTrace.recordLlmCallUsage({
-          threadId: request.threadId,
-          model: request.model,
-          provider: provider.name,
-          cost,
-          promptTokens: raw.usage.promptTokens,
-          completionTokens: raw.usage.completionTokens,
-          cachedTokens: raw.usage.cachedTokens,
-          costLabel: request.costLabel,
-        });
-      }
 
       // Strip null bytes — Postgres rejects \u0000 in text/jsonb columns
       // and LLMs occasionally produce them in structured output.
       let content = raw.content;
-      if (content.includes("\u0000")) {
-        content = content.split("\u0000").join("");
+      if (content.includes('\u0000')) {
+        content = content.split('\u0000').join('');
       }
 
       const rawContent = content;
@@ -168,7 +151,7 @@ export class AiChatService {
             retryCount: request.retryCount ?? 0,
           });
         } catch (traceError) {
-          this.logger.warn("Failed to collect trace data", {
+          this.logger.warn('Failed to collect trace data', {
             error: traceError,
             ...debugContext,
           });
@@ -180,15 +163,15 @@ export class AiChatService {
       this.metricsService.recordCompletion(
         provider.name,
         request.model,
-        request.costLabel ?? "unknown",
+        request.costLabel ?? 'unknown',
         0,
         0,
         0,
-        "error",
+        'error',
       );
 
       this.logger.error(
-        "Error creating AI chat completion",
+        'Error creating AI chat completion',
         error,
         debugContext,
       );
@@ -255,7 +238,7 @@ export class AiChatService {
       },
       choices: [
         {
-          message: { role: "assistant", content: params.content },
+          message: { role: 'assistant', content: params.content },
           finish_reason: params.finishReason,
         },
       ],

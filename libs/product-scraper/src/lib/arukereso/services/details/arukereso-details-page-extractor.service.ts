@@ -1,27 +1,27 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSourceType,
   ScrapeTask,
   SourceSpecConfig,
   SourceSpecMapping,
   SpecExtractMode,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   CategoryConfigService,
   SourceConfigService,
-} from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+} from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   ScrapedProduct,
   ScrapedProductSpec,
   SpecExtractionService,
-} from "@ebike-backend/product";
-import { TranslationService } from "@ebike-backend/translation";
-import * as cheerio from "cheerio";
-import { uniq, uniqBy } from "lodash";
-import { ArukeresoCategoryMapperService } from "./arukereso-category-mapper.service";
-import { ProductDetailsPageExtractor } from "../../../product-scraper/interfaces/product-details-page-extractor.interface";
-import { ProductScrapingMetricsService } from "@ebike-backend/metrics";
+} from '@fittkereso-backend/product';
+import { TranslationService } from '@fittkereso-backend/translation';
+import * as cheerio from 'cheerio';
+import { uniq, uniqBy } from 'lodash';
+import { ArukeresoCategoryMapperService } from './arukereso-category-mapper.service';
+import { ProductDetailsPageExtractor } from '../../../product-scraper/interfaces/product-details-page-extractor.interface';
+import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 
 /**
  * Extract modes that produce a number or structured numeric output. Values fed
@@ -30,13 +30,13 @@ import { ProductScrapingMetricsService } from "@ebike-backend/metrics";
  */
 const NUMERIC_EXTRACT_MODES: ReadonlySet<SpecExtractMode> =
   new Set<SpecExtractMode>([
-    "number",
-    "secondNumber",
-    "roundedNumber",
-    "ceiledNumber",
-    "cmToInchList",
-    "mmToCmAndInchList",
-    "standardRatio",
+    'number',
+    'secondNumber',
+    'roundedNumber',
+    'ceiledNumber',
+    'cmToInchList',
+    'mmToCmAndInchList',
+    'standardRatio',
   ]);
 
 @Injectable()
@@ -66,7 +66,7 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     });
     if (!category) {
       this.logger.warn(
-        "Category could not be identified, skipping product creation",
+        'Category could not be identified, skipping product creation',
         {
           taskId: task.id,
           url: task.url,
@@ -75,10 +75,10 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
       );
       this.scrapingMetrics.recordExtractionSkipReason(
         ProductSourceType.arukereso,
-        "category_not_identified",
+        'category_not_identified',
       );
 
-      throw new Error("Category could not be identified");
+      throw new Error('Category could not be identified');
     }
 
     const enabledCategories = this.sourceConfigService.getEnabledCategorySlugs(
@@ -91,7 +91,7 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
       );
       this.scrapingMetrics.recordExtractionSkipReason(
         ProductSourceType.arukereso,
-        "category_not_enabled",
+        'category_not_enabled',
       );
       return null;
     }
@@ -102,7 +102,7 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
 
     if (!jsonSchema) {
       this.logger.warn(
-        "Category has no associated JSON schema, skipping product creation",
+        'Category has no associated JSON schema, skipping product creation',
         {
           taskId: task.id,
           url: task.url,
@@ -111,22 +111,22 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
       );
       this.scrapingMetrics.recordExtractionSkipReason(
         ProductSourceType.arukereso,
-        "missing_schema",
+        'missing_schema',
       );
 
-      throw new Error("Category has no associated JSON schema");
+      throw new Error('Category has no associated JSON schema');
     }
 
     // Find the main product info block
-    const productTop = $(".product-page-top");
+    const productTop = $('.product-page-top');
 
     // Extract brand and model from the dataLayer JSON injected by arukereso — it
     // contains clean values (e.g. item_brand="ASUS", item_name="ASUS ROG Swift PG34WCDM")
     // without the category suffix that pollutes the breadcrumb and h1 text.
-    const dataLayerJson = $("script")
+    const dataLayerJson = $('script')
       .toArray()
-      .map((el) => $(el).html() ?? "")
-      .find((text) => text.includes("dataLayerHG"));
+      .map((el) => $(el).html() ?? '')
+      .find((text) => text.includes('dataLayerHG'));
     const dataLayerBrand = dataLayerJson
       ?.match(/"item_brand"\s*:\s*"([^"]+)"/)?.[1]
       ?.trim();
@@ -145,16 +145,16 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
       .text()
       .trim();
     const breadcrumbBrand = breadcrumbBrandText
-      .replace(new RegExp(`\\s*${categoryName}\\s*`, "i"), "")
+      .replace(new RegExp(`\\s*${categoryName}\\s*`, 'i'), '')
       .trim();
     const brand = dataLayerBrand || breadcrumbBrand;
 
     // Fall back to h1 text for model if dataLayer is unavailable.
     // Both sources include the brand prefix (e.g. "ASUS ROG Swift PG34WCDM"), so strip it.
-    const h1Text = productTop.find("h1.hidden-xs").first().text().trim();
+    const h1Text = productTop.find('h1.hidden-xs').first().text().trim();
     const fullModelText = dataLayerModel ?? h1Text;
     const rawModel = brand
-      ? fullModelText.replace(new RegExp(`^${brand}\\s*`), "")
+      ? fullModelText.replace(new RegExp(`^${brand}\\s*`), '')
       : fullModelText;
 
     // Strip parenthesized SKU / color-variant codes from the model name
@@ -163,12 +163,12 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const partNumberPattern =
       /\s*\([A-Za-z0-9][A-Za-z0-9\-/]*(?:-[A-Za-z0-9]+|[0-9])[A-Za-z0-9\-/]*\)/g;
     const modelWithoutPartNumbers = rawModel
-      .replace(partNumberPattern, "")
+      .replace(partNumberPattern, '')
       .trim();
     const model = modelWithoutPartNumbers
       .replace(
         /\s+\b(AF|AR|BE|BR|CA|CH|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IL|IT|JP|KR|LA|LT|LV|ME|MK|NL|NO|PL|PT|RO|RS|RU|SE|SI|SK|SL|TR|UA|UK|US|YU)\b\s*$/i,
-        "",
+        '',
       )
       .trim();
     const displayName = `${brand} ${model}`.trim();
@@ -196,12 +196,12 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const { lookup: translator, stats: translationStats } =
       await this.translationService.translateBatch({
         texts: rawValues,
-        sourceLanguage: "hu",
-        targetLanguage: "en",
+        sourceLanguage: 'hu',
+        targetLanguage: 'en',
         context: translationContext,
       });
 
-    this.logger.debug("Arukereso spec translation completed", {
+    this.logger.debug('Arukereso spec translation completed', {
       url: task.url,
       ...translationStats,
     });
@@ -277,8 +277,8 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const urls: string[] = [];
 
     // V1 layout: carousel with lazy-loaded images
-    $(".carousel-inner img").each((_, el) => {
-      const src = $(el).attr("data-lazy-delayed-src");
+    $('.carousel-inner img').each((_, el) => {
+      const src = $(el).attr('data-lazy-delayed-src');
       if (src) {
         urls.push(src.trim());
       }
@@ -286,16 +286,16 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
 
     // V2 layout: collect image URLs, preferring full-size from href over mid-size from src
     if (urls.length === 0) {
-      $(".product-image").each((_, el) => {
-        const href = $(el).find("a.product-image-wrapper").attr("href");
-        if (href && href.includes("akcdn.net")) {
+      $('.product-image').each((_, el) => {
+        const href = $(el).find('a.product-image-wrapper').attr('href');
+        if (href && href.includes('akcdn.net')) {
           urls.push(href.trim());
           return;
         }
 
-        const src = $(el).find("img").attr("src");
-        if (src && src.includes("akcdn.net")) {
-          urls.push(src.replace("/mid/", "/full/").trim());
+        const src = $(el).find('img').attr('src');
+        if (src && src.includes('akcdn.net')) {
+          urls.push(src.replace('/mid/', '/full/').trim());
         }
       });
     }
@@ -314,18 +314,18 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const thirdItem = breadcrumbItems.eq(2);
     const category = thirdItem.find('[itemprop="name"]').text().trim();
 
-    return category || "unknown";
+    return category || 'unknown';
   }
 
   private extractSpecifications($: cheerio.CheerioAPI): ScrapedProductSpec[] {
     const specs =
-      $("table.product-properties").length > 0
+      $('table.product-properties').length > 0
         ? this.extractSpecificationsV1($)
         : this.extractSpecificationsV2($);
 
     const description = this.extractDescription($);
     if (description) {
-      specs.push({ name: "description", values: [description] });
+      specs.push({ name: 'description', values: [description] });
     }
 
     return specs;
@@ -333,7 +333,7 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
 
   private extractDescription($: cheerio.CheerioAPI): string | undefined {
     return (
-      $('meta[itemprop="description"]').first().attr("content")?.trim() ||
+      $('meta[itemprop="description"]').first().attr('content')?.trim() ||
       undefined
     );
   }
@@ -342,15 +342,15 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const specs: ScrapedProductSpec[] = [];
     let currentSection: string | undefined;
 
-    $("table.product-properties tr").each((_, tr) => {
+    $('table.product-properties tr').each((_, tr) => {
       const $tr = $(tr);
-      const nameCell = $tr.find("td.prop-name");
-      const valueCell = $tr.find("td").eq(1);
+      const nameCell = $tr.find('td.prop-name');
+      const valueCell = $tr.find('td').eq(1);
 
       if (!nameCell.length) return;
 
       // Detect <h3> — this marks a new section
-      const h3 = nameCell.find("h3");
+      const h3 = nameCell.find('h3');
       if (h3.length > 0) {
         currentSection = h3.text().trim();
         return;
@@ -360,13 +360,13 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
       if (!name) return;
 
       // Extract hint description if present
-      const description = nameCell.find(".hint").attr("data-content")?.trim();
+      const description = nameCell.find('.hint').attr('data-content')?.trim();
 
       // Extract values (handle <div class="prop"><div class="name">...</div></div>)
       const values: string[] = [];
 
-      if (valueCell.find(".prop .name").length > 0) {
-        valueCell.find(".prop .name").each((_, el) => {
+      if (valueCell.find('.prop .name').length > 0) {
+        valueCell.find('.prop .name').each((_, el) => {
           const val = $(el).text().trim();
           if (val) values.push(val);
         });
@@ -393,32 +393,32 @@ export class ArukeresoDetailsPageExtractor implements ProductDetailsPageExtracto
     const specs: ScrapedProductSpec[] = [];
     let currentSectionTitle: string | undefined = undefined;
 
-    $("table.property-sheet tr").each((_, el) => {
+    $('table.property-sheet tr').each((_, el) => {
       const $row = $(el);
 
       // Section header row
-      if ($row.hasClass("property-title")) {
+      if ($row.hasClass('property-title')) {
         currentSectionTitle = $row.text().trim();
         return;
       }
 
-      const name = $row.find(".property-name").text().trim();
+      const name = $row.find('.property-name').text().trim();
       const description = $row
-        .find(".icon-help-circled")
-        .attr("data-content")
+        .find('.icon-help-circled')
+        .attr('data-content')
         ?.trim();
 
       const values: string[] = [];
 
       // Extract visible text values
-      $row.find(".property-value div").each((_, div) => {
+      $row.find('.property-value div').each((_, div) => {
         const text = $(div).text().trim();
         if (text) {
           values.push(text);
         } else {
           // For icon-ok / icon-cancel (Yes/No)
-          const icon = $(div).find(".icon-ok, .icon-cancel").first();
-          const title = icon.attr("title");
+          const icon = $(div).find('.icon-ok, .icon-cancel').first();
+          const title = icon.attr('title');
           if (title) values.push(title.trim());
         }
       });

@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { HttpService } from "@nestjs/axios";
-import * as fs from "fs";
-import { extname } from "path";
-import { v4 as uuidv4 } from "uuid";
-import { FileStorageService, UploadedFile } from "@ebike-backend/storage";
+import { Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import * as fs from 'fs';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { FileStorageService, UploadedFile } from '@fittkereso-backend/storage';
 
 @Injectable()
 export class ProductImageStorageService {
@@ -17,7 +17,7 @@ export class ProductImageStorageService {
     originalName: string,
     file: Buffer | fs.ReadStream | string,
   ): Promise<UploadedFile> {
-    const ext = extname(originalName) || ".jpg";
+    const ext = extname(originalName) || '.jpg';
     const fileName = `${uuidv4()}${ext}`;
     const path = this.buildPath(productId);
 
@@ -28,7 +28,7 @@ export class ProductImageStorageService {
     productId: string,
     imageUrl: string,
   ): Promise<UploadedFile> {
-    const ext = extname(imageUrl) || ".jpg";
+    const ext = extname(imageUrl) || '.jpg';
     const fileName = `${uuidv4()}${ext}`;
     const path = this.buildPath(productId);
 
@@ -38,14 +38,14 @@ export class ProductImageStorageService {
 
   private async download(url: string): Promise<Buffer> {
     const res = await this.http.axiosRef.get(url, {
-      responseType: "arraybuffer",
+      responseType: 'arraybuffer',
       timeout: 10000,
-      headers: { Accept: "image/*" },
+      headers: { Accept: 'image/*' },
     });
     if (res.status !== 200) {
       throw new Error(`Download failed: ${url}`);
     }
-    return Buffer.from(res.data, "binary");
+    return Buffer.from(res.data, 'binary');
   }
 
   public async deleteFile(productId: string, fileName: string): Promise<void> {

@@ -1,19 +1,18 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { ChatTraceData } from "@ebike-backend/debug";
+import { Inject, Injectable } from '@nestjs/common';
+import { ChatTraceData } from '@fittkereso-backend/debug';
 import type {
   ResolutionContext,
   FinalDecision,
-} from "../models/resolution-context";
-import type { ResolutionThreadContext } from "../models/caller-context";
+} from '../models/resolution-context';
 import {
   DECISION_STRATEGY,
   type DecisionStrategy,
-} from "../models/strategy-types";
-import { QualityGatesService } from "../matching/quality-gates.service";
+} from '../models/strategy-types';
+import { QualityGatesService } from '../matching/quality-gates.service';
 import type {
   CategoryMatchConfig,
   ParsedModelCode,
-} from "../matching/input-normalization.service";
+} from '../matching/input-normalization.service';
 
 /**
  * Decision stage. Bridges the scoring output to a `FinalDecision`.
@@ -37,18 +36,17 @@ export class DecisionService {
 
   async decide(
     context: ResolutionContext,
-    threadContext?: ResolutionThreadContext,
     traceCollector?: (data: ChatTraceData) => void,
     logContext?: Record<string, string>,
   ): Promise<void> {
     // Case 0: no recall candidates at all → matcher_reject (LLM has nothing).
     if (context.candidates.length === 0) {
       context.decision = {
-        kind: "matcher_reject",
+        kind: 'matcher_reject',
         confidence: 0,
-        reason: "no_qualifying_candidates",
+        reason: 'no_qualifying_candidates',
         selectedCandidates: [],
-        evidenceSummary: "no candidates after recall + filter",
+        evidenceSummary: 'no candidates after recall + filter',
       };
       return;
     }
@@ -60,16 +58,16 @@ export class DecisionService {
 
     if (acceptable.length > 0) {
       context.decision = {
-        kind: "matcher_accept",
+        kind: 'matcher_accept',
         confidence: acceptable[0].score,
-        reason: "matcher_accept",
+        reason: 'matcher_accept',
         selectedCandidates: acceptable.map((match, index) => ({
           candidateId: match.candidateId,
           confidence: match.score,
           reason:
             index === 0
-              ? "matcher_accept_best"
-              : "matcher_accept_above_threshold",
+              ? 'matcher_accept_best'
+              : 'matcher_accept_above_threshold',
         })),
         evidenceSummary:
           acceptable.length === 1
@@ -83,14 +81,14 @@ export class DecisionService {
     // when web search ran (it brings new evidence the matcher already saw).
     // Otherwise short-circuit to matcher_reject — the comment's mention couldn't
     // be resolved, downstream validation picks it up via unresolved_after_search.
-    const webSearchRan = context.strategiesRun.includes("web");
+    const webSearchRan = context.strategiesRun.includes('web');
     const shouldRunLlm = context.options.webSearchEnabled && webSearchRan;
 
     if (!shouldRunLlm) {
       context.decision = {
-        kind: "matcher_reject",
+        kind: 'matcher_reject',
         confidence: 0,
-        reason: "no_candidates_above_threshold",
+        reason: 'no_candidates_above_threshold',
         selectedCandidates: [],
         evidenceSummary: `matcher returned ${context.candidates.length} candidate(s), none above the effective floor`,
       };
@@ -103,21 +101,20 @@ export class DecisionService {
     try {
       decision = await this.decisionStrategy.decide(
         context,
-        threadContext,
         traceCollector,
         logContext,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "decision",
+        phase: 'decision',
         message,
         timestamp: new Date().toISOString(),
       });
       decision = {
-        kind: "llm_unresolved",
+        kind: 'llm_unresolved',
         confidence: 0,
-        reason: "decision_strategy_error",
+        reason: 'decision_strategy_error',
         selectedCandidates: [],
         evidenceSummary: message,
       };

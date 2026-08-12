@@ -1350,7 +1350,7 @@
   "tags": [
     "monitoring",
     "prometheus",
-    "ebike-backend",
+    "fittkereso-backend",
     "product-resolution"
   ],
   "templating": {

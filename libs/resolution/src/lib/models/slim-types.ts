@@ -1,4 +1,4 @@
-import type { ProductSpecs } from "@ebike-backend/database";
+import type { ProductSpecs } from '@fittkereso-backend/database';
 
 /** Slim snapshot of the reference product (the catalog row identified by
  *  `input.referenceProductId`). Source of inherited primary specs for
@@ -50,7 +50,7 @@ export interface SlimCandidate {
    *  "34GS95QE-B" matches alias "34gs95qe-b" exactly while the bare model
    *  "UltraGear 34GS95QE" loses the `-B` suffix). */
   aliases?: string[];
-  source: "fuzzy" | "embedding" | "web";
+  source: 'fuzzy' | 'embedding' | 'web';
   /** Matcher score on the unified 0–100 scale. Populated after the Scoring stage. */
   matchScore?: number;
   matchComponents?: MatchResultComponents;

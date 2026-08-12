@@ -1,7 +1,7 @@
-import { Injectable, LoggerService as NestLoggerService } from "@nestjs/common";
-import { LoggerConfigService } from "@ebike-backend/config";
-import * as winston from "winston";
-import LokiTransport from "winston-loki";
+import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
+import { LoggerConfigService } from '@fittkereso-backend/config';
+import * as winston from 'winston';
+import LokiTransport from 'winston-loki';
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
@@ -9,18 +9,18 @@ export class LoggerService implements NestLoggerService {
 
   constructor(private readonly config: LoggerConfigService) {
     this.logger = winston.createLogger({
-      level: "debug",
+      level: 'debug',
       format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.json(),
         winston.format.colorize({
           all: true,
           colors: {
-            info: "white",
-            error: "red",
-            warn: "yellow",
-            debug: "green",
-            verbose: "cyan",
+            info: 'white',
+            error: 'red',
+            warn: 'yellow',
+            debug: 'green',
+            verbose: 'cyan',
           },
         }),
       ),
@@ -34,7 +34,7 @@ export class LoggerService implements NestLoggerService {
           format: winston.format.combine(
             winston.format.colorize(),
             winston.format.printf(({ level, message, timestamp, context }) => {
-              return `[${timestamp || new Date().toISOString()}] ${context ? " [" + context + "]" : ""} ${level}: ${message}`;
+              return `[${timestamp || new Date().toISOString()}] ${context ? ' [' + context + ']' : ''} ${level}: ${message}`;
             }),
           ),
         }),
@@ -45,16 +45,16 @@ export class LoggerService implements NestLoggerService {
             winston.format.colorize({
               all: true,
               colors: {
-                info: "green",
-                error: "red",
-                warn: "yellow",
-                debug: "cyan",
-                verbose: "white",
+                info: 'green',
+                error: 'red',
+                warn: 'yellow',
+                debug: 'cyan',
+                verbose: 'white',
               },
             }),
             winston.format.simple(),
           ),
-          host: config.url || "http://localhost:3100",
+          host: config.url || 'http://localhost:3100',
           labels: {
             service: config.appName,
             env: config.environment,
@@ -86,7 +86,7 @@ export class LoggerService implements NestLoggerService {
   ) {
     let extendedMeta: any = {
       ...meta,
-      ...(trace ? trace["trace"] : undefined),
+      ...(trace ? trace['trace'] : undefined),
     };
     if (extendedMeta.error) {
       extendedMeta = {

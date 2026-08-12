@@ -19,50 +19,41 @@
     "noImplicitAny": false,
     "baseUrl": ".",
     "paths": {
-      "@ebike-backend/ai": ["libs/ai/src/index.ts"],
-      "@ebike-backend/ai-core": ["libs/ai-core/src/index.ts"],
-      "@ebike-backend/auth": ["libs/auth/src/index.ts"],
-      "@ebike-backend/bunny": ["libs/bunny/src/index.ts"],
-      "@ebike-backend/claude": ["libs/claude/src/index.ts"],
-      "@ebike-backend/comment": ["libs/comment/src/index.ts"],
-      "@ebike-backend/config": ["libs/config/src/index.ts"],
-      "@ebike-backend/database": ["libs/database/src/index.ts"],
-      "@ebike-backend/dataforseo": ["libs/dataforseo/src/index.ts"],
-      "@ebike-backend/debug": ["libs/debug/src/index.ts"],
-      "@ebike-backend/deepseek": ["libs/deepseek/src/index.ts"],
-      "@ebike-backend/dynamic-config": [
+      "@fittkereso-backend/ai": ["libs/ai/src/index.ts"],
+      "@fittkereso-backend/ai-core": ["libs/ai-core/src/index.ts"],
+      "@fittkereso-backend/auth": ["libs/auth/src/index.ts"],
+      "@fittkereso-backend/bunny": ["libs/bunny/src/index.ts"],
+      "@fittkereso-backend/claude": ["libs/claude/src/index.ts"],
+      "@fittkereso-backend/config": ["libs/config/src/index.ts"],
+      "@fittkereso-backend/database": ["libs/database/src/index.ts"],
+      "@fittkereso-backend/dataforseo": ["libs/dataforseo/src/index.ts"],
+      "@fittkereso-backend/debug": ["libs/debug/src/index.ts"],
+      "@fittkereso-backend/deepseek": ["libs/deepseek/src/index.ts"],
+      "@fittkereso-backend/dynamic-config": [
         "libs/dynamic-config/src/index.ts"
       ],
-      "@ebike-backend/email": ["libs/email/src/index.ts"],
-      "@ebike-backend/exa": ["libs/exa/src/index.ts"],
-      "@ebike-backend/finance": ["libs/finance/src/index.ts"],
-      "@ebike-backend/gemini": ["libs/gemini/src/index.ts"],
-      "@ebike-backend/logger": ["libs/logger/src/index.ts"],
-      "@ebike-backend/metrics": ["libs/metrics/src/index.ts"],
-      "@ebike-backend/openai": ["libs/openai/src/index.ts"],
-      "@ebike-backend/openrouter": ["libs/openrouter/src/index.ts"],
-      "@ebike-backend/product": ["libs/product/src/index.ts"],
-      "@ebike-backend/product-scraper": [
+      "@fittkereso-backend/email": ["libs/email/src/index.ts"],
+      "@fittkereso-backend/exa": ["libs/exa/src/index.ts"],
+      "@fittkereso-backend/finance": ["libs/finance/src/index.ts"],
+      "@fittkereso-backend/gemini": ["libs/gemini/src/index.ts"],
+      "@fittkereso-backend/logger": ["libs/logger/src/index.ts"],
+      "@fittkereso-backend/metrics": ["libs/metrics/src/index.ts"],
+      "@fittkereso-backend/openai": ["libs/openai/src/index.ts"],
+      "@fittkereso-backend/product": ["libs/product/src/index.ts"],
+      "@fittkereso-backend/product-scraper": [
         "libs/product-scraper/src/index.ts"
       ],
-      "@ebike-backend/reddit": ["libs/reddit/src/index.ts"],
-      "@ebike-backend/relevance": ["libs/relevance/src/index.ts"],
-      "@ebike-backend/resolution": [
+      "@fittkereso-backend/resolution": [
         "libs/resolution/src/index.ts"
       ],
-      "@ebike-backend/scraper": ["libs/scraper/src/index.ts"],
-      "@ebike-backend/search": ["libs/search/src/index.ts"],
-      "@ebike-backend/storage": ["libs/storage/src/index.ts"],
-      "@ebike-backend/supabase": ["libs/supabase/src/index.ts"],
-      "@ebike-backend/task": ["libs/task/src/index.ts"],
-      "@ebike-backend/thread": ["libs/thread/src/index.ts"],
-      "@ebike-backend/thread-processor": [
-        "libs/thread-processor/src/index.ts"
-      ],
-      "@ebike-backend/thread-search": ["libs/thread-search/src/index.ts"],
-      "@ebike-backend/translation": ["libs/translation/src/index.ts"],
-      "@ebike-backend/utils": ["libs/utils/src/index.ts"],
-      "@ebike-backend/zyte": ["libs/zyte/src/index.ts"]
+      "@fittkereso-backend/scraper": ["libs/scraper/src/index.ts"],
+      "@fittkereso-backend/search": ["libs/search/src/index.ts"],
+      "@fittkereso-backend/storage": ["libs/storage/src/index.ts"],
+      "@fittkereso-backend/supabase": ["libs/supabase/src/index.ts"],
+      "@fittkereso-backend/task": ["libs/task/src/index.ts"],
+      "@fittkereso-backend/translation": ["libs/translation/src/index.ts"],
+      "@fittkereso-backend/utils": ["libs/utils/src/index.ts"],
+      "@fittkereso-backend/zyte": ["libs/zyte/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

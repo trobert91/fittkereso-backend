@@ -1,10 +1,10 @@
-import { Expose, Transform, Type } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
+import { Expose, Transform, Type } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 import type {
   FilterType,
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 export class CategoryListDto {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] }) id: string;
@@ -22,9 +22,6 @@ export class CategoryDetailDto extends CategoryListDto {
   @Expose({ groups: [SerializeGroup.details] })
   @Transform(({ value }) => value ?? undefined)
   uiSchema?: SpecDefinitionUiSchema;
-  @Expose({ groups: [SerializeGroup.details] })
-  @Transform(({ value }) => value ?? undefined)
-  useCases?: string[];
 }
 
 export class FilterOptionDto {
@@ -66,8 +63,5 @@ export class FilterConfigDto {
   @Expose({ groups: [SerializeGroup.details] })
   @Type(() => FilterOptionDto)
   brands?: FilterOptionDto[];
-  @Expose({ groups: [SerializeGroup.details] })
-  @Type(() => NumericRangeDto)
-  scoreRange?: NumericRangeDto;
   @Expose({ groups: [SerializeGroup.details] }) totalProducts?: number;
 }

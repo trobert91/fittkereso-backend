@@ -10,11 +10,7 @@ import {
 } from 'class-validator';
 
 export enum SortBy {
-  totalReviewCount = 'totalReviewCount',
-  averageReviewScore = 'averageReviewScore',
-  rating = 'rating',
   releaseYear = 'releaseYear',
-  useCaseScore = 'useCaseScore',
 }
 
 export class ProductQueryDto {
@@ -41,29 +37,11 @@ export class ProductQueryDto {
 
   @IsOptional()
   @IsEnum(SortBy)
-  sortBy?: SortBy = SortBy.rating;
+  sortBy?: SortBy = SortBy.releaseYear;
 
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   sortDir?: 'asc' | 'desc' = 'desc';
-
-  @IsOptional()
-  @IsString()
-  sortUseCase?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(100)
-  ratingMin?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(100)
-  ratingMax?: number;
 
   /** Spec filters: specs[key]=value or specs[key][min]=N&specs[key][max]=N */
   @IsOptional()

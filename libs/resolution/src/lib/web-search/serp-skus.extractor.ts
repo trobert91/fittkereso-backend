@@ -1,28 +1,28 @@
-import { Injectable } from "@nestjs/common";
-import { AiChatService } from "@ebike-backend/ai";
-import { ChatTraceData } from "@ebike-backend/debug";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { SearchEvidence } from "../models/search-evidence";
+import { Injectable } from '@nestjs/common';
+import { AiChatService } from '@fittkereso-backend/ai';
+import { ChatTraceData } from '@fittkereso-backend/debug';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { SearchEvidence } from '../models/search-evidence';
 
 const EXTRACTION_SCHEMA = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
   properties: {
     records: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         additionalProperties: false,
         properties: {
-          index: { type: "number" },
-          modelNumbers: { type: "array", items: { type: "string" } },
+          index: { type: 'number' },
+          modelNumbers: { type: 'array', items: { type: 'string' } },
         },
-        required: ["index", "modelNumbers"],
+        required: ['index', 'modelNumbers'],
       },
     },
   },
-  required: ["records"],
+  required: ['records'],
 } as const;
 
 interface ExtractionResponse {
@@ -66,23 +66,22 @@ export class SerpSkusExtractor {
 
     const model =
       this.dynamicConfigService.search?.webSearch?.extractionModel ??
-      "deepseek-v4-flash";
+      'deepseek-v4-flash';
 
     const userMessage = this.buildUserMessage(context, records);
 
     let parsed: ExtractionResponse;
     try {
       const response = await this.aiChatService.createChat({
-        costLabel: "web_research_serp_extraction",
+        costLabel: 'web_research_serp_extraction',
         schema: EXTRACTION_SCHEMA,
-        schemaName: "web_research_serp_extraction",
+        schemaName: 'web_research_serp_extraction',
         traceCollector,
         logContext,
-        threadId: context.threadId,
         model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMessage },
         ],
         temperature: 1,
       });
@@ -96,7 +95,7 @@ export class SerpSkusExtractor {
 
     const byIndex = new Map<number, string[]>();
     for (const entry of parsed.records ?? []) {
-      if (typeof entry.index !== "number") continue;
+      if (typeof entry.index !== 'number') continue;
       byIndex.set(entry.index, dedupe(entry.modelNumbers ?? []));
     }
 
@@ -113,40 +112,40 @@ export class SerpSkusExtractor {
     const reference = context.referenceProduct;
     const parts: string[] = [];
 
-    parts.push("INPUT:");
+    parts.push('INPUT:');
     if (input.brand) parts.push(`- Input brand: ${input.brand}`);
     if (input.model) parts.push(`- Input model token: ${input.model}`);
     if (input.modelClues?.length) {
       parts.push(
-        `- Comment-mentioned model fragments: ${input.modelClues.join(", ")}`,
+        `- Comment-mentioned model fragments: ${input.modelClues.join(', ')}`,
       );
     }
     if (reference) {
-      const refBrand = reference.brand ?? "";
-      const refModel = reference.model ?? "";
+      const refBrand = reference.brand ?? '';
+      const refModel = reference.model ?? '';
       parts.push(
         `- Reference product (cheat-sheet): ${refBrand} ${refModel}`.trim(),
       );
       parts.push(
-        "  Reference SKU should NOT be returned for any record — it is the search seed, not the answer.",
+        '  Reference SKU should NOT be returned for any record — it is the search seed, not the answer.',
       );
     }
-    parts.push("");
-    parts.push("SERP RECORDS:");
+    parts.push('');
+    parts.push('SERP RECORDS:');
     for (let index = 0; index < records.length; index++) {
       const record = records[index];
       parts.push(`[${index}] (${record.queryIntent}) ${record.title}`);
       if (record.description) parts.push(`    ${record.description}`);
       parts.push(`    ${record.url}`);
     }
-    parts.push("");
+    parts.push('');
     parts.push(
       'Return a "records" array with one entry per SERP record above, indexed 0..N-1.',
     );
     parts.push(
       "Each entry must include `index` (matching the SERP record index) and `modelNumbers` (string[] of SKUs found in that record's text).",
     );
-    return parts.join("\n");
+    return parts.join('\n');
   }
 }
 

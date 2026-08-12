@@ -1,8 +1,8 @@
-import { HttpService } from "@nestjs/axios";
-import { AxiosRequestConfig } from "axios";
-import { BaseDataForSeoResponse } from "../models/base-dataforseo-response";
-import { DataForSeoConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+import { HttpService } from '@nestjs/axios';
+import { AxiosRequestConfig } from 'axios';
+import { BaseDataForSeoResponse } from '../models/base-dataforseo-response';
+import { DataForSeoConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 export abstract class BaseDataForSeoService {
   constructor(
@@ -18,7 +18,7 @@ export abstract class BaseDataForSeoService {
 
     if (response.status === 402) {
       this.getLogger().error(
-        "Dataforseo request failed with status 402, insufficient funds",
+        'Dataforseo request failed with status 402, insufficient funds',
       );
     }
 
@@ -37,7 +37,7 @@ export abstract class BaseDataForSeoService {
 
     if (response.status === 402) {
       this.getLogger().error(
-        "Dataforseo request failed with status 402, insufficient funds",
+        'Dataforseo request failed with status 402, insufficient funds',
       );
     }
 
@@ -47,7 +47,7 @@ export abstract class BaseDataForSeoService {
   protected getDataForSeoConfig() {
     const basicAuth = Buffer.from(
       `${this.config.email}:${this.config.password}`,
-    ).toString("base64");
+    ).toString('base64');
 
     const config: AxiosRequestConfig = {
       baseURL: this.config.apiUrl,

@@ -1,13 +1,13 @@
-import type { ProductSpecs } from "@ebike-backend/database";
+import type { ProductSpecs } from '@fittkereso-backend/database';
 
 /** Why a particular SERP query was fired. The decision LLM uses this to reason
  *  about evidence — e.g. a `cross_market` record whose SKUs resolve to one of
  *  the candidates likely identifies a regional rename. */
 export type WebQueryIntent =
-  | "exact_model"
-  | "model_with_specs"
-  | "reference_sibling_sku"
-  | "cross_market";
+  | 'exact_model'
+  | 'model_with_specs'
+  | 'reference_sibling_sku'
+  | 'cross_market';
 
 /**
  * Per-SERP-record evidence assembled by `WebRecall`.
@@ -20,7 +20,7 @@ export interface SearchEvidence {
   title: string;
   description: string;
   url: string;
-  provider: "dataforseo" | "exa";
+  provider: 'dataforseo' | 'exa';
   queryIntent: WebQueryIntent;
   /** Model numbers found in this record and validated by the extraction LLM as
    *  real SKUs. Empty until the SKU-extraction stage runs. */
@@ -38,7 +38,7 @@ export interface SearchEvidence {
 export interface WebQueryRecord {
   intent: WebQueryIntent;
   keyword: string;
-  provider: "dataforseo" | "exa";
+  provider: 'dataforseo' | 'exa';
   cacheHit: boolean;
   serpResultCount: number;
 }

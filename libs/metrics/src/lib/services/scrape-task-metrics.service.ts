@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
-import * as client from "prom-client";
-import { PrometheusService } from "../prometheus.service";
+import { Injectable } from '@nestjs/common';
+import * as client from 'prom-client';
+import { PrometheusService } from '../prometheus.service';
 import {
   SCRAPE_TASK_STARTED_TOTAL,
   SCRAPE_TASK_FINISHED_TOTAL,
   SCRAPE_TASK_FAILED_TOTAL,
   SCRAPE_TASK_DURATION_SECONDS,
-} from "../metric-names";
-import { ProductSourceType } from "@ebike-backend/database";
+} from '../metric-names';
+import { ProductSourceType } from '@fittkereso-backend/database';
 
 @Injectable()
 export class ScrapeTaskMetricsService {
@@ -19,29 +19,29 @@ export class ScrapeTaskMetricsService {
   constructor(private readonly prometheusService: PrometheusService) {
     this.taskStartedCounter = new client.Counter({
       name: SCRAPE_TASK_STARTED_TOTAL,
-      help: "Total number of scrape task processing starts",
-      labelNames: ["queue_name", "source_type"],
+      help: 'Total number of scrape task processing starts',
+      labelNames: ['queue_name', 'source_type'],
       registers: [this.prometheusService.register],
     });
 
     this.taskFinishedCounter = new client.Counter({
       name: SCRAPE_TASK_FINISHED_TOTAL,
-      help: "Total number of scrape task processing finishes",
-      labelNames: ["queue_name", "source_type"],
+      help: 'Total number of scrape task processing finishes',
+      labelNames: ['queue_name', 'source_type'],
       registers: [this.prometheusService.register],
     });
 
     this.taskFailedCounter = new client.Counter({
       name: SCRAPE_TASK_FAILED_TOTAL,
-      help: "Total number of scrape task processing failures",
-      labelNames: ["queue_name", "source_type"],
+      help: 'Total number of scrape task processing failures',
+      labelNames: ['queue_name', 'source_type'],
       registers: [this.prometheusService.register],
     });
 
     this.taskDurationSummary = new client.Summary({
       name: SCRAPE_TASK_DURATION_SECONDS,
-      help: "Scrape task processing duration in seconds",
-      labelNames: ["queue_name", "source_type", "status"], // status: finished or failed
+      help: 'Scrape task processing duration in seconds',
+      labelNames: ['queue_name', 'source_type', 'status'], // status: finished or failed
       percentiles: [0.5, 0.9, 0.99],
       registers: [this.prometheusService.register],
     });
@@ -68,7 +68,7 @@ export class ScrapeTaskMetricsService {
   public recordTaskDuration(
     queueName: string,
     type: ProductSourceType,
-    status: "finished" | "failed",
+    status: 'finished' | 'failed',
     durationSeconds: number,
   ): void {
     this.taskDurationSummary.observe(

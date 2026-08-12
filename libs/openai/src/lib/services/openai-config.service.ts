@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { OPENAI_DEFAULTS } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { OPENAI_DEFAULTS } from '@fittkereso-backend/config';
 
 @Injectable()
 export class OpenAiConfigService {

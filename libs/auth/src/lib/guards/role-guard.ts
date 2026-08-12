@@ -3,13 +3,13 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
-} from "@nestjs/common";
-import { Request } from "express";
-import { UserAuthService } from "../services/user-auth.service";
-import { Reflector } from "@nestjs/core";
-import { Roles } from "../decorators/roles.decorator";
-import { some } from "lodash";
-import { UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { Request } from 'express';
+import { UserAuthService } from '../services/user-auth.service';
+import { Reflector } from '@nestjs/core';
+import { Roles } from '../decorators/roles.decorator';
+import { some } from 'lodash';
+import { UserRole } from '@fittkereso-backend/database';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
@@ -21,13 +21,13 @@ export class RoleGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
 
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : req.cookies?.["access_token"]; // fallback to cookie if available
+    const authHeader = req.headers['authorization'];
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : req.cookies?.['access_token']; // fallback to cookie if available
 
     if (!token) {
-      throw new UnauthorizedException("Missing access token");
+      throw new UnauthorizedException('Missing access token');
     }
 
     const user = await this.userAuthService.getUser(token);
@@ -37,7 +37,7 @@ export class RoleGuard implements CanActivate {
     }
 
     if (some(roles, (role) => user.role !== role)) {
-      throw new UnauthorizedException("Missing required role");
+      throw new UnauthorizedException('Missing required role');
     }
 
     // Attach the user to the request for downstream handlers

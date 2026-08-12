@@ -2,10 +2,10 @@ import type {
   EvaluatedProduct,
   ProductModel,
   WithSimilarity,
-} from "@ebike-backend/database";
-import type { ResolutionContext } from "../../models/resolution-context";
-import type { SlimCandidate } from "../../models/slim-types";
-import { buildModelVariants } from "../../matching/build-model-variants";
+} from '@fittkereso-backend/database';
+import type { ResolutionContext } from '../../models/resolution-context';
+import type { SlimCandidate } from '../../models/slim-types';
+import { buildModelVariants } from '../../matching/build-model-variants';
 
 export const MAX_MODEL_VARIANTS_DEFAULT = 20;
 
@@ -98,7 +98,7 @@ export function fuzzyHitToSlim(
       : undefined,
     specs: hit.entity.specs,
     aliases: hit.entity.aliases?.map((alias) => alias.alias),
-    source: "fuzzy",
+    source: 'fuzzy',
   };
 }
 
@@ -118,6 +118,6 @@ export function embeddingHitToSlim(hit: EvaluatedProduct): SlimCandidate {
       : undefined,
     specs: hit.specs,
     aliases: hit.aliases,
-    source: "embedding",
+    source: 'embedding',
   };
 }

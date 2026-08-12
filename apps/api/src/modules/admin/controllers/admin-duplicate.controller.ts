@@ -9,30 +9,29 @@ import {
   Post,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
 import {
   ProductDuplicate,
   ProductDuplicateDecision,
   ProductDuplicateRepository,
   ProductModel,
-  ProductReferenceCandidateRepository,
   UserRole,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
 import {
   ProductDuplicateEvaluationService,
   ProductImageDtoService,
   ProductMergeService,
-} from "@ebike-backend/product";
+} from '@fittkereso-backend/product';
 import {
   ProductDuplicateSearchParams,
   ProductDuplicateSearchResult,
   ProductDuplicateSearchService,
-} from "@ebike-backend/search";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { IsOptional, IsString } from "class-validator";
-import type { DuplicateDetectionRunSummary } from "@ebike-backend/product";
+} from '@fittkereso-backend/search';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { IsOptional, IsString } from 'class-validator';
+import type { DuplicateDetectionRunSummary } from '@fittkereso-backend/product';
 
 class RejectDuplicateDto {
   @IsOptional()
@@ -46,20 +45,19 @@ class TriggerDuplicateDetectionDto {
   categoryId?: string;
 }
 
-@Controller("admin-product/duplicate-pairs")
+@Controller('admin-product/duplicate-pairs')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminDuplicateController {
   constructor(
     private readonly duplicateSearchService: ProductDuplicateSearchService,
     private readonly duplicateRepo: ProductDuplicateRepository,
-    private readonly candidateRepo: ProductReferenceCandidateRepository,
     private readonly mergeService: ProductMergeService,
     private readonly evaluationService: ProductDuplicateEvaluationService,
     private readonly imageDtoService: ProductImageDtoService,
   ) {}
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
@@ -69,15 +67,15 @@ export class AdminDuplicateController {
     return this.duplicateSearchService.search(params);
   }
 
-  @Post("trigger")
-  @SerializeOptions({ strategy: "exposeAll" })
+  @Post('trigger')
+  @SerializeOptions({ strategy: 'exposeAll' })
   async triggerDuplicateDetection(
     @Body() body: TriggerDuplicateDetectionDto,
   ): Promise<DuplicateDetectionRunSummary> {
     return this.evaluationService.processAllCategories(body.categoryId);
   }
 
-  @Get(":id")
+  @Get(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -86,24 +84,24 @@ export class AdminDuplicateController {
       SerializeGroup.details,
     ],
   })
-  async getDuplicatePair(@Param("id") id: string): Promise<ProductDuplicate> {
+  async getDuplicatePair(@Param('id') id: string): Promise<ProductDuplicate> {
     const duplicate = await this.duplicateRepo.findOne({
       where: { id },
       relations: [
-        nameOf<ProductDuplicate>("productA"),
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("brand")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("productCategory")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("sources")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("images")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("mainImage")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("aliases")}`,
-        nameOf<ProductDuplicate>("productB"),
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("brand")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("productCategory")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("sources")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("images")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("mainImage")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("aliases")}`,
+        nameOf<ProductDuplicate>('productA'),
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('brand')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('productCategory')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('sources')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('images')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('mainImage')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('aliases')}`,
+        nameOf<ProductDuplicate>('productB'),
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('brand')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('productCategory')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('sources')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('images')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('mainImage')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('aliases')}`,
       ],
     });
 
@@ -119,22 +117,20 @@ export class AdminDuplicateController {
     return duplicate;
   }
 
-  @Post(":id/approve")
+  @Post(':id/approve')
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
-  async approvePair(@Param("id") id: string): Promise<ProductDuplicate> {
+  async approvePair(@Param('id') id: string): Promise<ProductDuplicate> {
     const duplicate = await this.duplicateRepo.findOne({
       where: { id },
       relations: [
-        nameOf<ProductDuplicate>("productA"),
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("brand")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("productCategory")}`,
-        `${nameOf<ProductDuplicate>("productA")}.${nameOf<ProductModel>("reviews")}`,
-        nameOf<ProductDuplicate>("productB"),
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("brand")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("productCategory")}`,
-        `${nameOf<ProductDuplicate>("productB")}.${nameOf<ProductModel>("reviews")}`,
+        nameOf<ProductDuplicate>('productA'),
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('brand')}`,
+        `${nameOf<ProductDuplicate>('productA')}.${nameOf<ProductModel>('productCategory')}`,
+        nameOf<ProductDuplicate>('productB'),
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('brand')}`,
+        `${nameOf<ProductDuplicate>('productB')}.${nameOf<ProductModel>('productCategory')}`,
       ],
     });
 
@@ -148,38 +144,9 @@ export class AdminDuplicateController {
       );
     }
 
-    // Count distinct references that have a candidate pointing at each
-    // product — i.e. the number of source references each product attracts,
-    // regardless of which candidate slot (primary vs. runner-up) they fill.
-    const countReferencesByModel = (modelId: string): Promise<number> =>
-      this.candidateRepo.repo
-        .createQueryBuilder("candidate")
-        .where("candidate.modelId = :modelId", { modelId })
-        .select("COUNT(DISTINCT candidate.referenceId)", "count")
-        .getRawOne<{ count: string }>()
-        .then((row) => Number(row?.count ?? 0));
-
-    const [refCountA, refCountB] = await Promise.all([
-      countReferencesByModel(duplicate.productA.id),
-      countReferencesByModel(duplicate.productB.id),
-    ]);
-
-    const reviewCountA = duplicate.productA.reviews?.length ?? 0;
-    const reviewCountB = duplicate.productB.reviews?.length ?? 0;
-
     const { sourceId, targetId } = this.evaluationService.selectMergeTarget(
-      {
-        id: duplicate.productA.id,
-        reviewCount: reviewCountA,
-        createdAt: duplicate.productA.createdAt,
-      },
-      {
-        id: duplicate.productB.id,
-        reviewCount: reviewCountB,
-        createdAt: duplicate.productB.createdAt,
-      },
-      refCountA,
-      refCountB,
+      { id: duplicate.productA.id, createdAt: duplicate.productA.createdAt },
+      { id: duplicate.productB.id, createdAt: duplicate.productB.createdAt },
     );
 
     await this.mergeService.mergeProducts({ sourceId, targetId });
@@ -190,8 +157,8 @@ export class AdminDuplicateController {
     return this.duplicateRepo.save(duplicate);
   }
 
-  @Delete(":id")
-  async deletePair(@Param("id") id: string): Promise<void> {
+  @Delete(':id')
+  async deletePair(@Param('id') id: string): Promise<void> {
     const exists = await this.duplicateRepo.findOne({ where: { id } });
 
     if (!exists) {
@@ -201,19 +168,19 @@ export class AdminDuplicateController {
     await this.duplicateRepo.deleteById(id);
   }
 
-  @Post(":id/reject")
+  @Post(':id/reject')
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
   async rejectPair(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() body: RejectDuplicateDto,
   ): Promise<ProductDuplicate> {
     const duplicate = await this.duplicateRepo.findOne({
       where: { id },
       relations: [
-        nameOf<ProductDuplicate>("productA"),
-        nameOf<ProductDuplicate>("productB"),
+        nameOf<ProductDuplicate>('productA'),
+        nameOf<ProductDuplicate>('productB'),
       ],
     });
 

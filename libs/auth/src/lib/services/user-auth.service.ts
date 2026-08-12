@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { AuthenticatedUser } from "../models";
-import { SupabaseJwtService } from "@ebike-backend/supabase";
-import { UserRole } from "@ebike-backend/database";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { AuthenticatedUser } from '../models';
+import { SupabaseJwtService } from '@fittkereso-backend/supabase';
+import { UserRole } from '@fittkereso-backend/database';
 
 @Injectable()
 export class UserAuthService {
@@ -12,7 +12,7 @@ export class UserAuthService {
       const decoded = await this.supabaseJwtService.verifyToken(accessToken);
 
       if (!decoded || !decoded.sub || !decoded.email) {
-        throw new UnauthorizedException("Invalid or malformed token");
+        throw new UnauthorizedException('Invalid or malformed token');
       }
 
       const user = new AuthenticatedUser();
@@ -22,7 +22,7 @@ export class UserAuthService {
 
       return user;
     } catch (error) {
-      throw new UnauthorizedException("Invalid access token");
+      throw new UnauthorizedException('Invalid access token');
     }
   }
 }

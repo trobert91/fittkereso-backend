@@ -1,9 +1,9 @@
-import { HttpService } from "@nestjs/axios";
-import { Injectable } from "@nestjs/common";
-import { firstValueFrom } from "rxjs";
-import { ZyteConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ZyteMetricsService } from "@ebike-backend/metrics";
+import { HttpService } from '@nestjs/axios';
+import { Injectable } from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
+import { ZyteConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ZyteMetricsService } from '@fittkereso-backend/metrics';
 
 @Injectable()
 export class ZyteScraperService {
@@ -17,7 +17,7 @@ export class ZyteScraperService {
 
   async scrape(url: string): Promise<string> {
     if (!this.zyteConfigService.apiKey) {
-      throw new Error("Missing Zyte API Key in environment variables");
+      throw new Error('Missing Zyte API Key in environment variables');
     }
 
     const startTime = Date.now();
@@ -31,11 +31,11 @@ export class ZyteScraperService {
 
       const auth = {
         username: this.zyteConfigService.apiKey,
-        password: "", // Zyte only requires username (API key)
+        password: '', // Zyte only requires username (API key)
       };
 
       const response = await firstValueFrom(
-        this.httpService.post("/extract", payload, {
+        this.httpService.post('/extract', payload, {
           auth,
           baseURL: this.zyteConfigService.apiUrl,
         }),
@@ -44,8 +44,8 @@ export class ZyteScraperService {
       // Decode the Base64-encoded HTML body
       const httpResponseBody = Buffer.from(
         response.data.httpResponseBody,
-        "base64",
-      ).toString("utf-8");
+        'base64',
+      ).toString('utf-8');
 
       this.zyteMetrics.scrapeCompleted();
       this.zyteMetrics.recordScrapeDuration((Date.now() - startTime) / 1000);

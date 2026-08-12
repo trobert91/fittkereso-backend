@@ -1,17 +1,20 @@
-import { Injectable } from "@nestjs/common";
-import { ProductModel, ProductModelRepository } from "@ebike-backend/database";
-import { SpecComparisonService } from "@ebike-backend/product";
-import { InputNormalizationService } from "../matching/input-normalization.service";
+import { Injectable } from '@nestjs/common';
+import {
+  ProductModel,
+  ProductModelRepository,
+} from '@fittkereso-backend/database';
+import { SpecComparisonService } from '@fittkereso-backend/product';
+import { InputNormalizationService } from '../matching/input-normalization.service';
 import {
   computeEffectiveMatchSpecs,
   pickPrimarySpecs,
-} from "../matching/effective-match-specs";
+} from '../matching/effective-match-specs';
 import {
   deriveReferenceRelation,
   type ReferenceRelation,
-} from "../matching/derive-reference-relation";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { ProductResolutionInput } from "../models/resolution-input";
+} from '../matching/derive-reference-relation';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { ProductResolutionInput } from '../models/resolution-input';
 
 /**
  * Outcome of reference-product resolution. Three branches:
@@ -30,12 +33,12 @@ import type { ProductResolutionInput } from "../models/resolution-input";
  */
 export type ReferenceResult =
   | {
-      kind: "resolved";
+      kind: 'resolved';
       product: ProductModel;
       confidence: number;
       reason: string;
     }
-  | { kind: "reference_variant_search"; product: ProductModel };
+  | { kind: 'reference_variant_search'; product: ProductModel };
 
 /**
  * Stage 1 — reference-product routing.
@@ -73,7 +76,7 @@ export class ReferenceProductResolver {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "reference_product",
+        phase: 'reference_product',
         message,
         timestamp: new Date().toISOString(),
       });
@@ -82,7 +85,7 @@ export class ReferenceProductResolver {
 
     if (!referenceProduct) {
       context.errors.push({
-        phase: "reference_product",
+        phase: 'reference_product',
         message: `referenceProductId ${referenceProductId} did not resolve to a catalog product`,
         timestamp: new Date().toISOString(),
       });
@@ -109,16 +112,16 @@ export class ReferenceProductResolver {
       this.specComparison,
     );
 
-    if (relation === "same") {
+    if (relation === 'same') {
       return {
-        kind: "resolved",
+        kind: 'resolved',
         product: referenceProduct,
         confidence: 100,
-        reason: "reference_same",
+        reason: 'reference_same',
       };
     }
 
-    if (relation === "variant") {
+    if (relation === 'variant') {
       // Seed effectiveMatchSpecs from the reference (inherited primary specs)
       // overlaid by the input's spec evidence. Filter consumes this to drop
       // candidates that contradict inherited dimensions.
@@ -133,7 +136,7 @@ export class ReferenceProductResolver {
       // and modelClues off the input — and the caller is expected to set
       // input.referenceModel = referenceProduct.model when constructing the
       // variant search at the boundary. This stage doesn't need to mutate input.
-      return { kind: "reference_variant_search", product: referenceProduct };
+      return { kind: 'reference_variant_search', product: referenceProduct };
     }
 
     // relation === 'none' is unreachable when referenceProductId is set
@@ -188,7 +191,7 @@ export function buildReferenceVariantInput(
   enrichedInput: ProductResolutionInput,
   referenceProduct: ProductModel,
 ): ProductResolutionInput {
-  const brand = referenceProduct.brand?.name ?? enrichedInput.brand ?? "";
+  const brand = referenceProduct.brand?.name ?? enrichedInput.brand ?? '';
   const modelClues = enrichedInput.modelClues ?? [];
   return {
     ...enrichedInput,
@@ -197,10 +200,10 @@ export function buildReferenceVariantInput(
     // tokens it did mention. When neither the comment's own model nor a model
     // clue is present, leave model empty so recall keys off referenceProductId
     // + clues, not the reference itself.
-    model: enrichedInput.model || modelClues[0] || "",
+    model: enrichedInput.model || modelClues[0] || '',
     referenceModel: referenceProduct.model ?? enrichedInput.referenceModel,
     displayName:
-      `${referenceProduct.displayName ?? ""} ${modelClues.join(" ")}`.trim(),
+      `${referenceProduct.displayName ?? ''} ${modelClues.join(' ')}`.trim(),
     categoryHint:
       referenceProduct.productCategory?.name ?? enrichedInput.categoryHint,
   };

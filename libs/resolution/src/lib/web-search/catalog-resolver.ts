@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import type { ProductSpecs } from "@ebike-backend/database";
-import { InputNormalizationService } from "../matching/input-normalization.service";
-import { pickPrimarySpecs } from "../matching/effective-match-specs";
-import { ModelCatalogSearchService } from "../strategies/recall/model-catalog-search.service";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { SearchEvidence } from "../models/search-evidence";
-import type { SlimCandidate } from "../models/slim-types";
+import { Injectable } from '@nestjs/common';
+import type { ProductSpecs } from '@fittkereso-backend/database';
+import { InputNormalizationService } from '../matching/input-normalization.service';
+import { pickPrimarySpecs } from '../matching/effective-match-specs';
+import { ModelCatalogSearchService } from '../strategies/recall/model-catalog-search.service';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { SearchEvidence } from '../models/search-evidence';
+import type { SlimCandidate } from '../models/slim-types';
 
 export interface CatalogResolveResult {
   /** SKUs that resolved to a catalog product, as new SlimCandidates (source='web'). */
@@ -78,7 +78,7 @@ export class CatalogResolver {
         )
           continue;
         record.resolvedProducts.push({
-          brand: resolved.brand ?? context.input.brand ?? "",
+          brand: resolved.brand ?? context.input.brand ?? '',
           model: resolved.model ?? modelNumber,
           productId: resolved.productId,
           specs,
@@ -91,7 +91,7 @@ export class CatalogResolver {
     for (const resolved of resolvedByModel.values()) {
       if (seenIds.has(resolved.productId)) continue;
       seenIds.add(resolved.productId);
-      addedCandidates.push({ ...resolved, source: "web" });
+      addedCandidates.push({ ...resolved, source: 'web' });
     }
 
     return { addedCandidates, webOnlyModels: unresolved };

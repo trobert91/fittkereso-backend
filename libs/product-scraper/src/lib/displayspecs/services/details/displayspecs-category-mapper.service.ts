@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
-import { ScrapedProductSpec } from "@ebike-backend/product";
-import { compact } from "lodash";
+} from '@fittkereso-backend/database';
+import { ScrapedProductSpec } from '@fittkereso-backend/product';
+import { compact } from 'lodash';
 
 @Injectable()
 export class DisplayspecsCategoryMapperService {
@@ -17,7 +17,7 @@ export class DisplayspecsCategoryMapperService {
     specs: ScrapedProductSpec[],
   ): Promise<ProductCategory> {
     // Section titles that indicate a TV
-    const tvSections = ["Video file formats", "Audio file formats", "TV tuner"];
+    const tvSections = ['Video file formats', 'Audio file formats', 'TV tuner'];
 
     // Normalize section titles for comparison
     const sectionTitles = compact(
@@ -37,9 +37,9 @@ export class DisplayspecsCategoryMapperService {
 
   private async getTVCategory(): Promise<ProductCategory> {
     if (this._tvCategory) return this._tvCategory;
-    this._tvCategory = await this.categoryRepo.findBySlug("tvs");
+    this._tvCategory = await this.categoryRepo.findBySlug('tvs');
     if (!this._tvCategory) {
-      throw new Error("TV category not found in database");
+      throw new Error('TV category not found in database');
     }
 
     return this._tvCategory;
@@ -47,9 +47,9 @@ export class DisplayspecsCategoryMapperService {
 
   private async getMonitorCategory(): Promise<ProductCategory> {
     if (this._monitorCategory) return this._monitorCategory;
-    this._monitorCategory = await this.categoryRepo.findBySlug("monitors");
+    this._monitorCategory = await this.categoryRepo.findBySlug('monitors');
     if (!this._monitorCategory) {
-      throw new Error("Monitor category not found in database");
+      throw new Error('Monitor category not found in database');
     }
 
     return this._monitorCategory;

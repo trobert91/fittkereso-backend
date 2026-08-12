@@ -1,15 +1,15 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import {
   AiChatProvider,
   AiChatRequest,
   AiProviderConfig,
   AiProviderRegistry,
   RawProviderResult,
-} from "@ebike-backend/ai-core";
-import { GeminiConfigService as AppGeminiConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { GeminiConfigService } from "./gemini-config.service";
-import { GeminiClientService } from "./gemini-client.service";
+} from '@fittkereso-backend/ai-core';
+import { GeminiConfigService as AppGeminiConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { GeminiConfigService } from './gemini-config.service';
+import { GeminiClientService } from './gemini-client.service';
 
 function supportsThinking(model: string): boolean {
   return /^gemini-2\.5/.test(model) || /^gemini-3/.test(model);
@@ -17,7 +17,7 @@ function supportsThinking(model: string): boolean {
 
 @Injectable()
 export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
-  readonly name = "gemini" as const;
+  readonly name = 'gemini' as const;
   private readonly logger = new CustomLogger(GeminiChatProvider.name);
 
   constructor(
@@ -45,11 +45,11 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
     if (
       anyError.status === 429 ||
       anyError.code === 429 ||
-      anyError.code === "RESOURCE_EXHAUSTED"
+      anyError.code === 'RESOURCE_EXHAUSTED'
     ) {
       return true;
     }
-    return /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(anyError.message ?? "");
+    return /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(anyError.message ?? '');
   }
 
   getConfig(): AiProviderConfig {
@@ -68,17 +68,17 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
 
     const config: Record<string, unknown> = {};
     if (request.temperature !== undefined) {
-      config["temperature"] = request.temperature;
+      config['temperature'] = request.temperature;
     }
     if (request.maxTokens !== undefined) {
-      config["maxOutputTokens"] = request.maxTokens;
+      config['maxOutputTokens'] = request.maxTokens;
     }
     if (request.schema) {
-      config["responseMimeType"] = "application/json";
-      config["responseJsonSchema"] = request.schema;
+      config['responseMimeType'] = 'application/json';
+      config['responseJsonSchema'] = request.schema;
     }
     if (systemInstruction) {
-      config["systemInstruction"] = systemInstruction;
+      config['systemInstruction'] = systemInstruction;
     }
 
     this.applyReasoning(config, request);
@@ -127,18 +127,18 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
       }>;
     };
 
-    if (typeof r.text === "function") {
-      return r.text() ?? "";
+    if (typeof r.text === 'function') {
+      return r.text() ?? '';
     }
-    if (typeof r.text === "string") {
+    if (typeof r.text === 'string') {
       return r.text;
     }
 
     const parts = r.candidates?.[0]?.content?.parts ?? [];
     return parts
-      .map((part) => part.text ?? "")
+      .map((part) => part.text ?? '')
       .filter(Boolean)
-      .join("");
+      .join('');
   }
 
   /**
@@ -147,23 +147,23 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
    * a single `systemInstruction` string. Multimodal content is passed
    * through as-is via `parts`.
    */
-  private toGeminiMessages(messages: AiChatRequest["messages"]): {
+  private toGeminiMessages(messages: AiChatRequest['messages']): {
     systemInstruction?: string;
-    contents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }>;
+    contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
   } {
     const systemParts: string[] = [];
     const contents: Array<{
-      role: "user" | "model";
+      role: 'user' | 'model';
       parts: Array<{ text: string }>;
     }> = [];
 
     for (const message of messages) {
       const text = this.toText(message.content);
-      if (message.role === "system") {
+      if (message.role === 'system') {
         systemParts.push(text);
       } else {
         contents.push({
-          role: message.role === "assistant" ? "model" : "user",
+          role: message.role === 'assistant' ? 'model' : 'user',
           parts: [{ text }],
         });
       }
@@ -171,7 +171,7 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
 
     return {
       ...(systemParts.length > 0
-        ? { systemInstruction: systemParts.join("\n\n") }
+        ? { systemInstruction: systemParts.join('\n\n') }
         : {}),
       contents,
     };
@@ -186,24 +186,24 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
 
     if (!supportsThinking(model)) {
       if (thinking !== undefined) {
-        this.logger.warn("thinking ignored on model without thinking support", {
+        this.logger.warn('thinking ignored on model without thinking support', {
           provider: this.name,
           model,
-          feature: "thinking",
+          feature: 'thinking',
         });
       }
       if (effort !== undefined) {
-        this.logger.warn("effort ignored on model without thinking support", {
+        this.logger.warn('effort ignored on model without thinking support', {
           provider: this.name,
           model,
-          feature: "effort",
+          feature: 'effort',
         });
       }
       return;
     }
 
     if (thinking === false) {
-      config["thinkingConfig"] = { thinkingBudget: 0 };
+      config['thinkingConfig'] = { thinkingBudget: 0 };
       return;
     }
 
@@ -212,29 +212,29 @@ export class GeminiChatProvider implements AiChatProvider, OnModuleInit {
       if (Number.isNaN(budget)) {
         this.logger.warn(
           `effort='${effort}' is not an integer budget for gemini, ignoring`,
-          { provider: this.name, model, feature: "effort" },
+          { provider: this.name, model, feature: 'effort' },
         );
         return;
       }
-      config["thinkingConfig"] = { thinkingBudget: budget };
+      config['thinkingConfig'] = { thinkingBudget: budget };
     }
   }
 
   private toText(content: unknown): string {
-    if (typeof content === "string") return content;
+    if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       // Multimodal payloads (e.g. image_url): collect text parts; ignore
       // non-text blocks. Gemini supports images through a different code
       // path — image callers should switch to a Gemini-aware service.
       return content
         .map((part) => {
-          if (typeof part === "string") return part;
+          if (typeof part === 'string') return part;
           const p = part as { text?: string; type?: string };
-          return p.text ?? "";
+          return p.text ?? '';
         })
         .filter(Boolean)
-        .join("\n");
+        .join('\n');
     }
-    return "";
+    return '';
   }
 }

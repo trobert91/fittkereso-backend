@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import { Interval } from "@nestjs/schedule";
+import { Injectable } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import {
   ProductSource,
   ScrapeQueueName,
   ScrapeTask,
   ScrapeTaskRepository,
   TaskStatus,
-} from "@ebike-backend/database";
-import { ProductCollectionMetricsService } from "@ebike-backend/metrics";
-import { CustomLogger } from "@ebike-backend/logger";
-import { nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class ScrapeTaskQueueDepthService {
@@ -23,16 +23,16 @@ export class ScrapeTaskQueueDepthService {
   @Interval(30000)
   async recordQueueDepth(): Promise<void> {
     try {
-      const queueColumn = `task.${nameOf<ScrapeTask>("queue")}`;
-      const statusColumn = `task.${nameOf<ScrapeTask>("status")}`;
-      const sourceTypeColumn = `source.${nameOf<ProductSource>("type")}`;
+      const queueColumn = `task.${nameOf<ScrapeTask>('queue')}`;
+      const statusColumn = `task.${nameOf<ScrapeTask>('status')}`;
+      const sourceTypeColumn = `source.${nameOf<ProductSource>('type')}`;
       const counts = await this.scrapeTaskRepository.repo
-        .createQueryBuilder("task")
-        .select(queueColumn, "queue")
-        .addSelect(sourceTypeColumn, "source_type")
-        .addSelect(statusColumn, "status")
-        .addSelect("COUNT(*)::int", "count")
-        .innerJoin(`task.${nameOf<ScrapeTask>("source")}`, "source")
+        .createQueryBuilder('task')
+        .select(queueColumn, 'queue')
+        .addSelect(sourceTypeColumn, 'source_type')
+        .addSelect(statusColumn, 'status')
+        .addSelect('COUNT(*)::int', 'count')
+        .innerJoin(`task.${nameOf<ScrapeTask>('source')}`, 'source')
         .where(`${statusColumn} IN (:...statuses)`, {
           statuses: [
             TaskStatus.PENDING,
@@ -61,7 +61,7 @@ export class ScrapeTaskQueueDepthService {
         );
       }
     } catch (error: unknown) {
-      this.logger.warn("Failed to record queue depth metrics", {
+      this.logger.warn('Failed to record queue depth metrics', {
         error: error instanceof Error ? error.message : String(error),
       });
     }

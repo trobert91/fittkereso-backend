@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   Brand,
   ProductAlias,
@@ -7,14 +7,14 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   SearchResultDto,
   SearchProductDto,
   SearchCategoryDto,
-} from "../dto/search.dto";
-import { ProductImageDtoService } from "@ebike-backend/product";
-import { nameOf } from "@ebike-backend/utils";
+} from '../dto/search.dto';
+import { ProductImageDtoService } from '@fittkereso-backend/product';
+import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class PublicSearchService {
@@ -66,28 +66,28 @@ export class PublicSearchService {
     const useTrigramSimilarity = q.length >= 3;
     const pattern = `%${q}%`;
 
-    const normalizedNameColumn = `product."${nameOf<ProductModel>("normalizedName")}"`;
-    const aliasColumn = `alias.${nameOf<ProductAlias>("alias")}`;
-    const displayNameColumn = `product."${nameOf<ProductModel>("displayName")}"`;
+    const normalizedNameColumn = `product."${nameOf<ProductModel>('normalizedName')}"`;
+    const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
+    const displayNameColumn = `product."${nameOf<ProductModel>('displayName')}"`;
     const qb = this.productModelRepo.repo
-      .createQueryBuilder("product")
-      .leftJoin(`product.${nameOf<ProductModel>("brand")}`, "brand")
-      .leftJoin(`product.${nameOf<ProductModel>("mainImage")}`, "mainImage")
+      .createQueryBuilder('product')
+      .leftJoin(`product.${nameOf<ProductModel>('brand')}`, 'brand')
+      .leftJoin(`product.${nameOf<ProductModel>('mainImage')}`, 'mainImage')
       .leftJoin(
-        `product.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `product.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
-      .leftJoin(`product.${nameOf<ProductModel>("aliases")}`, "alias")
+      .leftJoin(`product.${nameOf<ProductModel>('aliases')}`, 'alias')
       .select([
-        `product.${nameOf<ProductModel>("id")}`,
-        `product.${nameOf<ProductModel>("slug")}`,
-        `product.${nameOf<ProductModel>("displayName")}`,
-        `brand.${nameOf<Brand>("name")}`,
-        `category.${nameOf<ProductCategory>("slug")}`,
-        `mainImage.${nameOf<ProductImage>("url")}`,
-        `mainImage.${nameOf<ProductImage>("fileName")}`,
+        `product.${nameOf<ProductModel>('id')}`,
+        `product.${nameOf<ProductModel>('slug')}`,
+        `product.${nameOf<ProductModel>('displayName')}`,
+        `brand.${nameOf<Brand>('name')}`,
+        `category.${nameOf<ProductCategory>('slug')}`,
+        `mainImage.${nameOf<ProductImage>('url')}`,
+        `mainImage.${nameOf<ProductImage>('fileName')}`,
       ])
-      .where(`product.${nameOf<ProductModel>("enabled")} = :enabled`, {
+      .where(`product.${nameOf<ProductModel>('enabled')} = :enabled`, {
         enabled: true,
       });
 
@@ -107,17 +107,17 @@ export class PublicSearchService {
             similarity(${normalizedNameColumn}, :q),
             COALESCE(MAX(similarity(${aliasColumn}, :q)), 0)
           )`,
-          "relevance",
+          'relevance',
         )
         .groupBy(
-          `product.${nameOf<ProductModel>("id")}, brand.${nameOf<Brand>("id")}, mainImage.${nameOf<ProductImage>("id")}, category.${nameOf<ProductCategory>("id")}`,
+          `product.${nameOf<ProductModel>('id')}, brand.${nameOf<Brand>('id')}, mainImage.${nameOf<ProductImage>('id')}, category.${nameOf<ProductCategory>('id')}`,
         )
-        .orderBy("relevance", "DESC");
+        .orderBy('relevance', 'DESC');
     } else {
       qb.andWhere(
-        `(${displayNameColumn} ILIKE :pattern OR brand.${nameOf<Brand>("name")} ILIKE :pattern)`,
+        `(${displayNameColumn} ILIKE :pattern OR brand.${nameOf<Brand>('name')} ILIKE :pattern)`,
         { pattern },
-      ).orderBy(displayNameColumn, "ASC");
+      ).orderBy(displayNameColumn, 'ASC');
     }
 
     qb.skip(offset).take(limit);
@@ -127,7 +127,7 @@ export class PublicSearchService {
     this.productImageDtoService.updateProductImageUrls(products);
     const data = products.map((p) => {
       const dto = new SearchProductDto();
-      dto.slug = p.slug ?? "";
+      dto.slug = p.slug ?? '';
       dto.displayName = p.displayName;
       dto.brandName = p.brand?.name;
       dto.categorySlug = p.productCategory?.slug ?? undefined;

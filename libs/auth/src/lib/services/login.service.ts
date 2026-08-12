@@ -1,5 +1,5 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { SupabaseClientService } from "@ebike-backend/supabase";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { SupabaseClientService } from '@fittkereso-backend/supabase';
 
 @Injectable()
 export class LoginService {

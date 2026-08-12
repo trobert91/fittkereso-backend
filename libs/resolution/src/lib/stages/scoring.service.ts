@@ -1,14 +1,14 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import type {
   EvaluatedProduct,
   ProductCategory,
-} from "@ebike-backend/database";
-import { CandidateScoringService } from "../matching/candidate-scoring.service";
-import { InputNormalizationService } from "../matching/input-normalization.service";
-import { QualityGatesService } from "../matching/quality-gates.service";
-import { getInputSpecsMap } from "../matching/spec-utils";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { SlimCandidate } from "../models/slim-types";
+} from '@fittkereso-backend/database';
+import { CandidateScoringService } from '../matching/candidate-scoring.service';
+import { InputNormalizationService } from '../matching/input-normalization.service';
+import { QualityGatesService } from '../matching/quality-gates.service';
+import { getInputSpecsMap } from '../matching/spec-utils';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { SlimCandidate } from '../models/slim-types';
 
 /**
  * Scoring stage. For each filtered candidate, runs the matcher

@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { SupabaseConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class SupabaseClientService {

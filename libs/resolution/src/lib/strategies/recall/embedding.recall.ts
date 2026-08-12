@@ -1,17 +1,17 @@
-import { Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { ProductEmbeddingMatchService } from "@ebike-backend/product";
-import type { EvaluatedProduct } from "@ebike-backend/database";
-import type { RecallStrategy } from "../../models/strategy-types";
-import type { ResolutionContext } from "../../models/resolution-context";
-import type { SlimCandidate } from "../../models/slim-types";
+import { Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { ProductEmbeddingMatchService } from '@fittkereso-backend/product';
+import type { EvaluatedProduct } from '@fittkereso-backend/database';
+import type { RecallStrategy } from '../../models/strategy-types';
+import type { ResolutionContext } from '../../models/resolution-context';
+import type { SlimCandidate } from '../../models/slim-types';
 import {
   MAX_MODEL_VARIANTS_DEFAULT,
   dedupeBySimilarity,
   embeddingHitToSlim,
   getBaseModelVariants,
   recordVariants,
-} from "./recall-shared";
+} from './recall-shared';
 
 /**
  * Recall via pgvector embedding similarity.
@@ -28,7 +28,7 @@ import {
  */
 @Injectable()
 export class EmbeddingRecallStrategy implements RecallStrategy {
-  readonly name = "embedding" as const;
+  readonly name = 'embedding' as const;
 
   constructor(
     private readonly embeddingMatch: ProductEmbeddingMatchService,
@@ -37,7 +37,7 @@ export class EmbeddingRecallStrategy implements RecallStrategy {
 
   shouldRun(context: ResolutionContext): boolean {
     if (!context.options.useEmbedding) return false;
-    if (context.strategiesRun.includes("embedding")) return false;
+    if (context.strategiesRun.includes('embedding')) return false;
     if (!context.scoring) return context.candidates.length === 0;
     if (context.candidates.length === 0) return true;
     return (context.scoring.failedGates?.length ?? 0) > 0;
@@ -66,15 +66,15 @@ export class EmbeddingRecallStrategy implements RecallStrategy {
 
     const hits: EvaluatedProduct[] = [];
     for (const result of variantResults) {
-      if (result.status === "rejected") {
+      if (result.status === 'rejected') {
         const message =
           result.reason instanceof Error
             ? result.reason.message
             : String(result.reason);
         context.errors.push({
-          phase: "recall",
+          phase: 'recall',
           message,
-          detail: "embedding",
+          detail: 'embedding',
           timestamp: new Date().toISOString(),
         });
         continue;

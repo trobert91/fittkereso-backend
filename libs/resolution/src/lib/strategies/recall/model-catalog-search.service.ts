@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductEmbeddingMatchService,
   ProductFuzzySearchService,
   type CandidateSearchInput,
-} from "@ebike-backend/product";
-import type { ResolutionContext } from "../../models/resolution-context";
-import type { SlimCandidate } from "../../models/slim-types";
+} from '@fittkereso-backend/product';
+import type { ResolutionContext } from '../../models/resolution-context';
+import type { SlimCandidate } from '../../models/slim-types';
 
 export interface ModelCatalogSearchArgs {
   modelString: string;
@@ -15,7 +15,7 @@ export interface ModelCatalogSearchArgs {
 
 export interface ModelCatalogSearchResult {
   candidates: SlimCandidate[];
-  source: "fuzzy" | "embedding" | "none";
+  source: 'fuzzy' | 'embedding' | 'none';
 }
 
 /**
@@ -46,7 +46,7 @@ export class ModelCatalogSearchService {
     useEmbedding,
   }: ModelCatalogSearchArgs): Promise<ModelCatalogSearchResult> {
     const trimmed = modelString.trim();
-    if (trimmed.length === 0) return { candidates: [], source: "none" };
+    if (trimmed.length === 0) return { candidates: [], source: 'none' };
 
     const categoryIds = context.category ? [context.category.id] : undefined;
     const brandIds = context.brand ? [context.brand.id] : undefined;
@@ -66,27 +66,27 @@ export class ModelCatalogSearchService {
     if (fuzzyHits.length > 0) {
       return {
         candidates: fuzzyHits.map((hit) => fuzzyToSlim(hit)),
-        source: "fuzzy",
+        source: 'fuzzy',
       };
     }
 
-    if (!useEmbedding) return { candidates: [], source: "none" };
+    if (!useEmbedding) return { candidates: [], source: 'none' };
 
     const embeddingHits = await this.embeddingMatch.findMatches(
       { ...context.input, model: trimmed },
       categoryIds,
       brandIds,
     );
-    if (embeddingHits.length === 0) return { candidates: [], source: "none" };
+    if (embeddingHits.length === 0) return { candidates: [], source: 'none' };
     return {
       candidates: embeddingHits.map((hit) => embeddingToSlim(hit)),
-      source: "embedding",
+      source: 'embedding',
     };
   }
 }
 
 function fuzzyToSlim(
-  hit: Awaited<ReturnType<ProductFuzzySearchService["search"]>>[number],
+  hit: Awaited<ReturnType<ProductFuzzySearchService['search']>>[number],
 ): SlimCandidate {
   const entity = hit.entity;
   return {
@@ -104,12 +104,12 @@ function fuzzyToSlim(
       : undefined,
     specs: entity.specs,
     aliases: entity.aliases?.map((alias) => alias.alias),
-    source: "fuzzy",
+    source: 'fuzzy',
   };
 }
 
 function embeddingToSlim(
-  hit: Awaited<ReturnType<ProductEmbeddingMatchService["findMatches"]>>[number],
+  hit: Awaited<ReturnType<ProductEmbeddingMatchService['findMatches']>>[number],
 ): SlimCandidate {
   return {
     productId: hit.id,
@@ -126,6 +126,6 @@ function embeddingToSlim(
       : undefined,
     specs: hit.specs,
     aliases: hit.aliases,
-    source: "embedding",
+    source: 'embedding',
   };
 }

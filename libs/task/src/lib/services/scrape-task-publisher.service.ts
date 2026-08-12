@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   TaskStatus,
   ScrapeTask,
   ScrapeTaskRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 @Injectable()
 export class ScrapeTaskPublisherService {

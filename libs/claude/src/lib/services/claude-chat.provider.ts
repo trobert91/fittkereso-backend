@@ -1,16 +1,16 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import Anthropic from "@anthropic-ai/sdk";
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   AiChatProvider,
   AiChatRequest,
   AiProviderConfig,
   AiProviderRegistry,
   RawProviderResult,
-} from "@ebike-backend/ai-core";
-import { ClaudeConfigService as AppClaudeConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ClaudeClientService } from "./claude-client.service";
-import { ClaudeConfigService } from "./claude-config.service";
+} from '@fittkereso-backend/ai-core';
+import { ClaudeConfigService as AppClaudeConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ClaudeClientService } from './claude-client.service';
+import { ClaudeConfigService } from './claude-config.service';
 
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_THINKING_BUDGET = 4096;
@@ -21,7 +21,7 @@ function supportsThinking(model: string): boolean {
 
 @Injectable()
 export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
-  readonly name = "claude" as const;
+  readonly name = 'claude' as const;
   private readonly logger = new CustomLogger(ClaudeChatProvider.name);
 
   constructor(
@@ -50,11 +50,11 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
     if (
       anyError.status === 429 ||
       anyError.code === 429 ||
-      anyError.code === "rate_limit_error"
+      anyError.code === 'rate_limit_error'
     ) {
       return true;
     }
-    return /rate.?limit|quota/i.test(anyError.message ?? "");
+    return /rate.?limit|quota/i.test(anyError.message ?? '');
   }
 
   getConfig(): AiProviderConfig {
@@ -80,15 +80,15 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
     };
 
     if (request.schema) {
-      const toolName = request.schemaName ?? request.costLabel ?? "response";
+      const toolName = request.schemaName ?? request.costLabel ?? 'response';
       body.tools = [
         {
           name: toolName,
-          description: "Return the response in the required structured format.",
+          description: 'Return the response in the required structured format.',
           input_schema: request.schema,
         },
       ];
-      body.tool_choice = { type: "tool", name: toolName };
+      body.tool_choice = { type: 'tool', name: toolName };
     }
 
     this.applyReasoning(body, request);
@@ -125,15 +125,15 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
   private extractContent(response: Anthropic.Message): string {
     const blocks = response.content ?? [];
     const toolUse = blocks.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
     );
     if (toolUse) {
       return JSON.stringify(toolUse.input ?? {});
     }
     return blocks
-      .map((block) => (block.type === "text" ? block.text : ""))
+      .map((block) => (block.type === 'text' ? block.text : ''))
       .filter(Boolean)
-      .join("");
+      .join('');
   }
 
   /**
@@ -142,7 +142,7 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
    * into a single top-level `system` string. Multimodal payloads are reduced
    * to their text parts; image support belongs in a Claude-aware service.
    */
-  private toClaudeMessages(messages: AiChatRequest["messages"]): {
+  private toClaudeMessages(messages: AiChatRequest['messages']): {
     system?: string;
     messages: Anthropic.MessageParam[];
   } {
@@ -151,18 +151,18 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
 
     for (const message of messages) {
       const text = this.toText(message.content);
-      if (message.role === "system") {
+      if (message.role === 'system') {
         systemParts.push(text);
       } else {
         claudeMessages.push({
-          role: message.role === "assistant" ? "assistant" : "user",
+          role: message.role === 'assistant' ? 'assistant' : 'user',
           content: text,
         });
       }
     }
 
     return {
-      ...(systemParts.length > 0 ? { system: systemParts.join("\n\n") } : {}),
+      ...(systemParts.length > 0 ? { system: systemParts.join('\n\n') } : {}),
       messages: claudeMessages,
     };
   }
@@ -176,17 +176,17 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
 
     if (!supportsThinking(model)) {
       if (thinking !== undefined) {
-        this.logger.warn("thinking ignored on model without thinking support", {
+        this.logger.warn('thinking ignored on model without thinking support', {
           provider: this.name,
           model,
-          feature: "thinking",
+          feature: 'thinking',
         });
       }
       if (effort !== undefined) {
-        this.logger.warn("effort ignored on model without thinking support", {
+        this.logger.warn('effort ignored on model without thinking support', {
           provider: this.name,
           model,
-          feature: "effort",
+          feature: 'effort',
         });
       }
       return;
@@ -200,31 +200,31 @@ export class ClaudeChatProvider implements AiChatProvider, OnModuleInit {
       if (Number.isNaN(parsed)) {
         this.logger.warn(
           `effort='${effort}' is not an integer budget for claude, defaulting to ${DEFAULT_THINKING_BUDGET}`,
-          { provider: this.name, model, feature: "effort" },
+          { provider: this.name, model, feature: 'effort' },
         );
       } else {
         budget = parsed;
       }
     }
 
-    body.thinking = { type: "enabled", budget_tokens: budget };
+    body.thinking = { type: 'enabled', budget_tokens: budget };
     if (body.max_tokens <= budget) {
       body.max_tokens = budget + DEFAULT_MAX_TOKENS;
     }
   }
 
   private toText(content: unknown): string {
-    if (typeof content === "string") return content;
+    if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content
         .map((part) => {
-          if (typeof part === "string") return part;
+          if (typeof part === 'string') return part;
           const p = part as { text?: string; type?: string };
-          return p.text ?? "";
+          return p.text ?? '';
         })
         .filter(Boolean)
-        .join("\n");
+        .join('\n');
     }
-    return "";
+    return '';
   }
 }

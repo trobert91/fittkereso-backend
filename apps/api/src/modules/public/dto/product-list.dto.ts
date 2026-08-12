@@ -1,10 +1,9 @@
-import { Expose, Transform, Type } from "class-transformer";
-import { SerializeGroup, transfromExposeAll } from "@ebike-backend/utils";
-import { BrandDto } from "./brand.dto";
-import { CategoryListDto } from "./category.dto";
-import { MainImageDto } from "./main-image.dto";
-import { ProductRatingDto } from "./product-rating.dto";
-import type { OrderedSpec } from "@ebike-backend/database";
+import { Expose, Transform, Type } from 'class-transformer';
+import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
+import { BrandDto } from './brand.dto';
+import { CategoryListDto } from './category.dto';
+import { MainImageDto } from './main-image.dto';
+import type { OrderedSpec } from '@fittkereso-backend/database';
 
 export class ProductListDto {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] }) id: string;
@@ -25,9 +24,6 @@ export class ProductListDto {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
   @Type(() => MainImageDto)
   mainImage?: MainImageDto | null;
-  @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
-  @Type(() => ProductRatingDto)
-  rating?: ProductRatingDto | null;
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
   @Transform(transfromExposeAll())
   orderedSpecs?: OrderedSpec[];

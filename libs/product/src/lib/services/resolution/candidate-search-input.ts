@@ -1,7 +1,7 @@
 import type {
   ProductResolutionBrand,
   ProductResolutionInput,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 export interface CandidateSearchInput {
   input: ProductResolutionInput;

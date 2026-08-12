@@ -6,15 +6,10 @@
     "acceptThreshold": 70,
     "acceptThresholdStrict": 80,
     "ambiguityGap": 5,
-    "minCandidateScore": 50,
     "maxLlmPicks": 6,
     "defaultStrictness": "moderate",
     "defaultNumericTokenWeight": 2.5,
     "importantTokenWeightThreshold": 2.0
-  },
-  "aliasAutoCreate": {
-    "enabled": false,
-    "minScore": 80
   },
   "search": {
     "maxModelVariants": 20,

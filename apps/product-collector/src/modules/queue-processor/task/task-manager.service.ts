@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
-import { TaskRepository, Task, QueueName } from "@ebike-backend/database";
-import { TaskConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { TaskRepository, Task, QueueName } from '@fittkereso-backend/database';
+import { TaskConfigService } from '@fittkereso-backend/config';
 import {
   BaseTaskManagerService,
   ProductSourceSyncMessage,
-} from "@ebike-backend/task";
-import { ProductSourceSyncListener } from "./product-source-sync-listener.service";
-import { TaskMetricsService } from "@ebike-backend/metrics";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
+} from '@fittkereso-backend/task';
+import { ProductSourceSyncListener } from './product-source-sync-listener.service';
+import { TaskMetricsService } from '@fittkereso-backend/metrics';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 
 @Injectable()
 export class TaskManagerService extends BaseTaskManagerService {

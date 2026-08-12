@@ -1,10 +1,13 @@
-import { Injectable } from "@nestjs/common";
-import { ProductModel, ProductModelRepository } from "@ebike-backend/database";
-import { productSpecsSummary } from "../matching/spec-utils";
-import type { ResolutionContext } from "../models/resolution-context";
-import type { ResolutionResult } from "../models/resolution-result";
-import type { SlimResolvedModel } from "../models/slim-types";
-import { ResolutionStatus } from "../models/resolution-status";
+import { Injectable } from '@nestjs/common';
+import {
+  ProductModel,
+  ProductModelRepository,
+} from '@fittkereso-backend/database';
+import { productSpecsSummary } from '../matching/spec-utils';
+import type { ResolutionContext } from '../models/resolution-context';
+import type { ResolutionResult } from '../models/resolution-result';
+import type { SlimResolvedModel } from '../models/slim-types';
+import { ResolutionStatus } from '../models/resolution-status';
 
 /**
  * Final stage. Loads the resolved `ProductModel` entity (when the decision
@@ -55,7 +58,7 @@ export class FinalizeService {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "finalize",
+        phase: 'finalize',
         message,
         timestamp: new Date().toISOString(),
       });
@@ -82,7 +85,7 @@ export class FinalizeService {
 }
 
 function isUnresolved(kind: string): boolean {
-  return kind === "llm_unresolved" || kind === "matcher_reject";
+  return kind === 'llm_unresolved' || kind === 'matcher_reject';
 }
 
 function toSlimResolved(model: ProductModel): SlimResolvedModel {

@@ -1,14 +1,14 @@
-import { ScraperService } from "@ebike-backend/scraper";
-import { ScrapeTaskPublisherService } from "@ebike-backend/task";
-import { ScrapeUrlDeduplicationService } from "./scrape-url-deduplication.service";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ScrapeQueueName, ScrapeTask } from "@ebike-backend/database";
-import * as cheerio from "cheerio";
-import { compact, isEmpty } from "lodash";
-import { ListPageExtractor } from "../interfaces/list-page-extractor.interface";
-import { Injectable } from "@nestjs/common";
-import { WebLink } from "@ebike-backend/product";
-import { ProductCollectionMetricsService } from "@ebike-backend/metrics";
+import { ScraperService } from '@fittkereso-backend/scraper';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { ScrapeUrlDeduplicationService } from './scrape-url-deduplication.service';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ScrapeQueueName, ScrapeTask } from '@fittkereso-backend/database';
+import * as cheerio from 'cheerio';
+import { compact, isEmpty } from 'lodash';
+import { ListPageExtractor } from '../interfaces/list-page-extractor.interface';
+import { Injectable } from '@nestjs/common';
+import { WebLink } from '@fittkereso-backend/product';
+import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
 
 @Injectable()
 export class ProductListPageScraperService {
@@ -93,7 +93,7 @@ export class ProductListPageScraperService {
     link: WebLink,
   ): Promise<ScrapeTask | undefined> {
     if (isEmpty(link.url) || isEmpty(link.title)) {
-      this.logger.warn("Skipping link with empty URL or name", {
+      this.logger.warn('Skipping link with empty URL or name', {
         taskId: parentTask.id,
         parentUrl: parentTask.url,
         link,
@@ -122,7 +122,7 @@ export class ProductListPageScraperService {
 
       return task;
     } catch (error) {
-      this.logger.error("Error checking dedup for product link", {
+      this.logger.error('Error checking dedup for product link', {
         taskId: parentTask.id,
         parentUrl: parentTask.url,
         linkUrl: link.url,

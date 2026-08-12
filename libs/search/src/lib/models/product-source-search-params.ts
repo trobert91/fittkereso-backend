@@ -1,4 +1,4 @@
-import { ProductSourceType } from "@ebike-backend/database";
+import { ProductSourceType } from '@fittkereso-backend/database';
 import {
   IsBoolean,
   IsEnum,
@@ -6,7 +6,7 @@ import {
   IsOptional,
   IsString,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
 export class ProductSourceSearchParams {
   @IsOptional()
@@ -33,42 +33,42 @@ export class ProductSourceSearchParams {
 
   @IsOptional()
   @IsEnum([
-    "name",
-    "type",
-    "schedulingEnabled",
-    "processingEnabled",
-    "priority",
-    "maxConcurrent",
-    "requestsPerHour",
-    "lastRunAt",
-    "fullSyncInterval",
-    "nextFullSyncAt",
-    "lastFullSyncAt",
-    "incrementalSyncInterval",
-    "nextIncrementalSyncAt",
-    "lastIncrementalSyncAt",
-    "createdAt",
-    "updatedAt",
+    'name',
+    'type',
+    'schedulingEnabled',
+    'processingEnabled',
+    'priority',
+    'maxConcurrent',
+    'requestsPerHour',
+    'lastRunAt',
+    'fullSyncInterval',
+    'nextFullSyncAt',
+    'lastFullSyncAt',
+    'incrementalSyncInterval',
+    'nextIncrementalSyncAt',
+    'lastIncrementalSyncAt',
+    'createdAt',
+    'updatedAt',
   ])
   sort?:
-    | "name"
-    | "type"
-    | "schedulingEnabled"
-    | "processingEnabled"
-    | "priority"
-    | "maxConcurrent"
-    | "requestsPerHour"
-    | "lastRunAt"
-    | "fullSyncInterval"
-    | "nextFullSyncAt"
-    | "lastFullSyncAt"
-    | "incrementalSyncInterval"
-    | "nextIncrementalSyncAt"
-    | "lastIncrementalSyncAt"
-    | "createdAt"
-    | "updatedAt";
+    | 'name'
+    | 'type'
+    | 'schedulingEnabled'
+    | 'processingEnabled'
+    | 'priority'
+    | 'maxConcurrent'
+    | 'requestsPerHour'
+    | 'lastRunAt'
+    | 'fullSyncInterval'
+    | 'nextFullSyncAt'
+    | 'lastFullSyncAt'
+    | 'incrementalSyncInterval'
+    | 'nextIncrementalSyncAt'
+    | 'lastIncrementalSyncAt'
+    | 'createdAt'
+    | 'updatedAt';
 
   @IsOptional()
-  @IsEnum(["ASC", "DESC"])
-  order?: "ASC" | "DESC";
+  @IsEnum(['ASC', 'DESC'])
+  order?: 'ASC' | 'DESC';
 }

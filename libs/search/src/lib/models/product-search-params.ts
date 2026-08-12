@@ -49,8 +49,8 @@ export class ProductSearchParams {
   pageSize?: number;
 
   @IsOptional()
-  @IsIn(['model', 'displayName', 'createdAt', 'updatedAt', 'rating', 'totalReviewCount'])
-  sort?: 'model' | 'displayName' | 'createdAt' | 'updatedAt' | 'rating' | 'totalReviewCount';
+  @IsIn(['model', 'displayName', 'createdAt', 'updatedAt'])
+  sort?: 'model' | 'displayName' | 'createdAt' | 'updatedAt';
 
   @IsOptional()
   @IsIn(['ASC', 'DESC'])

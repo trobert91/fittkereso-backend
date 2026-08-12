@@ -1,5 +1,5 @@
-import { QueueName, TaskStatus } from "@ebike-backend/database";
-import { IsEnum, IsInt, IsOptional, Min } from "class-validator";
+import { QueueName, TaskStatus } from '@fittkereso-backend/database';
+import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
 
 export class TaskSearchParams {
   @IsOptional()
@@ -22,28 +22,28 @@ export class TaskSearchParams {
 
   @IsOptional()
   @IsEnum([
-    "queue",
-    "status",
-    "attempts",
-    "scheduledAt",
-    "lastRunAt",
-    "lockedAt",
-    "executionTimeInSec",
-    "createdAt",
-    "updatedAt",
+    'queue',
+    'status',
+    'attempts',
+    'scheduledAt',
+    'lastRunAt',
+    'lockedAt',
+    'executionTimeInSec',
+    'createdAt',
+    'updatedAt',
   ])
   sort?:
-    | "queue"
-    | "status"
-    | "attempts"
-    | "scheduledAt"
-    | "lastRunAt"
-    | "lockedAt"
-    | "executionTimeInSec"
-    | "createdAt"
-    | "updatedAt";
+    | 'queue'
+    | 'status'
+    | 'attempts'
+    | 'scheduledAt'
+    | 'lastRunAt'
+    | 'lockedAt'
+    | 'executionTimeInSec'
+    | 'createdAt'
+    | 'updatedAt';
 
   @IsOptional()
-  @IsEnum(["ASC", "DESC"])
-  order?: "ASC" | "DESC";
+  @IsEnum(['ASC', 'DESC'])
+  order?: 'ASC' | 'DESC';
 }

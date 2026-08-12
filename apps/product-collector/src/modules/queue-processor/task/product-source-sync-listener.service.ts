@@ -1,22 +1,22 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategoryRepository,
   ProductSource,
   ProductSourceRepository,
   ProductSourceSyncMode,
   ProductSourceType,
-} from "@ebike-backend/database";
-import { SourceConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+} from '@fittkereso-backend/database';
+import { SourceConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   ArukeresoSyncService,
   DisplayspecsSyncService,
   IncrementalSyncService,
   ProductSourceSyncService,
-} from "@ebike-backend/product-scraper";
-import { ProductSourceSyncMessage } from "@ebike-backend/task";
-import { isEmpty } from "lodash";
-import { In } from "typeorm";
+} from '@fittkereso-backend/product-scraper';
+import { ProductSourceSyncMessage } from '@fittkereso-backend/task';
+import { isEmpty } from 'lodash';
+import { In } from 'typeorm';
 
 @Injectable()
 export class ProductSourceSyncListener {
@@ -70,7 +70,7 @@ export class ProductSourceSyncListener {
         );
       });
     } catch (error: unknown) {
-      this.logger.error("Error processing ProductSourceSync job: ", error);
+      this.logger.error('Error processing ProductSourceSync job: ', error);
       throw error;
     }
   }

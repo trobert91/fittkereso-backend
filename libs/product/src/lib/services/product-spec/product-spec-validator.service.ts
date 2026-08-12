@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import Ajv, { ErrorObject } from "ajv";
-import addFormats from "ajv-formats";
+import { Injectable } from '@nestjs/common';
+import Ajv, { ErrorObject } from 'ajv';
+import addFormats from 'ajv-formats';
 
 import {
   ProductSpecs,
   SpecDefinitionJsonSchema,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 export interface SpecValidationResult {
   isValid: boolean;
@@ -55,10 +55,10 @@ export class ProductSpecValidatorService {
 
     for (const err of errors) {
       const key =
-        err.instancePath.replace(/^\//, "") || err.params["missingProperty"];
+        err.instancePath.replace(/^\//, '') || err.params['missingProperty'];
       if (!key) continue;
 
-      const message = err.message || "Invalid value";
+      const message = err.message || 'Invalid value';
       if (!output[key]) output[key] = [];
 
       output[key].push(message);

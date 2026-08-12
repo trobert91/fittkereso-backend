@@ -1,4 +1,4 @@
-import { ProductSource } from "@ebike-backend/database";
+import { ProductSource } from '@fittkereso-backend/database';
 
 export interface ProductSourceSyncOptions {
   sourceTitles?: string[];

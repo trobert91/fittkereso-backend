@@ -4,7 +4,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const root = "e:/Work/ebike/repos/ebike-backend";
+const root = "e:/Work/fittkereso/repos/fittkereso-backend";
 const subtreesPath = path.join(root, ".tmp", "identification-subtrees.json");
 const fixturePath = path.join(
   root,

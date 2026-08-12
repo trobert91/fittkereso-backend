@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { AiEmbeddingService } from "@ebike-backend/ai";
-import { compact } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { AiEmbeddingService } from '@fittkereso-backend/ai';
+import { compact } from 'lodash';
 
 export interface ProductEmbeddingInput {
   brand: string | undefined;
@@ -30,7 +30,7 @@ export class ProductEmbeddingService {
       input.model ?? input.displayName,
       input.category,
     ])
-      .join(" ")
+      .join(' ')
       .trim();
 
     return this.embeddingService.createEmbedding(text);

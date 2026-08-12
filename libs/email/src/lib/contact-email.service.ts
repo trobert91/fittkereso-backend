@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { MailgunConfigService } from "@ebike-backend/config";
-import { EmailService } from "./email.service";
-import { EmailTemplateService } from "./email-template.service";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { MailgunConfigService } from '@fittkereso-backend/config';
+import { EmailService } from './email.service';
+import { EmailTemplateService } from './email-template.service';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class ContactEmailService {
@@ -24,11 +24,11 @@ export class ContactEmailService {
     const adminEmail = this.dynamicConfigService.general.adminContactEmail;
 
     if (!adminEmail) {
-      this.logger.error("adminContactEmail not configured in DynamicConfig");
-      throw new Error("Admin contact email not configured");
+      this.logger.error('adminContactEmail not configured in DynamicConfig');
+      throw new Error('Admin contact email not configured');
     }
 
-    const { html, text } = this.templateService.render("contact", {
+    const { html, text } = this.templateService.render('contact', {
       senderName: params.senderName,
       senderEmail: params.senderEmail,
       message: params.message,
@@ -36,7 +36,7 @@ export class ContactEmailService {
 
     await this.emailService.send({
       to: adminEmail,
-      from: `ebike Contact <noreply@${this.mailgunConfig.domain}>`,
+      from: `fittkereso Contact <noreply@${this.mailgunConfig.domain}>`,
       subject: `Contact Form: ${params.senderName}`,
       html,
       text,

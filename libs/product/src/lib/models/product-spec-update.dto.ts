@@ -1,5 +1,5 @@
-import { IsObject, IsDefined } from "class-validator";
-import { ProductSpecs } from "@ebike-backend/database";
+import { IsObject, IsDefined } from 'class-validator';
+import { ProductSpecs } from '@fittkereso-backend/database';
 
 export class ProductSpecUpdateDto {
   @IsObject()

@@ -6,7 +6,7 @@ rule_files:
   - /etc/prometheus/pipeline_alerts.yml
 
 scrape_configs:
-  - job_name: "ebike-services"
+  - job_name: "fittkereso-services"
     static_configs:
       - targets:
           - "host.docker.internal:8080" # review-collector if exposed

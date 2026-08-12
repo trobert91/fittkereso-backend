@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { ScrapeQueueName } from "@ebike-backend/database";
+import { Injectable } from '@nestjs/common';
+import { ScrapeQueueName } from '@fittkereso-backend/database';
 import {
   UrlClassification,
   UrlClassifier,
-} from "../../interfaces/url-classifier.interface";
+} from '../../interfaces/url-classifier.interface';
 
 /**
  * Classifies Arukereso URLs into scrape queues.

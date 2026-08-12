@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { BasePostgresRepository } from "./base-postgres-repository";
-import { BrandAlias, BrandAliasSource } from "../models/brand-alias.entity";
-import { WithSimilarity } from "../models/with-similarity";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { BasePostgresRepository } from './base-postgres-repository';
+import { BrandAlias, BrandAliasSource } from '../models/brand-alias.entity';
+import { WithSimilarity } from '../models/with-similarity';
 
 @Injectable()
 export class BrandAliasRepository extends BasePostgresRepository<BrandAlias> {
   constructor(
-    @InjectRepository(BrandAlias, "postgres")
+    @InjectRepository(BrandAlias, 'postgres')
     repository: Repository<BrandAlias>,
   ) {
     super(repository, BrandAlias);
@@ -27,16 +27,16 @@ export class BrandAliasRepository extends BasePostgresRepository<BrandAlias> {
     minSimilarity: number,
     limit: number,
   ): Promise<WithSimilarity<BrandAlias>[]> {
-    const aliasColumn = `ba.${nameOf<BrandAlias>("alias")}`;
+    const aliasColumn = `ba.${nameOf<BrandAlias>('alias')}`;
     const { entities, raw } = await this.repo
-      .createQueryBuilder("ba")
-      .leftJoinAndSelect(`ba.${nameOf<BrandAlias>("brand")}`, "brand")
-      .addSelect(`similarity(${aliasColumn}, :alias)`, "similarity")
+      .createQueryBuilder('ba')
+      .leftJoinAndSelect(`ba.${nameOf<BrandAlias>('brand')}`, 'brand')
+      .addSelect(`similarity(${aliasColumn}, :alias)`, 'similarity')
       .where(`similarity(${aliasColumn}, :alias) >= :minSimilarity`, {
         alias,
         minSimilarity,
       })
-      .orderBy(`similarity(${aliasColumn}, :alias)`, "DESC")
+      .orderBy(`similarity(${aliasColumn}, :alias)`, 'DESC')
       .limit(limit)
       .getRawAndEntities();
 

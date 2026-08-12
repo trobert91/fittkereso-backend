@@ -7,24 +7,24 @@ import {
   Put,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
-import { UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { UserRole } from '@fittkereso-backend/database';
 import {
   BrandCreateDto,
   BrandCreateService,
   BrandDetailService,
   BrandUpdateDto,
   BrandUpdateService,
-} from "@ebike-backend/product";
+} from '@fittkereso-backend/product';
 import {
   BrandSearchParams,
   BrandSearchResult,
   BrandSearchService,
-} from "@ebike-backend/search";
-import { SerializeGroup } from "@ebike-backend/utils";
+} from '@fittkereso-backend/search';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 
-@Controller("admin-brand")
+@Controller('admin-brand')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class AdminBrandController {
@@ -35,7 +35,7 @@ export class AdminBrandController {
     private readonly createService: BrandCreateService,
   ) {}
 
-  @Get(":id")
+  @Get(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -44,11 +44,11 @@ export class AdminBrandController {
       SerializeGroup.details,
     ],
   })
-  async getBrand(@Param("id") id: string) {
+  async getBrand(@Param('id') id: string) {
     return this.detailService.getById(id);
   }
 
-  @Post("search")
+  @Post('search')
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchBrands(
     @Body() searchParams: BrandSearchParams,
@@ -70,7 +70,7 @@ export class AdminBrandController {
     return this.detailService.getById(created.id);
   }
 
-  @Put(":id")
+  @Put(':id')
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -80,7 +80,7 @@ export class AdminBrandController {
     ],
   })
   async updateBrand(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateDto: BrandUpdateDto,
   ) {
     await this.updateService.updateBrand(id, updateDto);

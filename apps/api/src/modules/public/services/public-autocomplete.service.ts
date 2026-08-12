@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   Brand,
   ProductAlias,
@@ -7,14 +7,14 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   AutocompleteResultDto,
   AutocompleteProductDto,
   AutocompleteCategoryDto,
-} from "../dto/search.dto";
-import { ProductImageDtoService } from "@ebike-backend/product";
-import { nameOf } from "@ebike-backend/utils";
+} from '../dto/search.dto';
+import { ProductImageDtoService } from '@fittkereso-backend/product';
+import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class PublicAutocompleteService {
@@ -63,35 +63,35 @@ export class PublicAutocompleteService {
 
   private async searchProducts(q: string): Promise<AutocompleteProductDto[]> {
     const pattern = `%${q}%`;
-    const normalizedNameColumn = `product."${nameOf<ProductModel>("normalizedName")}"`;
-    const aliasColumn = `alias.${nameOf<ProductAlias>("alias")}`;
-    const displayNameColumn = `product."${nameOf<ProductModel>("displayName")}"`;
+    const normalizedNameColumn = `product."${nameOf<ProductModel>('normalizedName')}"`;
+    const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
+    const displayNameColumn = `product."${nameOf<ProductModel>('displayName')}"`;
     const products = await this.productModelRepo.repo
-      .createQueryBuilder("product")
-      .leftJoin(`product.${nameOf<ProductModel>("brand")}`, "brand")
-      .leftJoin(`product.${nameOf<ProductModel>("mainImage")}`, "mainImage")
+      .createQueryBuilder('product')
+      .leftJoin(`product.${nameOf<ProductModel>('brand')}`, 'brand')
+      .leftJoin(`product.${nameOf<ProductModel>('mainImage')}`, 'mainImage')
       .leftJoin(
-        `product.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `product.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
-      .leftJoin(`product.${nameOf<ProductModel>("aliases")}`, "alias")
+      .leftJoin(`product.${nameOf<ProductModel>('aliases')}`, 'alias')
       .select([
-        `product.${nameOf<ProductModel>("id")}`,
-        `product.${nameOf<ProductModel>("slug")}`,
-        `product.${nameOf<ProductModel>("displayName")}`,
-        `brand.${nameOf<Brand>("name")}`,
-        `category.${nameOf<ProductCategory>("slug")}`,
-        `mainImage.${nameOf<ProductImage>("url")}`,
-        `mainImage.${nameOf<ProductImage>("fileName")}`,
+        `product.${nameOf<ProductModel>('id')}`,
+        `product.${nameOf<ProductModel>('slug')}`,
+        `product.${nameOf<ProductModel>('displayName')}`,
+        `brand.${nameOf<Brand>('name')}`,
+        `category.${nameOf<ProductCategory>('slug')}`,
+        `mainImage.${nameOf<ProductImage>('url')}`,
+        `mainImage.${nameOf<ProductImage>('fileName')}`,
       ])
       .addSelect(
         `GREATEST(
           similarity(${normalizedNameColumn}, :q),
           COALESCE(MAX(similarity(${aliasColumn}, :q)), 0)
         )`,
-        "relevance",
+        'relevance',
       )
-      .where(`product.${nameOf<ProductModel>("enabled")} = :enabled`, {
+      .where(`product.${nameOf<ProductModel>('enabled')} = :enabled`, {
         enabled: true,
       })
       .andWhere(
@@ -105,9 +105,9 @@ export class PublicAutocompleteService {
         { q, pattern },
       )
       .groupBy(
-        `product.${nameOf<ProductModel>("id")}, brand.${nameOf<Brand>("id")}, mainImage.${nameOf<ProductImage>("id")}, category.${nameOf<ProductCategory>("id")}`,
+        `product.${nameOf<ProductModel>('id')}, brand.${nameOf<Brand>('id')}, mainImage.${nameOf<ProductImage>('id')}, category.${nameOf<ProductCategory>('id')}`,
       )
-      .orderBy("relevance", "DESC")
+      .orderBy('relevance', 'DESC')
       .limit(5)
       .getMany();
 

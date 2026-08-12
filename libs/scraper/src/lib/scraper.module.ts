@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { ScraperService } from "./services/scraper.service";
-import { ZyteModule } from "@ebike-backend/zyte";
+import { Module } from '@nestjs/common';
+import { ScraperService } from './services/scraper.service';
+import { ZyteModule } from '@fittkereso-backend/zyte';
 
 @Module({
   imports: [ZyteModule],

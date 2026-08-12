@@ -1,7 +1,0 @@
-thread categorization + relevance calculation
-
-product search with thread 1dfc0e00-14ee-43db-9c22-c20d232d569c
-
-plan with the "WQHD" and similar primarySpec translation
-
-how many product categories do I want for thread processing

@@ -1,11 +1,7 @@
-import { Expose, Type } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { ProductListDto } from "./product-list.dto";
-import {
-  FilterFieldDto,
-  FilterOptionDto,
-  NumericRangeDto,
-} from "./category.dto";
+import { Expose, Type } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { ProductListDto } from './product-list.dto';
+import { FilterFieldDto, FilterOptionDto } from './category.dto';
 
 export abstract class PaginatedResultBase {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
@@ -28,7 +24,4 @@ export class PaginatedProductResult extends PaginatedResultBase {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
   @Type(() => FilterOptionDto)
   brands?: FilterOptionDto[];
-  @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
-  @Type(() => NumericRangeDto)
-  scoreRange?: NumericRangeDto;
 }

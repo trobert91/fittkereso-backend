@@ -1,14 +1,14 @@
-import { Injectable } from "@nestjs/common";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { isEmpty } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { isEmpty } from 'lodash';
 import {
   TokenParserConfig,
   ParsedTokens,
   basicNormalization,
   removeBrand,
   parseTokens,
-} from "./token-parser";
+} from './token-parser';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ export class SimilarityInputNormalizationService {
     const tokenConfig: TokenParserConfig = {
       numericTokenRules: numericTokenRules.map(
         (rule: { pattern: string; weight: number; critical: boolean }) => ({
-          pattern: new RegExp(rule.pattern, "i"),
+          pattern: new RegExp(rule.pattern, 'i'),
           weight: rule.weight,
           critical: rule.critical,
         }),

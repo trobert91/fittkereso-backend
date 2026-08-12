@@ -1,5 +1,5 @@
-import { Expose } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
+import { Expose } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
 
 export class BrandDto {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })

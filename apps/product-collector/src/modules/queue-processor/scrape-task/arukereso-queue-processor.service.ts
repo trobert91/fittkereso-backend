@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { ScrapeQueueName, ScrapeTask } from "@ebike-backend/database";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { ScrapeQueueName, ScrapeTask } from '@fittkereso-backend/database';
+import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   ArukeresoDetailsPageExtractor,
   ArukeresoListPageExtractor,
   ProductDetailsPageScraperService,
   ProductListPageScraperService,
-} from "@ebike-backend/product-scraper";
+} from '@fittkereso-backend/product-scraper';
 
 @Injectable()
 export class ArukeresoQueueProcessorService {

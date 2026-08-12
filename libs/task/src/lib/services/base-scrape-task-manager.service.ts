@@ -1,14 +1,17 @@
-import { Interval } from "@nestjs/schedule";
+import { Interval } from '@nestjs/schedule';
 import {
   TaskStatus,
   ScrapeTaskRepository,
   ScrapeQueueName,
   ScrapeTask,
-} from "@ebike-backend/database";
-import { SCHEDULING_DEFAULTS, TaskConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ScrapeTaskMetricsService } from "@ebike-backend/metrics";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
+} from '@fittkereso-backend/database';
+import {
+  SCHEDULING_DEFAULTS,
+  TaskConfigService,
+} from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ScrapeTaskMetricsService } from '@fittkereso-backend/metrics';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 
 export abstract class BaseScrapeTaskManagerService {
   protected readonly logger = new CustomLogger(
@@ -93,7 +96,7 @@ export abstract class BaseScrapeTaskManagerService {
         this.taskMetricsService.recordTaskDuration(
           task.queue,
           task.source.type,
-          task.status === TaskStatus.FAILED ? "failed" : "finished",
+          task.status === TaskStatus.FAILED ? 'failed' : 'finished',
           task.executionTimeInSec,
         );
       }

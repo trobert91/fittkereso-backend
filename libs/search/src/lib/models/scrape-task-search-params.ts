@@ -2,8 +2,8 @@ import {
   ProductSourceType,
   ScrapeQueueName,
   TaskStatus,
-} from "@ebike-backend/database";
-import { IsEnum, IsInt, IsOptional, Min } from "class-validator";
+} from '@fittkereso-backend/database';
+import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
 
 export class ScrapeTaskSearchParams {
   @IsOptional()
@@ -30,28 +30,28 @@ export class ScrapeTaskSearchParams {
 
   @IsOptional()
   @IsEnum([
-    "queue",
-    "status",
-    "attempts",
-    "scheduledAt",
-    "lastRunAt",
-    "lockedAt",
-    "executionTimeInSec",
-    "createdAt",
-    "updatedAt",
+    'queue',
+    'status',
+    'attempts',
+    'scheduledAt',
+    'lastRunAt',
+    'lockedAt',
+    'executionTimeInSec',
+    'createdAt',
+    'updatedAt',
   ])
   sort?:
-    | "queue"
-    | "status"
-    | "attempts"
-    | "scheduledAt"
-    | "lastRunAt"
-    | "lockedAt"
-    | "executionTimeInSec"
-    | "createdAt"
-    | "updatedAt";
+    | 'queue'
+    | 'status'
+    | 'attempts'
+    | 'scheduledAt'
+    | 'lastRunAt'
+    | 'lockedAt'
+    | 'executionTimeInSec'
+    | 'createdAt'
+    | 'updatedAt';
 
   @IsOptional()
-  @IsEnum(["ASC", "DESC"])
-  order?: "ASC" | "DESC";
+  @IsEnum(['ASC', 'DESC'])
+  order?: 'ASC' | 'DESC';
 }

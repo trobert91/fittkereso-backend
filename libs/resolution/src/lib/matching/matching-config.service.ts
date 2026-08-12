@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { RESOLUTION_DEFAULTS } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
 
 /**
  * Threshold + weight knobs the matcher and quality gates consult.
@@ -13,7 +13,7 @@ export interface MatchingConfig {
   acceptThreshold: number;
   acceptThresholdStrict: number;
   ambiguityGap: number;
-  defaultStrictness: "strict" | "moderate" | "loose";
+  defaultStrictness: 'strict' | 'moderate' | 'loose';
   defaultNumericTokenWeight: number;
   ambiguityGapAnchored: number;
 }
@@ -31,13 +31,13 @@ export class MatchingConfigService {
         overrides?.acceptThresholdStrict ?? defaults.acceptThresholdStrict,
       ambiguityGap: overrides?.ambiguityGap ?? defaults.ambiguityGap,
       defaultStrictness: (overrides?.defaultStrictness ??
-        defaults.defaultStrictness) as "strict" | "moderate" | "loose",
+        defaults.defaultStrictness) as 'strict' | 'moderate' | 'loose',
       defaultNumericTokenWeight:
         overrides?.defaultNumericTokenWeight ??
         defaults.defaultNumericTokenWeight,
       ambiguityGapAnchored:
         (overrides as Record<string, number> | undefined)?.[
-          "ambiguityGapAnchored"
+          'ambiguityGapAnchored'
         ] ?? 10,
     };
   }

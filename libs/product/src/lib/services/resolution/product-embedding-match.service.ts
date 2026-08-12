@@ -1,16 +1,16 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   EvaluatedProduct,
   ProductModel,
   ProductModelRepository,
   ProductResolutionInput,
-} from "@ebike-backend/database";
-import { CustomLogger } from "@ebike-backend/logger";
-import { nameOf } from "@ebike-backend/utils";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { RESOLUTION_DEFAULTS } from "@ebike-backend/config";
-import { In } from "typeorm";
-import { ProductEmbeddingService } from "../product-embedding.service";
+} from '@fittkereso-backend/database';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { nameOf } from '@fittkereso-backend/utils';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
+import { In } from 'typeorm';
+import { ProductEmbeddingService } from '../product-embedding.service';
 
 @Injectable()
 export class ProductEmbeddingMatchService {
@@ -67,28 +67,28 @@ export class ProductEmbeddingMatchService {
       similarity: number;
     }[]
   > {
-    const embeddingLiteral = `[${embedding.join(",")}]`;
+    const embeddingLiteral = `[${embedding.join(',')}]`;
 
     // Phase 1: Get product IDs and similarity scores (no one-to-many joins)
     const qb = this.productModelRepo.repo
-      .createQueryBuilder("pm")
-      .innerJoin(`pm.${nameOf<ProductModel>("embedding")}`, "e")
-      .select(`pm.${nameOf<ProductModel>("id")}`, "product_id")
-      .addSelect("1 - (e.embedding <=> :embeddingQuery)", "similarity")
-      .where("1 - (e.embedding <=> :embeddingQuery) > :threshold")
-      .orderBy("similarity", "DESC")
+      .createQueryBuilder('pm')
+      .innerJoin(`pm.${nameOf<ProductModel>('embedding')}`, 'e')
+      .select(`pm.${nameOf<ProductModel>('id')}`, 'product_id')
+      .addSelect('1 - (e.embedding <=> :embeddingQuery)', 'similarity')
+      .where('1 - (e.embedding <=> :embeddingQuery) > :threshold')
+      .orderBy('similarity', 'DESC')
       .limit(limit)
-      .setParameter("embeddingQuery", embeddingLiteral)
-      .setParameter("threshold", this.similarityThreshold);
+      .setParameter('embeddingQuery', embeddingLiteral)
+      .setParameter('threshold', this.similarityThreshold);
 
     if (categoryIds?.length) {
-      qb.andWhere("pm.productCategoryId IN (:...categoryIds)", {
+      qb.andWhere('pm.productCategoryId IN (:...categoryIds)', {
         categoryIds,
       });
     }
 
     if (brandIds?.length) {
-      qb.andWhere("pm.brandId IN (:...brandIds)", {
+      qb.andWhere('pm.brandId IN (:...brandIds)', {
         brandIds,
       });
     }
@@ -113,9 +113,9 @@ export class ProductEmbeddingMatchService {
     const entities = await this.productModelRepo.repo.find({
       where: { id: In(productIds) },
       relations: [
-        nameOf<ProductModel>("brand"),
-        nameOf<ProductModel>("productCategory"),
-        nameOf<ProductModel>("aliases"),
+        nameOf<ProductModel>('brand'),
+        nameOf<ProductModel>('productCategory'),
+        nameOf<ProductModel>('aliases'),
       ],
     });
 
@@ -143,7 +143,7 @@ export class ProductEmbeddingMatchService {
       specs: candidate.entity.specs,
       aliases: candidate.entity.aliases?.map((alias) => alias.alias),
       releaseYear: candidate.entity.releaseYear,
-      source: "embedding",
+      source: 'embedding',
     };
   }
 

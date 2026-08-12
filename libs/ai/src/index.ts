@@ -1,5 +1,5 @@
-export * from "./lib/ai.module";
-export * from "./lib/services";
+export * from './lib/ai.module';
+export * from './lib/services';
 
 // Re-export the shared core surface so callers only need one import.
-export * from "@ebike-backend/ai-core";
+export * from '@fittkereso-backend/ai-core';

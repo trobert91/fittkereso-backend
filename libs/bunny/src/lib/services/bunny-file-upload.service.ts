@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import { firstValueFrom } from "rxjs";
-import { BunnyUploadedFile } from "../models";
-import * as fs from "fs";
-import { BunnyConfigService } from "@ebike-backend/config";
-import { compact } from "lodash";
-import { HttpService } from "@nestjs/axios";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
+import { BunnyUploadedFile } from '../models';
+import * as fs from 'fs';
+import { BunnyConfigService } from '@fittkereso-backend/config';
+import { compact } from 'lodash';
+import { HttpService } from '@nestjs/axios';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class BunnyFileUploadService {
@@ -22,7 +22,7 @@ export class BunnyFileUploadService {
     file: Buffer | fs.ReadStream | string,
   ): Promise<BunnyUploadedFile> {
     let data: fs.ReadStream | Buffer;
-    if (typeof file === "string") {
+    if (typeof file === 'string') {
       data = fs.createReadStream(file);
     } else {
       data = file;
@@ -30,16 +30,16 @@ export class BunnyFileUploadService {
 
     const url = this.bunnyConfig.url;
 
-    let urlPath = "";
+    let urlPath = '';
     try {
-      urlPath = compact([path, fileName]).join("/");
+      urlPath = compact([path, fileName]).join('/');
 
       await firstValueFrom(
         this.httpService.put(urlPath, data, {
           baseURL: url,
           headers: {
             AccessKey: this.bunnyConfig.apiKey,
-            "Content-Type": "application/octet-stream",
+            'Content-Type': 'application/octet-stream',
           },
           maxBodyLength: Infinity,
         }),
@@ -62,16 +62,16 @@ export class BunnyFileUploadService {
   public async deleteFile(path: string, fileName: string): Promise<void> {
     const url = this.bunnyConfig.url;
 
-    let urlPath = "";
+    let urlPath = '';
     try {
-      urlPath = compact([path, fileName]).join("/");
+      urlPath = compact([path, fileName]).join('/');
 
       await firstValueFrom(
         this.httpService.delete(urlPath, {
           baseURL: url,
           headers: {
             AccessKey: this.bunnyConfig.apiKey,
-            "Content-Type": "application/octet-stream",
+            'Content-Type': 'application/octet-stream',
           },
         }),
       );

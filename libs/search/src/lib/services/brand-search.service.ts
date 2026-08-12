@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
-import { Brand, BrandRepository } from "@ebike-backend/database";
-import { SelectQueryBuilder } from "typeorm";
-import { isEmpty } from "lodash";
-import { nameOf } from "@ebike-backend/utils";
-import { BrandSearchParams } from "../models/brand-search-params";
-import { BrandSearchResult } from "../models/brand-search-result";
+import { Injectable } from '@nestjs/common';
+import { Brand, BrandRepository } from '@fittkereso-backend/database';
+import { SelectQueryBuilder } from 'typeorm';
+import { isEmpty } from 'lodash';
+import { nameOf } from '@fittkereso-backend/utils';
+import { BrandSearchParams } from '../models/brand-search-params';
+import { BrandSearchResult } from '../models/brand-search-result';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -15,8 +15,8 @@ export class BrandSearchService {
   public async search(params: BrandSearchParams): Promise<BrandSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? "name",
-      order: params.order ?? "ASC",
+      sort: params.sort ?? 'name',
+      order: params.order ?? 'ASC',
     };
 
     const query = this.buildQuery(finalParams);
@@ -28,14 +28,14 @@ export class BrandSearchService {
   }
 
   private buildQuery(params: BrandSearchParams): SelectQueryBuilder<Brand> {
-    let query = this.repo.repo.createQueryBuilder("brand");
+    let query = this.repo.repo.createQueryBuilder('brand');
 
     // --- Text search ---
     if (params.searchTerm && !isEmpty(params.searchTerm?.trim())) {
       const term = params.searchTerm.trim().toLowerCase();
 
       query = query.andWhere(
-        `LOWER(brand.${nameOf<Brand>("name")}) LIKE :term`,
+        `LOWER(brand.${nameOf<Brand>('name')}) LIKE :term`,
         { term: `%${term}%` },
       );
     }

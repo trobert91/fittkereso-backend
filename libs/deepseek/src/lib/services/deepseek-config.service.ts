@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { DEEPSEEK_DEFAULTS } from "@ebike-backend/config";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { ModelPricing } from "@ebike-backend/ai-core";
+import { Injectable } from '@nestjs/common';
+import { DEEPSEEK_DEFAULTS } from '@fittkereso-backend/config';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { ModelPricing } from '@fittkereso-backend/ai-core';
 
 @Injectable()
 export class DeepSeekConfigService {

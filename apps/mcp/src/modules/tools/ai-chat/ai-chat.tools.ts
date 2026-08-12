@@ -1,27 +1,27 @@
-import { Injectable } from "@nestjs/common";
-import { Tool } from "@rekog/mcp-nest";
-import { z } from "zod";
-import { AiChatRequest, AiChatService } from "@ebike-backend/ai";
+import { Injectable } from '@nestjs/common';
+import { Tool } from '@rekog/mcp-nest';
+import { z } from 'zod';
+import { AiChatRequest, AiChatService } from '@fittkereso-backend/ai';
 
 @Injectable()
 export class AiChatTools {
   constructor(private readonly aiChatService: AiChatService) {}
 
   @Tool({
-    name: "test_ai_chat",
+    name: 'test_ai_chat',
     description:
       "Run a one-shot AI chat against the production AiChatService for prompt testing. Returns the model's response plus cost, token usage, execution time, and the chatId for follow-up log inspection. Use this when drafting or tuning a prompt to see how a specific model will behave before wiring it into the pipeline. Note: gpt-5* models do not support temperature — the tool forces temperature=1 for those models regardless of what is passed in, matching pipeline behavior.",
     parameters: z.object({
       messages: z
         .array(
           z.object({
-            role: z.enum(["system", "user", "assistant"]),
+            role: z.enum(['system', 'user', 'assistant']),
             content: z.string(),
           }),
         )
         .min(1)
         .describe(
-          "Chat messages in order. Typically starts with a system message followed by user/assistant turns.",
+          'Chat messages in order. Typically starts with a system message followed by user/assistant turns.',
         ),
       model: z
         .string()
@@ -34,25 +34,25 @@ export class AiChatTools {
         .max(2)
         .optional()
         .describe(
-          "Sampling temperature. Ignored for gpt-5* models — the tool forces 1.",
+          'Sampling temperature. Ignored for gpt-5* models — the tool forces 1.',
         ),
       maxTokens: z
         .number()
         .int()
         .positive()
         .optional()
-        .describe("Maximum output tokens."),
+        .describe('Maximum output tokens.'),
       schema: z
         .record(z.string(), z.any())
         .optional()
         .describe(
-          "JSON Schema (OpenAI dialect) for structured output. When provided, the response includes a validated parsed object.",
+          'JSON Schema (OpenAI dialect) for structured output. When provided, the response includes a validated parsed object.',
         ),
       schemaName: z
         .string()
         .optional()
         .describe(
-          "Optional name for the JSON schema (used by some providers).",
+          'Optional name for the JSON schema (used by some providers).',
         ),
       costLabel: z
         .string()
@@ -64,7 +64,7 @@ export class AiChatTools {
     annotations: { readOnlyHint: false, destructiveHint: false },
   })
   async testAiChat(args: {
-    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
     model: string;
     temperature?: number;
     maxTokens?: number;
@@ -72,7 +72,7 @@ export class AiChatTools {
     schemaName?: string;
     costLabel?: string;
   }): Promise<string> {
-    const isGpt5 = args.model.startsWith("gpt-5");
+    const isGpt5 = args.model.startsWith('gpt-5');
     const temperature = isGpt5 ? 1 : args.temperature;
 
     const request: AiChatRequest = {
@@ -82,7 +82,7 @@ export class AiChatTools {
       ...(args.maxTokens !== undefined && { maxTokens: args.maxTokens }),
       ...(args.schema !== undefined && { schema: args.schema }),
       ...(args.schemaName !== undefined && { schemaName: args.schemaName }),
-      costLabel: args.costLabel ?? "mcp-test",
+      costLabel: args.costLabel ?? 'mcp-test',
     };
 
     try {
@@ -95,7 +95,7 @@ export class AiChatTools {
   }
 
   private formatResponse(
-    response: Awaited<ReturnType<AiChatService["createChat"]>>,
+    response: Awaited<ReturnType<AiChatService['createChat']>>,
     gpt5TemperatureOverridden: boolean,
     userSuppliedTemperature: number | undefined,
   ): string {
@@ -121,18 +121,18 @@ export class AiChatTools {
         `- **note**: temperature=${userSuppliedTemperature} was overridden to 1 (gpt-5* models do not accept custom temperatures).`,
       );
     }
-    L.push("");
+    L.push('');
 
     if (response.parsed !== undefined) {
-      L.push("## Parsed (schema-validated)");
-      L.push("```json");
+      L.push('## Parsed (schema-validated)');
+      L.push('```json');
       L.push(JSON.stringify(response.parsed, null, 2));
-      L.push("```");
+      L.push('```');
     } else {
-      L.push("## Content");
+      L.push('## Content');
       L.push(response.content);
     }
 
-    return L.join("\n");
+    return L.join('\n');
   }
 }

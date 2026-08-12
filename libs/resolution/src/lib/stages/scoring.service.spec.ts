@@ -1,25 +1,25 @@
-import type { CategoryConfigService } from "@ebike-backend/config";
+import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   EvaluatedProduct,
   MatchResult,
   ProductSpecs,
-} from "@ebike-backend/database";
-import { ScoringService } from "./scoring.service";
-import { CandidateScoringService } from "../matching/candidate-scoring.service";
-import { InputNormalizationService } from "../matching/input-normalization.service";
-import { QualityGatesService } from "../matching/quality-gates.service";
+} from '@fittkereso-backend/database';
+import { ScoringService } from './scoring.service';
+import { CandidateScoringService } from '../matching/candidate-scoring.service';
+import { InputNormalizationService } from '../matching/input-normalization.service';
+import { QualityGatesService } from '../matching/quality-gates.service';
 import {
   MatchingConfig,
   MatchingConfigService,
-} from "../matching/matching-config.service";
-import { makeTestContext } from "../testing/make-context";
-import type { SlimCandidate } from "../models/slim-types";
+} from '../matching/matching-config.service';
+import { makeTestContext } from '../testing/make-context';
+import type { SlimCandidate } from '../models/slim-types';
 
 const MATCHING_CONFIG: MatchingConfig = {
   acceptThreshold: 55,
   acceptThresholdStrict: 70,
   ambiguityGap: 5,
-  defaultStrictness: "moderate",
+  defaultStrictness: 'moderate',
   defaultNumericTokenWeight: 2.5,
   ambiguityGapAnchored: 10,
 };
@@ -27,10 +27,10 @@ const MATCHING_CONFIG: MatchingConfig = {
 function slim(id: string, model: string): SlimCandidate {
   return {
     productId: id,
-    source: "fuzzy",
-    brand: "Samsung",
+    source: 'fuzzy',
+    brand: 'Samsung',
     model,
-    productCategory: { id: "c-monitors", name: "Monitor", slug: "monitors" },
+    productCategory: { id: 'c-monitors', name: 'Monitor', slug: 'monitors' },
   };
 }
 
@@ -66,8 +66,8 @@ function makeInputNormalization(): InputNormalizationService {
 const NO_SPECS: ProductSpecs = {};
 void NO_SPECS;
 
-describe("ScoringService", () => {
-  it("writes empty scoring snapshot when no candidates", () => {
+describe('ScoringService', () => {
+  it('writes empty scoring snapshot when no candidates', () => {
     const service = new ScoringService(
       makeCandidateScoring(() => []),
       makeQualityGates(true),
@@ -80,11 +80,11 @@ describe("ScoringService", () => {
     expect(context.scoring).toEqual({ failedGates: [] });
   });
 
-  it("annotates each candidate with matchScore + matchComponents and sorts by score desc", () => {
+  it('annotates each candidate with matchScore + matchComponents and sorts by score desc', () => {
     const scoring = makeCandidateScoring(() => [
       {
-        candidateId: "p1",
-        alias: "g85sd",
+        candidateId: 'p1',
+        alias: 'g85sd',
         score: 70,
         components: {
           stringSimilarity: 0.7,
@@ -95,8 +95,8 @@ describe("ScoringService", () => {
         },
       } as MatchResult,
       {
-        candidateId: "p2",
-        alias: "mpg341cqpx",
+        candidateId: 'p2',
+        alias: 'mpg341cqpx',
         score: 92,
         components: {
           stringSimilarity: 0.9,
@@ -114,23 +114,23 @@ describe("ScoringService", () => {
     );
 
     const context = makeTestContext({
-      input: { brand: "Samsung", model: "G85SD" },
-      candidates: [slim("p1", "G85SD"), slim("p2", "MPG341CQPX")],
+      input: { brand: 'Samsung', model: 'G85SD' },
+      candidates: [slim('p1', 'G85SD'), slim('p2', 'MPG341CQPX')],
     });
     service.score(context);
 
-    expect(context.candidates.map((c) => c.productId)).toEqual(["p2", "p1"]);
+    expect(context.candidates.map((c) => c.productId)).toEqual(['p2', 'p1']);
     expect(context.candidates[0].matchScore).toBe(92);
     expect(context.candidates[1].matchScore).toBe(70);
-    expect(context.scoring?.bestCandidate?.candidateId).toBe("p2");
+    expect(context.scoring?.bestCandidate?.candidateId).toBe('p2');
     expect(context.scoring?.secondScore).toBe(70);
   });
 
-  it("uses evaluateAnchored when a reference product is set", () => {
+  it('uses evaluateAnchored when a reference product is set', () => {
     const scoring = makeCandidateScoring(() => [
       {
-        candidateId: "p1",
-        alias: "g85sd",
+        candidateId: 'p1',
+        alias: 'g85sd',
         score: 80,
         components: {
           stringSimilarity: 0.9,
@@ -149,16 +149,16 @@ describe("ScoringService", () => {
     );
 
     const context = makeTestContext({
-      input: { brand: "Samsung", model: "G85SD" },
-      candidates: [slim("p1", "G85SD")],
+      input: { brand: 'Samsung', model: 'G85SD' },
+      candidates: [slim('p1', 'G85SD')],
       referenceProduct: {
-        productId: "ref",
-        brand: "Samsung",
-        model: "S95D",
+        productId: 'ref',
+        brand: 'Samsung',
+        model: 'S95D',
         productCategory: {
-          id: "c-monitors",
-          name: "Monitor",
-          slug: "monitors",
+          id: 'c-monitors',
+          name: 'Monitor',
+          slug: 'monitors',
         },
         specs: {},
       },
@@ -169,11 +169,11 @@ describe("ScoringService", () => {
     expect(qualityGates.evaluate).not.toHaveBeenCalled();
   });
 
-  it("records failedGates from the quality gate result", () => {
+  it('records failedGates from the quality gate result', () => {
     const scoring = makeCandidateScoring(() => [
       {
-        candidateId: "p1",
-        alias: "g85sd",
+        candidateId: 'p1',
+        alias: 'g85sd',
         score: 40,
         components: {
           stringSimilarity: 0.4,
@@ -186,21 +186,21 @@ describe("ScoringService", () => {
     ]);
     const service = new ScoringService(
       scoring,
-      makeQualityGates(false, ["low_confidence"]),
+      makeQualityGates(false, ['low_confidence']),
       makeInputNormalization(),
     );
 
     const context = makeTestContext({
-      input: { brand: "Samsung", model: "G85SD" },
-      candidates: [slim("p1", "G85SD")],
+      input: { brand: 'Samsung', model: 'G85SD' },
+      candidates: [slim('p1', 'G85SD')],
     });
     service.score(context);
 
-    expect(context.scoring?.failedGates).toEqual(["low_confidence"]);
+    expect(context.scoring?.failedGates).toEqual(['low_confidence']);
   });
 
-  describe("matcher query model fallback (reference-variant search)", () => {
-    it("falls back to input.referenceModel when input.model is empty", () => {
+  describe('matcher query model fallback (reference-variant search)', () => {
+    it('falls back to input.referenceModel when input.model is empty', () => {
       const scoring = makeCandidateScoring(() => []);
       const service = new ScoringService(
         scoring,
@@ -210,20 +210,20 @@ describe("ScoringService", () => {
 
       const context = makeTestContext({
         input: {
-          brand: "LG",
-          model: "",
-          referenceModel: "UltraGear 34GS95QE",
-          specs: [{ name: "screenSize", value: '39"' }],
+          brand: 'LG',
+          model: '',
+          referenceModel: 'UltraGear 34GS95QE',
+          specs: [{ name: 'screenSize', value: '39"' }],
         },
-        candidates: [slim("p1", "UltraGear 39GS95QE-B")],
+        candidates: [slim('p1', 'UltraGear 39GS95QE-B')],
       });
       service.score(context);
 
       const callArgs = (scoring.scoreAllCandidates as jest.Mock).mock.calls[0];
-      expect(callArgs[0].model).toBe("UltraGear 34GS95QE");
+      expect(callArgs[0].model).toBe('UltraGear 34GS95QE');
     });
 
-    it("falls back to referenceProduct.model when input.model and referenceModel are both empty", () => {
+    it('falls back to referenceProduct.model when input.model and referenceModel are both empty', () => {
       const scoring = makeCandidateScoring(() => []);
       const service = new ScoringService(
         scoring,
@@ -232,16 +232,16 @@ describe("ScoringService", () => {
       );
 
       const context = makeTestContext({
-        input: { brand: "LG", model: "" },
-        candidates: [slim("p1", "39GS95QE")],
+        input: { brand: 'LG', model: '' },
+        candidates: [slim('p1', '39GS95QE')],
         referenceProduct: {
-          productId: "ref-1",
-          brand: "LG",
-          model: "UltraGear 34GS95QE",
+          productId: 'ref-1',
+          brand: 'LG',
+          model: 'UltraGear 34GS95QE',
           productCategory: {
-            id: "c-monitors",
-            name: "Monitor",
-            slug: "monitors",
+            id: 'c-monitors',
+            name: 'Monitor',
+            slug: 'monitors',
           },
           specs: {},
         },
@@ -249,10 +249,10 @@ describe("ScoringService", () => {
       service.score(context);
 
       const callArgs = (scoring.scoreAllCandidates as jest.Mock).mock.calls[0];
-      expect(callArgs[0].model).toBe("UltraGear 34GS95QE");
+      expect(callArgs[0].model).toBe('UltraGear 34GS95QE');
     });
 
-    it("prefers input.model when present, even with a reference set", () => {
+    it('prefers input.model when present, even with a reference set', () => {
       const scoring = makeCandidateScoring(() => []);
       const service = new ScoringService(
         scoring,
@@ -262,19 +262,19 @@ describe("ScoringService", () => {
 
       const context = makeTestContext({
         input: {
-          brand: "LG",
-          model: "39GS95QE",
-          referenceModel: "UltraGear 34GS95QE",
+          brand: 'LG',
+          model: '39GS95QE',
+          referenceModel: 'UltraGear 34GS95QE',
         },
-        candidates: [slim("p1", "UltraGear 39GS95QE-B")],
+        candidates: [slim('p1', 'UltraGear 39GS95QE-B')],
         referenceProduct: {
-          productId: "ref-1",
-          brand: "LG",
-          model: "UltraGear 34GS95QE",
+          productId: 'ref-1',
+          brand: 'LG',
+          model: 'UltraGear 34GS95QE',
           productCategory: {
-            id: "c-monitors",
-            name: "Monitor",
-            slug: "monitors",
+            id: 'c-monitors',
+            name: 'Monitor',
+            slug: 'monitors',
           },
           specs: {},
         },
@@ -282,10 +282,10 @@ describe("ScoringService", () => {
       service.score(context);
 
       const callArgs = (scoring.scoreAllCandidates as jest.Mock).mock.calls[0];
-      expect(callArgs[0].model).toBe("39GS95QE");
+      expect(callArgs[0].model).toBe('39GS95QE');
     });
 
-    it("falls through to input.displayName when no other model source is available", () => {
+    it('falls through to input.displayName when no other model source is available', () => {
       const scoring = makeCandidateScoring(() => []);
       const service = new ScoringService(
         scoring,
@@ -294,13 +294,13 @@ describe("ScoringService", () => {
       );
 
       const context = makeTestContext({
-        input: { brand: "LG", model: "", displayName: "LG OLED" },
-        candidates: [slim("p1", "UltraGear 39GS95QE-B")],
+        input: { brand: 'LG', model: '', displayName: 'LG OLED' },
+        candidates: [slim('p1', 'UltraGear 39GS95QE-B')],
       });
       service.score(context);
 
       const callArgs = (scoring.scoreAllCandidates as jest.Mock).mock.calls[0];
-      expect(callArgs[0].model).toBe("LG OLED");
+      expect(callArgs[0].model).toBe('LG OLED');
     });
   });
 });

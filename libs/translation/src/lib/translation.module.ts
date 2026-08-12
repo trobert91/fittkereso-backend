@@ -1,9 +1,9 @@
-import { Module } from "@nestjs/common";
-import { DatabaseModule } from "@ebike-backend/database";
-import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
-import { MetricsModule } from "@ebike-backend/metrics";
-import { AiModule } from "@ebike-backend/ai";
-import { TranslationService } from "./services/translation.service";
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from '@fittkereso-backend/database';
+import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
+import { MetricsModule } from '@fittkereso-backend/metrics';
+import { AiModule } from '@fittkereso-backend/ai';
+import { TranslationService } from './services/translation.service';
 
 @Module({
   imports: [DatabaseModule, DynamicConfigModule, MetricsModule, AiModule],

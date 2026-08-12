@@ -1,6 +1,6 @@
 # Database Export Scripts
 
-This directory contains SQL scripts for exporting configuration data from the ebike backend database.
+This directory contains SQL scripts for exporting configuration data from the fittkereso backend database.
 
 ## Available Scripts
 
@@ -12,7 +12,7 @@ This directory contains SQL scripts for exporting configuration data from the eb
 
 ```bash
 # Export to file
-psql -d ebike -f scripts/export-config-data.sql > exported-data.sql
+psql -d fittkereso -f scripts/export-config-data.sql > exported-data.sql
 
 # Import into target database
 psql -d target_database -f exported-data.sql
@@ -47,10 +47,10 @@ ON CONFLICT (id) DO UPDATE SET ...;
 
 ```bash
 # View in terminal (recommended)
-psql -d ebike -f scripts/export-config-only.sql
+psql -d fittkereso -f scripts/export-config-only.sql
 
 # Export to file
-psql -d ebike -f scripts/export-config-only.sql > config-review.sql
+psql -d fittkereso -f scripts/export-config-only.sql > config-review.sql
 ```
 
 **Features:**
@@ -90,41 +90,41 @@ WHERE id = 'uuid-here';
 
 ```bash
 # Create timestamped backup
-psql -d ebike -f scripts/export-config-data.sql > backups/config-$(date +%Y%m%d).sql
+psql -d fittkereso -f scripts/export-config-data.sql > backups/config-$(date +%Y%m%d).sql
 ```
 
 ### 2. Review Current Configuration
 
 ```bash
 # View readable config in terminal
-psql -d ebike -f scripts/export-config-only.sql | less
+psql -d fittkereso -f scripts/export-config-only.sql | less
 ```
 
 ### 3. Seed Development Database
 
 ```bash
 # Export from production
-psql -d ebike_prod -f scripts/export-config-data.sql > prod-config.sql
+psql -d fittkereso_prod -f scripts/export-config-data.sql > prod-config.sql
 
 # Import to dev
-psql -d ebike_dev -f prod-config.sql
+psql -d fittkereso_dev -f prod-config.sql
 ```
 
 ### 4. Migrate Configuration to New Environment
 
 ```bash
 # Export
-psql -h prod-db.example.com -U user -d ebike -f scripts/export-config-data.sql > config.sql
+psql -h prod-db.example.com -U user -d fittkereso -f scripts/export-config-data.sql > config.sql
 
 # Import
-psql -h staging-db.example.com -U user -d ebike -f config.sql
+psql -h staging-db.example.com -U user -d fittkereso -f config.sql
 ```
 
 ### 5. Extract Category Config for Documentation
 
 ```bash
 # Export monitors config to file
-psql -d ebike -c "
+psql -d fittkereso -c "
   SELECT jsonb_pretty(config)
   FROM product_category
   WHERE name = 'monitors' AND deleted_at IS NULL
@@ -230,8 +230,8 @@ CREATE TABLE product_category (
 
 ```bash
 # Ensure you have read permissions
-psql -d ebike -c "SELECT COUNT(*) FROM dynamic_config;"
-psql -d ebike -c "SELECT COUNT(*) FROM product_category;"
+psql -d fittkereso -c "SELECT COUNT(*) FROM dynamic_config;"
+psql -d fittkereso -c "SELECT COUNT(*) FROM product_category;"
 ```
 
 ### Issue: JSONB Formatting Errors
@@ -240,7 +240,7 @@ If the exported JSONB doesn't import correctly:
 
 ```bash
 # Validate JSON before import
-psql -d ebike -c "SELECT jsonb_pretty(config) FROM product_category WHERE name = 'monitors';"
+psql -d fittkereso -c "SELECT jsonb_pretty(config) FROM product_category WHERE name = 'monitors';"
 ```
 
 ### Issue: Foreign Key Violations During Import

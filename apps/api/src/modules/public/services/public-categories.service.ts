@@ -1,37 +1,33 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   Brand,
   ProductCategory,
   ProductCategoryRepository,
   ProductModelRepository,
   ProductModel,
-  ProductRating,
-  ProductLabelSummary,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
 import type {
   FilterBucket,
   FilterSpecConfig,
   ProductCategoryConfig,
   SpecDefinitionJsonSchema,
-} from "@ebike-backend/database";
-import { CategoryConfigService } from "@ebike-backend/config";
-import { isEmpty, sumBy } from "lodash";
+} from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { sumBy } from 'lodash';
 import {
   CategoryListDto,
   CategoryDetailDto,
   FilterConfigDto,
   FilterFieldDto,
   FilterOptionDto,
-  NumericRangeDto,
-} from "../dto/category.dto";
-import { ProductListDto } from "../dto/product-list.dto";
-import { BrandDto } from "../dto/brand.dto";
-import { MainImageDto } from "../dto/main-image.dto";
-import { ProductRatingDto } from "../dto/product-rating.dto";
-import { PaginatedProductResult } from "../dto/paginated-result.dto";
-import { ProductQueryDto, SortBy } from "../dto/product-query.dto";
-import { ProductImageDtoService } from "@ebike-backend/product";
+} from '../dto/category.dto';
+import { ProductListDto } from '../dto/product-list.dto';
+import { BrandDto } from '../dto/brand.dto';
+import { MainImageDto } from '../dto/main-image.dto';
+import { PaginatedProductResult } from '../dto/paginated-result.dto';
+import { ProductQueryDto, SortBy } from '../dto/product-query.dto';
+import { ProductImageDtoService } from '@fittkereso-backend/product';
 
 interface FilterWhereSql {
   conditions: string[];
@@ -50,7 +46,7 @@ export class PublicCategoriesService {
   async getCategories(): Promise<CategoryListDto[]> {
     const categories = await this.categoryRepo.find({
       where: { enabled: true },
-      order: { name: "ASC" },
+      order: { name: 'ASC' },
     });
 
     return categories
@@ -89,35 +85,7 @@ export class PublicCategoriesService {
     dto.uiSchema = categorySlug
       ? this.categoryConfigService.getUiSchema(categorySlug)
       : undefined;
-    const configuredUseCases = config?.useCases?.map(
-      (useCase) => useCase.label,
-    );
-    if (!isEmpty(configuredUseCases)) {
-      const usedUseCases = await this.findUseCasesWithRatings(category.id);
-      dto.useCases = configuredUseCases.filter((label) =>
-        usedUseCases.has(label),
-      );
-    }
     return dto;
-  }
-
-  private async findUseCasesWithRatings(
-    categoryId: string,
-  ): Promise<Set<string>> {
-    const rows: { key: string }[] = await this.productModelRepo.repo.query(
-      `SELECT DISTINCT key
-       FROM product_model product
-       INNER JOIN product_rating rating ON rating."modelId" = product.id,
-            LATERAL jsonb_each(rating."useCaseScores") AS entry(key, value)
-       WHERE product."productCategoryId" = $1
-         AND product.enabled = true
-         AND rating."useCaseScores" IS NOT NULL
-         AND jsonb_typeof(rating."useCaseScores") = 'object'
-         AND entry.value IS NOT NULL
-         AND jsonb_typeof(entry.value) = 'number'`,
-      [categoryId],
-    );
-    return new Set(rows.map((row) => row.key));
   }
 
   async getFilterConfig(
@@ -150,15 +118,14 @@ export class PublicCategoriesService {
       const schema = dto.jsonSchema;
       if (schema?.properties && config) {
         const filterSpecs = this.resolveFilterSpecs(schema, config);
-        const [aggregations, brands, scoreAndTotal] = await Promise.all([
+        const [aggregations, brands, totalProducts] = await Promise.all([
           this.aggregateFilterFields(category.id, schema, filterSpecs),
           this.aggregateBrands(category.id),
-          this.aggregateScoreAndTotal(category.id),
+          this.aggregateTotalProducts(category.id),
         ]);
         dto.aggregations = aggregations;
         dto.brands = brands;
-        dto.scoreRange = scoreAndTotal.scoreRange;
-        dto.totalProducts = scoreAndTotal.totalProducts;
+        dto.totalProducts = totalProducts;
       }
     }
 
@@ -176,8 +143,7 @@ export class PublicCategoriesService {
       brand,
       specs,
       sortBy,
-      sortDir = "desc",
-      sortUseCase,
+      sortDir = 'desc',
     } = query;
 
     const category = await this.categoryRepo.findOne({
@@ -194,32 +160,31 @@ export class PublicCategoriesService {
     const arraySpecKeys = this.getArraySpecKeys(jsonSchema);
 
     const qb = this.productModelRepo.repo
-      .createQueryBuilder("product")
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("brand")}`, "brand")
+      .createQueryBuilder('product')
+      .leftJoinAndSelect(`product.${nameOf<ProductModel>('brand')}`, 'brand')
       .leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("mainImage")}`,
-        "mainImage",
+        `product.${nameOf<ProductModel>('mainImage')}`,
+        'mainImage',
       )
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("rating")}`, "rating")
       .leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `product.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
-      .where(`category.${nameOf<ProductCategory>("slug")} = :slug`, { slug })
-      .andWhere(`product.${nameOf<ProductModel>("enabled")} = :enabled`, {
+      .where(`category.${nameOf<ProductCategory>('slug')} = :slug`, { slug })
+      .andWhere(`product.${nameOf<ProductModel>('enabled')} = :enabled`, {
         enabled: true,
       });
 
     if (brand) {
-      const brandSlugs = brand.split(",").map((b) => b.trim());
-      qb.andWhere(`brand.${nameOf<Brand>("slug")} IN (:...brandSlugs)`, {
+      const brandSlugs = brand.split(',').map((b) => b.trim());
+      qb.andWhere(`brand.${nameOf<Brand>('slug')} IN (:...brandSlugs)`, {
         brandSlugs,
       });
     }
 
     if (name) {
       qb.andWhere(
-        `(product."${nameOf<ProductModel>("displayName")}" ILIKE :namePattern OR brand.${nameOf<Brand>("name")} ILIKE :namePattern)`,
+        `(product."${nameOf<ProductModel>('displayName')}" ILIKE :namePattern OR brand.${nameOf<Brand>('name')} ILIKE :namePattern)`,
         { namePattern: `%${name}%` },
       );
     }
@@ -227,7 +192,7 @@ export class PublicCategoriesService {
     if (specs) {
       let specIdx = 0;
       for (const [key, value] of Object.entries(specs)) {
-        if (typeof value === "object" && value !== null) {
+        if (typeof value === 'object' && value !== null) {
           if (value.min !== undefined) {
             qb.andWhere(
               `(product.specs->>:specKey${specIdx})::numeric >= :specMin${specIdx}`,
@@ -246,19 +211,19 @@ export class PublicCategoriesService {
               },
             );
           }
-        } else if (typeof value === "string") {
-          if (value === "true" || value === "false") {
+        } else if (typeof value === 'string') {
+          if (value === 'true' || value === 'false') {
             qb.andWhere(
               `(product.specs->>:specKey${specIdx})::boolean = :specVal${specIdx}`,
               {
                 [`specKey${specIdx}`]: key,
-                [`specVal${specIdx}`]: value === "true",
+                [`specVal${specIdx}`]: value === 'true',
               },
             );
-          } else if (value.includes(",") || value.includes("-")) {
-            const values = value.split(",").map((v) => v.trim());
-            const bucketRanges = values.filter((v) => v.includes("-"));
-            const exactValues = values.filter((v) => !v.includes("-"));
+          } else if (value.includes(',') || value.includes('-')) {
+            const values = value.split(',').map((v) => v.trim());
+            const bucketRanges = values.filter((v) => v.includes('-'));
+            const exactValues = values.filter((v) => !v.includes('-'));
 
             const conditions: string[] = [];
             const params: Record<string, unknown> = {
@@ -286,27 +251,27 @@ export class PublicCategoriesService {
               bucketIdx < bucketRanges.length;
               bucketIdx++
             ) {
-              const [minStr, maxStr] = bucketRanges[bucketIdx].split("-");
+              const [minStr, maxStr] = bucketRanges[bucketIdx].split('-');
               const rangeConditions: string[] = [];
-              if (minStr !== "") {
+              if (minStr !== '') {
                 rangeConditions.push(
                   `(product.specs->>:specKey${specIdx})::numeric >= :bucketMin${specIdx}_${bucketIdx}`,
                 );
                 params[`bucketMin${specIdx}_${bucketIdx}`] = Number(minStr);
               }
-              if (maxStr !== "") {
+              if (maxStr !== '') {
                 rangeConditions.push(
                   `(product.specs->>:specKey${specIdx})::numeric <= :bucketMax${specIdx}_${bucketIdx}`,
                 );
                 params[`bucketMax${specIdx}_${bucketIdx}`] = Number(maxStr);
               }
               if (rangeConditions.length > 0) {
-                conditions.push(`(${rangeConditions.join(" AND ")})`);
+                conditions.push(`(${rangeConditions.join(' AND ')})`);
               }
             }
 
             if (conditions.length > 0) {
-              qb.andWhere(`(${conditions.join(" OR ")})`, params);
+              qb.andWhere(`(${conditions.join(' OR ')})`, params);
             }
           } else if (arraySpecKeys.has(key)) {
             qb.andWhere(
@@ -324,74 +289,20 @@ export class PublicCategoriesService {
       }
     }
 
-    if (query.ratingMin !== undefined) {
-      qb.andWhere(`rating.${nameOf<ProductRating>("rating")} >= :ratingMin`, {
-        ratingMin: query.ratingMin,
-      });
-    }
-    if (query.ratingMax !== undefined) {
-      qb.andWhere(`rating.${nameOf<ProductRating>("rating")} <= :ratingMax`, {
-        ratingMax: query.ratingMax,
-      });
-    }
-
-    if (sortBy === SortBy.useCaseScore && sortUseCase) {
-      qb.andWhere(
-        `(rating."${nameOf<ProductRating>("useCaseScores")}"->>:sortUseCase) IS NOT NULL`,
-        { sortUseCase },
-      );
-    }
-
-    const direction = sortDir.toUpperCase() as "ASC" | "DESC";
+    const direction = sortDir.toUpperCase() as 'ASC' | 'DESC';
     switch (sortBy) {
-      case SortBy.totalReviewCount:
-        qb.orderBy(
-          `rating.${nameOf<ProductRating>("totalReviewCount")}`,
-          direction,
-          "NULLS LAST",
-        );
-        break;
-      case SortBy.averageReviewScore:
-        qb.orderBy(
-          `rating.${nameOf<ProductRating>("averageReviewScore")}`,
-          direction,
-          "NULLS LAST",
-        );
-        break;
-      case SortBy.rating:
-        qb.orderBy(
-          `rating.${nameOf<ProductRating>("rating")}`,
-          direction,
-          "NULLS LAST",
-        );
-        break;
       case SortBy.releaseYear:
         qb.orderBy(
-          `product.${nameOf<ProductModel>("releaseYear")}`,
+          `product.${nameOf<ProductModel>('releaseYear')}`,
           direction,
-          "NULLS LAST",
+          'NULLS LAST',
         );
-        break;
-      case SortBy.useCaseScore:
-        if (sortUseCase) {
-          qb.orderBy(
-            `COALESCE((rating."${nameOf<ProductRating>("useCaseScores")}"->>:sortUseCase)::float, NULL)`,
-            direction,
-            "NULLS LAST",
-          ).setParameter("sortUseCase", sortUseCase);
-        } else {
-          qb.orderBy(
-            `rating.${nameOf<ProductRating>("rating")}`,
-            direction,
-            "NULLS LAST",
-          );
-        }
         break;
       default:
         qb.orderBy(
-          `rating.${nameOf<ProductRating>("rating")}`,
+          `product.${nameOf<ProductModel>('createdAt')}`,
           direction,
-          "NULLS LAST",
+          'NULLS LAST',
         );
         break;
     }
@@ -403,9 +314,7 @@ export class PublicCategoriesService {
 
     this.productImageDtoService.updateProductImageUrls(products);
     const result = new PaginatedProductResult();
-    const activeUseCase =
-      sortBy === SortBy.useCaseScore ? sortUseCase : undefined;
-    result.data = products.map((p) => this.toProductListDto(p, activeUseCase));
+    result.data = products.map((p) => this.toProductListDto(p));
     result.total = total;
     result.page = page;
     result.pageSize = pageSize;
@@ -422,7 +331,7 @@ export class PublicCategoriesService {
     if (schema?.properties && config) {
       const filterSpecs = this.resolveFilterSpecs(schema, config);
       if (filterSpecs.length > 0) {
-        const [aggregations, brands, scoreAndTotal] = await Promise.all([
+        const [aggregations, brands] = await Promise.all([
           this.aggregateFilterFields(
             category.id,
             schema,
@@ -431,11 +340,9 @@ export class PublicCategoriesService {
             arraySpecKeys,
           ),
           this.aggregateBrands(category.id, query, arraySpecKeys),
-          this.aggregateScoreAndTotal(category.id, query, arraySpecKeys),
         ]);
         result.aggregations = aggregations;
         result.brands = brands;
-        result.scoreRange = scoreAndTotal.scoreRange;
       }
     }
 
@@ -450,7 +357,7 @@ export class PublicCategoriesService {
     if (!schema?.properties) return new Set();
     return new Set(
       Object.entries(schema.properties)
-        .filter(([, def]) => def.type === "array")
+        .filter(([, def]) => def.type === 'array')
         .map(([key]) => key),
     );
   }
@@ -470,7 +377,6 @@ export class PublicCategoriesService {
    * Uses positional parameters starting from $startParam.
    * excludeSpecKey: omit this spec from the WHERE (for faceted counting of that spec).
    * excludeBrand: omit brand filter (for faceted counting of brands).
-   * excludeRating: omit rating filter (for faceted counting of score range).
    */
   private buildFilterWhereSql(
     query: ProductQueryDto,
@@ -478,7 +384,6 @@ export class PublicCategoriesService {
     options?: {
       excludeSpecKey?: string;
       excludeBrand?: boolean;
-      excludeRating?: boolean;
       arraySpecKeys?: Set<string>;
     },
   ): FilterWhereSql {
@@ -487,8 +392,8 @@ export class PublicCategoriesService {
     let paramIdx = startParam;
 
     if (query.brand && !options?.excludeBrand) {
-      const brandSlugs = query.brand.split(",").map((b) => b.trim());
-      const placeholders = brandSlugs.map(() => `$${paramIdx++}`).join(", ");
+      const brandSlugs = query.brand.split(',').map((b) => b.trim());
+      const placeholders = brandSlugs.map(() => `$${paramIdx++}`).join(', ');
       conditions.push(
         `product.id IN (SELECT pm.id FROM product_model pm INNER JOIN brand b ON b.id = pm."brandId" WHERE b.slug IN (${placeholders}))`,
       );
@@ -507,7 +412,7 @@ export class PublicCategoriesService {
       for (const [key, value] of Object.entries(query.specs)) {
         if (key === options?.excludeSpecKey) continue;
 
-        if (typeof value === "object" && value !== null) {
+        if (typeof value === 'object' && value !== null) {
           if (value.min !== undefined) {
             conditions.push(
               `(product.specs->>$${paramIdx})::numeric >= $${paramIdx + 1}`,
@@ -522,17 +427,17 @@ export class PublicCategoriesService {
             params.push(key, Number(value.max));
             paramIdx += 2;
           }
-        } else if (typeof value === "string") {
-          if (value === "true" || value === "false") {
+        } else if (typeof value === 'string') {
+          if (value === 'true' || value === 'false') {
             conditions.push(
               `(product.specs->>$${paramIdx})::boolean = $${paramIdx + 1}`,
             );
-            params.push(key, value === "true");
+            params.push(key, value === 'true');
             paramIdx += 2;
-          } else if (value.includes(",") || value.includes("-")) {
-            const values = value.split(",").map((v) => v.trim());
-            const bucketRanges = values.filter((v) => v.includes("-"));
-            const exactValues = values.filter((v) => !v.includes("-"));
+          } else if (value.includes(',') || value.includes('-')) {
+            const values = value.split(',').map((v) => v.trim());
+            const bucketRanges = values.filter((v) => v.includes('-'));
+            const exactValues = values.filter((v) => !v.includes('-'));
 
             const orConditions: string[] = [];
             const keyParam = paramIdx++;
@@ -549,7 +454,7 @@ export class PublicCategoriesService {
               } else {
                 const placeholders = exactValues
                   .map(() => `$${paramIdx++}`)
-                  .join(", ");
+                  .join(', ');
                 orConditions.push(
                   `product.specs->>$${keyParam} IN (${placeholders})`,
                 );
@@ -558,16 +463,16 @@ export class PublicCategoriesService {
             }
 
             for (const bucketRange of bucketRanges) {
-              const [minStr, maxStr] = bucketRange.split("-");
+              const [minStr, maxStr] = bucketRange.split('-');
               const rangeConditions: string[] = [];
-              if (minStr !== "") {
+              if (minStr !== '') {
                 rangeConditions.push(
                   `(product.specs->>$${keyParam})::numeric >= $${paramIdx}`,
                 );
                 params.push(Number(minStr));
                 paramIdx++;
               }
-              if (maxStr !== "") {
+              if (maxStr !== '') {
                 rangeConditions.push(
                   `(product.specs->>$${keyParam})::numeric <= $${paramIdx}`,
                 );
@@ -575,12 +480,12 @@ export class PublicCategoriesService {
                 paramIdx++;
               }
               if (rangeConditions.length > 0) {
-                orConditions.push(`(${rangeConditions.join(" AND ")})`);
+                orConditions.push(`(${rangeConditions.join(' AND ')})`);
               }
             }
 
             if (orConditions.length > 0) {
-              conditions.push(`(${orConditions.join(" OR ")})`);
+              conditions.push(`(${orConditions.join(' OR ')})`);
             }
           } else if (options?.arraySpecKeys?.has(key)) {
             conditions.push(`product.specs->$${paramIdx} ? $${paramIdx + 1}`);
@@ -595,21 +500,6 @@ export class PublicCategoriesService {
       }
     }
 
-    if (query.ratingMin !== undefined && !options?.excludeRating) {
-      conditions.push(
-        `product.id IN (SELECT r."modelId" FROM product_rating r WHERE r.rating >= $${paramIdx})`,
-      );
-      params.push(query.ratingMin);
-      paramIdx++;
-    }
-    if (query.ratingMax !== undefined && !options?.excludeRating) {
-      conditions.push(
-        `product.id IN (SELECT r."modelId" FROM product_rating r WHERE r.rating <= $${paramIdx})`,
-      );
-      params.push(query.ratingMax);
-      paramIdx++;
-    }
-
     return { conditions, params };
   }
 
@@ -619,7 +509,6 @@ export class PublicCategoriesService {
     options?: {
       excludeSpecKey?: string;
       excludeBrand?: boolean;
-      excludeRating?: boolean;
       arraySpecKeys?: Set<string>;
     },
   ): { sql: string; params: unknown[] } {
@@ -628,8 +517,8 @@ export class PublicCategoriesService {
       startParam,
       options,
     );
-    if (conditions.length === 0) return { sql: "", params: [] };
-    return { sql: " AND " + conditions.join(" AND "), params };
+    if (conditions.length === 0) return { sql: '', params: [] };
+    return { sql: ' AND ' + conditions.join(' AND '), params };
   }
 
   private async aggregateFilterFields(
@@ -640,13 +529,13 @@ export class PublicCategoriesService {
     arraySpecKeys?: Set<string>,
   ): Promise<FilterFieldDto[]> {
     const booleanSpecs = filterSpecs.filter(
-      (spec) => spec.filterType === "boolean",
+      (spec) => spec.filterType === 'boolean',
     );
     const rangeSpecs = filterSpecs.filter(
-      (spec) => spec.filterType === "range",
+      (spec) => spec.filterType === 'range',
     );
     const multiselectSpecs = filterSpecs.filter(
-      (spec) => spec.filterType === "multiselect",
+      (spec) => spec.filterType === 'multiselect',
     );
 
     const promises: Promise<void>[] = [];
@@ -679,7 +568,7 @@ export class PublicCategoriesService {
 
     for (const spec of multiselectSpecs) {
       const property = schema.properties[spec.key];
-      const isArray = property?.type === "array";
+      const isArray = property?.type === 'array';
       promises.push(
         (async () => {
           const field = fieldMap.get(spec.key);
@@ -708,7 +597,7 @@ export class PublicCategoriesService {
             );
           }
           if (field.options?.length) {
-            field.totalCount = sumBy(field.options, "count");
+            field.totalCount = sumBy(field.options, 'count');
           }
         })(),
       );
@@ -720,9 +609,9 @@ export class PublicCategoriesService {
       .map((spec) => fieldMap.get(spec.key))
       .filter((field): field is FilterFieldDto => {
         if (!field) return false;
-        if (field.type === "boolean") return (field.totalCount ?? 0) > 0;
-        if (field.type === "range") return field.range != null;
-        if (field.type === "multiselect")
+        if (field.type === 'boolean') return (field.totalCount ?? 0) > 0;
+        if (field.type === 'range') return field.range != null;
+        if (field.type === 'multiselect')
           return (field.options?.length ?? 0) > 0;
         return false;
       });
@@ -759,10 +648,10 @@ export class PublicCategoriesService {
 
     const filterSuffix = query
       ? this.buildFilterWhereSuffix(query, 2, { arraySpecKeys })
-      : { sql: "", params: [] };
+      : { sql: '', params: [] };
 
     const row = await this.productModelRepo.repo.query(
-      `SELECT ${selectClauses.join(", ")}
+      `SELECT ${selectClauses.join(', ')}
        FROM product_model product
        WHERE product."productCategoryId" = $1 AND product.enabled = true${filterSuffix.sql}`,
       [categoryId, ...filterSuffix.params],
@@ -802,7 +691,7 @@ export class PublicCategoriesService {
           excludeSpecKey: specKey,
           arraySpecKeys,
         })
-      : { sql: "", params: [] };
+      : { sql: '', params: [] };
 
     const rows: { value: string; count: string }[] =
       await this.productModelRepo.repo.query(
@@ -840,16 +729,16 @@ export class PublicCategoriesService {
         if (bucket.max !== undefined) {
           conditions.push(`val <= ${Number(bucket.max)}`);
         }
-        return `WHEN ${conditions.join(" AND ")} THEN ${index}`;
+        return `WHEN ${conditions.join(' AND ')} THEN ${index}`;
       })
-      .join(" ");
+      .join(' ');
 
     const filterSuffix = query
       ? this.buildFilterWhereSuffix(query, 3, {
           excludeSpecKey: specKey,
           arraySpecKeys,
         })
-      : { sql: "", params: [] };
+      : { sql: '', params: [] };
 
     const rows: { bucketIndex: string; count: string }[] =
       await this.productModelRepo.repo.query(
@@ -874,8 +763,8 @@ export class PublicCategoriesService {
 
     return buckets.map((bucket, index) => {
       const count = countMap.get(index) ?? 0;
-      const minPart = bucket.min !== undefined ? String(bucket.min) : "";
-      const maxPart = bucket.max !== undefined ? String(bucket.max) : "";
+      const minPart = bucket.min !== undefined ? String(bucket.min) : '';
+      const maxPart = bucket.max !== undefined ? String(bucket.max) : '';
       return {
         value: `${minPart}-${maxPart}`,
         label: bucket.label,
@@ -895,7 +784,7 @@ export class PublicCategoriesService {
           excludeSpecKey: specKey,
           arraySpecKeys,
         })
-      : { sql: "", params: [] };
+      : { sql: '', params: [] };
 
     const rows: { value: string; count: string }[] =
       await this.productModelRepo.repo.query(
@@ -927,7 +816,7 @@ export class PublicCategoriesService {
           excludeBrand: true,
           arraySpecKeys,
         })
-      : { sql: "", params: [] };
+      : { sql: '', params: [] };
 
     const rows: { value: string; label: string; count: string }[] =
       await this.productModelRepo.repo.query(
@@ -948,53 +837,32 @@ export class PublicCategoriesService {
     }));
   }
 
-  private async aggregateScoreAndTotal(
+  private async aggregateTotalProducts(
     categoryId: string,
     query?: ProductQueryDto,
     arraySpecKeys?: Set<string>,
-  ): Promise<{ scoreRange?: NumericRangeDto; totalProducts: number }> {
+  ): Promise<number> {
     const filterSuffix = query
-      ? this.buildFilterWhereSuffix(query, 2, {
-          excludeRating: true,
-          arraySpecKeys,
-        })
-      : { sql: "", params: [] };
+      ? this.buildFilterWhereSuffix(query, 2, { arraySpecKeys })
+      : { sql: '', params: [] };
 
     const row = await this.productModelRepo.repo.query(
-      `SELECT
-         COUNT(*)::int AS "totalProducts",
-         MIN(rating.rating)::int AS "scoreMin",
-         MAX(rating.rating)::int AS "scoreMax"
+      `SELECT COUNT(*)::int AS "totalProducts"
        FROM product_model product
-       LEFT JOIN product_rating rating ON rating."modelId" = product.id
        WHERE product."productCategoryId" = $1
          AND product.enabled = true${filterSuffix.sql}`,
       [categoryId, ...filterSuffix.params],
     );
 
-    const result = row?.[0];
-    const totalProducts = Number(result?.totalProducts ?? 0);
-    const scoreMin = result?.scoreMin;
-    const scoreMax = result?.scoreMax;
-
-    return {
-      totalProducts,
-      scoreRange:
-        scoreMin != null
-          ? { min: Number(scoreMin), max: Number(scoreMax) }
-          : undefined,
-    };
+    return Number(row?.[0]?.totalProducts ?? 0);
   }
 
   // ─── DTO Mapping ────────────────────────────────────────────────────────────
 
-  private toProductListDto(
-    product: ProductModel,
-    activeUseCase?: string,
-  ): ProductListDto {
+  private toProductListDto(product: ProductModel): ProductListDto {
     const dto = new ProductListDto();
     dto.id = product.id;
-    dto.slug = product.slug ?? "";
+    dto.slug = product.slug ?? '';
     dto.displayName = product.displayName;
     dto.model = product.model;
     dto.releaseYear = product.releaseYear;
@@ -1002,7 +870,7 @@ export class PublicCategoriesService {
 
     if (product.brand) {
       const brandDto = new BrandDto();
-      brandDto.slug = product.brand.slug ?? "";
+      brandDto.slug = product.brand.slug ?? '';
       brandDto.name = product.brand.name;
       dto.brand = brandDto;
     }
@@ -1010,79 +878,19 @@ export class PublicCategoriesService {
     if (product.productCategory) {
       const categoryDto = new CategoryListDto();
       categoryDto.id = product.productCategory.id;
-      categoryDto.slug = product.productCategory.slug ?? "";
+      categoryDto.slug = product.productCategory.slug ?? '';
       categoryDto.name = product.productCategory.name;
       dto.category = categoryDto;
     }
 
     if (product.mainImage) {
       const mainImageDto = new MainImageDto();
-      mainImageDto.url = product.mainImage.url ?? "";
+      mainImageDto.url = product.mainImage.url ?? '';
       dto.mainImage = mainImageDto;
     } else {
       dto.mainImage = null;
     }
 
-    if (product.rating) {
-      dto.rating = this.buildRatingDto(product.rating, activeUseCase);
-    } else {
-      dto.rating = null;
-    }
-
     return dto;
-  }
-
-  private buildRatingDto(
-    rating: ProductRating,
-    activeUseCase?: string,
-  ): ProductRatingDto {
-    const useCaseEntry = activeUseCase
-      ? rating.useCaseSummary?.find((entry) => entry.name === activeUseCase)
-      : undefined;
-
-    const dto = new ProductRatingDto();
-    dto.handsonReviewCount = rating.handsonReviewCount;
-    dto.averageReviewScore = rating.averageReviewScore;
-
-    if (useCaseEntry) {
-      const counts = this.sentimentCountsFromSummary(useCaseEntry);
-      dto.strongPositiveReviewCount = counts.strongPositiveReviewCount;
-      dto.positiveReviewCount = counts.positiveReviewCount;
-      dto.neutralReviewCount = counts.neutralReviewCount;
-      dto.mixedReviewCount = counts.mixedReviewCount;
-      dto.negativeReviewCount = counts.negativeReviewCount;
-      dto.strongNegativeReviewCount = counts.strongNegativeReviewCount;
-      dto.totalReviewCount = useCaseEntry.mentionCount;
-      dto.rating = Math.round(useCaseEntry.score);
-    } else {
-      dto.strongPositiveReviewCount = rating.strongPositiveReviewCount;
-      dto.positiveReviewCount = rating.positiveReviewCount;
-      dto.neutralReviewCount = rating.neutralReviewCount;
-      dto.mixedReviewCount = rating.mixedReviewCount;
-      dto.negativeReviewCount = rating.negativeReviewCount;
-      dto.strongNegativeReviewCount = rating.strongNegativeReviewCount;
-      dto.totalReviewCount = rating.totalReviewCount;
-      dto.rating = rating.rating;
-    }
-
-    return dto;
-  }
-
-  private sentimentCountsFromSummary(entry: ProductLabelSummary): {
-    strongPositiveReviewCount: number;
-    positiveReviewCount: number;
-    neutralReviewCount: number;
-    mixedReviewCount: number;
-    negativeReviewCount: number;
-    strongNegativeReviewCount: number;
-  } {
-    return {
-      strongPositiveReviewCount: entry.strongPositiveCount,
-      positiveReviewCount: entry.positiveCount,
-      neutralReviewCount: entry.neutralCount,
-      mixedReviewCount: entry.mixedCount,
-      negativeReviewCount: entry.negativeCount,
-      strongNegativeReviewCount: entry.strongNegativeCount,
-    };
   }
 }

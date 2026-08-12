@@ -1,6 +1,6 @@
-import { normalize } from "@ebike-backend/utils";
-import type { ProductResolutionInput } from "../models/resolution-input";
-import type { ModelVariant } from "../models/resolution-context";
+import { normalize } from '@fittkereso-backend/utils';
+import type { ProductResolutionInput } from '../models/resolution-input';
+import type { ModelVariant } from '../models/resolution-context';
 
 export interface BuildModelVariantsOptions {
   /** Resolved brand name (from Stage 1 or 2). Drives `brand_strip`. */
@@ -32,32 +32,32 @@ export function buildModelVariants(
   options: BuildModelVariantsOptions,
 ): ModelVariant[] {
   const { brandName, maxModelVariants } = options;
-  const originalModel = input.model?.trim() ?? "";
+  const originalModel = input.model?.trim() ?? '';
   const candidates: ModelVariant[] = [];
 
   if (originalModel) {
-    candidates.push({ model: originalModel, source: "original" });
+    candidates.push({ model: originalModel, source: 'original' });
 
-    const suffixStripped = originalModel.replace(/[-/][a-zA-Z]$/i, "");
+    const suffixStripped = originalModel.replace(/[-/][a-zA-Z]$/i, '');
     if (suffixStripped !== originalModel) {
-      candidates.push({ model: suffixStripped, source: "suffix_strip" });
+      candidates.push({ model: suffixStripped, source: 'suffix_strip' });
     }
 
     const normalized = originalModel
-      .replace(/([a-zA-Z])\s+(\d)/g, "$1$2")
-      .replace(/(\d)\s+([a-zA-Z])/g, "$1$2");
+      .replace(/([a-zA-Z])\s+(\d)/g, '$1$2')
+      .replace(/(\d)\s+([a-zA-Z])/g, '$1$2');
     if (
       normalized !== originalModel &&
       !candidates.some((variant) => variant.model === normalized)
     ) {
-      candidates.push({ model: normalized, source: "normalization" });
+      candidates.push({ model: normalized, source: 'normalization' });
     }
 
     if (brandName) {
       const normalizedBrand = normalize(brandName);
       const normalizedModel = normalize(originalModel);
       if (
-        normalizedModel.startsWith(normalizedBrand + " ") ||
+        normalizedModel.startsWith(normalizedBrand + ' ') ||
         normalizedModel.startsWith(normalizedBrand)
       ) {
         const stripped = originalModel.slice(brandName.length).trim();
@@ -65,7 +65,7 @@ export function buildModelVariants(
           stripped &&
           !candidates.some((variant) => variant.model === stripped)
         ) {
-          candidates.push({ model: stripped, source: "brand_strip" });
+          candidates.push({ model: stripped, source: 'brand_strip' });
         }
       }
     }
@@ -79,13 +79,13 @@ export function buildModelVariants(
     referenceModel &&
     !candidates.some((variant) => variant.model === referenceModel)
   ) {
-    candidates.push({ model: referenceModel, source: "reference_model" });
+    candidates.push({ model: referenceModel, source: 'reference_model' });
   }
   for (const clue of input.modelClues ?? []) {
     const trimmed = clue.trim();
     if (!trimmed || candidates.some((variant) => variant.model === trimmed))
       continue;
-    candidates.push({ model: trimmed, source: "identification_clue" });
+    candidates.push({ model: trimmed, source: 'identification_clue' });
   }
 
   if (candidates.length === 0) return [];

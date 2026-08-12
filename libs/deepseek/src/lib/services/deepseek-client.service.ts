@@ -1,19 +1,19 @@
-import { Injectable } from "@nestjs/common";
-import { DeepSeekConfigService as AppDeepSeekConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import { DeepSeekConfigService as AppDeepSeekConfigService } from '@fittkereso-backend/config';
 
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 
 export interface DeepSeekChatMessage {
-  role: "system" | "user" | "assistant";
+  role: 'system' | 'user' | 'assistant';
   content: string | unknown[];
 }
 
 export interface DeepSeekResponseFormat {
-  type: "json_object";
+  type: 'json_object';
 }
 
 export interface DeepSeekThinkingConfig {
-  type: "enabled" | "disabled";
+  type: 'enabled' | 'disabled';
   reasoning_effort?: string;
 }
 
@@ -39,7 +39,7 @@ export interface DeepSeekUsage {
 
 export interface DeepSeekChatResponse {
   choices: Array<{
-    message: { role: "assistant"; content: string | null };
+    message: { role: 'assistant'; content: string | null };
     finish_reason?: string;
   }>;
   usage?: DeepSeekUsage;
@@ -52,7 +52,7 @@ export class DeepSeekApiError extends Error {
     public readonly body: string,
   ) {
     super(message);
-    this.name = "DeepSeekApiError";
+    this.name = 'DeepSeekApiError';
   }
 }
 
@@ -72,10 +72,10 @@ export class DeepSeekClientService {
     body: DeepSeekChatRequestBody,
   ): Promise<DeepSeekChatResponse> {
     const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${this.deepSeekConfig.apiKey}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });

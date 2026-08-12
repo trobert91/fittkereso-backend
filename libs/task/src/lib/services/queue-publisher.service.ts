@@ -1,27 +1,18 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductReviewAnalysisMessage,
   ProductSourceSyncMessage,
-  ThreadMessage,
-} from "../models/messages";
+} from '../models/messages';
 import {
   TaskRepository,
   Task,
   TaskStatus,
   QueueName,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 @Injectable()
 export class QueuePublisherService {
   constructor(private readonly taskRepo: TaskRepository) {}
-
-  async addThreadProcessTask(message: ThreadMessage): Promise<void> {
-    const task = new Task();
-    task.queue = QueueName.ThreadProcess;
-    task.payload = message;
-
-    await this.addTask(task);
-  }
 
   async addProductSourceSyncTask(
     message: ProductSourceSyncMessage,

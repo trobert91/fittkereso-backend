@@ -1,8 +1,8 @@
-import type { ProductModel } from "@ebike-backend/database";
-import type { SpecComparisonService } from "@ebike-backend/product";
-import type { ProductResolutionInput } from "../models/resolution-input";
-import type { CategoryMatchConfig } from "./input-normalization.service";
-import { structuredSpecsToProductSpecs } from "./spec-utils";
+import type { ProductModel } from '@fittkereso-backend/database';
+import type { SpecComparisonService } from '@fittkereso-backend/product';
+import type { ProductResolutionInput } from '../models/resolution-input';
+import type { CategoryMatchConfig } from './input-normalization.service';
+import { structuredSpecsToProductSpecs } from './spec-utils';
 
 /**
  * Same vs variant vs none classification for a reference-product-driven search.
@@ -28,7 +28,7 @@ import { structuredSpecsToProductSpecs } from "./spec-utils";
  * Byte-identical port of `deriveAnchorRelation` from
  * `libs/thread-processor/.../resolution-input-enricher.service.ts`.
  */
-export type ReferenceRelation = "same" | "variant" | "none";
+export type ReferenceRelation = 'same' | 'variant' | 'none';
 
 export function deriveReferenceRelation(
   input: ProductResolutionInput,
@@ -36,7 +36,7 @@ export function deriveReferenceRelation(
   matchConfig: CategoryMatchConfig,
   specComparison: SpecComparisonService,
 ): ReferenceRelation {
-  if (!input.referenceProductId) return "none";
+  if (!input.referenceProductId) return 'none';
 
   const noModelClues = (input.modelClues ?? []).length === 0;
   const noVariantClues = (input.variantClues ?? []).length === 0;
@@ -52,5 +52,5 @@ export function deriveReferenceRelation(
   const specsConsistent =
     result.primaryMismatches === 0 && result.matcherSpecMismatches === 0;
 
-  return noModelClues && noVariantClues && specsConsistent ? "same" : "variant";
+  return noModelClues && noVariantClues && specsConsistent ? 'same' : 'variant';
 }

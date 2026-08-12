@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductImage,
   ProductImageRepository,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
-import { orderBy } from "lodash";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import { orderBy } from 'lodash';
 
 @Injectable()
 export class ProductImageOrderService {
@@ -21,7 +21,7 @@ export class ProductImageOrderService {
   ): Promise<ProductImage[]> {
     const model = await this.productRepo.findOneOrFail({
       where: { id },
-      relations: [nameOf<ProductModel>("images")],
+      relations: [nameOf<ProductModel>('images')],
     });
 
     return this.updateImageOrder(model, imageOrders);
@@ -32,7 +32,7 @@ export class ProductImageOrderService {
     imageOrders: { id: string; order: number }[],
   ): Promise<ProductImage[]> {
     // reindex orders based on provided order
-    const ordered = orderBy(imageOrders, ["order"], ["asc"]);
+    const ordered = orderBy(imageOrders, ['order'], ['asc']);
 
     let i = 0;
     for (const { id } of ordered) {

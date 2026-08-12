@@ -1,14 +1,14 @@
-import type { MatchResult, ProductSpecs } from "@ebike-backend/database";
-import type { ProductResolutionInput } from "./resolution-input";
-import type { ResolutionOptions } from "./resolution-options";
-import type { ResolutionStatus } from "./resolution-status";
+import type { MatchResult, ProductSpecs } from '@fittkereso-backend/database';
+import type { ProductResolutionInput } from './resolution-input';
+import type { ResolutionOptions } from './resolution-options';
+import type { ResolutionStatus } from './resolution-status';
 import type {
   CandidateFunnel,
   SlimCandidate,
   SlimReference,
   SlimResolvedModel,
-} from "./slim-types";
-import type { SearchEvidence, WebQueryRecord } from "./search-evidence";
+} from './slim-types';
+import type { SearchEvidence, WebQueryRecord } from './search-evidence';
 
 /** Filter outcome — which candidates survived the category + effectiveMatchSpecs
  *  gates, and which were dropped (with reason). */
@@ -20,7 +20,7 @@ export interface FilterOutcome {
      *  clarity — saves readers from cross-referencing candidateId against
      *  `ctx.candidates`. */
     candidateName?: string;
-    reason: "match_specs" | "category" | "brand";
+    reason: 'match_specs' | 'category' | 'brand';
     detail: string;
   }>;
 }
@@ -58,7 +58,7 @@ export interface ScoringOutcome {
  *  Non-empty `selectedCandidates` ⇒ `matcher_accept` or `llm_resolved`.
  *  Empty `selectedCandidates` ⇒ `matcher_reject` or `llm_unresolved`. */
 export interface FinalDecision {
-  kind: "matcher_accept" | "matcher_reject" | "llm_resolved" | "llm_unresolved";
+  kind: 'matcher_accept' | 'matcher_reject' | 'llm_resolved' | 'llm_unresolved';
   /** 0–100 integer. Equals `max(selectedCandidates[*].confidence)` when picks exist, 0 otherwise. */
   confidence: number;
   /** Short reason code: `reference_same`, `registry_hit`, `below_accept_threshold`,
@@ -93,14 +93,14 @@ export interface SearchTotals {
  *  are recorded and surfaced on the persisted artifact, not thrown. */
 export interface PhaseError {
   phase:
-    | "reference_product"
-    | "brand_resolution"
-    | "category_resolution"
-    | "recall"
-    | "filter"
-    | "scoring"
-    | "decision"
-    | "finalize";
+    | 'reference_product'
+    | 'brand_resolution'
+    | 'category_resolution'
+    | 'recall'
+    | 'filter'
+    | 'scoring'
+    | 'decision'
+    | 'finalize';
   message: string;
   detail?: string;
   timestamp: string;
@@ -111,12 +111,12 @@ export interface PhaseError {
 export interface ModelVariant {
   model: string;
   source:
-    | "original"
-    | "suffix_strip"
-    | "normalization"
-    | "brand_strip"
-    | "reference_model"
-    | "identification_clue";
+    | 'original'
+    | 'suffix_strip'
+    | 'normalization'
+    | 'brand_strip'
+    | 'reference_model'
+    | 'identification_clue';
 }
 
 /**
@@ -139,10 +139,6 @@ export interface ResolutionContext {
    *  Transient — never persisted. Populated lazily via `getInputSpecsMap`. */
   inputSpecsMap?: ProductSpecs;
   options: ResolutionOptions;
-  /** Thread the resolution belongs to. Transient — never persisted. Read by
-   *  stages that issue LLM calls so per-thread cost accounting captures
-   *  resolution spend (`DebugTraceService.recordLlmCallUsage`). */
-  threadId?: string;
 
   // ── Reference-product resolution (Stage 1 output) ──────────────────────────
   referenceProduct?: SlimReference;

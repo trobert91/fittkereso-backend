@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import * as fs from "fs";
-import { BunnyUploadedFile } from "../models/bunny-uploaded-file";
-import { CustomLogger } from "@ebike-backend/logger";
-import { BunnyFileUploadService } from "./bunny-file-upload.service";
-import { BunnyStorageUrlService } from "./bunny-storage-url.service";
+import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import { BunnyUploadedFile } from '../models/bunny-uploaded-file';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { BunnyFileUploadService } from './bunny-file-upload.service';
+import { BunnyStorageUrlService } from './bunny-storage-url.service';
 
 @Injectable()
 export class BunnyStorageService {

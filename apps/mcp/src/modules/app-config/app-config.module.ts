@@ -1,5 +1,5 @@
-import { Global, Module } from "@nestjs/common";
-import { AppConfigService } from "./services/app-config.service";
+import { Global, Module } from '@nestjs/common';
+import { AppConfigService } from './services/app-config.service';
 import {
   PostgresConfigService,
   LoggerConfigService,
@@ -8,9 +8,8 @@ import {
   OpenAiConfigService,
   GeminiConfigService,
   ClaudeConfigService,
-  OpenRouterConfigService,
   DeepSeekConfigService,
-} from "@ebike-backend/config";
+} from '@fittkereso-backend/config';
 
 @Global()
 @Module({
@@ -24,7 +23,6 @@ import {
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
   ],
   exports: [
@@ -36,7 +34,6 @@ import {
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
   ],
 })

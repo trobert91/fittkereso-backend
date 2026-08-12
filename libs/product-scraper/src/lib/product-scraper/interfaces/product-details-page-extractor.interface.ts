@@ -1,6 +1,6 @@
-import { ScrapeTask } from "@ebike-backend/database";
-import { ScrapedProduct } from "@ebike-backend/product";
-import * as cheerio from "cheerio";
+import { ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapedProduct } from '@fittkereso-backend/product';
+import * as cheerio from 'cheerio';
 
 export interface ProductDetailsPageExtractor {
   extractProductDetails(

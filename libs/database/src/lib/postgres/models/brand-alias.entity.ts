@@ -1,17 +1,17 @@
-import { Column, Entity, Index, ManyToOne, Unique } from "typeorm";
-import { Expose } from "class-transformer";
-import { BasePostgresEntity } from "./base-postgres-entity";
-import { Brand } from "./brand.entity";
-import { nameOf, SerializeGroup } from "@ebike-backend/utils";
+import { Column, Entity, Index, ManyToOne, Unique } from 'typeorm';
+import { Expose } from 'class-transformer';
+import { BasePostgresEntity } from './base-postgres-entity';
+import { Brand } from './brand.entity';
+import { nameOf, SerializeGroup } from '@fittkereso-backend/utils';
 
 export enum BrandAliasSource {
-  manual = "manual",
-  correction = "correction",
-  auto_generated = "auto_generated",
+  manual = 'manual',
+  correction = 'correction',
+  auto_generated = 'auto_generated',
 }
 
 @Entity()
-@Unique([nameOf<BrandAlias>("alias")])
+@Unique([nameOf<BrandAlias>('alias')])
 export class BrandAlias extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   @Index()
@@ -20,7 +20,7 @@ export class BrandAlias extends BasePostgresEntity {
 
   @Expose({ groups: [SerializeGroup.list] })
   @Column({
-    type: "enum",
+    type: 'enum',
     enum: BrandAliasSource,
     default: BrandAliasSource.manual,
   })
@@ -28,7 +28,7 @@ export class BrandAlias extends BasePostgresEntity {
 
   @Index()
   @ManyToOne(() => Brand, (brand) => brand.aliases, {
-    onDelete: "CASCADE",
+    onDelete: 'CASCADE',
     nullable: false,
   })
   brand: Brand;

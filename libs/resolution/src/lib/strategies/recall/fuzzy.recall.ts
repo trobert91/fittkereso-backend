@@ -1,20 +1,23 @@
-import { Injectable } from "@nestjs/common";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
+import { Injectable } from '@nestjs/common';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import {
   ProductFuzzySearchService,
   type CandidateSearchInput,
-} from "@ebike-backend/product";
-import type { ProductModel, WithSimilarity } from "@ebike-backend/database";
-import type { RecallStrategy } from "../../models/strategy-types";
-import type { ResolutionContext } from "../../models/resolution-context";
-import type { SlimCandidate } from "../../models/slim-types";
+} from '@fittkereso-backend/product';
+import type {
+  ProductModel,
+  WithSimilarity,
+} from '@fittkereso-backend/database';
+import type { RecallStrategy } from '../../models/strategy-types';
+import type { ResolutionContext } from '../../models/resolution-context';
+import type { SlimCandidate } from '../../models/slim-types';
 import {
   MAX_MODEL_VARIANTS_DEFAULT,
   dedupeBySimilarity,
   fuzzyHitToSlim,
   getBaseModelVariants,
   recordVariants,
-} from "./recall-shared";
+} from './recall-shared';
 
 /**
  * Recall via Postgres trigram + alias fuzzy search.
@@ -33,7 +36,7 @@ import {
  */
 @Injectable()
 export class FuzzyRecallStrategy implements RecallStrategy {
-  readonly name = "fuzzy" as const;
+  readonly name = 'fuzzy' as const;
 
   constructor(
     private readonly fuzzySearch: ProductFuzzySearchService,
@@ -41,7 +44,7 @@ export class FuzzyRecallStrategy implements RecallStrategy {
   ) {}
 
   shouldRun(context: ResolutionContext): boolean {
-    return !context.strategiesRun.includes("fuzzy");
+    return !context.strategiesRun.includes('fuzzy');
   }
 
   async recall(context: ResolutionContext): Promise<SlimCandidate[]> {
@@ -58,7 +61,7 @@ export class FuzzyRecallStrategy implements RecallStrategy {
       variants.length < maxModelVariants &&
       !variants.some((v) => v.model === referenceEntityModel)
     ) {
-      variants.push({ model: referenceEntityModel, source: "reference_model" });
+      variants.push({ model: referenceEntityModel, source: 'reference_model' });
     }
 
     if (variants.length === 0) return [];
@@ -85,15 +88,15 @@ export class FuzzyRecallStrategy implements RecallStrategy {
 
     const hits: WithSimilarity<ProductModel>[] = [];
     for (const result of variantResults) {
-      if (result.status === "rejected") {
+      if (result.status === 'rejected') {
         const message =
           result.reason instanceof Error
             ? result.reason.message
             : String(result.reason);
         context.errors.push({
-          phase: "recall",
+          phase: 'recall',
           message,
-          detail: "fuzzy",
+          detail: 'fuzzy',
           timestamp: new Date().toISOString(),
         });
         continue;

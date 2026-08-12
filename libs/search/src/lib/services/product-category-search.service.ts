@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductCategoryRepository,
-} from "@ebike-backend/database";
-import { SelectQueryBuilder } from "typeorm";
-import { isEmpty } from "lodash";
-import { CategorySearchParams } from "../models/category-search-params";
-import { CategorySearchResult } from "../models/category-search-result";
-import { nameOf } from "@ebike-backend/utils";
+} from '@fittkereso-backend/database';
+import { SelectQueryBuilder } from 'typeorm';
+import { isEmpty } from 'lodash';
+import { CategorySearchParams } from '../models/category-search-params';
+import { CategorySearchResult } from '../models/category-search-result';
+import { nameOf } from '@fittkereso-backend/utils';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -20,8 +20,8 @@ export class ProductCategorySearchService {
   ): Promise<CategorySearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? "name",
-      order: params.order ?? "ASC",
+      sort: params.sort ?? 'name',
+      order: params.order ?? 'ASC',
     };
 
     const query = this.buildQuery(finalParams);
@@ -35,7 +35,7 @@ export class ProductCategorySearchService {
   private buildQuery(
     params: CategorySearchParams,
   ): SelectQueryBuilder<ProductCategory> {
-    let query = this.repo.repo.createQueryBuilder("category");
+    let query = this.repo.repo.createQueryBuilder('category');
 
     // --- Text search ---
     if (params.searchTerm && !isEmpty(params.searchTerm?.trim())) {
@@ -44,7 +44,7 @@ export class ProductCategorySearchService {
       // Trigram similarity search — uses pg_trgm GIN indexes
       query = query.andWhere(
         `(
-        LOWER(category.${nameOf<ProductCategory>("name")}) % :term
+        LOWER(category.${nameOf<ProductCategory>('name')}) % :term
         )`,
         { term },
       );
@@ -55,29 +55,29 @@ export class ProductCategorySearchService {
         greatest(
         similarity(LOWER(category."name"), :term)
         )`,
-        "similarity_score",
+        'similarity_score',
       );
-      query = query.orderBy("similarity_score", "DESC");
+      query = query.orderBy('similarity_score', 'DESC');
     }
 
     // --- Boolean filters ---
     if (params.autoDeduplicationEnabled !== undefined) {
       query = query.andWhere(
-        `category.${nameOf<ProductCategory>("autoDeduplicationEnabled")} = :autoDedup`,
+        `category.${nameOf<ProductCategory>('autoDeduplicationEnabled')} = :autoDedup`,
         { autoDedup: params.autoDeduplicationEnabled },
       );
     }
 
     if (params.enabled !== undefined) {
       query = query.andWhere(
-        `category.${nameOf<ProductCategory>("enabled")} = :enabled`,
+        `category.${nameOf<ProductCategory>('enabled')} = :enabled`,
         { enabled: params.enabled },
       );
     }
 
     if (params.searchEnabled !== undefined) {
       query = query.andWhere(
-        `category.${nameOf<ProductCategory>("searchEnabled")} = :searchEnabled`,
+        `category.${nameOf<ProductCategory>('searchEnabled')} = :searchEnabled`,
         { searchEnabled: params.searchEnabled },
       );
     }

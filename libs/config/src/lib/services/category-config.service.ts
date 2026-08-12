@@ -1,19 +1,17 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger } from '@nestjs/common';
 import type {
-  CategorySearchConfig,
   ProductCategoryConfig,
   SourceSpecConfig,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import type {
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
-} from "@ebike-backend/database";
-import * as fs from "fs";
-import * as path from "path";
+} from '@fittkereso-backend/database';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface CategoryConfigFiles {
   config?: ProductCategoryConfig;
-  searchConfig?: CategorySearchConfig;
   jsonSchema?: SpecDefinitionJsonSchema;
   uiSchema?: SpecDefinitionUiSchema;
   specMappings?: Record<string, SourceSpecConfig>;
@@ -28,7 +26,7 @@ export class CategoryConfigService {
   constructor() {
     this.categoriesPath = path.join(
       process.cwd(),
-      "libs/config/src/lib/categories",
+      'libs/config/src/lib/categories',
     );
     this.loadAll();
   }
@@ -56,13 +54,6 @@ export class CategoryConfigService {
     return this.configCache.get(slug)?.uiSchema;
   }
 
-  getSearchConfig(
-    slug: string | null | undefined,
-  ): CategorySearchConfig | undefined {
-    if (!slug) return undefined;
-    return this.configCache.get(slug)?.searchConfig;
-  }
-
   getSpecMappings(
     slug: string | null | undefined,
   ): Record<string, SourceSpecConfig> | undefined {
@@ -82,22 +73,22 @@ export class CategoryConfigService {
 
   writeConfig(slug: string, config: ProductCategoryConfig): void {
     this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, "config.json");
-    fs.writeFileSync(filePath, JSON.stringify(config, null, 2) + "\n");
+    const filePath = path.join(this.categoriesPath, slug, 'config.json');
+    fs.writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
   writeJsonSchema(slug: string, schema: SpecDefinitionJsonSchema): void {
     this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, "jsonSchema.json");
-    fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + "\n");
+    const filePath = path.join(this.categoriesPath, slug, 'jsonSchema.json');
+    fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
   writeUiSchema(slug: string, schema: SpecDefinitionUiSchema): void {
     this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, "uiSchema.json");
-    fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + "\n");
+    const filePath = path.join(this.categoriesPath, slug, 'uiSchema.json');
+    fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -106,8 +97,8 @@ export class CategoryConfigService {
     mappings: Record<string, SourceSpecConfig>,
   ): void {
     this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, "specMappings.json");
-    fs.writeFileSync(filePath, JSON.stringify(mappings, null, 2) + "\n");
+    const filePath = path.join(this.categoriesPath, slug, 'specMappings.json');
+    fs.writeFileSync(filePath, JSON.stringify(mappings, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -160,21 +151,18 @@ export class CategoryConfigService {
 
   private loadCategoryFiles(categoryDirectory: string): CategoryConfigFiles {
     const config = this.readJsonFile<ProductCategoryConfig>(
-      path.join(categoryDirectory, "config.json"),
+      path.join(categoryDirectory, 'config.json'),
     );
     return {
       config,
-      searchConfig: this.readJsonFile<CategorySearchConfig>(
-        path.join(categoryDirectory, "search.json"),
-      ),
       jsonSchema: this.readJsonFile<SpecDefinitionJsonSchema>(
-        path.join(categoryDirectory, "jsonSchema.json"),
+        path.join(categoryDirectory, 'jsonSchema.json'),
       ),
       uiSchema: this.readJsonFile<SpecDefinitionUiSchema>(
-        path.join(categoryDirectory, "uiSchema.json"),
+        path.join(categoryDirectory, 'uiSchema.json'),
       ),
       specMappings: this.readJsonFile<Record<string, SourceSpecConfig>>(
-        path.join(categoryDirectory, "specMappings.json"),
+        path.join(categoryDirectory, 'specMappings.json'),
       ),
     };
   }
@@ -185,7 +173,7 @@ export class CategoryConfigService {
     }
 
     try {
-      const content = fs.readFileSync(filePath, "utf-8");
+      const content = fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(content) as T;
     } catch (error: unknown) {
       this.logger.warn(

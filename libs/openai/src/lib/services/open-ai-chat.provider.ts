@@ -1,27 +1,27 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import { RateLimitError } from "openai";
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { RateLimitError } from 'openai';
 import {
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionMessageParam,
-} from "openai/resources";
+} from 'openai/resources';
 import {
   AiChatProvider,
   AiChatRequest,
   AiProviderConfig,
   AiProviderRegistry,
   RawProviderResult,
-} from "@ebike-backend/ai-core";
-import { OpenAiConfigService as AppOpenAiConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { OpenAiClientService } from "./open-ai-client.service";
-import { OpenAiConfigService } from "./openai-config.service";
+} from '@fittkereso-backend/ai-core';
+import { OpenAiConfigService as AppOpenAiConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { OpenAiClientService } from './open-ai-client.service';
+import { OpenAiConfigService } from './openai-config.service';
 
 // Widen the SDK's strict enum so the caller can supply any effort string the
 // API accepts (matches the design: effort is provider/model-specific and
 // forwarded as-is). The narrow SDK enum lags real-world supported values.
 type OpenAiChatBody = Omit<
   ChatCompletionCreateParamsNonStreaming,
-  "reasoning_effort"
+  'reasoning_effort'
 > & {
   reasoning_effort?: string;
 };
@@ -32,7 +32,7 @@ function isReasoningModel(model: string): boolean {
 
 @Injectable()
 export class OpenAiChatProvider implements AiChatProvider, OnModuleInit {
-  readonly name = "openai" as const;
+  readonly name = 'openai' as const;
   private readonly logger = new CustomLogger(OpenAiChatProvider.name);
 
   constructor(
@@ -57,7 +57,7 @@ export class OpenAiChatProvider implements AiChatProvider, OnModuleInit {
   getConfig(): AiProviderConfig {
     return {
       pricing: this.openAiConfig.pricing,
-      fallbackModel: "deepseek-v4-flash",
+      fallbackModel: 'deepseek-v4-flash',
       maxRetries: this.openAiConfig.maxRetries,
       debug: this.appOpenAiConfig.debug,
     };
@@ -75,9 +75,9 @@ export class OpenAiChatProvider implements AiChatProvider, OnModuleInit {
 
     if (request.schema) {
       body.response_format = {
-        type: "json_schema",
+        type: 'json_schema',
         json_schema: {
-          name: request.schemaName ?? request.costLabel ?? "response",
+          name: request.schemaName ?? request.costLabel ?? 'response',
           schema: request.schema,
         },
       };
@@ -89,7 +89,7 @@ export class OpenAiChatProvider implements AiChatProvider, OnModuleInit {
       body as ChatCompletionCreateParamsNonStreaming,
     );
 
-    const content = response.choices[0]?.message?.content ?? "";
+    const content = response.choices[0]?.message?.content ?? '';
     const usage = response.usage;
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
@@ -120,27 +120,27 @@ export class OpenAiChatProvider implements AiChatProvider, OnModuleInit {
     const reasoning = isReasoningModel(model);
     if (!reasoning) {
       if (thinking !== undefined) {
-        this.logger.warn("thinking ignored on non-reasoning model", {
+        this.logger.warn('thinking ignored on non-reasoning model', {
           provider: this.name,
           model,
-          feature: "thinking",
+          feature: 'thinking',
         });
       }
       if (effort !== undefined) {
-        this.logger.warn("effort ignored on non-reasoning model", {
+        this.logger.warn('effort ignored on non-reasoning model', {
           provider: this.name,
           model,
-          feature: "effort",
+          feature: 'effort',
         });
       }
       return;
     }
 
     if (thinking === false) {
-      this.logger.warn("thinking=false ignored on reasoning model", {
+      this.logger.warn('thinking=false ignored on reasoning model', {
         provider: this.name,
         model,
-        feature: "thinking",
+        feature: 'thinking',
       });
     }
     if (effort !== undefined) {

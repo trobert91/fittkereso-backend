@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { BrandResolutionService } from "@ebike-backend/product";
-import type { ResolutionContext } from "../models/resolution-context";
+import { Injectable } from '@nestjs/common';
+import { BrandResolutionService } from '@fittkereso-backend/product';
+import type { ResolutionContext } from '../models/resolution-context';
 
 /**
  * Stage 2 brand resolution.
@@ -33,7 +33,7 @@ export class BrandResolverService {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       context.errors.push({
-        phase: "brand_resolution",
+        phase: 'brand_resolution',
         message,
         timestamp: new Date().toISOString(),
       });

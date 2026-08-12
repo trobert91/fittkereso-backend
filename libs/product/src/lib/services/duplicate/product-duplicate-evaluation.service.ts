@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductAlias,
   ProductAliasSource,
@@ -6,23 +6,21 @@ import {
   ProductDuplicateDecision,
   ProductDuplicateRepository,
   ProductModelRepository,
-  ProductReferenceCandidateRepository,
   ProductAliasRepository,
-} from "@ebike-backend/database";
-import type { SpecMatchDetails } from "@ebike-backend/database";
-import { SCHEDULING_DEFAULTS } from "@ebike-backend/config";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { DuplicateDetectionMetricsService } from "@ebike-backend/metrics";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ProductDuplicationSearchService } from "@ebike-backend/search";
-import { normalize } from "@ebike-backend/utils";
-import { isEmpty, isNil } from "lodash";
-import { ProductSimilarityService } from "../similarity/product-similarity.service";
-import { ProductMergeService } from "../merge/product-merge.service";
-import type { DuplicatePairItem } from "@ebike-backend/search";
+} from '@fittkereso-backend/database';
+import type { SpecMatchDetails } from '@fittkereso-backend/database';
+import { SCHEDULING_DEFAULTS } from '@fittkereso-backend/config';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { DuplicateDetectionMetricsService } from '@fittkereso-backend/metrics';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ProductDuplicationSearchService } from '@fittkereso-backend/search';
+import { normalize } from '@fittkereso-backend/utils';
+import { isEmpty, isNil } from 'lodash';
+import { ProductSimilarityService } from '../similarity/product-similarity.service';
+import { ProductMergeService } from '../merge/product-merge.service';
+import type { DuplicatePairItem } from '@fittkereso-backend/search';
 
 const MIN_SIMILARITY_FLOOR = 40;
-const MIN_REVIEW_COUNT_FOR_HIGH_ACTIVITY = 3;
 
 interface DuplicateDetectionConfig {
   enabled: boolean;
@@ -32,11 +30,10 @@ interface DuplicateDetectionConfig {
   maxNonPrimaryMismatches: number;
   batchSize: number;
   maxMergesPerRun: number;
-  highActivityThreshold: number;
 }
 
 interface PairEvaluation {
-  decision: ProductDuplicateDecision | "skip";
+  decision: ProductDuplicateDecision | 'skip';
   reasons: string[];
   specMatchDetails?: SpecMatchDetails;
 }
@@ -62,7 +59,6 @@ export class ProductDuplicateEvaluationService {
     private readonly mergeService: ProductMergeService,
     private readonly categoryRepo: ProductCategoryRepository,
     private readonly productRepo: ProductModelRepository,
-    private readonly candidateRepo: ProductReferenceCandidateRepository,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly dynamicConfigService: DynamicConfigService,
     private readonly metricsService: DuplicateDetectionMetricsService,
@@ -122,7 +118,7 @@ export class ProductDuplicateEvaluationService {
           durationSeconds,
         );
 
-        this.logger.log("Category duplicate detection completed", {
+        this.logger.log('Category duplicate detection completed', {
           category: category.name,
           evaluated: result.evaluated,
           autoMerged: result.autoMerged,
@@ -131,7 +127,7 @@ export class ProductDuplicateEvaluationService {
           durationSeconds,
         });
       } catch (error: unknown) {
-        this.logger.error("Category duplicate detection failed", error, {
+        this.logger.error('Category duplicate detection failed', error, {
           category: category.name,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -143,26 +139,10 @@ export class ProductDuplicateEvaluationService {
   }
 
   public selectMergeTarget(
-    pairItemA: { id: string; reviewCount: number; createdAt?: Date },
-    pairItemB: { id: string; reviewCount: number; createdAt?: Date },
-    referenceCountA: number,
-    referenceCountB: number,
+    pairItemA: { id: string; createdAt?: Date },
+    pairItemB: { id: string; createdAt?: Date },
   ): { sourceId: string; targetId: string } {
-    // Most reviews wins
-    if (pairItemA.reviewCount !== pairItemB.reviewCount) {
-      return pairItemA.reviewCount > pairItemB.reviewCount
-        ? { sourceId: pairItemB.id, targetId: pairItemA.id }
-        : { sourceId: pairItemA.id, targetId: pairItemB.id };
-    }
-
-    // Tie → most references wins
-    if (referenceCountA !== referenceCountB) {
-      return referenceCountA > referenceCountB
-        ? { sourceId: pairItemB.id, targetId: pairItemA.id }
-        : { sourceId: pairItemA.id, targetId: pairItemB.id };
-    }
-
-    // Tie → oldest product wins (target)
+    // Oldest product wins (target)
     const createdAtA = pairItemA.createdAt ?? new Date();
     const createdAtB = pairItemB.createdAt ?? new Date();
     return createdAtA <= createdAtB
@@ -210,11 +190,11 @@ export class ProductDuplicateEvaluationService {
         categorySlug,
       });
 
-      if (evaluation.decision === "skip") {
+      if (evaluation.decision === 'skip') {
         skipped++;
         this.metricsService.skipped(
           categoryName,
-          evaluation.reasons[0] ?? "unknown",
+          evaluation.reasons[0] ?? 'unknown',
         );
         continue;
       }
@@ -237,7 +217,7 @@ export class ProductDuplicateEvaluationService {
 
       if (!saved) {
         skipped++;
-        this.metricsService.skipped(categoryName, "product_not_found");
+        this.metricsService.skipped(categoryName, 'product_not_found');
         continue;
       }
 
@@ -287,13 +267,13 @@ export class ProductDuplicateEvaluationService {
         ProductDuplicateDecision.approved,
       ];
       if (terminalDecisions.includes(existing.decision)) {
-        return { decision: "skip", reasons: ["already_processed"] };
+        return { decision: 'skip', reasons: ['already_processed'] };
       }
     }
 
     // 1b. Trigram similarity floor — too low to even consider
     if (trigramScore < MIN_SIMILARITY_FLOOR) {
-      return { decision: "skip", reasons: ["below_similarity_floor"] };
+      return { decision: 'skip', reasons: ['below_similarity_floor'] };
     }
 
     // 2. Compute in-process similarity score via ProductSimilarityService
@@ -311,13 +291,13 @@ export class ProductDuplicateEvaluationService {
 
     const similarityResult = this.productSimilarity.score({
       query: {
-        model: query.model ?? "",
+        model: query.model ?? '',
         displayName: query.displayName,
         aliases: queryAliases,
         specs: query.specs,
       },
       candidate: {
-        model: candidate.model ?? "",
+        model: candidate.model ?? '',
         displayName: candidate.displayName,
         aliases: candidateAliases,
         specs: candidate.specs,
@@ -331,12 +311,12 @@ export class ProductDuplicateEvaluationService {
     const inProcessScore = similarityResult.score;
 
     if (inProcessScore < config.minPendingReviewThreshold) {
-      return { decision: "skip", reasons: ["below_pending_review_threshold"] };
+      return { decision: 'skip', reasons: ['below_pending_review_threshold'] };
     }
 
     const specMatchDetails = similarityResult.specMatchDetails;
 
-    this.logger.debug("Duplicate pair scored", {
+    this.logger.debug('Duplicate pair scored', {
       productAId: productA.id,
       productBId: productB.id,
       trigramScore,
@@ -377,25 +357,6 @@ export class ProductDuplicateEvaluationService {
       );
     }
 
-    // 7. High activity safety valve
-    if (
-      productA.reviewCount > MIN_REVIEW_COUNT_FOR_HIGH_ACTIVITY &&
-      productB.reviewCount > MIN_REVIEW_COUNT_FOR_HIGH_ACTIVITY
-    ) {
-      const [refCountA, refCountB] = await this.getReferenceCountsForPair(
-        productA.id,
-        productB.id,
-      );
-      if (
-        refCountA > config.highActivityThreshold &&
-        refCountB > config.highActivityThreshold
-      ) {
-        pendingReasons.push(
-          `high activity: ${refCountA}/${refCountB} refs, ${productA.reviewCount}/${productB.reviewCount} reviews`,
-        );
-      }
-    }
-
     const needsReview = belowThreshold || !isEmpty(pendingReasons);
 
     if (needsReview) {
@@ -415,7 +376,7 @@ export class ProductDuplicateEvaluationService {
     // All checks pass
     return {
       decision: ProductDuplicateDecision.auto_merged,
-      reasons: ["all_checks_passed"],
+      reasons: ['all_checks_passed'],
       specMatchDetails,
       inProcessScore,
     };
@@ -427,19 +388,12 @@ export class ProductDuplicateEvaluationService {
     categoryName: string,
   ): Promise<boolean> {
     try {
-      const [refCountA, refCountB] = await this.getReferenceCountsForPair(
-        productA.id,
-        productB.id,
-      );
-
       const { sourceId, targetId } = this.selectMergeTarget(
         productA,
         productB,
-        refCountA,
-        refCountB,
       );
 
-      this.logger.log("Auto-merging duplicate pair", {
+      this.logger.log('Auto-merging duplicate pair', {
         sourceId,
         targetId,
         category: categoryName,
@@ -472,7 +426,7 @@ export class ProductDuplicateEvaluationService {
 
       return true;
     } catch (error: unknown) {
-      this.logger.error("Auto-merge failed", {
+      this.logger.error('Auto-merge failed', {
         productAId: productA.id,
         productBId: productB.id,
         category: categoryName,
@@ -495,7 +449,7 @@ export class ProductDuplicateEvaluationService {
     if (!sourceModel) return;
 
     const normalizedAlias = normalize(sourceModel);
-    const targetModel = normalize(target.model ?? "");
+    const targetModel = normalize(target.model ?? '');
 
     if (normalizedAlias.length < 2) return;
     if (normalizedAlias === targetModel) return;
@@ -528,7 +482,7 @@ export class ProductDuplicateEvaluationService {
 
       await this.aliasRepo.save(alias);
 
-      this.logger.debug("Auto-created alias from dedup merge", {
+      this.logger.debug('Auto-created alias from dedup merge', {
         alias: normalizedAlias,
         targetId: target.id,
         sourceId: source.id,
@@ -536,11 +490,11 @@ export class ProductDuplicateEvaluationService {
     } catch (error: unknown) {
       if (
         error instanceof Error &&
-        error.message?.includes("unique constraint")
+        error.message?.includes('unique constraint')
       ) {
         return;
       }
-      this.logger.warn("Auto-create alias from dedup failed", {
+      this.logger.warn('Auto-create alias from dedup failed', {
         alias: normalizedAlias,
         targetId: target.id,
         error: error instanceof Error ? error.message : String(error),
@@ -561,28 +515,6 @@ export class ProductDuplicateEvaluationService {
       queryAliasEntities.map((entity) => entity.alias),
       candidateAliasEntities.map((entity) => entity.alias),
     ];
-  }
-
-  private async getReferenceCountsForPair(
-    productAId: string,
-    productBId: string,
-  ): Promise<[number, number]> {
-    // Count distinct references with a candidate pointing at each product —
-    // the multi-candidate equivalent of "references resolved to this product".
-    const countByModel = (modelId: string): Promise<number> =>
-      this.candidateRepo.repo
-        .createQueryBuilder("candidate")
-        .where("candidate.modelId = :modelId", { modelId })
-        .select("COUNT(DISTINCT candidate.referenceId)", "count")
-        .getRawOne<{ count: string }>()
-        .then((row) => Number(row?.count ?? 0));
-
-    const [countA, countB] = await Promise.all([
-      countByModel(productAId),
-      countByModel(productBId),
-    ]);
-
-    return [countA, countB];
   }
 
   private resolveConfig(): DuplicateDetectionConfig {
@@ -606,8 +538,6 @@ export class ProductDuplicateEvaluationService {
       batchSize: dynamicConfig?.batchSize ?? defaults.batchSize,
       maxMergesPerRun:
         dynamicConfig?.maxMergesPerRun ?? defaults.maxMergesPerRun,
-      highActivityThreshold:
-        dynamicConfig?.highActivityThreshold ?? defaults.highActivityThreshold,
     };
   }
 }

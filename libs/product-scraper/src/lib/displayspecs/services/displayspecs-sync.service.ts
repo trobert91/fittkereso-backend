@@ -1,19 +1,19 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSourceSyncService,
   ProductSourceSyncOptions,
-} from "../../interfaces/product-source-sync-service.interface";
+} from '../../interfaces/product-source-sync-service.interface';
 import {
   BrandRepository,
   ProductSource,
   ScrapeQueueName,
   ScrapeTask,
-} from "@ebike-backend/database";
-import { DisplaySpecsIndexPageService } from "./displayspecs-index-page.service";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ProductCollectionMetricsService } from "@ebike-backend/metrics";
-import { ScrapeTaskPublisherService } from "@ebike-backend/task";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { DisplaySpecsIndexPageService } from './displayspecs-index-page.service';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class DisplayspecsSyncService implements ProductSourceSyncService {
@@ -31,7 +31,7 @@ export class DisplayspecsSyncService implements ProductSourceSyncService {
     options?: ProductSourceSyncOptions,
   ): Promise<void> {
     const startTime = Date.now();
-    this.logger.debug("Starting sync for displayspecs.com");
+    this.logger.debug('Starting sync for displayspecs.com');
 
     try {
       let brandLinks = await this.getBrandLinks(source);
@@ -48,7 +48,7 @@ export class DisplayspecsSyncService implements ProductSourceSyncService {
         }
         brandLinks = filtered;
         this.logger.debug(
-          `Filtered to ${Object.keys(brandLinks).length} brands matching: ${(options?.brandNames ?? []).join(", ")}`,
+          `Filtered to ${Object.keys(brandLinks).length} brands matching: ${(options?.brandNames ?? []).join(', ')}`,
         );
       }
 

@@ -5,9 +5,9 @@ import {
   IsOptional,
   IsString,
   IsArray,
-} from "class-validator";
-import { ProductSpecs } from "@ebike-backend/database";
-import { Transform } from "class-transformer";
+} from 'class-validator';
+import { ProductSpecs } from '@fittkereso-backend/database';
+import { Transform } from 'class-transformer';
 
 export class ProductModelUpdateDto {
   @IsOptional()
@@ -44,7 +44,7 @@ export class ProductModelUpdateDto {
 
   @IsOptional()
   @IsInt()
-  @Transform(({ value }) => (value === "" ? undefined : value))
+  @Transform(({ value }) => (value === '' ? undefined : value))
   releaseYear?: number;
 
   @IsOptional()

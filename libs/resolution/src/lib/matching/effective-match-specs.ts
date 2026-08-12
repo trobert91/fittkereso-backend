@@ -1,6 +1,6 @@
-import { ProductSpecs, StructuredSpec } from "@ebike-backend/database";
-import { isNil } from "lodash";
-import { structuredSpecsToProductSpecs } from "./spec-utils";
+import { ProductSpecs, StructuredSpec } from '@fittkereso-backend/database';
+import { isNil } from 'lodash';
+import { structuredSpecsToProductSpecs } from './spec-utils';
 
 /**
  * Restrict a ProductSpecs map to the keys listed in primarySpecs.

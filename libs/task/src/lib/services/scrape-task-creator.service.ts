@@ -1,15 +1,15 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   ProductModel,
   ScrapeTask,
   ScrapeTaskRepository,
   ProductSourceRepository,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
-import { ScrapeTaskCreateDto } from "../models/scrape-task-create.dto";
-import { ScrapeTaskPublisherService } from "./scrape-task-publisher.service";
-import { isNil } from "lodash";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ScrapeTaskCreateDto } from '../models/scrape-task-create.dto';
+import { ScrapeTaskPublisherService } from './scrape-task-publisher.service';
+import { isNil } from 'lodash';
 
 @Injectable()
 export class ScrapeTaskCreatorService {
@@ -53,9 +53,9 @@ export class ScrapeTaskCreatorService {
     return this.scrapeTaskRepository.findOneOrFail({
       where: { id: task.id },
       relations: [
-        nameOf<ScrapeTask>("source"),
-        nameOf<ScrapeTask>("product"),
-        `${nameOf<ScrapeTask>("product")}.${nameOf<ProductModel>("brand")}`,
+        nameOf<ScrapeTask>('source'),
+        nameOf<ScrapeTask>('product'),
+        `${nameOf<ScrapeTask>('product')}.${nameOf<ProductModel>('brand')}`,
       ],
     });
   }

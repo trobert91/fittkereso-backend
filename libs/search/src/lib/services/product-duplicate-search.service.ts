@@ -1,14 +1,14 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductCategory,
   ProductDuplicate,
   ProductDuplicateRepository,
   ProductModel,
-} from "@ebike-backend/database";
-import { nameOf } from "@ebike-backend/utils";
-import type { SelectQueryBuilder } from "typeorm";
-import { ProductDuplicateSearchParams } from "../models/product-duplicate-search-params";
-import { ProductDuplicateSearchResult } from "../models/product-duplicate-search-result";
+} from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import type { SelectQueryBuilder } from 'typeorm';
+import { ProductDuplicateSearchParams } from '../models/product-duplicate-search-params';
+import { ProductDuplicateSearchResult } from '../models/product-duplicate-search-result';
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -42,29 +42,29 @@ export class ProductDuplicateSearchService {
     params: ProductDuplicateSearchParams,
   ): SelectQueryBuilder<ProductDuplicate> {
     const query = this.duplicateRepo.repo
-      .createQueryBuilder("duplicate")
+      .createQueryBuilder('duplicate')
       .leftJoinAndSelect(
-        `duplicate.${nameOf<ProductDuplicate>("productA")}`,
-        "productA",
+        `duplicate.${nameOf<ProductDuplicate>('productA')}`,
+        'productA',
       )
-      .leftJoinAndSelect(`productA.${nameOf<ProductModel>("brand")}`, "brandA")
+      .leftJoinAndSelect(`productA.${nameOf<ProductModel>('brand')}`, 'brandA')
       .leftJoinAndSelect(
-        `productA.${nameOf<ProductModel>("productCategory")}`,
-        "categoryA",
+        `productA.${nameOf<ProductModel>('productCategory')}`,
+        'categoryA',
       )
       .leftJoinAndSelect(
-        `duplicate.${nameOf<ProductDuplicate>("productB")}`,
-        "productB",
+        `duplicate.${nameOf<ProductDuplicate>('productB')}`,
+        'productB',
       )
-      .leftJoinAndSelect(`productB.${nameOf<ProductModel>("brand")}`, "brandB")
+      .leftJoinAndSelect(`productB.${nameOf<ProductModel>('brand')}`, 'brandB')
       .leftJoinAndSelect(
-        `productB.${nameOf<ProductModel>("productCategory")}`,
-        "categoryB",
+        `productB.${nameOf<ProductModel>('productCategory')}`,
+        'categoryB',
       );
 
     if (params.decision) {
       query.andWhere(
-        `duplicate.${nameOf<ProductDuplicate>("decision")} = :decision`,
+        `duplicate.${nameOf<ProductDuplicate>('decision')} = :decision`,
         {
           decision: params.decision,
         },
@@ -72,14 +72,14 @@ export class ProductDuplicateSearchService {
     }
 
     if (params.categoryId) {
-      const categoryIdColumn = nameOf<ProductCategory>("id");
+      const categoryIdColumn = nameOf<ProductCategory>('id');
       query.andWhere(
         `(categoryA.${categoryIdColumn} = :categoryId OR categoryB.${categoryIdColumn} = :categoryId)`,
         { categoryId: params.categoryId },
       );
     }
 
-    query.orderBy(`duplicate.${nameOf<ProductDuplicate>("createdAt")}`, "DESC");
+    query.orderBy(`duplicate.${nameOf<ProductDuplicate>('createdAt')}`, 'DESC');
 
     return query;
   }

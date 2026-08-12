@@ -2,7 +2,7 @@
 
 Anthropic Claude SDK adapter. Wraps `@anthropic-ai/sdk` and exposes
 `ClaudeChatProvider`, which implements the `AiChatProvider` interface from
-`@ebike-backend/ai`. Self-registers into `AiProviderRegistry` on module
+`@fittkereso-backend/ai`. Self-registers into `AiProviderRegistry` on module
 init so requests with a `claude-*` model name route here automatically.
 
 Structured output (`request.schema`) is delivered via the Anthropic tool-use

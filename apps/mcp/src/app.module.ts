@@ -1,16 +1,16 @@
-import { Module } from "@nestjs/common";
-import { AppConfigModule } from "./modules/app-config/app-config.module";
-import { ConfigModule } from "@nestjs/config";
-import { ConfigLoader } from "./modules/app-config/loader/config-loader";
-import { DatabaseModule } from "@ebike-backend/database";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { PostgresConfigService } from "@ebike-backend/config";
-import { DataSource, DataSourceOptions } from "typeorm";
-import { WithLengthColumnType } from "typeorm/driver/types/ColumnTypes";
-import { LoggerModule } from "@ebike-backend/logger";
-import { AiModule } from "@ebike-backend/ai";
-import { McpModule, McpTransportType } from "@rekog/mcp-nest";
-import { ToolsModule } from "./modules/tools/tools.module";
+import { Module } from '@nestjs/common';
+import { AppConfigModule } from './modules/app-config/app-config.module';
+import { ConfigModule } from '@nestjs/config';
+import { ConfigLoader } from './modules/app-config/loader/config-loader';
+import { DatabaseModule } from '@fittkereso-backend/database';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { PostgresConfigService } from '@fittkereso-backend/config';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { WithLengthColumnType } from 'typeorm/driver/types/ColumnTypes';
+import { LoggerModule } from '@fittkereso-backend/logger';
+import { AiModule } from '@fittkereso-backend/ai';
+import { McpModule, McpTransportType } from '@rekog/mcp-nest';
+import { ToolsModule } from './modules/tools/tools.module';
 
 @Module({
   imports: [
@@ -22,22 +22,22 @@ import { ToolsModule } from "./modules/tools/tools.module";
     }),
     DatabaseModule,
     TypeOrmModule.forRootAsync({
-      name: "postgres",
+      name: 'postgres',
       useExisting: PostgresConfigService,
       dataSourceFactory: async (config: DataSourceOptions | undefined) => {
         if (!config) {
           throw new Error(
-            "DataSourceOptions are required for postgres connection",
+            'DataSourceOptions are required for postgres connection',
           );
         }
         const dataSource = new DataSource(config);
 
         // Add pgvector support
         dataSource.driver.supportedDataTypes.push(
-          "vector" as WithLengthColumnType,
+          'vector' as WithLengthColumnType,
         );
         dataSource.driver.withLengthColumnTypes.push(
-          "vector" as WithLengthColumnType,
+          'vector' as WithLengthColumnType,
         );
 
         await dataSource.initialize();
@@ -49,10 +49,10 @@ import { ToolsModule } from "./modules/tools/tools.module";
     LoggerModule,
     AiModule,
     McpModule.forRoot({
-      name: "ebike",
-      version: "1.0.0",
+      name: 'fittkereso',
+      version: '1.0.0',
       transport: [McpTransportType.STREAMABLE_HTTP, McpTransportType.SSE],
-      logging: { level: ["log", "warn", "error"] },
+      logging: { level: ['log', 'warn', 'error'] },
     }),
     ToolsModule,
   ],

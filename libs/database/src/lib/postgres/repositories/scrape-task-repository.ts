@@ -1,20 +1,20 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { ScrapeTask } from "../models/scrape-task.entity";
-import { TaskStatus } from "../models/task.entity";
-import { BasePostgresRepository } from "./base-postgres-repository";
-import { ScrapeQueueName } from "../types";
-import { nameOf } from "@ebike-backend/utils";
-import { ProductSource } from "../models";
-import { isEmpty } from "lodash";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ScrapeTask } from '../models/scrape-task.entity';
+import { TaskStatus } from '../models/task.entity';
+import { BasePostgresRepository } from './base-postgres-repository';
+import { ScrapeQueueName } from '../types';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ProductSource } from '../models';
+import { isEmpty } from 'lodash';
 
 const DEFAULT_REQUEST_PER_HOUR = 50;
 
 @Injectable()
 export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
   constructor(
-    @InjectRepository(ScrapeTask, "postgres")
+    @InjectRepository(ScrapeTask, 'postgres')
     repository: Repository<ScrapeTask>,
   ) {
     super(repository, ScrapeTask);
@@ -36,14 +36,14 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
       // Lock only the task row — FOR UPDATE cannot be used with outer joins,
       // so we select just the ID here and load relations in a separate query.
       const lockedTask = await queryRunner.manager
-        .createQueryBuilder(ScrapeTask, "task")
-        .setLock("pessimistic_write")
-        .select(`task.${nameOf<ScrapeTask>("id")}`)
-        .innerJoin(`task.${nameOf<ScrapeTask>("source")}`, "source")
+        .createQueryBuilder(ScrapeTask, 'task')
+        .setLock('pessimistic_write')
+        .select(`task.${nameOf<ScrapeTask>('id')}`)
+        .innerJoin(`task.${nameOf<ScrapeTask>('source')}`, 'source')
         .where(
-          `(task.${nameOf<ScrapeTask>("status")} = :pendingStatus OR
-           (task.${nameOf<ScrapeTask>("status")} = :failedStatus AND task.${nameOf<ScrapeTask>("attempts")} < :maxAttempts) OR
-           (task.${nameOf<ScrapeTask>("status")} = :processingStatus AND task."${nameOf<ScrapeTask>("lockedAt")}" < NOW() - MAKE_INTERVAL(mins => :staleTimeoutMinutes)))`,
+          `(task.${nameOf<ScrapeTask>('status')} = :pendingStatus OR
+           (task.${nameOf<ScrapeTask>('status')} = :failedStatus AND task.${nameOf<ScrapeTask>('attempts')} < :maxAttempts) OR
+           (task.${nameOf<ScrapeTask>('status')} = :processingStatus AND task."${nameOf<ScrapeTask>('lockedAt')}" < NOW() - MAKE_INTERVAL(mins => :staleTimeoutMinutes)))`,
           {
             pendingStatus: TaskStatus.PENDING,
             failedStatus: TaskStatus.FAILED,
@@ -52,38 +52,38 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
             staleTimeoutMinutes: staleTaskTimeoutMinutes,
           },
         )
-        .andWhere(`source.${nameOf<ProductSource>("processingEnabled")} = true`)
-        .andWhere(`task.${nameOf<ScrapeTask>("queue")} IN (:...queues)`, {
+        .andWhere(`source.${nameOf<ProductSource>('processingEnabled')} = true`)
+        .andWhere(`task.${nameOf<ScrapeTask>('queue')} IN (:...queues)`, {
           queues,
         })
         .andWhere(
-          `(task.${nameOf<ScrapeTask>("scheduledAt")} IS NULL OR task.${nameOf<ScrapeTask>("scheduledAt")} <= NOW())`,
+          `(task.${nameOf<ScrapeTask>('scheduledAt')} IS NULL OR task.${nameOf<ScrapeTask>('scheduledAt')} <= NOW())`,
         )
         .andWhere((qb) => {
           const subQuery = qb
             .subQuery()
-            .select("COUNT(*)")
-            .from(ScrapeTask, "t2")
-            .leftJoin(`t2.${nameOf<ScrapeTask>("source")}`, "s2")
+            .select('COUNT(*)')
+            .from(ScrapeTask, 't2')
+            .leftJoin(`t2.${nameOf<ScrapeTask>('source')}`, 's2')
             .where(
-              `s2.${nameOf<ProductSource>("id")} = source.${nameOf<ProductSource>("id")}`,
+              `s2.${nameOf<ProductSource>('id')} = source.${nameOf<ProductSource>('id')}`,
             )
-            .andWhere(`t2.${nameOf<ScrapeTask>("status")} = :activeProcessing`)
+            .andWhere(`t2.${nameOf<ScrapeTask>('status')} = :activeProcessing`)
             .andWhere(
-              `t2."${nameOf<ScrapeTask>("lockedAt")}" >= NOW() - MAKE_INTERVAL(mins => :staleTimeoutMinutes)`,
+              `t2."${nameOf<ScrapeTask>('lockedAt')}" >= NOW() - MAKE_INTERVAL(mins => :staleTimeoutMinutes)`,
             )
             .getQuery();
 
-          return `${subQuery} < COALESCE(source.${nameOf<ProductSource>("maxConcurrent")}, 1)`;
+          return `${subQuery} < COALESCE(source.${nameOf<ProductSource>('maxConcurrent')}, 1)`;
         })
         .andWhere((qb) => {
           const subQuery = qb
             .subQuery()
-            .select(`MAX(t3.${nameOf<ScrapeTask>("lockedAt")})`)
-            .from(ScrapeTask, "t3")
-            .leftJoin(`t3.${nameOf<ScrapeTask>("source")}`, "s3")
+            .select(`MAX(t3.${nameOf<ScrapeTask>('lockedAt')})`)
+            .from(ScrapeTask, 't3')
+            .leftJoin(`t3.${nameOf<ScrapeTask>('source')}`, 's3')
             .where(
-              `s3.${nameOf<ProductSource>("id")} = source.${nameOf<ProductSource>("id")}`,
+              `s3.${nameOf<ProductSource>('id')} = source.${nameOf<ProductSource>('id')}`,
             )
             .getQuery();
 
@@ -93,7 +93,7 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
               OR
               NOW() - (${subQuery})
                 >= INTERVAL '1 second'
-                  * (3600 / COALESCE(source.${nameOf<ProductSource>("requestsPerHour")}, ${DEFAULT_REQUEST_PER_HOUR}))
+                  * (3600 / COALESCE(source.${nameOf<ProductSource>('requestsPerHour')}, ${DEFAULT_REQUEST_PER_HOUR}))
             )
           `;
         })
@@ -101,7 +101,7 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
           activeProcessing: TaskStatus.PROCESSING,
           staleTimeoutMinutes: staleTaskTimeoutMinutes,
         })
-        .orderBy(`task.${nameOf<ScrapeTask>("createdAt")}`, "ASC")
+        .orderBy(`task.${nameOf<ScrapeTask>('createdAt')}`, 'ASC')
         .getOne();
 
       if (!lockedTask) {
@@ -114,8 +114,8 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
       const task = await queryRunner.manager.findOneOrFail(ScrapeTask, {
         where: { id: lockedTask.id },
         relations: [
-          nameOf<ScrapeTask>("source"),
-          nameOf<ScrapeTask>("product"),
+          nameOf<ScrapeTask>('source'),
+          nameOf<ScrapeTask>('product'),
         ],
       });
 
@@ -149,19 +149,19 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
     if (isEmpty(urls)) return [];
 
     const normalizedUrls = urls.map((url) =>
-      url.toLowerCase().replace(/\/+$/, ""),
+      url.toLowerCase().replace(/\/+$/, ''),
     );
 
     return this.repo
-      .createQueryBuilder("task")
+      .createQueryBuilder('task')
       .where(
-        `LOWER(RTRIM(task.${nameOf<ScrapeTask>("url")}, :slash)) IN (:...urls)`,
+        `LOWER(RTRIM(task.${nameOf<ScrapeTask>('url')}, :slash)) IN (:...urls)`,
         {
           urls: normalizedUrls,
-          slash: "/",
+          slash: '/',
         },
       )
-      .andWhere(`task.${nameOf<ScrapeTask>("status")} IN (:...statuses)`, {
+      .andWhere(`task.${nameOf<ScrapeTask>('status')} IN (:...statuses)`, {
         statuses,
       })
       .getMany();

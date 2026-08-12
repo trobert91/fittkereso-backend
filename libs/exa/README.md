@@ -1,6 +1,6 @@
 # Exa.ai Integration Library
 
-This library provides integration with [Exa.ai](https://exa.ai) neural/semantic search API for the ebike backend.
+This library provides integration with [Exa.ai](https://exa.ai) neural/semantic search API for the fittkereso backend.
 
 ## Features
 
@@ -41,7 +41,7 @@ Import the `ExaModule` in your application module:
 
 ```typescript
 import { Module } from "@nestjs/common";
-import { ExaModule } from "@ebike-backend/exa";
+import { ExaModule } from "@fittkereso-backend/exa";
 
 @Module({
   imports: [ExaModule],
@@ -53,7 +53,7 @@ export class YourModule {}
 ### Search Examples
 
 ```typescript
-import { ExaSearchService } from "@ebike-backend/exa";
+import { ExaSearchService } from "@fittkereso-backend/exa";
 
 @Injectable()
 export class YourService {
@@ -188,8 +188,8 @@ Get contents for specific URLs.
 The Exa library is designed to work with the unified ProductWebSearchService:
 
 ```typescript
-import { ExaSearchService } from "@ebike-backend/exa";
-import { WebSearchProvider } from "@ebike-backend/database";
+import { ExaSearchService } from "@fittkereso-backend/exa";
+import { WebSearchProvider } from "@fittkereso-backend/database";
 
 // Provider selection based on comment relevance
 const provider =

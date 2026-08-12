@@ -1,16 +1,16 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   CacheStoreItem,
   TranslationCacheRepository,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   DynamicConfigService,
   TranslationConfig,
-} from "@ebike-backend/dynamic-config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { TranslationMetricsService } from "@ebike-backend/metrics";
-import { AiChatService } from "@ebike-backend/ai";
-import { compact, uniq } from "lodash";
+} from '@fittkereso-backend/dynamic-config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { TranslationMetricsService } from '@fittkereso-backend/metrics';
+import { AiChatService } from '@fittkereso-backend/ai';
+import { compact, uniq } from 'lodash';
 
 export interface TranslateBatchParams {
   /** Raw source strings. May contain duplicates, empties, or undefined — all deduped/filtered internally. */
@@ -69,19 +69,19 @@ const isNumericOnly = (value: string): boolean =>
   NUMERIC_ONLY_PATTERN.test(value) && /\d/.test(value);
 
 const BATCH_TRANSLATION_SCHEMA = {
-  type: "object",
+  type: 'object',
   additionalProperties: false,
-  required: ["translations"],
+  required: ['translations'],
   properties: {
     translations: {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         additionalProperties: false,
-        required: ["source", "translation"],
+        required: ['source', 'translation'],
         properties: {
-          source: { type: "string" },
-          translation: { type: "string" },
+          source: { type: 'string' },
+          translation: { type: 'string' },
         },
       },
     },
@@ -121,9 +121,9 @@ export class TranslationService {
     const startedAt = Date.now();
     const config = this.getConfig();
     const sourceLanguage =
-      params.sourceLanguage ?? config.defaultSourceLanguage ?? "hu";
+      params.sourceLanguage ?? config.defaultSourceLanguage ?? 'hu';
     const targetLanguage =
-      params.targetLanguage ?? config.defaultTargetLanguage ?? "en";
+      params.targetLanguage ?? config.defaultTargetLanguage ?? 'en';
 
     // 1. NORMALIZE + DEDUPE — run ONCE up front, before any lookups.
     //    - compact() drops undefined/null/empty strings
@@ -160,7 +160,7 @@ export class TranslationService {
       this.metrics.recordBatch({
         sourceLanguage,
         targetLanguage,
-        outcome: "empty",
+        outcome: 'empty',
         durationSeconds: (Date.now() - startedAt) / 1000,
       });
       return { translations, stats, lookup };
@@ -171,7 +171,7 @@ export class TranslationService {
       this.metrics.recordBatch({
         sourceLanguage,
         targetLanguage,
-        outcome: "identity",
+        outcome: 'identity',
         durationSeconds: (Date.now() - startedAt) / 1000,
       });
       return { translations, stats, lookup };
@@ -230,7 +230,7 @@ export class TranslationService {
     this.metrics.recordBatch({
       sourceLanguage,
       targetLanguage,
-      outcome: "success",
+      outcome: 'success',
       durationSeconds: (Date.now() - startedAt) / 1000,
     });
     this.metrics.recordItems({
@@ -284,7 +284,7 @@ export class TranslationService {
         targetLanguage,
         context,
         maxBatchSize: config.maxBatchSize ?? 50,
-        model: config.model ?? "deepseek-v4-flash",
+        model: config.model ?? 'deepseek-v4-flash',
       });
 
       const toStore: CacheStoreItem[] = [];
@@ -305,13 +305,13 @@ export class TranslationService {
         await this.cacheRepo.storeBatch({
           sourceLanguage,
           targetLanguage,
-          source: "llm",
+          source: 'llm',
           items: toStore,
           ttlDays: config.cacheTtlDays,
         });
       }
     } catch (error: unknown) {
-      this.logger.warn("Batch translation LLM call failed", {
+      this.logger.warn('Batch translation LLM call failed', {
         sourceLanguage,
         targetLanguage,
         pendingCount: llmQueue.length,
@@ -369,7 +369,7 @@ export class TranslationService {
   }): Promise<Map<string, string>> {
     const contextBlock = params.context
       ? `Domain context: ${params.context}\n\n`
-      : "";
+      : '';
 
     const systemPrompt =
       `You are a technical translator. Translate each item from ${params.sourceLanguage} to ${params.targetLanguage}.\n\n` +
@@ -387,13 +387,13 @@ export class TranslationService {
     let response;
     try {
       response = await this.aiChat.createChat({
-        costLabel: "translation",
+        costLabel: 'translation',
         schema: BATCH_TRANSLATION_SCHEMA,
-        schemaName: "batch_translation",
+        schemaName: 'batch_translation',
         model: params.model,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
         temperature: 1,
       });
@@ -403,7 +403,7 @@ export class TranslationService {
         targetLanguage: params.targetLanguage,
         chunkSize: params.texts.length,
         durationSeconds: (Date.now() - startedAt) / 1000,
-        status: "error",
+        status: 'error',
       });
       throw error;
     }
@@ -413,7 +413,7 @@ export class TranslationService {
       targetLanguage: params.targetLanguage,
       chunkSize: params.texts.length,
       durationSeconds: (Date.now() - startedAt) / 1000,
-      status: "success",
+      status: 'success',
     });
 
     const content = response.choices[0]?.message?.content;
@@ -425,7 +425,7 @@ export class TranslationService {
     try {
       parsed = JSON.parse(content);
     } catch {
-      this.logger.warn("Translation LLM returned invalid JSON", {
+      this.logger.warn('Translation LLM returned invalid JSON', {
         preview: content.slice(0, 200),
       });
       return new Map();

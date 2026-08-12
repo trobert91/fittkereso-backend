@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
-import { Brand, BrandRepository } from "@ebike-backend/database";
-import { isUndefined } from "lodash";
-import { generateSlug, nameOf } from "@ebike-backend/utils";
-import { BrandUpdateDto } from "../../models";
+import { Injectable } from '@nestjs/common';
+import { Brand, BrandRepository } from '@fittkereso-backend/database';
+import { isUndefined } from 'lodash';
+import { generateSlug, nameOf } from '@fittkereso-backend/utils';
+import { BrandUpdateDto } from '../../models';
 
 @Injectable()
 export class BrandUpdateService {
@@ -11,7 +11,7 @@ export class BrandUpdateService {
   public async updateBrand(id: string, dto: BrandUpdateDto): Promise<Brand> {
     const brand = await this.brandRepo.findOneOrFail({
       where: { id },
-      relations: [nameOf<Brand>("aliases")],
+      relations: [nameOf<Brand>('aliases')],
     });
 
     if (!isUndefined(dto.name)) {
@@ -31,10 +31,10 @@ export class BrandUpdateService {
     let slug = generateSlug(entity.id, entity.name);
     const existing = await this.brandRepo.findOne({
       where: { slug },
-      select: ["id"],
+      select: ['id'],
     });
     if (existing && existing.id !== entity.id) {
-      slug = slug + "-" + entity.id.slice(-6);
+      slug = slug + '-' + entity.id.slice(-6);
     }
     entity.slug = slug;
   }

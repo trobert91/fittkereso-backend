@@ -17,7 +17,7 @@ Execute the following steps to gather data. Work through them sequentially where
 
 **Local file mode:** Read the JSON file once and use `items[0].thread` for title, topic, URL, OP body, and `totalItems` for comment count. Derive status distribution by aggregating `status` and `lastProcessedStatus` across `items`. Skip MCP unless the user explicitly asks for additional thread context.
 
-**MCP mode:** Call `mcp__ebike__get_thread_detail` with `threadId: "$ARGUMENTS"` to understand:
+**MCP mode:** Call `mcp__fittkereso__get_thread_detail` with `threadId: "$ARGUMENTS"` to understand:
 
 - Thread title, topic/subreddit, URL
 - Total comment counts and breakdown by status (new, extracted, relevance_calculated, resolved, approved, in_review)
@@ -27,7 +27,7 @@ Execute the following steps to gather data. Work through them sequentially where
 
 **Local file mode:** Derive a status summary from the JSON items (count by `status`, count of items with non-empty `productReferences`, count by `validationDecision`, count by `moderations[].suggestedStatus`). Skip MCP unless the user explicitly asks for the full processed trace summary.
 
-**MCP mode:** Call `mcp__ebike__get_thread_trace_summary` with `threadId: "$ARGUMENTS"` to understand:
+**MCP mode:** Call `mcp__fittkereso__get_thread_trace_summary` with `threadId: "$ARGUMENTS"` to understand:
 
 - Overall pipeline health and anomalies
 - Comment table with statuses
@@ -37,25 +37,25 @@ Execute the following steps to gather data. Work through them sequentially where
 
 **Local file mode:** Filter the JSON `items` where `status === "approved"`, take up to 20.
 
-**MCP mode:** Call `mcp__ebike__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["approved"]`, `pageSize: 20`.
+**MCP mode:** Call `mcp__fittkereso__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["approved"]`, `pageSize: 20`.
 
 ### Step 4 — Sample In-Review Comments
 
 **Local file mode:** Filter `items` where `status === "in_review"` (or `validationDecision === "in_review"` on the comment or its `parent`), take up to 20. Inspect `moderations[]` entries for reasons.
 
-**MCP mode:** Call `mcp__ebike__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["in_review"]`, `pageSize: 20`.
+**MCP mode:** Call `mcp__fittkereso__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["in_review"]`, `pageSize: 20`.
 
 ### Step 5 — Sample Unprocessed / New Comments
 
 **Local file mode:** Filter `items` where `status === "new"` or `status === "skipped"` with no `productReferences` and a non-trivial body, take up to 10.
 
-**MCP mode:** Call `mcp__ebike__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["new"]`, `pageSize: 10`.
+**MCP mode:** Call `mcp__fittkereso__search_comments` with `threadId: "$ARGUMENTS"`, `statuses: ["new"]`, `pageSize: 10`.
 
 ### Step 6 — Deep-Dive Comment Details
 
 **Local file mode:** Pick up to 5 representative items (mix of approved, in_review, anomalous). The JSON already contains `body`, `parent`, `productReferences` (with resolution candidates), `moderations`, and `validationDecision` — use these directly. Skip MCP unless the user explicitly asks for additional resolution context (e.g. full web search candidates) not present in the file.
 
-**MCP mode:** Call `mcp__ebike__get_comment_detail` on up to 5 representative comments — mix approved, in_review, and any anomalous ones identified in Step 2. Focus on comments that look interesting or problematic based on their body text.
+**MCP mode:** Call `mcp__fittkereso__get_comment_detail` on up to 5 representative comments — mix approved, in_review, and any anomalous ones identified in Step 2. Focus on comments that look interesting or problematic based on their body text.
 
 ### Step 7 — Pipeline Traces for Flagged Comments (Exact Prompts via Loki)
 
@@ -93,11 +93,11 @@ curl -s -G "http://localhost:3100/loki/api/v1/query_range" \
   --data-urlencode "direction=forward"
 ```
 
-Parse the JSON metadata in each returned log line: `messages[0].content` for the prompt body, `response` for the LLM output, plus `model`, `provider`, `cost`, `executionTimeInSec`, `usage`. Only fall back to `mcp__ebike__get_comment_traces` if Loki returns no results (e.g. logs aged out past 30-day retention).
+Parse the JSON metadata in each returned log line: `messages[0].content` for the prompt body, `response` for the LLM output, plus `model`, `provider`, `cost`, `executionTimeInSec`, `usage`. Only fall back to `mcp__fittkereso__get_comment_traces` if Loki returns no results (e.g. logs aged out past 30-day retention).
 
 ### Step 8 — Verify Missing Products in Database
 
-For every product that appears to be missing from the database (unresolved references, wrong-product flags, or resolution failures identified in Steps 6–7), call `mcp__ebike__search_products` to confirm whether the product actually exists before reporting it as absent. Use the brand name and key model terms as the search term. Only report a product as "missing from the DB" if the search returns no plausible match.
+For every product that appears to be missing from the database (unresolved references, wrong-product flags, or resolution failures identified in Steps 6–7), call `mcp__fittkereso__search_products` to confirm whether the product actually exists before reporting it as absent. Use the brand name and key model terms as the search term. Only report a product as "missing from the DB" if the search returns no plausible match.
 
 **Local file mode:** This step still uses MCP because the local JSON does not contain the canonical product catalog. Skip it only if the user explicitly asks for a file-only analysis.
 

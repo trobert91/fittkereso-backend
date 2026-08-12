@@ -7,9 +7,9 @@ import {
   ProductModelSourceRepository,
   ScrapeTask,
   ScrapeTaskRepository,
-} from "@ebike-backend/database";
-import type { ProductMetricsService } from "@ebike-backend/metrics";
-import type { ResolutionService } from "@ebike-backend/resolution";
+} from '@fittkereso-backend/database';
+import type { ProductMetricsService } from '@fittkereso-backend/metrics';
+import type { ResolutionService } from '@fittkereso-backend/resolution';
 import type {
   BrandResolutionService,
   ProductEmbeddingService,
@@ -17,41 +17,41 @@ import type {
   ProductNormalizerService,
   ProductSpecUpdaterService,
   ScrapedProduct,
-} from "@ebike-backend/product";
+} from '@fittkereso-backend/product';
 
-jest.mock("@ebike-backend/resolution", () => ({
+jest.mock('@fittkereso-backend/resolution', () => ({
   productSpecsToStructuredSpecs: jest.fn((specs) => specs),
 }));
 
-jest.mock("@ebike-backend/product", () => ({}));
+jest.mock('@fittkereso-backend/product', () => ({}));
 
-import { ProductScrapeUpdaterService } from "./product-scrape-updater.service";
+import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
 
-function makeBrand(name = "Logitech"): Brand {
+function makeBrand(name = 'Logitech'): Brand {
   const brand = new Brand();
-  brand.id = "brand-1";
+  brand.id = 'brand-1';
   brand.name = name;
   return brand;
 }
 
 function makeCategory(overrides?: Partial<ProductCategory>): ProductCategory {
   const category = new ProductCategory();
-  category.id = "category-1";
-  category.name = "Keyboards";
-  category.slug = "keyboards";
+  category.id = 'category-1';
+  category.name = 'Keyboards';
+  category.slug = 'keyboards';
   Object.assign(category, overrides);
   return category;
 }
 
 function makeExistingModel(): ProductModel {
   const model = new ProductModel();
-  model.id = "model-1";
+  model.id = 'model-1';
   model.brand = makeBrand();
   model.productCategory = makeCategory();
-  model.displayName = "Logitech MX Keys";
-  model.model = "MX Keys";
-  model.normalizedName = "mx keys";
-  model.slug = "logitech-mx-keys";
+  model.displayName = 'Logitech MX Keys';
+  model.model = 'MX Keys';
+  model.normalizedName = 'mx keys';
+  model.slug = 'logitech-mx-keys';
   model.images = [];
   model.sources = [];
   return model;
@@ -59,10 +59,10 @@ function makeExistingModel(): ProductModel {
 
 function makeTask(): ScrapeTask {
   return {
-    id: "task-1",
-    url: "https://example.com/product",
+    id: 'task-1',
+    url: 'https://example.com/product',
     source: {
-      type: "arukereso",
+      type: 'arukereso',
     },
   } as ScrapeTask;
 }
@@ -71,11 +71,11 @@ function makeScrapedProduct(
   overrides?: Partial<ScrapedProduct>,
 ): ScrapedProduct {
   return {
-    brand: "Logitech",
-    displayName: "Logitech MX Keys",
-    model: "MX Keys",
+    brand: 'Logitech',
+    displayName: 'Logitech MX Keys',
+    model: 'MX Keys',
     category: makeCategory(),
-    specs: { layout: "UK" },
+    specs: { layout: 'UK' },
     imageUrls: [],
     ...overrides,
   } as ScrapedProduct;
@@ -96,7 +96,7 @@ function makeAliasInsertBuilder() {
   };
 }
 
-describe("ProductScrapeUpdaterService", () => {
+describe('ProductScrapeUpdaterService', () => {
   let service: ProductScrapeUpdaterService;
   let mockProductSearch: jest.Mocked<ResolutionService>;
   let mockBrandResolution: jest.Mocked<BrandResolutionService>;
@@ -164,7 +164,7 @@ describe("ProductScrapeUpdaterService", () => {
     } as unknown as jest.Mocked<ProductMetricsService>;
 
     mockProductNormalizer = {
-      normalizeProduct: jest.fn().mockReturnValue("mx keys"),
+      normalizeProduct: jest.fn().mockReturnValue('mx keys'),
     } as unknown as jest.Mocked<ProductNormalizerService>;
 
     service = new ProductScrapeUpdaterService(
@@ -182,7 +182,7 @@ describe("ProductScrapeUpdaterService", () => {
     );
   });
 
-  it("reuses an exact normalizedName match before creating a new product", async () => {
+  it('reuses an exact normalizedName match before creating a new product', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
@@ -190,7 +190,7 @@ describe("ProductScrapeUpdaterService", () => {
     mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
-        type: "arukereso",
+        type: 'arukereso',
         sourceName: scrapedProduct.displayName,
       } as never,
     ]);
@@ -202,16 +202,16 @@ describe("ProductScrapeUpdaterService", () => {
     expect(mockProductSearch.search).not.toHaveBeenCalled();
     expect(mockBrandResolution.resolve).not.toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      "arukereso",
-      "path1_hit",
+      'arukereso',
+      'path1_hit',
     );
-    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith("arukereso");
+    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith('arukereso');
     expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
     expect(mockTaskRepo.save).toHaveBeenCalledWith(task);
     expect(task.product).toBe(existingModel);
   });
 
-  it("takes a cross-source row when no same-source exact match exists", async () => {
+  it('takes a cross-source row when no same-source exact match exists', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
@@ -219,8 +219,8 @@ describe("ProductScrapeUpdaterService", () => {
     mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
-        type: "displayspecs",
-        sourceName: "Logitech MX Keys (different display name)",
+        type: 'displayspecs',
+        sourceName: 'Logitech MX Keys (different display name)',
       } as never,
     ]);
     mockProductRepo.save.mockResolvedValue(existingModel);
@@ -230,27 +230,27 @@ describe("ProductScrapeUpdaterService", () => {
     expect(result).toBe(existingModel);
     expect(mockProductSearch.search).not.toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      "arukereso",
-      "path1_hit",
+      'arukereso',
+      'path1_hit',
     );
   });
 
-  it("skips Path 1 when only same-source-different-name rows exist (variant siblings)", async () => {
+  it('skips Path 1 when only same-source-different-name rows exist (variant siblings)', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
-      displayName: "LG 39GS95QE-W",
-      model: "39GS95QE-W",
-      brand: "LG",
+      displayName: 'LG 39GS95QE-W',
+      model: '39GS95QE-W',
+      brand: 'LG',
     });
     const otherVariant = makeExistingModel();
-    otherVariant.id = "model-variant-b";
-    otherVariant.sources = [{ type: "arukereso" } as never];
+    otherVariant.id = 'model-variant-b';
+    otherVariant.sources = [{ type: 'arukereso' } as never];
 
     mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: otherVariant,
-        type: "arukereso",
-        sourceName: "LG UltraGear 39GS95QE-B",
+        type: 'arukereso',
+        sourceName: 'LG UltraGear 39GS95QE-B',
       } as never,
     ]);
     mockProductSearch.search.mockResolvedValueOnce({
@@ -259,25 +259,25 @@ describe("ProductScrapeUpdaterService", () => {
     } as never);
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(otherVariant);
     mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = "model-variant-w";
+      if (!model.id) model.id = 'model-variant-w';
       return model;
     });
 
     const result = await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(result?.id).toBe("model-variant-w");
+    expect(result?.id).toBe('model-variant-w');
     expect(mockProductSearch.search).toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      "arukereso",
-      "cross_source_rejected_same_source",
+      'arukereso',
+      'cross_source_rejected_same_source',
     );
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      "arukereso",
-      "new_product",
+      'arukereso',
+      'new_product',
     );
   });
 
-  it("recovers from a normalizedName insert race by loading the existing product", async () => {
+  it('recovers from a normalizedName insert race by loading the existing product', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
@@ -299,28 +299,28 @@ describe("ProductScrapeUpdaterService", () => {
       2,
     );
     expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
-    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith("arukereso");
+    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith('arukereso');
     expect(mockTaskRepo.save).toHaveBeenCalledWith(task);
     expect(task.product).toBe(existingModel);
   });
 
-  it("uses strict matching for scrape-time resolution", async () => {
+  it('uses strict matching for scrape-time resolution', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
-      brand: "MSI",
-      displayName: "MSI MPG 341CQPX",
-      model: "MPG 341CQPX",
+      brand: 'MSI',
+      displayName: 'MSI MPG 341CQPX',
+      model: 'MPG 341CQPX',
       category: makeCategory({
-        id: "category-monitors",
-        name: "Monitors",
-        slug: "monitors",
+        id: 'category-monitors',
+        name: 'Monitors',
+        slug: 'monitors',
       }),
     });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
     mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
       if (!model.id) {
-        model.id = "model-2";
+        model.id = 'model-2';
       }
       return model;
     });
@@ -333,21 +333,20 @@ describe("ProductScrapeUpdaterService", () => {
         model: scrapedProduct.model,
         displayName: scrapedProduct.displayName,
       }),
-      expect.objectContaining({ mode: "strict" }),
-      {},
+      expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
     );
   });
 
-  it("uses strict matching for non-monitor scrapes too", async () => {
+  it('uses strict matching for non-monitor scrapes too', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
     mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
       if (!model.id) {
-        model.id = "model-3";
+        model.id = 'model-3';
       }
       return model;
     });
@@ -360,8 +359,7 @@ describe("ProductScrapeUpdaterService", () => {
         model: scrapedProduct.model,
         displayName: scrapedProduct.displayName,
       }),
-      expect.objectContaining({ mode: "strict" }),
-      {},
+      expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
     );

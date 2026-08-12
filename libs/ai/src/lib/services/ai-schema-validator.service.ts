@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import Ajv from "ajv";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import Ajv from 'ajv';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class AiSchemaValidatorService {
@@ -21,10 +21,10 @@ export class AiSchemaValidatorService {
     strict = false,
   ): { sanitized: string; parsed: any } {
     const cleaned = rawContent
-      ?.replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
+      ?.replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
       .trim();
-    const parsed = JSON.parse(cleaned || "{}");
+    const parsed = JSON.parse(cleaned || '{}');
 
     this.stripExtraProperties(parsed, schema);
 
@@ -36,12 +36,12 @@ export class AiSchemaValidatorService {
     const ajv = new Ajv({ allErrors: true, strict: true });
     const validate = ajv.compile(schema);
     if (!validate(parsed)) {
-      this.logger.error("Schema validation failed", undefined, {
+      this.logger.error('Schema validation failed', undefined, {
         errors: validate.errors,
         rawContent,
         parsed,
       });
-      throw new Error("Invalid response schema from AI provider");
+      throw new Error('Invalid response schema from AI provider');
     }
 
     return { sanitized: JSON.stringify(parsed), parsed };
@@ -74,7 +74,7 @@ export class AiSchemaValidatorService {
       return;
     }
 
-    if (typeof data === "object" && schema.properties) {
+    if (typeof data === 'object' && schema.properties) {
       for (const [key, propSchema] of Object.entries(schema.properties) as [
         string,
         any,
@@ -98,7 +98,7 @@ export class AiSchemaValidatorService {
   }
 
   private fillMissingEnumDefaults(data: any, schema: any): void {
-    if (!data || typeof data !== "object" || !schema) return;
+    if (!data || typeof data !== 'object' || !schema) return;
 
     if (Array.isArray(data)) {
       const itemSchema = schema.items;
@@ -134,7 +134,7 @@ export class AiSchemaValidatorService {
   }
 
   private stripExtraProperties(data: any, schema: any): void {
-    if (!data || typeof data !== "object" || !schema) return;
+    if (!data || typeof data !== 'object' || !schema) return;
 
     if (Array.isArray(data)) {
       const itemSchema = schema.items;

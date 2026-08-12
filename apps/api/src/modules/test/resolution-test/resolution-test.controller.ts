@@ -4,24 +4,23 @@ import {
   Post,
   SerializeOptions,
   UseGuards,
-} from "@nestjs/common";
-import { AuthGuard, RoleGuard, Roles } from "@ebike-backend/auth";
-import { ProductResolutionInput, UserRole } from "@ebike-backend/database";
+} from '@nestjs/common';
+import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { ProductResolutionInput, UserRole } from '@fittkereso-backend/database';
 import {
   ResolutionOptions,
   ResolutionResult,
   ResolutionService,
-  ResolutionThreadContext,
-} from "@ebike-backend/resolution";
+} from '@fittkereso-backend/resolution';
 
-@Controller("test/resolve")
+@Controller('test/resolve')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
 export class ResolutionTestController {
   constructor(private readonly productSearch: ResolutionService) {}
 
-  @Post("/product")
-  @SerializeOptions({ strategy: "exposeAll" })
+  @Post('/product')
+  @SerializeOptions({ strategy: 'exposeAll' })
   async resolve(
     @Body()
     body: {
@@ -29,8 +28,7 @@ export class ResolutionTestController {
       options?: {
         webSearchEnabled?: boolean;
         useEmbedding?: boolean;
-        mode?: "strict" | "loose";
-        threadContext?: ResolutionThreadContext;
+        mode?: 'strict' | 'loose';
       };
     },
   ): Promise<ResolutionResult> {
@@ -41,18 +39,11 @@ export class ResolutionTestController {
     const options: ResolutionOptions = {
       webSearchEnabled: body.options?.webSearchEnabled ?? true,
       useEmbedding: body.options?.useEmbedding ?? true,
-      mode: body.options?.mode ?? "loose",
+      mode: body.options?.mode ?? 'loose',
     };
-    const callerContext = body.options?.threadContext
-      ? { threadContext: body.options.threadContext }
-      : {};
 
-    return this.productSearch.search(
-      body.input,
-      options,
-      callerContext,
-      undefined,
-      { source: "resolution-test-controller" },
-    );
+    return this.productSearch.search(body.input, options, undefined, {
+      source: 'resolution-test-controller',
+    });
   }
 }

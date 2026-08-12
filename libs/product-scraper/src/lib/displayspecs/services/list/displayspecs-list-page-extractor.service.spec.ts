@@ -1,11 +1,11 @@
-import { ScrapeTask } from "@ebike-backend/database";
-import * as cheerio from "cheerio";
-import { DisplayspecsListPageExtractor } from "./displayspecs-list-page-extractor.service";
+import { ScrapeTask } from '@fittkereso-backend/database';
+import * as cheerio from 'cheerio';
+import { DisplayspecsListPageExtractor } from './displayspecs-list-page-extractor.service';
 
-describe("DisplayspecsListPageExtractor", () => {
+describe('DisplayspecsListPageExtractor', () => {
   const extractor = new DisplayspecsListPageExtractor();
 
-  it("skips empty section headers and finds model containers before the next section header", async () => {
+  it('skips empty section headers and finds model containers before the next section header', async () => {
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
     const oldYear = currentYear - 4;
@@ -46,20 +46,20 @@ describe("DisplayspecsListPageExtractor", () => {
     `);
 
     const links = await extractor.getProductLinks(
-      { id: "task-1" } as ScrapeTask,
+      { id: 'task-1' } as ScrapeTask,
       $,
     );
 
     expect(links).toEqual([
       {
         category: `BenQ - ${currentYear} - Desktop monitors`,
-        title: "BenQ MA270S",
-        url: "https://www.displayspecifications.com/en/model/new1",
+        title: 'BenQ MA270S',
+        url: 'https://www.displayspecifications.com/en/model/new1',
       },
       {
         category: `BenQ - ${previousYear} - Desktop monitors`,
-        title: "BenQ MA320UG",
-        url: "https://www.displayspecifications.com/en/model/new2",
+        title: 'BenQ MA320UG',
+        url: 'https://www.displayspecifications.com/en/model/new2',
       },
     ]);
   });

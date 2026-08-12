@@ -1,4 +1,4 @@
-# ebike Backend Instructions
+# fittkereso Backend Instructions
 
 Shared workspace rules live in `../.github/copilot-instructions.md`.
 
@@ -17,7 +17,7 @@ Use this file for backend-specific guidance only.
 - Prefer smaller, single-responsibility services over long or multi-purpose services.
 - Keep services stateless. All state should come from constructor-injected dependencies.
 - Use the repository pattern through existing repositories.
-- Respect module boundaries and use `@ebike-backend/*` path aliases across libraries.
+- Respect module boundaries and use `@fittkereso-backend/*` path aliases across libraries.
 - Extract a collaborator when a service starts to take on a second concern.
 
 ## Backend Configuration

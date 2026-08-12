@@ -1,9 +1,9 @@
-import { Expose, Transform, Type } from "class-transformer";
-import { SerializeGroup, transfromExposeAll } from "@ebike-backend/utils";
+import { Expose, Transform, Type } from 'class-transformer';
+import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import {
   ProductCategory,
   ProductCategoryConfig,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 
 export class CategoryWithConfigDto {
   @Expose()
@@ -36,5 +36,5 @@ export class CategoryWithConfigSearchResultDto {
   sort?: string;
 
   @Expose({ groups: [SerializeGroup.list] })
-  order?: "ASC" | "DESC";
+  order?: 'ASC' | 'DESC';
 }

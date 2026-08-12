@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { BasePostgresRepository } from "./base-postgres-repository";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { BasePostgresRepository } from './base-postgres-repository';
 import {
   TranslationCache,
   TranslationCacheSource,
-} from "../models/translation-cache.entity";
+} from '../models/translation-cache.entity';
 
 export interface BatchCacheLookupParams {
   sourceLanguage: string;
@@ -32,7 +32,7 @@ export interface BatchCacheStoreParams {
 @Injectable()
 export class TranslationCacheRepository extends BasePostgresRepository<TranslationCache> {
   constructor(
-    @InjectRepository(TranslationCache, "postgres")
+    @InjectRepository(TranslationCache, 'postgres')
     repository: Repository<TranslationCache>,
   ) {
     super(repository, TranslationCache);
@@ -48,23 +48,23 @@ export class TranslationCacheRepository extends BasePostgresRepository<Translati
     if (params.sourceTexts.length === 0) return new Map();
 
     const now = new Date();
-    const expiresAtColumn = `tc.${nameOf<TranslationCache>("expiresAt")}`;
+    const expiresAtColumn = `tc.${nameOf<TranslationCache>('expiresAt')}`;
     const rows = await this.repo
-      .createQueryBuilder("tc")
+      .createQueryBuilder('tc')
       .where(
-        `tc.${nameOf<TranslationCache>("sourceLanguage")} = :sourceLanguage`,
+        `tc.${nameOf<TranslationCache>('sourceLanguage')} = :sourceLanguage`,
         {
           sourceLanguage: params.sourceLanguage,
         },
       )
       .andWhere(
-        `tc.${nameOf<TranslationCache>("targetLanguage")} = :targetLanguage`,
+        `tc.${nameOf<TranslationCache>('targetLanguage')} = :targetLanguage`,
         {
           targetLanguage: params.targetLanguage,
         },
       )
       .andWhere(
-        `tc.${nameOf<TranslationCache>("sourceText")} IN (:...sourceTexts)`,
+        `tc.${nameOf<TranslationCache>('sourceText')} IN (:...sourceTexts)`,
         {
           sourceTexts: params.sourceTexts,
         },
@@ -116,7 +116,7 @@ export class TranslationCacheRepository extends BasePostgresRepository<Translati
     }));
 
     await this.repo.upsert(rows, {
-      conflictPaths: ["sourceLanguage", "targetLanguage", "sourceText"],
+      conflictPaths: ['sourceLanguage', 'targetLanguage', 'sourceText'],
       skipUpdateIfNoValuesChanged: true,
     });
   }

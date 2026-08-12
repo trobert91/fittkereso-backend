@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   Brand,
   ProductCategory,
   ProductModel,
   ProductModelRepository,
-} from "@ebike-backend/database";
-import { ProductSearchParams } from "../models/product-search-params";
-import { ProductSearchResult } from "../models/product-search-result";
-import { SelectQueryBuilder } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { ProductSearchParams } from '../models/product-search-params';
+import { ProductSearchResult } from '../models/product-search-result';
+import { SelectQueryBuilder } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { isEmpty } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -22,8 +22,8 @@ export class ProductSearchService {
   ): Promise<ProductSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? ("createdAt" as const),
-      order: params.order ?? ("DESC" as const),
+      sort: params.sort ?? ('createdAt' as const),
+      order: params.order ?? ('DESC' as const),
     };
 
     const query = this.buildQuery(finalParams);
@@ -38,28 +38,27 @@ export class ProductSearchService {
     params: ProductSearchParams,
   ): SelectQueryBuilder<ProductModel> {
     let query = this.productRepo.repo
-      .createQueryBuilder("product")
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("brand")}`, "brand")
+      .createQueryBuilder('product')
+      .leftJoinAndSelect(`product.${nameOf<ProductModel>('brand')}`, 'brand')
       .leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("productCategory")}`,
-        "category",
+        `product.${nameOf<ProductModel>('productCategory')}`,
+        'category',
       )
       .leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("mainImage")}`,
-        "mainImage",
-      )
-      .leftJoinAndSelect(`product.${nameOf<ProductModel>("rating")}`, "rating");
+        `product.${nameOf<ProductModel>('mainImage')}`,
+        'mainImage',
+      );
     if (params.includeImages) {
       query = query.leftJoinAndSelect(
-        `product.${nameOf<ProductModel>("images")}`,
-        "images",
+        `product.${nameOf<ProductModel>('images')}`,
+        'images',
       );
     }
 
     // --- Filters ---
     if (!isEmpty(params.categoryIds)) {
       query = query.andWhere(
-        `category.${nameOf<ProductCategory>("id")} IN (:...categoryIds)`,
+        `category.${nameOf<ProductCategory>('id')} IN (:...categoryIds)`,
         {
           categoryIds: params.categoryIds,
         },
@@ -67,7 +66,7 @@ export class ProductSearchService {
     }
 
     if (!isEmpty(params.brandIds)) {
-      query = query.andWhere(`brand.${nameOf<Brand>("id")} IN (:...brandIds)`, {
+      query = query.andWhere(`brand.${nameOf<Brand>('id')} IN (:...brandIds)`, {
         brandIds: params.brandIds,
       });
     }
@@ -81,21 +80,21 @@ export class ProductSearchService {
       query = query.andWhere(
         `(
       -- LIKE for recall
-      LOWER(product.${nameOf<ProductModel>("displayName")}) LIKE :likeTerm
-      OR LOWER(product.${nameOf<ProductModel>("model")}) LIKE :likeTerm
-      OR LOWER(product.${nameOf<ProductModel>("normalizedName")}) LIKE :likeTerm
+      LOWER(product.${nameOf<ProductModel>('displayName')}) LIKE :likeTerm
+      OR LOWER(product.${nameOf<ProductModel>('model')}) LIKE :likeTerm
+      OR LOWER(product.${nameOf<ProductModel>('normalizedName')}) LIKE :likeTerm
 
       -- OR trigram similarity filter
       OR similarity(
-          LOWER(product.${nameOf<ProductModel>("displayName")}),
+          LOWER(product.${nameOf<ProductModel>('displayName')}),
           :rawTerm
         ) >= :similarityThreshold
       OR similarity(
-          LOWER(product.${nameOf<ProductModel>("model")}),
+          LOWER(product.${nameOf<ProductModel>('model')}),
           :rawTerm
         ) >= :similarityThreshold
       OR similarity(
-          LOWER(product.${nameOf<ProductModel>("normalizedName")}),
+          LOWER(product.${nameOf<ProductModel>('normalizedName')}),
           :rawTerm
         ) >= :similarityThreshold
     )`,
@@ -105,23 +104,18 @@ export class ProductSearchService {
       query.addSelect(
         `
       GREATEST(
-        similarity(LOWER(product.${nameOf<ProductModel>("displayName")}), :rawTerm),
-        similarity(LOWER(product.${nameOf<ProductModel>("model")}), :rawTerm),
-        similarity(LOWER(product.${nameOf<ProductModel>("normalizedName")}), :rawTerm)
+        similarity(LOWER(product.${nameOf<ProductModel>('displayName')}), :rawTerm),
+        similarity(LOWER(product.${nameOf<ProductModel>('model')}), :rawTerm),
+        similarity(LOWER(product.${nameOf<ProductModel>('normalizedName')}), :rawTerm)
       )
       `,
-        "similarity_score",
+        'similarity_score',
       );
 
-      query = query.orderBy("similarity_score", "DESC");
+      query = query.orderBy('similarity_score', 'DESC');
     } else {
       // --- Ordering ---
-      const sort = params.sort;
-      if (sort === "rating" || sort === "totalReviewCount") {
-        query = query.orderBy(`rating.${sort}`, params.order, "NULLS LAST");
-      } else {
-        query = query.orderBy(`product.${sort}`, params.order);
-      }
+      query = query.orderBy(`product.${params.sort}`, params.order);
     }
 
     // --- Pagination ---

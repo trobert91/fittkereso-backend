@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { nameOf } from "@ebike-backend/utils";
-import { BasePostgresRepository } from "./base-postgres-repository";
-import { ProductDuplicate } from "../models/product-duplicate.entity";
-import { ProductDuplicateDecision } from "../types/product-duplicate-decision";
-import type { SpecMatchDetails } from "../types/spec-match-details";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { nameOf } from '@fittkereso-backend/utils';
+import { BasePostgresRepository } from './base-postgres-repository';
+import { ProductDuplicate } from '../models/product-duplicate.entity';
+import { ProductDuplicateDecision } from '../types/product-duplicate-decision';
+import type { SpecMatchDetails } from '../types/spec-match-details';
 
 export interface UpsertProductDuplicateParams {
   productAId: string;
@@ -19,7 +19,7 @@ export interface UpsertProductDuplicateParams {
 @Injectable()
 export class ProductDuplicateRepository extends BasePostgresRepository<ProductDuplicate> {
   constructor(
-    @InjectRepository(ProductDuplicate, "postgres")
+    @InjectRepository(ProductDuplicate, 'postgres')
     repository: Repository<ProductDuplicate>,
   ) {
     super(repository, ProductDuplicate);
@@ -40,8 +40,8 @@ export class ProductDuplicateRepository extends BasePostgresRepository<ProductDu
         productB: { id: orderedB },
       },
       relations: [
-        nameOf<ProductDuplicate>("productA"),
-        nameOf<ProductDuplicate>("productB"),
+        nameOf<ProductDuplicate>('productA'),
+        nameOf<ProductDuplicate>('productB'),
       ],
     });
   }
@@ -80,8 +80,8 @@ export class ProductDuplicateRepository extends BasePostgresRepository<ProductDu
     }
 
     const [productAExists, productBExists] = await Promise.all([
-      this.repo.manager.exists("ProductModel", { where: { id: orderedAId } }),
-      this.repo.manager.exists("ProductModel", { where: { id: orderedBId } }),
+      this.repo.manager.exists('ProductModel', { where: { id: orderedAId } }),
+      this.repo.manager.exists('ProductModel', { where: { id: orderedBId } }),
     ]);
 
     if (!productAExists || !productBExists) {

@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Injectable } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   ProductSource,
   ProductSourceRepository,
   ProductSourceSyncMode,
-} from "@ebike-backend/database";
-import { SchedulerMetricsService } from "@ebike-backend/metrics";
-import { BaseScheduler, QueuePublisherService } from "@ebike-backend/task";
-import { nameOf } from "@ebike-backend/utils";
-import { Brackets } from "typeorm";
-import ms from "ms";
+} from '@fittkereso-backend/database';
+import { SchedulerMetricsService } from '@fittkereso-backend/metrics';
+import { BaseScheduler, QueuePublisherService } from '@fittkereso-backend/task';
+import { nameOf } from '@fittkereso-backend/utils';
+import { Brackets } from 'typeorm';
+import ms from 'ms';
 
 interface SourceSyncEntry {
   source: ProductSource;
@@ -55,18 +55,18 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
   }
 
   private async findSourcesToSync(): Promise<SourceSyncEntry[]> {
-    const nextFullSyncAtColumn = `source.${nameOf<ProductSource>("nextFullSyncAt")}`;
-    const nextIncrementalSyncAtColumn = `source.${nameOf<ProductSource>("nextIncrementalSyncAt")}`;
+    const nextFullSyncAtColumn = `source.${nameOf<ProductSource>('nextFullSyncAt')}`;
+    const nextIncrementalSyncAtColumn = `source.${nameOf<ProductSource>('nextIncrementalSyncAt')}`;
     const sources = await this.repo.repo
-      .createQueryBuilder("source")
-      .where(`source.${nameOf<ProductSource>("schedulingEnabled")} = true`)
+      .createQueryBuilder('source')
+      .where(`source.${nameOf<ProductSource>('schedulingEnabled')} = true`)
       .andWhere(
         new Brackets((qb) => {
           qb.where(
             new Brackets((sub) => {
               sub
                 .where(
-                  `source.${nameOf<ProductSource>("fullSyncInterval")} IS NOT NULL`,
+                  `source.${nameOf<ProductSource>('fullSyncInterval')} IS NOT NULL`,
                 )
                 .andWhere(
                   `(${nextFullSyncAtColumn} IS NULL OR ${nextFullSyncAtColumn} <= NOW())`,
@@ -76,7 +76,7 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
             new Brackets((sub) => {
               sub
                 .where(
-                  `source.${nameOf<ProductSource>("incrementalSyncInterval")} IS NOT NULL`,
+                  `source.${nameOf<ProductSource>('incrementalSyncInterval')} IS NOT NULL`,
                 )
                 .andWhere(
                   `(${nextIncrementalSyncAtColumn} IS NULL OR ${nextIncrementalSyncAtColumn} <= NOW())`,
@@ -106,6 +106,6 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
   }
 
   private computeNextRun(interval?: ms.StringValue): Date {
-    return new Date(Date.now() + ms(interval ?? "7 days"));
+    return new Date(Date.now() + ms(interval ?? '7 days'));
   }
 }

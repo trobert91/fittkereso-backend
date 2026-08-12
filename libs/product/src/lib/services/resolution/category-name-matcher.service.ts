@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { ProductCategory } from "@ebike-backend/database";
-import { compact } from "lodash";
-import { CategoryCacheService } from "../category/category-cache.service";
+import { Injectable } from '@nestjs/common';
+import { ProductCategory } from '@fittkereso-backend/database';
+import { compact } from 'lodash';
+import { CategoryCacheService } from '../category/category-cache.service';
 
 const MATCH_THRESHOLD = 0.5;
 
@@ -25,7 +25,7 @@ export class CategoryNameMatcherService {
     categories: ProductCategory[],
   ): ProductCategory | undefined {
     const normalizedHint = normalizeCategoryString(hint);
-    const hintWords = compact(normalizedHint.split(" "));
+    const hintWords = compact(normalizedHint.split(' '));
 
     let bestCategory: ProductCategory | undefined;
     let bestScore = 0;
@@ -36,7 +36,7 @@ export class CategoryNameMatcherService {
       // 1. Exact match
       if (normalizedHint === normalizedName) return category;
 
-      const nameWords = compact(normalizedName.split(" "));
+      const nameWords = compact(normalizedName.split(' '));
 
       // 2. Word-overlap Jaccard: |intersection| / |union|
       const hintSet = new Set(hintWords);
@@ -98,8 +98,8 @@ export class CategoryNameMatcherService {
 function normalizeCategoryString(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 

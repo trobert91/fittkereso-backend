@@ -125,7 +125,7 @@
                 {
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "increase(scheduler_started_total{app=\"ebike-review-collector\"}[$__interval])",
+                    "expr": "increase(scheduler_started_total{app=\"fittkereso-review-collector\"}[$__interval])",
                     "legendFormat": "{{app}} / {{scheduler_name}}",
                     "range": true,
                     "refId": "A"
@@ -221,7 +221,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "increase(scheduler_finished_total{app=\"ebike-review-collector\"}[$__interval])",
+                    "expr": "increase(scheduler_finished_total{app=\"fittkereso-review-collector\"}[$__interval])",
                     "legendFormat": "{{app}} / {{scheduler_name}}",
                     "range": true,
                     "refId": "A"
@@ -317,7 +317,7 @@
             "targets": [
                 {
                     "editorMode": "code",
-                    "expr": "increase(scheduler_failed_total{app=\"ebike-review-collector\"}[$__interval])",
+                    "expr": "increase(scheduler_failed_total{app=\"fittkereso-review-collector\"}[$__interval])",
                     "legendFormat": "{{app}} / {{scheduler_name}}",
                     "range": true,
                     "refId": "A"
@@ -416,7 +416,7 @@
                         "uid": "af72b1069yhvka"
                     },
                     "editorMode": "code",
-                    "expr": "http_requests_total{app=\"ebike-review-collector\"}",
+                    "expr": "http_requests_total{app=\"fittkereso-review-collector\"}",
                     "format": "time_series",
                     "legendFormat": "{{method}} {{handler}}",
                     "range": true,
@@ -515,7 +515,7 @@
                         "type": "prometheus",
                         "uid": "af72b1069yhvka"
                     },
-                    "expr": "http_request_duration_seconds_sum{app=\"ebike-review-collector\"} / http_request_duration_seconds_count{app=\"ebike-review-collector\"}",
+                    "expr": "http_request_duration_seconds_sum{app=\"fittkereso-review-collector\"} / http_request_duration_seconds_count{app=\"fittkereso-review-collector\"}",
                     "format": "time_series",
                     "legendFormat": "Average Request Duration",
                     "refId": "A"
@@ -613,7 +613,7 @@
                         "type": "prometheus",
                         "uid": "af72b1069yhvka"
                     },
-                    "expr": "process_resident_memory_bytes{app=\"ebike-review-collector\"}",
+                    "expr": "process_resident_memory_bytes{app=\"fittkereso-review-collector\"}",
                     "format": "time_series",
                     "legendFormat": "Memory Usage",
                     "refId": "A"
@@ -711,7 +711,7 @@
                         "type": "prometheus",
                         "uid": "af72b1069yhvka"
                     },
-                    "expr": "rate(process_cpu_seconds_total{app=\"ebike-review-collector\"}[1m])",
+                    "expr": "rate(process_cpu_seconds_total{app=\"fittkereso-review-collector\"}[1m])",
                     "format": "time_series",
                     "legendFormat": "CPU Usage",
                     "refId": "A"

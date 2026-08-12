@@ -5,7 +5,7 @@
 -- in a readable format for manual review and editing.
 --
 -- Usage:
---   psql -d ebike -f export-config-only.sql
+--   psql -d fittkereso -f export-config-only.sql
 -- ============================================================================
 
 \echo '-- ============================================================================'

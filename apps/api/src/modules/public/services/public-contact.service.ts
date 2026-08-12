@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
-import { ContactEmailService } from "@ebike-backend/email";
-import { RecaptchaService } from "./recaptcha.service";
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { ContactEmailService } from '@fittkereso-backend/email';
+import { RecaptchaService } from './recaptcha.service';
 
 @Injectable()
 export class PublicContactService {
@@ -19,7 +19,7 @@ export class PublicContactService {
       params.recaptchaToken,
     );
     if (!verified) {
-      throw new BadRequestException("reCAPTCHA verification failed");
+      throw new BadRequestException('reCAPTCHA verification failed');
     }
 
     await this.contactEmailService.sendContactEmail({

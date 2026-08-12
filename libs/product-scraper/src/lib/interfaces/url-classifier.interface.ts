@@ -1,4 +1,4 @@
-import { ScrapeQueueName } from "@ebike-backend/database";
+import { ScrapeQueueName } from '@fittkereso-backend/database';
 
 export interface UrlClassification {
   queue: ScrapeQueueName;

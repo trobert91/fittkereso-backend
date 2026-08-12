@@ -1,1 +1,1 @@
-export type { ProductResolutionInput } from "@ebike-backend/database";
+export type { ProductResolutionInput } from '@fittkereso-backend/database';

@@ -1,12 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   BrandAliasRepository,
   BrandRepository,
   WithSimilarity,
   Brand,
-} from "@ebike-backend/database";
-import { normalize } from "@ebike-backend/utils";
-import { chain, isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { normalize } from '@fittkereso-backend/utils';
+import { chain, isEmpty } from 'lodash';
 
 @Injectable()
 export class BrandResolutionService {
@@ -47,7 +47,7 @@ export class BrandResolutionService {
       5,
     );
     const topByName = chain(brandsByName)
-      .orderBy((candidate) => candidate.similarity, "desc")
+      .orderBy((candidate) => candidate.similarity, 'desc')
       .first()
       .value();
     if (topByName) return topByName;
@@ -59,7 +59,7 @@ export class BrandResolutionService {
       5,
     );
     const topAlias = chain(aliasByTrigram)
-      .orderBy((candidate) => candidate.similarity, "desc")
+      .orderBy((candidate) => candidate.similarity, 'desc')
       .first()
       .value();
     if (topAlias) {
@@ -75,15 +75,15 @@ export class BrandResolutionService {
     if (!displayName) return undefined;
 
     // search by first word, then by first two words
-    let brands = await this.searchSimilarBrandByName(displayName.split(" ")[0]);
+    let brands = await this.searchSimilarBrandByName(displayName.split(' ')[0]);
     if (isEmpty(brands)) {
       brands = await this.searchSimilarBrandByName(
-        displayName.split(" ").slice(0, 2).join(" "),
+        displayName.split(' ').slice(0, 2).join(' '),
       );
     }
 
     return chain(brands)
-      .orderBy((candidate) => candidate.similarity, "desc")
+      .orderBy((candidate) => candidate.similarity, 'desc')
       .first()
       .value();
   }

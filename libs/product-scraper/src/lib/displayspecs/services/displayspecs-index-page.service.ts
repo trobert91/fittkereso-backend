@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
-import * as cheerio from "cheerio";
-import { Brand, ProductSource } from "@ebike-backend/database";
-import { SourceConfigService } from "@ebike-backend/config";
-import { ScraperService } from "@ebike-backend/scraper";
-import { isEmpty } from "lodash";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import * as cheerio from 'cheerio';
+import { Brand, ProductSource } from '@fittkereso-backend/database';
+import { SourceConfigService } from '@fittkereso-backend/config';
+import { ScraperService } from '@fittkereso-backend/scraper';
+import { isEmpty } from 'lodash';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class DisplaySpecsIndexPageService {
@@ -28,7 +28,7 @@ export class DisplaySpecsIndexPageService {
     );
     if (!fullSyncStartUrl) {
       throw new Error(
-        "DisplaySpecs fullSyncStartUrl not configured in source config",
+        'DisplaySpecs fullSyncStartUrl not configured in source config',
       );
     }
     const baseUrl = this.sourceConfigService.getBaseUrl(source.type)!;
@@ -36,22 +36,22 @@ export class DisplaySpecsIndexPageService {
     const html = await this.scraperService.getHtml(fullSyncStartUrl);
 
     const $ = cheerio.load(html);
-    const brandDiv = $(".brand-listing-container-frontpage");
+    const brandDiv = $('.brand-listing-container-frontpage');
 
     if (!brandDiv.length) {
       throw new Error(
-        "Could not find .brand-listing-container-frontpage in page",
+        'Could not find .brand-listing-container-frontpage in page',
       );
     }
 
     // Extract all brand links
     const brandLinks: Record<string, string> = {};
-    brandDiv.find("a").each((_, element) => {
+    brandDiv.find('a').each((_, element) => {
       const name = $(element).text().trim();
-      const href = $(element).attr("href");
+      const href = $(element).attr('href');
       if (name && href) {
         // Ensure href is absolute
-        const absoluteUrl = href.startsWith("http")
+        const absoluteUrl = href.startsWith('http')
           ? href
           : `${baseUrl}${href}`;
         brandLinks[name.toLowerCase()] = absoluteUrl;

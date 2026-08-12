@@ -1,27 +1,24 @@
-import { Injectable } from "@nestjs/common";
-import { ProductSpecs, SpecMatchDetails } from "@ebike-backend/database";
-import { DebugTraceService } from "@ebike-backend/debug";
-import { CustomLogger } from "@ebike-backend/logger";
-import { distance as levenshtein } from "fastest-levenshtein";
-import { isEmpty } from "lodash";
-import { SpecComparisonService } from "../duplicate/spec-comparison.service";
+import { Injectable } from '@nestjs/common';
+import { ProductSpecs, SpecMatchDetails } from '@fittkereso-backend/database';
+import { DebugTraceService } from '@fittkereso-backend/debug';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { distance as levenshtein } from 'fastest-levenshtein';
+import { isEmpty } from 'lodash';
+import { SpecComparisonService } from '../duplicate/spec-comparison.service';
 import {
   SimilarityInputNormalizationService,
   ParsedName,
-} from "./similarity-input-normalization.service";
+} from './similarity-input-normalization.service';
 import {
   ParsedTokens,
   TokenParserConfig,
   basicNormalization,
   getTokenWeights,
-} from "./token-parser";
+} from './token-parser';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 export interface SimilarityTraceContext {
-  threadId?: string;
-  commentId?: string;
-  productReferenceId?: string;
   productId?: string;
 }
 
@@ -113,13 +110,13 @@ export class ProductSimilarityService {
       input.candidate.releaseYear !== undefined &&
       input.candidate.releaseYear > input.query.year
     ) {
-      this.logger.debug("Year gate: candidate released after query year", {
+      this.logger.debug('Year gate: candidate released after query year', {
         queryModel: input.query.model,
         candidateModel: input.candidate.model,
         queryYear: input.query.year,
         candidateReleaseYear: input.candidate.releaseYear,
       });
-      return { score: 0, components: emptyComponents, bestMatchName: "" };
+      return { score: 0, components: emptyComponents, bestMatchName: '' };
     }
 
     // Build normalized name lists
@@ -131,7 +128,7 @@ export class ProductSimilarityService {
     });
 
     if (isEmpty(nameLists.queryNames) || isEmpty(nameLists.candidateNames)) {
-      return { score: 0, components: emptyComponents, bestMatchName: "" };
+      return { score: 0, components: emptyComponents, bestMatchName: '' };
     }
 
     // Cross-match all query names × candidate names, keep best pair
@@ -279,16 +276,13 @@ export class ProductSimilarityService {
   ): void {
     const context = input.traceContext!;
     const scoreLabel =
-      result.score >= 80 ? "high" : result.score >= 50 ? "medium" : "low";
+      result.score >= 80 ? 'high' : result.score >= 50 ? 'medium' : 'low';
 
     this.debugTrace
       .record({
-        threadId: context.threadId,
-        commentId: context.commentId,
-        productReferenceId: context.productReferenceId,
         productId: context.productId,
-        step: "product_similarity",
-        statusBefore: "scoring",
+        step: 'product_similarity',
+        statusBefore: 'scoring',
         statusAfter: `scored_${scoreLabel}`,
         durationMs: Date.now() - startMs,
         data: {
@@ -324,7 +318,7 @@ export class ProductSimilarityService {
         },
       })
       .catch((error: unknown) => {
-        this.logger.warn("Failed to record similarity trace", {
+        this.logger.warn('Failed to record similarity trace', {
           error: error instanceof Error ? error.message : String(error),
         });
       });

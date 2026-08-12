@@ -1,19 +1,19 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductSourceSyncService,
   ProductSourceSyncOptions,
-} from "../../interfaces/product-source-sync-service.interface";
+} from '../../interfaces/product-source-sync-service.interface';
 import {
   ProductSource,
   ScrapeQueueName,
   ScrapeTask,
-} from "@ebike-backend/database";
-import { ArukeresoIndexPageService } from "./arukereso-index-page.service";
-import { CustomLogger } from "@ebike-backend/logger";
-import { ProductCollectionMetricsService } from "@ebike-backend/metrics";
-import { ScrapeTaskPublisherService } from "@ebike-backend/task";
-import { isEmpty } from "lodash";
-import { WebLink } from "@ebike-backend/product";
+} from '@fittkereso-backend/database';
+import { ArukeresoIndexPageService } from './arukereso-index-page.service';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { isEmpty } from 'lodash';
+import { WebLink } from '@fittkereso-backend/product';
 
 @Injectable()
 export class ArukeresoSyncService implements ProductSourceSyncService {
@@ -30,13 +30,13 @@ export class ArukeresoSyncService implements ProductSourceSyncService {
     options?: ProductSourceSyncOptions,
   ): Promise<void> {
     const startTime = Date.now();
-    this.logger.debug("Starting sync for arukereso.hu");
+    this.logger.debug('Starting sync for arukereso.hu');
 
     try {
       const sourceTitles = options?.sourceTitles ?? [];
       if (isEmpty(sourceTitles)) {
         this.logger.warn(
-          "Arukereso full sync: no source titles provided, skipping",
+          'Arukereso full sync: no source titles provided, skipping',
         );
         this.productCollectionMetrics.recordCategoriesDiscovered(
           source.type,

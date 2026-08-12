@@ -7,24 +7,22 @@ import {
   OneToMany,
   OneToOne,
   Unique,
-} from "typeorm";
-import { BasePostgresEntity } from "./base-postgres-entity";
-import { ProductCategory } from "./product-category.entity";
-import { Review } from "./review.entity";
-import { ProductAlias } from "./product-alias.entity";
-import { ProductEmbedding } from "./product-embedding.entity";
-import { Brand } from "./brand.entity";
-import { OrderedSpec, ProductSpecs } from "../../models/product-spec";
-import { ProductModelSource } from "./product-model-source.entity";
-import { ProductImage } from "./product-image.entity";
-import { ScrapeTask } from "./scrape-task.entity";
-import { SerializeGroup, transfromExposeAll } from "@ebike-backend/utils";
-import { Expose, Transform } from "class-transformer";
-import { ProductRating } from "./product-rating.entity";
+} from 'typeorm';
+import { BasePostgresEntity } from './base-postgres-entity';
+import { ProductCategory } from './product-category.entity';
+import { ProductAlias } from './product-alias.entity';
+import { ProductEmbedding } from './product-embedding.entity';
+import { Brand } from './brand.entity';
+import { OrderedSpec, ProductSpecs } from '../../models/product-spec';
+import { ProductModelSource } from './product-model-source.entity';
+import { ProductImage } from './product-image.entity';
+import { ScrapeTask } from './scrape-task.entity';
+import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
+import { Expose, Transform } from 'class-transformer';
 
 @Entity()
-@Index(["productCategory", "enabled"])
-@Unique("UQ_product_brand_normalized_name", ["brand", "normalizedName"])
+@Index(['productCategory', 'enabled'])
+@Unique('UQ_product_brand_normalized_name', ['brand', 'normalizedName'])
 export class ProductModel extends BasePostgresEntity {
   @ManyToOne(() => Brand, (brand) => brand.models, { nullable: false })
   @Expose({ groups: [SerializeGroup.list] })
@@ -45,7 +43,7 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   normalizedName: string;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ type: 'text', nullable: true })
   @Expose({ groups: [SerializeGroup.details] })
   description: string;
 
@@ -56,10 +54,6 @@ export class ProductModel extends BasePostgresEntity {
   @OneToMany(() => ProductAlias, (alias) => alias.model, { cascade: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   aliases?: ProductAlias[];
-
-  @OneToMany(() => Review, (review) => review.model)
-  @Expose({ groups: [SerializeGroup.details] })
-  reviews?: Review[];
 
   @OneToMany(() => ProductModelSource, (source) => source.model, {
     cascade: true,
@@ -78,7 +72,7 @@ export class ProductModel extends BasePostgresEntity {
    *   "Size": 27
    * }
    */
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails, SerializeGroup.details] })
   @Transform(transfromExposeAll())
   specs?: ProductSpecs;
@@ -86,7 +80,7 @@ export class ProductModel extends BasePostgresEntity {
   /**
    * Ordered specifications according to specDefinitions.order with units
    */
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.list] })
   @Transform(transfromExposeAll())
   orderedSpecs?: OrderedSpec[];
@@ -96,14 +90,14 @@ export class ProductModel extends BasePostgresEntity {
   @Index()
   specValid?: boolean;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Transform(transfromExposeAll())
   specErrors?: Record<string, any>;
 
   @OneToOne(() => ProductImage, (image) => image.model, {
     nullable: true,
-    onDelete: "SET NULL",
+    onDelete: 'SET NULL',
   })
   @JoinColumn()
   @Expose({ groups: [SerializeGroup.list] })
@@ -118,7 +112,7 @@ export class ProductModel extends BasePostgresEntity {
   scrapeTasks?: ScrapeTask[];
 
   @Index({ unique: true })
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.adminList] })
   slug?: string | null;
 
@@ -127,23 +121,15 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   enabled: boolean;
 
-  @Column({ type: "int", nullable: true })
+  @Column({ type: 'int', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.details] })
   releaseYear?: number;
 
   @OneToOne(() => ProductEmbedding, {
-    onDelete: "SET NULL",
+    onDelete: 'SET NULL',
     nullable: false,
     cascade: true,
   })
   @JoinColumn()
   embedding?: ProductEmbedding;
-
-  @OneToOne(() => ProductRating, (rating) => rating.model, {
-    nullable: true,
-    onDelete: "SET NULL",
-    cascade: ["insert", "update"],
-  })
-  @Expose({ groups: [SerializeGroup.list] })
-  rating?: ProductRating | null;
 }

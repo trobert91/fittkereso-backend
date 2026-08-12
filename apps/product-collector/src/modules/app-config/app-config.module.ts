@@ -1,14 +1,12 @@
-import { Global, Module } from "@nestjs/common";
-import { AppConfigService } from "./services/app-config.service";
-import { AppSettingsConfigService } from "./sub-configs/app-settings.config.service";
+import { Global, Module } from '@nestjs/common';
+import { AppConfigService } from './services/app-config.service';
+import { AppSettingsConfigService } from './sub-configs/app-settings.config.service';
 import {
   PostgresConfigService,
   MongoConfigService,
-  RedditConfigService,
   OpenAiConfigService,
   GeminiConfigService,
   ClaudeConfigService,
-  OpenRouterConfigService,
   DeepSeekConfigService,
   DataForSeoConfigService,
   ExaConfigService,
@@ -18,7 +16,7 @@ import {
   BunnyConfigService,
   CategoryConfigService,
   SourceConfigService,
-} from "@ebike-backend/config";
+} from '@fittkereso-backend/config';
 
 @Global()
 @Module({
@@ -28,11 +26,9 @@ import {
     PostgresConfigService,
     MongoConfigService,
     AppSettingsConfigService,
-    RedditConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
     DataForSeoConfigService,
     ExaConfigService,
@@ -48,11 +44,9 @@ import {
     PostgresConfigService,
     MongoConfigService,
     AppSettingsConfigService,
-    RedditConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
     DataForSeoConfigService,
     ExaConfigService,

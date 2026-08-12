@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import * as client from "prom-client";
-import { LoggerConfigService } from "@ebike-backend/config";
+import { Injectable } from '@nestjs/common';
+import * as client from 'prom-client';
+import { LoggerConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class PrometheusService {

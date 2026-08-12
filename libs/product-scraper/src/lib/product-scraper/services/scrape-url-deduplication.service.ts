@@ -1,13 +1,13 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductModelSourceRepository,
   ScrapeTaskRepository,
   TaskStatus,
-} from "@ebike-backend/database";
-import { CustomLogger } from "@ebike-backend/logger";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/database';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { isEmpty } from 'lodash';
 
-export type DeduplicationReason = "existing_product_source" | "existing_task";
+export type DeduplicationReason = 'existing_product_source' | 'existing_task';
 
 export interface DeduplicationResult {
   isDuplicate: boolean;
@@ -37,11 +37,11 @@ export class ScrapeUrlDeduplicationService {
         {
           url,
           productId: existingSource.model?.id,
-          reason: "existing_product_source",
+          reason: 'existing_product_source',
           ...logContext,
         },
       );
-      return { isDuplicate: true, reason: "existing_product_source" };
+      return { isDuplicate: true, reason: 'existing_product_source' };
     }
 
     // Layer 2: in-flight — task already queued/processing for this URL
@@ -54,10 +54,10 @@ export class ScrapeUrlDeduplicationService {
         url,
         taskId: existingTask.id,
         taskStatus: existingTask.status,
-        reason: "existing_task",
+        reason: 'existing_task',
         ...logContext,
       });
-      return { isDuplicate: true, reason: "existing_task" };
+      return { isDuplicate: true, reason: 'existing_task' };
     }
 
     return { isDuplicate: false };
@@ -77,7 +77,7 @@ export class ScrapeUrlDeduplicationService {
       [TaskStatus.PENDING, TaskStatus.PROCESSING],
     );
     const existingTaskUrls = new Set(
-      existingTasks.map((task) => task.url.toLowerCase().replace(/\/+$/, "")),
+      existingTasks.map((task) => task.url.toLowerCase().replace(/\/+$/, '')),
     );
 
     if (existingProductUrls.size > 0) {

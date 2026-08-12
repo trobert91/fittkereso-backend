@@ -12,8 +12,6 @@ export * from './update/product-update.service';
 export * from './image';
 export * from './merge';
 export * from './product-spec';
-export * from './rating';
 export * from './duplicate';
 export * from './similarity';
 export * from './resolution';
-export * from './analysis';

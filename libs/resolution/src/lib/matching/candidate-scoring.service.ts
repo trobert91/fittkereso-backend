@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   EvaluatedProduct,
   MatchResult,
   ProductSpecs,
-} from "@ebike-backend/database";
+} from '@fittkereso-backend/database';
 import {
   ProductSimilarityService,
   ProductSimilarityInput,
   SimilarityTraceContext,
-} from "@ebike-backend/product";
-import { isEmpty } from "lodash";
+} from '@fittkereso-backend/product';
+import { isEmpty } from 'lodash';
 
 export interface CandidateScoringInput {
   model?: string;
@@ -19,7 +19,7 @@ export interface CandidateScoringInput {
 }
 
 /**
- * Thin adapter over `ProductSimilarityService` from `@ebike-backend/product`.
+ * Thin adapter over `ProductSimilarityService` from `@fittkereso-backend/product`.
  *
  * Takes the search lib's per-candidate inputs and yields `MatchResult[]` — the
  * shape the quality gates consume. Skips zero-score, empty-name results so the
@@ -43,13 +43,13 @@ export class CandidateScoringService {
 
       const similarityInput: ProductSimilarityInput = {
         query: {
-          model: input.model ?? "",
+          model: input.model ?? '',
           displayName: input.displayName,
           specs: isEmpty(inputSpecs) ? undefined : inputSpecs,
           year: input.releaseYear,
         },
         candidate: {
-          model: candidate.model ?? "",
+          model: candidate.model ?? '',
           displayName: candidate.displayName,
           aliases: candidate.aliases,
           specs: candidate.specs,
@@ -64,7 +64,7 @@ export class CandidateScoringService {
 
       const result = this.productSimilarity.score(similarityInput);
 
-      if (result.score === 0 && result.bestMatchName === "") continue;
+      if (result.score === 0 && result.bestMatchName === '') continue;
 
       matches.push({
         candidateId: candidate.id,

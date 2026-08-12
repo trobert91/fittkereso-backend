@@ -1,6 +1,6 @@
-import { UserRole } from "@ebike-backend/database";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { Expose } from "class-transformer";
+import { UserRole } from '@fittkereso-backend/database';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { Expose } from 'class-transformer';
 
 export class AuthenticatedUser {
   @Expose({ groups: [SerializeGroup.list] })

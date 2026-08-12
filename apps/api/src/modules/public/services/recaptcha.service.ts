@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { RecaptchaConfigService } from "@ebike-backend/config";
-import { CustomLogger } from "@ebike-backend/logger";
+import { Injectable } from '@nestjs/common';
+import { RecaptchaConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
 
 @Injectable()
 export class RecaptchaService {
@@ -17,10 +17,10 @@ export class RecaptchaService {
     });
 
     const response = await fetch(
-      "https://www.google.com/recaptcha/api/siteverify",
+      'https://www.google.com/recaptcha/api/siteverify',
       {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
       },
     );
@@ -28,7 +28,7 @@ export class RecaptchaService {
     const data = await response.json();
 
     if (!data.success) {
-      this.logger.warn("reCAPTCHA verification failed", data);
+      this.logger.warn('reCAPTCHA verification failed', data);
       return false;
     }
 

@@ -1,23 +1,20 @@
-import { Injectable } from "@nestjs/common";
-import { AiChatService } from "@ebike-backend/ai";
-import { ChatTraceData } from "@ebike-backend/debug";
-import { DynamicConfigService } from "@ebike-backend/dynamic-config";
-import { CustomLogger } from "@ebike-backend/logger";
-import { sortBy } from "lodash";
-import type { DecisionStrategy } from "../../models/strategy-types";
+import { Injectable } from '@nestjs/common';
+import { AiChatService } from '@fittkereso-backend/ai';
+import { ChatTraceData } from '@fittkereso-backend/debug';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { sortBy } from 'lodash';
+import type { DecisionStrategy } from '../../models/strategy-types';
 import type {
   FinalDecision,
   ResolutionContext,
-} from "../../models/resolution-context";
-import type { SlimCandidate, SlimReference } from "../../models/slim-types";
-import type { ResolutionThreadContext } from "../../models/caller-context";
-import { MatchingConfigService } from "../../matching/matching-config.service";
+} from '../../models/resolution-context';
+import type { SlimCandidate, SlimReference } from '../../models/slim-types';
+import { MatchingConfigService } from '../../matching/matching-config.service';
 
 const DEFAULT_MAX_PICKS = 6;
-const DEFAULT_DECISION_MODEL = "deepseek-v4-flash";
+const DEFAULT_DECISION_MODEL = 'deepseek-v4-flash';
 const MAX_CANDIDATE_SPECS = 8;
-const PARENT_COMMENT_TRUNCATE = 400;
-const COMMENT_BODY_TRUNCATE = 500;
 
 interface RawDecisionResponse {
   picks: Array<{ candidateId: string; confidence: number; reason: string }>;
@@ -58,7 +55,6 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
   async decide(
     context: ResolutionContext,
-    threadContext?: ResolutionThreadContext,
     traceCollector?: (data: ChatTraceData) => void,
     logContext?: Record<string, string>,
   ): Promise<FinalDecision> {
@@ -66,11 +62,11 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
     if (candidates.length === 0) {
       return {
-        kind: "llm_unresolved",
+        kind: 'llm_unresolved',
         confidence: 0,
-        reason: "no_qualifying_candidates",
+        reason: 'no_qualifying_candidates',
         selectedCandidates: [],
-        evidenceSummary: "pre-filter dropped every candidate",
+        evidenceSummary: 'pre-filter dropped every candidate',
       };
     }
 
@@ -79,7 +75,7 @@ export class LlmDecisionStrategy implements DecisionStrategy {
       DEFAULT_MAX_PICKS;
     const matchingCfg = this.matchingConfig.config;
     const acceptThreshold =
-      context.options.mode === "strict"
+      context.options.mode === 'strict'
         ? matchingCfg.acceptThresholdStrict
         : matchingCfg.acceptThreshold;
 
@@ -97,39 +93,34 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
     const schema = buildSchema(maxPicks);
     const systemPrompt = buildSystemPrompt(maxPicks);
-    const userMessage = this.buildUserMessage(
-      context,
-      threadContext,
-      shortIdByReal,
-    );
+    const userMessage = this.buildUserMessage(context, shortIdByReal);
     const model =
       this.dynamicConfigService.search?.decisionModel ?? DEFAULT_DECISION_MODEL;
 
     let raw: RawDecisionResponse;
     try {
       const response = await this.aiChatService.createChat({
-        costLabel: "product_resolution_decision",
+        costLabel: 'product_resolution_decision',
         schema,
-        schemaName: "product_resolution_decision",
+        schemaName: 'product_resolution_decision',
         traceCollector,
         logContext,
-        threadId: context.threadId,
         model,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
         ],
         temperature: 1,
       });
       raw = JSON.parse(
-        response.choices[0].message.content ?? "{}",
+        response.choices[0].message.content ?? '{}',
       ) as RawDecisionResponse;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return {
-        kind: "llm_unresolved",
+        kind: 'llm_unresolved',
         confidence: 0,
-        reason: "decision_llm_error",
+        reason: 'decision_llm_error',
         selectedCandidates: [],
         evidenceSummary: `decision LLM error: ${message}`,
       };
@@ -141,7 +132,7 @@ export class LlmDecisionStrategy implements DecisionStrategy {
       .map((pick) => {
         const realId = realByShort.get(pick.candidateId);
         if (!realId) {
-          this.logger.warn("Decision LLM returned unknown candidate short id", {
+          this.logger.warn('Decision LLM returned unknown candidate short id', {
             shortId: pick.candidateId,
             ...logContext,
           });
@@ -172,9 +163,9 @@ export class LlmDecisionStrategy implements DecisionStrategy {
           (evidence) => evidence.resolvedProducts.length === 0,
         );
       return {
-        kind: "llm_unresolved",
+        kind: 'llm_unresolved',
         confidence: 0,
-        reason: familyOnly ? "family_only_evidence" : "llm_returned_none",
+        reason: familyOnly ? 'family_only_evidence' : 'llm_returned_none',
         selectedCandidates: [],
         evidenceSummary: raw.evidenceSummary,
       };
@@ -189,9 +180,9 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
     if (accepted.length === 0) {
       return {
-        kind: "llm_unresolved",
+        kind: 'llm_unresolved',
         confidence: Math.max(...mappedPicks.map((p) => p.confidence)),
-        reason: "below_accept_threshold",
+        reason: 'below_accept_threshold',
         selectedCandidates: [],
         evidenceSummary: raw.evidenceSummary,
       };
@@ -199,9 +190,9 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
     const sorted = sortBy(accepted, (pick) => -pick.confidence);
     return {
-      kind: "llm_resolved",
+      kind: 'llm_resolved',
       confidence: sorted[0].confidence,
-      reason: "llm_resolved",
+      reason: 'llm_resolved',
       selectedCandidates: sorted,
       evidenceSummary: raw.evidenceSummary,
     };
@@ -209,107 +200,68 @@ export class LlmDecisionStrategy implements DecisionStrategy {
 
   private buildUserMessage(
     context: ResolutionContext,
-    threadContext: ResolutionThreadContext | undefined,
     shortIdByReal: Map<string, string>,
   ): string {
     const input = context.input;
     const lines: string[] = [];
 
     // ── Product to Identify ────────────────────────────────────────────────
-    lines.push("## Product to Identify");
-    lines.push(`Brand: ${input.brand ?? "unknown"}`);
-    lines.push(`Model: ${input.model ?? "unknown"}`);
+    lines.push('## Product to Identify');
+    lines.push(`Brand: ${input.brand ?? 'unknown'}`);
+    lines.push(`Model: ${input.model ?? 'unknown'}`);
     if (input.displayName) lines.push(`As mentioned: ${input.displayName}`);
     if (input.modelClues?.length)
-      lines.push(`Model clues: ${input.modelClues.join(", ")}`);
+      lines.push(`Model clues: ${input.modelClues.join(', ')}`);
     if (input.variantClues?.length)
-      lines.push(`Variant clues: ${input.variantClues.join(", ")}`);
+      lines.push(`Variant clues: ${input.variantClues.join(', ')}`);
     if (input.specs?.length) {
       lines.push(
         `Extracted specs: ${input.specs
           .map((spec) => `${spec.name}=${spec.value}`)
-          .join(", ")}`,
+          .join(', ')}`,
       );
     }
-    lines.push("");
+    lines.push('');
 
     // ── Reference Product (variant-search case) ────────────────────────────
     if (context.referenceProduct) {
       const ref = context.referenceProduct;
-      lines.push("## Reference Product");
+      lines.push('## Reference Product');
       lines.push(
-        "The mention is a back-reference or sibling of a product already identified",
+        'The mention is a back-reference or sibling of a product already identified',
       );
       lines.push(
-        "elsewhere in the thread. Pick a SIBLING SKU when the comment cues differ",
+        'elsewhere in the thread. Pick a SIBLING SKU when the comment cues differ',
       );
       lines.push(
-        "from the reference; pick the SAME SKU when the comment cues match exactly.",
+        'from the reference; pick the SAME SKU when the comment cues match exactly.',
       );
-      lines.push(`Brand: ${ref.brand ?? "unknown"}`);
-      lines.push(`Model: ${ref.model ?? "unknown"}`);
+      lines.push(`Brand: ${ref.brand ?? 'unknown'}`);
+      lines.push(`Model: ${ref.model ?? 'unknown'}`);
       if (ref.productCategory)
         lines.push(`Category: ${ref.productCategory.name}`);
       const refSpecs = renderSpecs(ref.specs);
       if (refSpecs) lines.push(`Reference specs: ${refSpecs}`);
-      lines.push("");
-    }
-
-    // ── Comment Body ──────────────────────────────────────────────────────
-    if (threadContext?.commentBody) {
-      lines.push("## Comment Body");
-      lines.push(threadContext.commentBody.slice(0, COMMENT_BODY_TRUNCATE));
-      lines.push("");
-    }
-
-    // ── Grandparent / Parent Comments (top-down conversational order) ──────
-    if (threadContext?.grandparentCommentBody) {
-      lines.push("## Grandparent Comment");
-      lines.push(
-        threadContext.grandparentCommentBody.slice(0, PARENT_COMMENT_TRUNCATE),
-      );
-      lines.push("");
-    }
-    if (threadContext?.parentCommentBody) {
-      lines.push("## Parent Comment (direct reply target)");
-      lines.push(
-        threadContext.parentCommentBody.slice(0, PARENT_COMMENT_TRUNCATE),
-      );
-      lines.push("");
-    }
-
-    // ── Thread Context ────────────────────────────────────────────────────
-    if (threadContext) {
-      lines.push("## Thread Context");
-      lines.push(`Subreddit: r/${threadContext.subreddit}`);
-      lines.push(`Thread title: ${threadContext.threadTitle}`);
-      if (threadContext.opSummary)
-        lines.push(`OP summary: ${threadContext.opSummary}`);
-      if (threadContext.resolvedProducts?.length) {
-        lines.push(
-          `Other resolved products in thread: ${threadContext.resolvedProducts.join(", ")}`,
-        );
-      }
-      lines.push("");
+      lines.push('');
     }
 
     // ── Web Search Evidence ───────────────────────────────────────────────
     if (context.searchEvidence.length > 0) {
-      lines.push("## Web Search Evidence");
+      lines.push('## Web Search Evidence');
       for (const evidence of context.searchEvidence.slice(0, 20)) {
         lines.push(`- [${evidence.queryIntent}] ${evidence.title}`);
         if (evidence.description) lines.push(`  ${evidence.description}`);
         lines.push(`  ${evidence.url}`);
         if (evidence.modelNumbers.length > 0) {
-          lines.push(`  models in text: ${evidence.modelNumbers.join(", ")}`);
+          lines.push(`  models in text: ${evidence.modelNumbers.join(', ')}`);
         }
         if (evidence.resolvedProducts.length > 0) {
           lines.push(
-            `  → catalog: ${evidence.resolvedProducts.map((p) => `${p.brand} ${p.model}`).join(", ")}`,
+            `  → catalog: ${evidence.resolvedProducts.map((p) => `${p.brand} ${p.model}`).join(', ')}`,
           );
         }
       }
-      lines.push("");
+      lines.push('');
     }
 
     // ── Matcher Diagnostics (soft evidence) ───────────────────────────────
@@ -327,66 +279,66 @@ export class LlmDecisionStrategy implements DecisionStrategy {
         parts.push(`runner-up score: ${context.scoring.secondScore}`);
       }
       if (context.scoring.failedGates?.length) {
-        parts.push(`failed gates: ${context.scoring.failedGates.join(", ")}`);
+        parts.push(`failed gates: ${context.scoring.failedGates.join(', ')}`);
       }
       if (parts.length > 0) {
         lines.push(
-          "## Matcher Diagnostics (soft evidence — do not enforce as constraints)",
+          '## Matcher Diagnostics (soft evidence — do not enforce as constraints)',
         );
         for (const part of parts) lines.push(`- ${part}`);
-        lines.push("");
+        lines.push('');
       }
     }
 
     // ── Qualifying Candidates ─────────────────────────────────────────────
-    lines.push("## Qualifying Candidates");
+    lines.push('## Qualifying Candidates');
     lines.push(
-      "Each candidate has already passed required spec and category gates.",
+      'Each candidate has already passed required spec and category gates.',
     );
     lines.push(
-      "Pick from the candidates that match THIS specific mention. If more than one plausibly matches (regional variant, sibling SKU), include all that fit.",
+      'Pick from the candidates that match THIS specific mention. If more than one plausibly matches (regional variant, sibling SKU), include all that fit.',
     );
-    lines.push("");
+    lines.push('');
     for (const candidate of context.candidates) {
       const shortId =
         shortIdByReal.get(candidate.productId) ?? candidate.productId;
       lines.push(`- ${formatCandidate(candidate, shortId)}`);
     }
 
-    return lines.join("\n");
+    return lines.join('\n');
   }
 }
 
 function buildSchema(maxPicks: number) {
   return {
-    type: "object",
+    type: 'object',
     additionalProperties: false,
     properties: {
       picks: {
-        type: "array",
+        type: 'array',
         minItems: 0,
         maxItems: maxPicks,
         items: {
-          type: "object",
+          type: 'object',
           additionalProperties: false,
           properties: {
-            candidateId: { type: "string" },
-            confidence: { type: "integer", minimum: 0, maximum: 100 },
-            reason: { type: "string" },
+            candidateId: { type: 'string' },
+            confidence: { type: 'integer', minimum: 0, maximum: 100 },
+            reason: { type: 'string' },
           },
-          required: ["candidateId", "confidence", "reason"],
+          required: ['candidateId', 'confidence', 'reason'],
         },
       },
-      evidenceSummary: { type: "string" },
+      evidenceSummary: { type: 'string' },
     },
-    required: ["picks", "evidenceSummary"],
+    required: ['picks', 'evidenceSummary'],
   } as const;
 }
 
 function buildSystemPrompt(maxPicks: number): string {
   return `You are a product identification expert. You are resolving ONE product mention (the "Product to Identify" below) to its catalog SKU(s). The comment may discuss many products — IGNORE everything except the specific mention named in "Product to Identify". Other mentions are handled separately by their own resolution call.
 
-Given the mention's brand/model/clues, the comment body for context, thread context, web search evidence, and a list of qualifying catalog candidates, decide which catalog candidate(s) THIS one mention refers to.
+Given the mention's brand/model/clues, web search evidence, and a list of qualifying catalog candidates, decide which catalog candidate(s) THIS one mention refers to.
 
 Return an array \`picks\` of 0..${maxPicks} catalog candidates that THIS specific mention matches. Each pick carries:
 - candidateId: the candidate's short id from the "Qualifying Candidates" list (e.g. "c1"). Must appear in the list — never invent one.
@@ -407,11 +359,8 @@ When to return an empty \`picks\` array:
 - The mention turned out to be a non-product (rare — extraction misclassification).
 
 Per-pick rules:
-- The comment body is the primary signal but is about more than just this mention. Read it for evidence that disambiguates THIS mention. Ignore parts of the comment that describe other products.
 - SERP evidence carries weight only when its model numbers map back to a candidate.
-- Use subreddit, thread title, and OP summary as context clues for the product family.
-- Parent/grandparent comments (when present) provide the conversational context — the current comment may use referring language ("the same one", "the cheaper option") that only resolves when read against the parent.
-- When a "## Reference Product" section is present, the mention is a sibling or variant of a product already identified in the thread. Use the reference's specs as the BASELINE; pick a sibling SKU when the comment cues differ from the reference (e.g. reference = "M3 Pro 14"; comment says "the 16-inch one" → pick the 16-inch sibling). Pick the SAME SKU when the comment matches the reference exactly.
+- When a "## Reference Product" section is present, the mention is a sibling or variant of a product already identified elsewhere. Use the reference's specs as the BASELINE; pick a sibling SKU when the mention's cues differ from the reference (e.g. reference = "M3 Pro 14"; mention says "the 16-inch one" → pick the 16-inch sibling). Pick the SAME SKU when the mention matches the reference exactly.
 - "matcher confidence" annotations on each candidate are evidence, not a constraint. A low matcher score warns that the literal name match was weak.
 - evidenceSummary must cite the specific clues that drove the overall decision.
 
@@ -423,29 +372,29 @@ Cross-market reasoning:
 function formatCandidate(candidate: SlimCandidate, shortId: string): string {
   const name =
     candidate.displayName ??
-    `${candidate.brand ?? ""} ${candidate.model ?? ""}`.trim();
+    `${candidate.brand ?? ''} ${candidate.model ?? ''}`.trim();
   const specs = renderSpecs(candidate.specs);
   const parts: string[] = [];
   if (candidate.matchScore != null) {
     const score = candidate.matchScore;
-    const label = score < 50 ? "low" : score < 70 ? "moderate" : "high";
+    const label = score < 50 ? 'low' : score < 70 ? 'moderate' : 'high';
     parts.push(`matcher confidence: ${score} (${label})`);
   }
-  const matcherNote = parts.length > 0 ? ` | ${parts.join("; ")}` : "";
-  return `id=${shortId}: ${name}${specs ? ` | ${specs}` : ""}${matcherNote}`;
+  const matcherNote = parts.length > 0 ? ` | ${parts.join('; ')}` : '';
+  return `id=${shortId}: ${name}${specs ? ` | ${specs}` : ''}${matcherNote}`;
 }
 
 /** Render a ProductSpecs map as `key=value, key=value, ...` capped at
  *  MAX_CANDIDATE_SPECS. Skips empty/false values. */
 function renderSpecs(
-  specs: SlimReference["specs"] | SlimCandidate["specs"],
+  specs: SlimReference['specs'] | SlimCandidate['specs'],
 ): string {
-  if (!specs) return "";
+  if (!specs) return '';
   return Object.entries(specs)
     .filter(
-      ([, value]) => value !== undefined && value !== null && value !== "",
+      ([, value]) => value !== undefined && value !== null && value !== '',
     )
     .slice(0, MAX_CANDIDATE_SPECS)
     .map(([key, value]) => `${key}=${String(value)}`)
-    .join(", ");
+    .join(', ');
 }

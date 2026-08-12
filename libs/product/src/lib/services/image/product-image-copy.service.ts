@@ -1,15 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import {
   ProductImage,
   ProductImageRepository,
   ProductModel,
   ProductSource,
-} from "@ebike-backend/database";
-import { ProductImageFactory } from "./product-image-factory";
-import { ProductImageStorageService } from "./product-image-storage.service";
-import { ProductMetricsService } from "@ebike-backend/metrics";
-import { CustomLogger } from "@ebike-backend/logger";
-import { isEmpty, maxBy } from "lodash";
+} from '@fittkereso-backend/database';
+import { ProductImageFactory } from './product-image-factory';
+import { ProductImageStorageService } from './product-image-storage.service';
+import { ProductMetricsService } from '@fittkereso-backend/metrics';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { isEmpty, maxBy } from 'lodash';
 
 @Injectable()
 export class ProductImageCopyService {

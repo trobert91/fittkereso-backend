@@ -1,5 +1,5 @@
-import type { ProductModel } from "@ebike-backend/database";
-import type { ResolutionContext } from "./resolution-context";
+import type { ProductModel } from '@fittkereso-backend/database';
+import type { ResolutionContext } from './resolution-context';
 
 /**
  * What `ResolutionService.search()` returns.

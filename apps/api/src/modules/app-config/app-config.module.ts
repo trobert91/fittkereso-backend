@@ -1,14 +1,12 @@
-import { Global, Module } from "@nestjs/common";
-import { AppConfigService } from "./services/app-config.service";
-import { AppSettingsConfigService } from "./sub-configs/app-settings.config.service";
+import { Global, Module } from '@nestjs/common';
+import { AppConfigService } from './services/app-config.service';
+import { AppSettingsConfigService } from './sub-configs/app-settings.config.service';
 import {
   PostgresConfigService,
   MongoConfigService,
-  RedditConfigService,
   OpenAiConfigService,
   GeminiConfigService,
   ClaudeConfigService,
-  OpenRouterConfigService,
   DeepSeekConfigService,
   DataForSeoConfigService,
   TaskConfigService,
@@ -18,9 +16,8 @@ import {
   BunnyConfigService,
   CategoryConfigService,
   SourceConfigService,
-  ProcessorConfigService,
-} from "@ebike-backend/config";
-import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
+} from '@fittkereso-backend/config';
+import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 
 @Global()
 @Module({
@@ -30,11 +27,9 @@ import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
     PostgresConfigService,
     MongoConfigService,
     AppSettingsConfigService,
-    RedditConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
     DataForSeoConfigService,
     TaskConfigService,
@@ -44,18 +39,15 @@ import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
     BunnyConfigService,
     CategoryConfigService,
     SourceConfigService,
-    ProcessorConfigService,
   ],
   exports: [
     AppConfigService,
     PostgresConfigService,
     MongoConfigService,
     AppSettingsConfigService,
-    RedditConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
-    OpenRouterConfigService,
     DeepSeekConfigService,
     DataForSeoConfigService,
     TaskConfigService,
@@ -65,7 +57,6 @@ import { DynamicConfigModule } from "@ebike-backend/dynamic-config";
     BunnyConfigService,
     CategoryConfigService,
     SourceConfigService,
-    ProcessorConfigService,
   ],
 })
 export class AppConfigModule {}

@@ -5,7 +5,7 @@
 -- tables that can be used to seed databases or migrate data.
 --
 -- Usage:
---   psql -d ebike -f export-config-data.sql > exported-data.sql
+--   psql -d fittkereso -f export-config-data.sql > exported-data.sql
 --
 -- The output can then be imported into another database:
 --   psql -d target_database -f exported-data.sql

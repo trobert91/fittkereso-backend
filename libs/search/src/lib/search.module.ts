@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module } from '@nestjs/common';
 import {
   BrandSearchService,
   ProductDuplicationSearchService,
@@ -6,16 +6,10 @@ import {
   ProductSourceSearchService,
   ProductCategorySearchService,
   ProductSearchService,
-  ReviewSearchService,
   ScrapeTaskSearchService,
   TaskSearchService,
-  ThreadSearchService,
-  ThreadSearchTaskSearchService,
-  ThreadSearchKeywordSearchService,
-  ThreadRunSearchService,
-} from "./services";
-import { DatabaseModule } from "@ebike-backend/database";
-import { UserCommentSearchService } from "./services/user-comment-search.service";
+} from './services';
+import { DatabaseModule } from '@fittkereso-backend/database';
 
 @Module({
   imports: [DatabaseModule],
@@ -27,14 +21,8 @@ import { UserCommentSearchService } from "./services/user-comment-search.service
     ProductSourceSearchService,
     ProductCategorySearchService,
     ProductSearchService,
-    ReviewSearchService,
     ScrapeTaskSearchService,
     TaskSearchService,
-    ThreadSearchService,
-    ThreadSearchTaskSearchService,
-    ThreadSearchKeywordSearchService,
-    ThreadRunSearchService,
-    UserCommentSearchService,
   ],
   exports: [
     BrandSearchService,
@@ -43,14 +31,8 @@ import { UserCommentSearchService } from "./services/user-comment-search.service
     ProductSourceSearchService,
     ProductCategorySearchService,
     ProductSearchService,
-    ReviewSearchService,
     ScrapeTaskSearchService,
     TaskSearchService,
-    ThreadSearchService,
-    ThreadSearchTaskSearchService,
-    ThreadSearchKeywordSearchService,
-    ThreadRunSearchService,
-    UserCommentSearchService,
   ],
 })
 export class SearchModule {}

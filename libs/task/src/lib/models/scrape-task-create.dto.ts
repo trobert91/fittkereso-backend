@@ -5,8 +5,8 @@ import {
   IsString,
   IsUUID,
   IsDateString,
-} from "class-validator";
-import { ScrapeQueueName } from "@ebike-backend/database";
+} from 'class-validator';
+import { ScrapeQueueName } from '@fittkereso-backend/database';
 
 export class ScrapeTaskCreateDto {
   @IsDefined()

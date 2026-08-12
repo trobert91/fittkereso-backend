@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import * as cheerio from "cheerio";
-import { ProductSource } from "@ebike-backend/database";
-import { SourceConfigService } from "@ebike-backend/config";
-import { ScraperService } from "@ebike-backend/scraper";
-import { isEmpty, uniq } from "lodash";
-import { CustomLogger } from "@ebike-backend/logger";
-import { WebLink } from "@ebike-backend/product";
+import { Injectable } from '@nestjs/common';
+import * as cheerio from 'cheerio';
+import { ProductSource } from '@fittkereso-backend/database';
+import { SourceConfigService } from '@fittkereso-backend/config';
+import { ScraperService } from '@fittkereso-backend/scraper';
+import { isEmpty, uniq } from 'lodash';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import { WebLink } from '@fittkereso-backend/product';
 
 @Injectable()
 export class ArukeresoIndexPageService {
@@ -29,7 +29,7 @@ export class ArukeresoIndexPageService {
     );
     if (!fullSyncStartUrl) {
       throw new Error(
-        "Arukereso fullSyncStartUrl not configured in source config",
+        'Arukereso fullSyncStartUrl not configured in source config',
       );
     }
 
@@ -45,9 +45,9 @@ export class ArukeresoIndexPageService {
     );
     const matched = new Map<string, WebLink>();
 
-    $(".all-categories .by-letter a").each((_, link) => {
+    $('.all-categories .by-letter a').each((_, link) => {
       const title = $(link).clone().children().remove().end().text().trim();
-      const url = $(link).attr("href")?.trim();
+      const url = $(link).attr('href')?.trim();
 
       if (!url || !title) return;
 

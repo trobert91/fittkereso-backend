@@ -1,7 +1,5 @@
 export * from './lib/resolution.module';
 export * from './lib/resolution.service';
-export * from './lib/resolution-result-applier.service';
-export * from './lib/registry-updater';
 export * from './lib/models';
 export * from './lib/matching';
 export * from './lib/stages';

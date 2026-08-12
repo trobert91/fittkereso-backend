@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { AiProviderRegistry } from "@ebike-backend/ai-core";
+import { Injectable } from '@nestjs/common';
+import { AiProviderRegistry } from '@fittkereso-backend/ai-core';
 
-const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 
 @Injectable()
 export class AiEmbeddingService {

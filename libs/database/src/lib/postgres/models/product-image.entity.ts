@@ -1,15 +1,15 @@
-import { Column, Entity, ManyToOne } from "typeorm";
-import { BasePostgresEntity } from "./base-postgres-entity";
-import { Expose } from "class-transformer";
-import { SerializeGroup } from "@ebike-backend/utils";
-import { ProductModel } from "./product-model.entity";
-import { ProductSource } from "./product-source.entity";
+import { Column, Entity, ManyToOne } from 'typeorm';
+import { BasePostgresEntity } from './base-postgres-entity';
+import { Expose } from 'class-transformer';
+import { SerializeGroup } from '@fittkereso-backend/utils';
+import { ProductModel } from './product-model.entity';
+import { ProductSource } from './product-source.entity';
 
 @Entity()
 export class ProductImage extends BasePostgresEntity {
   @ManyToOne(() => ProductModel, (model) => model.images, {
     nullable: false,
-    onDelete: "CASCADE",
+    onDelete: 'CASCADE',
   })
   model: ProductModel;
 
