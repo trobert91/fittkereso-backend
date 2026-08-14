@@ -130,8 +130,1409 @@
     }
   },
   "promptConfig": {
-    "searchKeywordSuffix": "monitor"
+    "validSpecs": [
+      {
+        "name": "refreshRate",
+        "format": "integer followed by 'Hz', no space",
+        "examples": "240Hz, 144Hz, 175Hz"
+      },
+      {
+        "name": "panelType",
+        "format": "panel type only, no surface descriptors",
+        "examples": "OLED, QD-OLED, WOLED, IPS, VA, TN",
+        "avoid": ["matte OLED", "glossy IPS", "QD OLED", "W-OLED"],
+        "hint": "Surface descriptors like 'matte' or 'glossy' are separate properties. Use the hyphenated forms QD-OLED and WOLED."
+      },
+      {
+        "name": "resolution",
+        "format": "WIDTHxHEIGHT in pixels (lowercase x, no spaces)",
+        "examples": "3440x1440, 2560x1440, 3840x2160, 1920x1080, 5120x1440",
+        "avoid": ["4K", "5K", "8K", "FHD", "QHD", "UHD", "WQHD", "DQHD", "1080p", "1440p", "2160p"],
+        "hint": "Disambiguate ultrawides via screenSize: on a 34\" panel, '1440p' or 'WQHD' means 3440x1440; on a 27\"/32\" panel it means 2560x1440."
+      },
+      {
+        "name": "screenSize",
+        "format": "number followed by the inch mark \"",
+        "examples": "34\", 27\", 32\", 49\"",
+        "avoid": ["34 inch", "34in", "34''"]
+      },
+      {
+        "name": "curvature",
+        "format": "radius integer followed by 'R'",
+        "examples": "1800R, 800R, 1500R",
+        "avoid": ["1800", "800mm"]
+      }
+    ],
+    "productIdExamples": [
+      {
+        "mentioned": "MSI MPG 341CQPX",
+        "brand": "MSI",
+        "model": "MPG 341CQPX"
+      },
+      {
+        "mentioned": "Acer Predator X34",
+        "brand": "Acer",
+        "model": "Predator X34"
+      },
+      {
+        "mentioned": "LG 34GS95QE-B",
+        "brand": "LG",
+        "model": "34GS95QE-B"
+      }
+    ],
+    "brandCorrectnessExamples": [
+      {
+        "mentioned": "AW3418DW",
+        "brand": "Alienware",
+        "model": "AW3418DW",
+        "context": "in an MSI discussion"
+      },
+      {
+        "mentioned": "my old Samsung G5",
+        "brand": "Samsung",
+        "model": "Odyssey G5",
+        "context": "in an LG thread"
+      }
+    ],
+    "technologyDescriptors": [
+      "OLED",
+      "QD-OLED",
+      "WOLED",
+      "IPS",
+      "VA",
+      "Mini LED",
+      "TN",
+      "DP 1.2"
+    ],
+    "productTypeWord": "monitor",
+    "disambiguationExamples": {
+      "suffix": [
+        [
+          "34GS95QE",
+          "34GS95QE-B"
+        ]
+      ],
+      "abbreviated": [
+        [
+          "MPG341",
+          "MPG 341CQPX"
+        ]
+      ],
+      "variant": [
+        [
+          "341CQP",
+          "341CQPX"
+        ],
+        [
+          "MPG431CQPX",
+          "MPG341CQPX"
+        ],
+        [
+          "MPG 321URX",
+          "MPG 341CQPX"
+        ],
+        [
+          "Odyssey OLED G8",
+          "Odyssey OLED G8 SD"
+        ],
+        [
+          "S34BG850SU",
+          "S34BG850SD"
+        ]
+      ]
+    },
+    "identificationExamples": {
+      "comments": [
+        {
+          "_": "OP lists 6 products. Cheat sheet has 'MSI MPG 341CQPX' so '341CQPX' resolves to it. Corsair added in an edit as 'not considering it, overpriced + new brand' → named model + reason → medium. ASUS written as 'ROG swift PG34WCDM' → brand Asus, model PG34WCDM resolves to cheat-sheet 'ASUS ROG Swift PG34WCDM'.",
+          "commentId": "c0",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "high",
+              "specs": [
+                {
+                  "name": "curvature",
+                  "value": "800R"
+                },
+                {
+                  "name": "panelType",
+                  "value": "matte WOLED"
+                }
+              ]
+            },
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "high",
+              "specs": [
+                {
+                  "name": "curvature",
+                  "value": "1800R"
+                },
+                {
+                  "name": "panelType",
+                  "value": "glossy QD-OLED"
+                }
+              ]
+            },
+            {
+              "brand": "Acer",
+              "model": "Predator X34 X5",
+              "contentQuality": "low"
+            },
+            {
+              "brand": "Gigabyte",
+              "model": "MO34WQC2",
+              "contentQuality": "low"
+            },
+            {
+              "brand": "Asus",
+              "model": "ROG Swift PG34WCDM",
+              "contentQuality": "medium",
+              "specs": [
+                {
+                  "name": "panelType",
+                  "value": "matte WOLED"
+                }
+              ]
+            },
+            {
+              "brand": "Corsair",
+              "model": "Xeneon 34WQHD240-C",
+              "contentQuality": "medium"
+            }
+          ]
+        },
+        {
+          "_": "u/Bob: 'I've had the MSI MPG341 for about a week. Coming from a 165Hz Acer Predator IPS, colors are crazy. The 1800R curve feels just right.' Cheat sheet has 'MSI MPG 341CQPX' as the only MSI MPG entry → 'MPG341' is an abbreviation, resolve to cheat-sheet model. Detailed first-hand → high. 1800R stated → curvature spec.",
+          "commentId": "c1",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "high",
+              "specs": [
+                {
+                  "name": "curvature",
+                  "value": "1800R"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_": "Same u/Bob: 'Got this one being delivered today' → bare logistics, same-author chain → low. Chain resolves to 'MPG 341CQPX' (same as c1).",
+          "commentId": "c2",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "Same u/Bob: 'This monitor is absolutely insane. I wish I had bought it sooner' → verdict without depth → medium. Same-author chain, MPG 341CQPX.",
+          "commentId": "c3",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "medium"
+            }
+          ]
+        },
+        {
+          "_": "Different commenter: 'Just got the MSI MPG431CQPX' — note the '4' before 31 — this is a distinct SKU number, NOT an abbreviation of MPG 341CQPX. Stay verbatim.",
+          "commentId": "c4",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG431CQPX",
+              "contentQuality": "medium"
+            }
+          ]
+        },
+        {
+          "_": "'Should I wait for the 5K2K version?' → no specific model named, just speculation about a future variant → products: [].",
+          "commentId": "c5",
+          "products": []
+        },
+        {
+          "_": "'Anyone tried the MSI MPG 341CQPX with G-sync?' → question that names a specific model. Identify the product, contentQuality low (no evaluation, just asking).",
+          "commentId": "c5b",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "'I'm gonna buy the LG 34GS95QE-B once it's in stock' → future-action / purchase intent naming a specific model → emit at low (intent stated, no evaluation).",
+          "commentId": "c5c",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "Parent [CONTEXT: LG 34GS95QE-B]. Commenter says 'I have the 39\"' → resolves via parent context to the cheat-sheet model. Stated screenSize 39\" goes into specs (it's the same product line, just a size note from the commenter).",
+          "commentId": "c6",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "medium",
+              "specs": [
+                {
+                  "name": "screenSize",
+                  "value": "39\""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_": "Ancestor PLAN chain established 'LG' (one LG entry in cheat sheet). Commenter says 'Yes the curve is perfect. Excellent gaming monitor. I have the 39\" and love it.' → still resolves to the cheat-sheet 'LG 34GS95QE-B' even though the ancestor is PLAN, not CONTEXT. The commenter's stated 39\" is a size note on the same product line and goes into specs — do NOT drop the product just because the size diverges from the cheat-sheet entry. Owner verdict with feature mention → medium.",
+          "commentId": "c6b",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "medium",
+              "specs": [
+                {
+                  "name": "screenSize",
+                  "value": "39\""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_": "Parent PLAN established 'LG' (one LG entry in cheat sheet). Commenter says 'I'm currently testing the 39\" LG oled, for now the 800r is good in most games but… 2d platformers… nauseous'. Resolves to cheat-sheet 'LG 34GS95QE-B' via parent PLAN + bare-brand 'LG oled'. Stated 39\" and 800R go into specs. Negative feature feedback (motion / nausea on 2D) is buyer-useful → high. Do NOT emit products: [] just because the stated 39\" doesn't match the cheat-sheet's 34\" — size variance is a spec note, not a reason to drop.",
+          "commentId": "c6c",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "high",
+              "specs": [
+                {
+                  "name": "screenSize",
+                  "value": "39\""
+                },
+                {
+                  "name": "curvature",
+                  "value": "800R"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_": "Cheat sheet has Samsung G8 SU as the only G8. Commenter wrote 'G8sd' (different variant — SD, not SU) → variant-distinct, stay verbatim.",
+          "commentId": "c7",
+          "products": [
+            {
+              "brand": "Samsung",
+              "model": "G8sd",
+              "contentQuality": "medium"
+            }
+          ]
+        },
+        {
+          "_": "'LG 34GN850' not in cheat sheet → emit verbatim.",
+          "commentId": "c8",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GN850",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "'950a owner here, the curve is nice' → bare partial '950a' on its own. Parent [CONTEXT: LG 34GS95QE-B] resolves it (or same-author chain if present) → low (bare ownership, no evaluation). Resolves to cheat-sheet '34GS95QE-B'.",
+          "commentId": "c9",
+          "products": [
+            {
+              "brand": "LG",
+              "model": "34GS95QE-B",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "Owner of MSI 341CQPX with feature-level feedback (PD, KVM, purple tint, text clarity) → high. 'I'm only using 120Hz because my GPU is too old' → GPU constraint, NOT the monitor's spec → do NOT emit refreshRate 120Hz. 'Coming from a 27\" 1080p display' → that screenSize/resolution belongs to the OLD device → do NOT emit. Parent [CONTEXT] showed panelType OLED → do NOT copy that into this entry's specs. '341CQPX' resolves to cheat-sheet 'MPG 341CQPX'.",
+          "commentId": "c10",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "high"
+            }
+          ]
+        },
+        {
+          "_": "'Nah qdoled >> woled. Don't get LG' standalone (no parent context, multiple LGs in cheat sheet) → too generic to attribute → products: []. If parent [CONTEXT: LG 34GS95QE-B] were present, this would resolve to 34GS95QE-B at low (bare anti-rec).",
+          "commentId": "c11",
+          "products": []
+        },
+        {
+          "_": "Cheat sheet has 'MSI MPG 341CQPX' AND 'MSI MAG 341CQP'. Commenter wrote 'I could order the MSI MAG with 175Hz' → MAG with 175Hz resolves to cheat-sheet 'MSI MAG 341CQP' (175Hz matches that entry). Specifying 175Hz disambiguates between the two MSI entries → use cheat-sheet model.",
+          "commentId": "c12",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MAG 341CQP",
+              "contentQuality": "low"
+            }
+          ]
+        },
+        {
+          "_": "Cheat sheet has 'MSI MPG 341CQPX' (240Hz) as the only MSI entry. Commenter says 'I'm getting the 175Hz version of the MSI' — no explicit model token (no alphanumeric code), just brand + spec description. Resolves via 2.3 to the single MSI cheat-sheet entry. model is left empty; referenceModel is set to 'MPG 341CQPX'. The stated 175Hz diverges from MPG 341CQPX's known 240Hz → goes into specs. Do NOT put 'MPG 341CQPX' in model — that would be a contradictory SKU+spec combination.",
+          "commentId": "c12b",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "",
+              "contentQuality": "low",
+              "referenceModel": "MPG 341CQPX",
+              "specs": [
+                {
+                  "name": "refreshRate",
+                  "value": "175Hz"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_": "Cheat sheet has exactly one QD-OLED entry: 'MSI MPG 341CQPX'. Commenter says 'QD-OLED is amazing for HDR' — bare tech term with no model named, no parent context, no chain. The single matching cheat-sheet entry uniquely resolves it → emit MSI MPG 341CQPX. Praise for a panel-type capability is a verdict without product-specific depth → medium.",
+          "commentId": "c13",
+          "products": [
+            {
+              "brand": "MSI",
+              "model": "MPG 341CQPX",
+              "contentQuality": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "extractionExamples": {
+      "comments": [
+        {
+          "NOTE": "c0: OP-style buyer deliberation — five named attributes, five quotes. Sentiment per default-neutral rule: grey-tint con named → negative. Thinner bezels pro named → positive. The QC impression and the G-sync expectation mention the product but claim no actual pro or con → neutral.",
+          "commentId": "c0",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I am concerned about the \"grey tint\" on a glossy-QD-OLED",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "800R curve could be very immersive in games but I am concern regular content like videos or photos might look too distorted",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "Thinner bezels and better looking design",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "LG just gives me the impression of better QC than the other",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "Certified G-sync compatible. So, I'd expect it to work better than the non-certified ones",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "NOTE": "c1: Owner with strong but informal verdicts. None of these are in any 'verdict vocabulary' — they are still kept because a buyer reading them cold would learn the speaker loves the monitor.",
+          "commentId": "c1",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "all I can say is wow",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "This monitor is absolutely insane",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I wish I had bought it sooner",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report",
+                "recommendation"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "NOTE": "c2: Reference-tier external info. Identification claim is informational with no pro/con → neutral. Firmware fix + 'no other monitor has done' is a pro → positive.",
+          "commentId": "c2",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "TFT says its the MSI 341CQPX",
+                  "sentiment": "neutral"
+                },
+                {
+                  "text": "they just released firmware which fixes the HDR which no other monitor in this field has done",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "reference",
+              "depth": "detailed",
+              "intents": [
+                "reputation_report",
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "NOTE": "c3: Multi-product comparison. Each product gets its own quote — the speaker prefers MSI on price/panel and is concerned about MSI on G-sync. LG gets the certification mention. Sentiment is judged per side from what the clause says about THAT side: 'I'm mostly concerned about G-sync since the panel is not certified' on MSI → negative (con named); 'The LG panels are at least certified' on LG → positive (pro named). A bare price comparison like 'a bit cheaper than LG' would be positive on MSI but neutral on LG — no con claimed about LG, just a price fact.",
+          "commentId": "c3",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "I also lean more toward the MSI as it offers a better panel at a lower price",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "I'm mostly concerned about G-sync since the panel is not certified",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "It looks great on specs but I'm also seeing a lot more issues reported than the LG",
+                  "sentiment": "mixed"
+                },
+                {
+                  "text": "Feeling like a huge gamble is what's making me hesitate atm",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "comprehensive",
+              "intents": [
+                "comparison",
+                "seeking_advice"
+              ],
+              "overallSentiment": "mixed"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "The LG panels are at least certified",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            }
+          ]
+        },
+        {
+          "NOTE": "c4: Prior-owner issue report. Multiple distinct issue clauses → multiple quotes. The acquisition ('I had to return it') merges with the symptom into one issue narrative; the troubleshooting attempt ('I tried 3 DP cables') is buyer-useful because it documents how thoroughly the issue was reproduced.",
+          "commentId": "c4",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "when I enabled G-Sync, I had black screen flickers (not OLED flicker), it looked like losing a signal or something",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I had to return it",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "I have tried 3 DP cables and two HDMI. Result was the same",
+                  "sentiment": "negative"
+                },
+                {
+                  "text": "It had black screen flickers several times per 10 seconds. So it wasnt usable for me while paying so much money for it",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "prior_owner",
+              "depth": "comprehensive",
+              "intents": [
+                "issue_report",
+                "warning"
+              ],
+              "overallSentiment": "negative"
+            }
+          ]
+        },
+        {
+          "NOTE": "c5: Owner with weak signal. 'No greats so far' is a real (if understated) verdict and stays. Acquisition drops.",
+          "commentId": "c5",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "No greats so far",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "owner",
+              "depth": "mentioned",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "NOTE": "c6: Two-product comment with empty product. The speaker evaluates only p0. The other product is named only as a baseline — p1 gets an empty entry.",
+          "commentId": "c6",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "the matte finish handles bright rooms way better than glossy panels",
+                  "sentiment": "positive"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "detailed",
+              "intents": [
+                "recommendation",
+                "comparison"
+              ],
+              "overallSentiment": "positive"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [],
+              "experience": "reference",
+              "depth": "superficial",
+              "intents": [],
+              "overallSentiment": "neutral"
+            }
+          ]
+        },
+        {
+          "NOTE": "c7: Acquisition + verdict + named-attribute con. Drop the acquisition. Panel pro → positive. The counterfactual 'if it had Android instead of Tizen it would be awesome' names a con on current software (Tizen worse than Android) → negative.",
+          "commentId": "c7",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "the panel is great",
+                  "sentiment": "positive"
+                },
+                {
+                  "text": "if it had Android instead of Tizen it would be awesome",
+                  "sentiment": "negative"
+                }
+              ],
+              "experience": "owner",
+              "depth": "detailed",
+              "intents": [
+                "experience_report"
+              ],
+              "overallSentiment": "mixed"
+            }
+          ]
+        },
+        {
+          "NOTE": "c8: Meta-commentary dual-attaches (rule 4) but neutral on BOTH — the clause evaluates the reviews/discourse, not the products themselves, so no pro or con is claimed about either side.",
+          "commentId": "c8",
+          "products": [
+            {
+              "productIndex": 0,
+              "quotes": [
+                {
+                  "text": "Most youtube and website reviews like Rtings favor the MSI but on Reddit I seem to find more issues reported than the LG",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report",
+                "comparison"
+              ],
+              "overallSentiment": "neutral"
+            },
+            {
+              "productIndex": 1,
+              "quotes": [
+                {
+                  "text": "Most youtube and website reviews like Rtings favor the MSI but on Reddit I seem to find more issues reported than the LG",
+                  "sentiment": "neutral"
+                }
+              ],
+              "experience": "prospective_buyer",
+              "depth": "mentioned",
+              "intents": [
+                "reputation_report",
+                "comparison"
+              ],
+              "overallSentiment": "neutral"
+            }
+          ]
+        }
+      ]
+    },
+    "labelingExamples": {
+      "NOTE": "ID format: uppercase letter = comment (A, B, C…), lowercase letter = product within that comment (a, b, c…). Aa = comment A product a, Ab = comment A product b. Copy the EXACT bracket IDs from the input. Issues live on issues[] as { label, sentiment }; sentiment is one of \"negative\" (minor/intermittent) or \"strongNegative\" (severe/defective/return-worthy). The parent feature is mapped programmatically at scoring time.",
+      "products": [
+        {
+          "productId": "Aa",
+          "NOTE": "Ex 1 — Quality is about prose specificity, not stance. q0 names two specific aspects (colors + text clarity) and ties them to a use case (gaming) — concrete enough to stand on its own → quality: high. q1 ('VRR works great') is a bare feature verdict with no specific detail → quality: medium, even though the speaker is an owner.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "features": [
+                {
+                  "label": "colors",
+                  "sentiment": "positive"
+                },
+                {
+                  "label": "text clarity",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "PC gaming",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "medium",
+              "features": [
+                {
+                  "label": "VRR",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ba",
+          "NOTE": "Ex 2 — Verdict polarity is independent of quality. q0 is a neutral capability claim with no specific detail → quality: medium. q1 is a brief feature-pro without specifics → quality: medium. q2 is hearsay aggregation ('I've heard the colors are amazing') — low-information regardless of who says it → quality: low with speculative=true on the quote.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "medium",
+              "features": [
+                {
+                  "label": "VRR",
+                  "sentiment": "neutral"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "medium",
+              "features": [
+                {
+                  "label": "VRR",
+                  "sentiment": "positive"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 2,
+              "quality": "low",
+              "speculative": true,
+              "features": [
+                {
+                  "label": "colors",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ca",
+          "NOTE": "Ex 3 — Brief generic verdicts are medium regardless of stance. q0 ('all I can say is wow'), q1 ('This monitor is absolutely insane'), q2 ('I wish I had bought it sooner') are real opinions but carry no specific detail → quality: medium. They aren't downgraded for being short, but they don't reach high without a named aspect or specific condition.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "medium"
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "medium"
+            },
+            {
+              "quoteIndex": 2,
+              "quality": "medium"
+            }
+          ]
+        },
+        {
+          "productId": "Da",
+          "NOTE": "Ex 4 — Closed-list issue label emitted on issues[]. q0 reports a specific symptom (VRR black screen with the exact triggering condition) → quality: high; parent feature (VRR) is mapped programmatically at scoring time. q1 ('I had to return it') is a decisive purchase-outcome signal a buyer cares about → quality: high even without elaboration; also flag referenceDetails.returned=true. q2 ('tried 3 DP cables and two HDMI') is troubleshooting context with no evaluation on its own → quality: low. q3 reports the symptom severity with concrete frequency ('several times per 10 seconds') → quality: high with the same issue label.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "issues": [
+                {
+                  "label": "vrr black screen",
+                  "sentiment": "strongNegative"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "high"
+            },
+            {
+              "quoteIndex": 2,
+              "quality": "low"
+            },
+            {
+              "quoteIndex": 3,
+              "quality": "high",
+              "issues": [
+                {
+                  "label": "vrr black screen",
+                  "sentiment": "strongNegative"
+                }
+              ]
+            }
+          ],
+          "referenceDetails": {
+            "returned": true
+          }
+        },
+        {
+          "productId": "Ea",
+          "NOTE": "Ex 5 — Implicit use case (STEP 2 iii). Names a specific aspect (HDR) tied to a concrete activity (watching movies) → quality: high.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "features": [
+                {
+                  "label": "HDR",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "movies",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Fa",
+          "NOTE": "Ex 6 — Owner speculating + price line. q0 ('I'm worried about burn-in') is a brief generic worry with no specific condition → quality: medium; speculative=true on the quote captures the stance separately. q1 names value with a concrete price comparison → quality: high. Price lifted verbatim into referenceDetails.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "medium",
+              "speculative": true,
+              "issues": [
+                {
+                  "label": "burn-in",
+                  "sentiment": "negative"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "high",
+              "features": [
+                {
+                  "label": "value",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ],
+          "referenceDetails": {
+            "purchasePrice": "$750"
+          }
+        },
+        {
+          "productId": "Ga",
+          "NOTE": "Ex 7 — Per-unit defect emits on issues[]. First-hand defect observation → quality: high. 'dead pixels' is in ISSUE LABELS — the parent feature (production quality) is mapped programmatically. referenceDetails.defective fires because it's a physical defect.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "issues": [
+                {
+                  "label": "dead pixels",
+                  "sentiment": "strongNegative"
+                }
+              ]
+            }
+          ],
+          "referenceDetails": {
+            "defective": true
+          }
+        },
+        {
+          "productId": "Ha",
+          "NOTE": "Ex 8 — Pick the closest closed-list match by symptom. First-hand observation of brightness oscillation during VRR → quality: high. 'vrr flickering' (NOT 'vrr black screen' — different symptom).",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "issues": [
+                {
+                  "label": "vrr flickering",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ia",
+          "NOTE": "Ex 9 — Mixed evidence on one quote: praise feature + closed-list issue + use case. Names colors + gaming + a concrete defect → quality: high.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "features": [
+                {
+                  "label": "colors",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "PC gaming",
+                  "sentiment": "positive"
+                }
+              ],
+              "issues": [
+                {
+                  "label": "vrr flickering",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "Ja",
+          "NOTE": "Ex 10 — Prospective-buyer concerns are judged on prose, not stance. q0 ('worried about G-Sync at 240Hz with HDR on since the panel isn't certified') names a specific condition (refresh rate + HDR + certification status) → quality: high; speculative=true on the quote captures that the speaker hasn't tested it. q1 ('feeling like a huge gamble') is a brief generic worry with no specifics → quality: low. Both are prospective_buyer; quality differs because the prose differs.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "speculative": true,
+              "features": [
+                {
+                  "label": "VRR",
+                  "sentiment": "negative"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "low"
+            }
+          ]
+        },
+        {
+          "productId": "Ka",
+          "NOTE": "Ex 11 — Hearsay aggregation lands at low. q0 ('I've heard people complain about coil whine') is the speaker reporting others' experiences, not their own — low-information regardless of whether it names an aspect → quality: low with speculative=true on the quote. Contrast with q1 ('a lot of online reviews report VRR flicker is worse on the MSI compared to the LG'), which is a specific aggregated comparison — still hearsay, still speculative=true, but specific enough to land at medium.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "low",
+              "speculative": true,
+              "issues": [
+                {
+                  "label": "coil whine",
+                  "sentiment": "negative"
+                }
+              ]
+            },
+            {
+              "quoteIndex": 1,
+              "quality": "medium",
+              "speculative": true,
+              "issues": [
+                {
+                  "label": "vrr flickering",
+                  "sentiment": "negative"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "productId": "La",
+          "NOTE": "Ex 12 — Immersion-axis gaming praise lands on 'immersive gaming', not the generic 'PC gaming' catch-all. q0 ('800R curve is very immersive in games') evaluates the product through a visual-immersion lens — that signal alone qualifies, even though no specific title or genre is named. Pair with curvature/HDR/contrast/FOV features when the quote names them. Reserve 'PC gaming' for quotes that mention gaming generically without an immersion, competitive, sim-racing, or flight-sim signal.",
+          "quotes": [
+            {
+              "quoteIndex": 0,
+              "quality": "high",
+              "features": [
+                {
+                  "label": "curvature",
+                  "sentiment": "positive"
+                }
+              ],
+              "useCases": [
+                {
+                  "label": "immersive gaming",
+                  "sentiment": "positive"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "validationCases": [
+      {
+        "note": "Whole comment is praise but sentiment is set to negative — single-type wrong_sentiment.",
+        "input": "[VALIDATE] @alice: \"I literally just received my MSI 341CQP — gorgeous, amazing colors, HDR is amazing, HUGE upgrade. Highly recommend.\"\n  Ref A (MSI MAG 341CQP): experience: owner, depth: comprehensive, sentiment: negative, intents: [recommendation, experience_report]",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_sentiment",
+                  "suggestedSentiment": "positive",
+                  "reasoning": "Every quote is praise ('gorgeous', 'amazing colors', 'HDR is amazing', 'Highly recommend') — sentiment is positive, not negative."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Detailed first-hand troubleshooting + explicit rejection misclassified as reference. Speaker's hands-on G-Sync black-screen experience and 'I dont want' rejection are prior_owner signals.",
+        "input": "[VALIDATE] @bob: \"I cant say — didnt try. As far as the G-Sync was enabled, there was this black screen show. I was really pissed about this... I dont want to have a monitor for more than 1000€ which is not G-Sync compatible.\"\n  Ref A (MSI MPG341CQPX): experience: reference, depth: comprehensive, sentiment: negative",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_experience",
+                  "suggestedExperience": "prior_owner",
+                  "reasoning": "Speaker describes hands-on G-Sync troubleshooting ('the G-Sync was enabled, there was this black screen') with first-hand observations and explicit rejection ('I dont want to have...') — that is prior_owner, not reference."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Multi-aspect comment with reasoning misclassified as mentioned. Names value, VRR/G-sync, reputation, overall risk — comprehensive.",
+        "input": "[VALIDATE] @cindy: \"I'm leaning toward MSI as it's slightly cheaper while offering a better panel. My concern is G-sync since the panel is not certified. Reviews are mixed — feeling like a huge gamble.\"\n  Ref A (MSI MPG341CQPX): experience: prospective_buyer, depth: mentioned, sentiment: mixed, intents: [seeking_advice]\n    quotes:\n      [q0] \"leaning toward MSI as it's slightly cheaper\" features: [0] value/pro\n      [q1] \"concerned about G-sync since the panel is not certified\" features: [0] VRR/con\n      [q2] \"Reviews are mixed\"\n      [q3] \"feeling like a huge gamble\"",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_depth",
+                  "suggestedDepth": "comprehensive",
+                  "reasoning": "Names 4 distinct aspects (value, VRR/G-sync certification, reputation, overall risk) with explicit reasoning — comprehensive, not mentioned."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Implicit prescriptive recommendation. \"Don't get LG\" is an imperative — recommendation is missing from the intent set.",
+        "input": "[VALIDATE] @dan: \"Nah qdoled >> woled. Don't get LG\"\n  Ref A (LG UltraGear 34GS95QE): experience: reference, depth: mentioned, sentiment: negative, intents: [comparison]",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_intent",
+                  "suggestedIntents": [
+                    "recommendation",
+                    "comparison"
+                  ],
+                  "reasoning": "'Don't get LG' is a prescriptive imperative — recommendation must be in the intent set alongside comparison."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Wrong product resolution. Comment is about 'the LG' (curve, matte coating, priced above MSI). Resolved product Samsung Odyssey G7 is a different brand entirely.",
+        "input": "[VALIDATE] @ed: \"I would love the immersion from the curve but I'm worried videos and pictures being distorted, and the matte coating not delivering better clarity. The LG also costs more than the MSI.\"\n  Ref A (Samsung Odyssey G7): experience: prospective_buyer, sentiment: negative",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_product",
+                  "reasoning": "Comment is plainly about 'the LG' (curve, matte coating, priced above MSI). Resolved product 'Samsung Odyssey G7' is a different brand with different specs."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Quote names a different product than the ref. q0 explicitly says 'VRR Flicker is worse on the MSI' — that quote belongs on the MSI ref (Ref B), not the LG ref (Ref A).",
+        "input": "[VALIDATE] @fran: \"I'm torn between the MSI 341CQPX and the LG 34GS95QE. VRR Flicker is worse on the MSI compared to the LG, and I'm hesitant on the 800R curve.\"\n  Ref A (LG UltraGear 34GS95QE): quotes: [q0] \"VRR Flicker is worse on the MSI compared to the LG\", [q1] \"hesitant on the 800R curve\"\n  Ref B (MSI MPG341CQPX): (no quotes)",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_quote_attribution",
+                  "quoteId": "q0",
+                  "reasoning": "'VRR Flicker is worse on the MSI compared to the LG' explicitly names the MSI as the subject — this quote belongs on Ref B (MSI), not Ref A (LG)."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Single ref carries quotes about TWO products. q0/q1/q2 are about MSI; q3 is about LG. Cleanest fix is splitting the ref — boundary_violation.",
+        "input": "[VALIDATE] @gabe: \"I'm leaning toward MSI but the LG is at least G-Sync certified and the MSI feels like a gamble.\"\n  Ref A (MSI MPG341CQPX): experience: prospective_buyer, sentiment: mixed\n    quotes:\n      [q0] \"leaning toward MSI as it's slightly cheaper while offering a better panel\"\n      [q1] \"concerned about G-sync since the panel is not certified\" features: [0] VRR/con\n      [q2] \"the MSI feels like a huge gamble\"\n      [q3] \"The LG panels are at least certified\"",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "boundary_violation",
+                  "reasoning": "Ref A is labeled MSI MPG341CQPX, but quote q3 ('The LG panels are at least certified') describes LG. The MSI and LG evidence should be split into separate refs."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Bare-acquisition quote labeled medium — should be downgraded to low. q0 is logistics with no verdict; q1 names panel type with a verdict and is correctly labeled medium.",
+        "input": "[VALIDATE] @hank: \"Just bought the Acer X34 X5 on Best Buy for 750. Should arrive tomorrow. The X5 variant has the QD OLED and not the WOLED LG panel so that was a plus.\"\n  Ref A (Acer Predator X34 X5): experience: prospective_buyer, sentiment: positive\n    quotes:\n      [q0] \"Just bought the Acer X34 X5 on Best Buy for 750\" quality: medium\n      [q1] \"The X5 variant has the QD OLED and not the WOLED LG panel so that was a plus\" quality: medium features: [0] colors/pro",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_quote_quality",
+                  "quoteId": "q0",
+                  "suggestedQuality": "low",
+                  "reasoning": "'Just bought the Acer X34 X5 on Best Buy for 750' is bare acquisition language — no verdict, no named aspect, no observation about how the product behaves. Quality should be low."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Speculative flag both directions in one subtree. Ref A: owner hedging future burn-in concern (flag should be true). Ref B: tested first-hand observation incorrectly hedged (flag should be false).",
+        "input": "[VALIDATE] @ivy: \"I'm worried about burn-in long term on my C4.\"\n  Ref A (LG C4 OLED): experience: owner\n    quotes: [q0] \"I'm worried about burn-in long term\" speculative=false features: [0] burn-in/con\n[VALIDATE] @jen: \"I tested it for 30 minutes — text rendering is razor sharp.\"\n  Ref B (Sony A95L): experience: tested\n    quotes: [q0] \"text rendering is razor sharp\" speculative=true features: [0] text clarity/pro",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "speculative_flag_mismatch",
+                  "quoteId": "q0",
+                  "suggestedSpeculative": true,
+                  "reasoning": "Quote is hedged about a future concern ('worried about... long term') — wording is speculative even though the speaker owns the unit."
+                }
+              ]
+            },
+            {
+              "refLabel": "B",
+              "issues": [
+                {
+                  "type": "speculative_flag_mismatch",
+                  "quoteId": "q0",
+                  "suggestedSpeculative": false,
+                  "reasoning": "Quote reports a concrete first-hand observation ('text rendering is razor sharp') — wording is direct, not speculative."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Hearsay wording, regardless of tier. The quote 'I heard the colors are amazing' is hearsay, so speculative MUST be true — even though it sits on a reference-tier ref, the trigger is the wording, not the tier.",
+        "input": "[VALIDATE] @kai: \"I heard the colors are amazing.\"\n  Ref A (Sony A95L): experience: reference\n    quotes: [q0] \"I heard the colors are amazing\" speculative=false features: [0] colors/pro",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "speculative_flag_mismatch",
+                  "quoteId": "q0",
+                  "suggestedSpeculative": true,
+                  "reasoning": "Quote is hearsay ('I heard the colors are amazing') — hedged/secondhand wording requires speculative=true."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Compound miss: pending order misclassified as owner + experience_report unsupported by future-tense framing + bare-logistics quote labeled medium that should be low. One ref, three independent issues.",
+        "input": "[VALIDATE] @leo: \"I ordered the MSI MPG341CQPX. Will report back.\"\n  Ref A (MSI MPG341CQPX): experience: owner, depth: mentioned, sentiment: positive, intents: [experience_report]\n    quotes: [q0] \"I ordered the MSI MPG341CQPX\" sentiment=neutral quality: medium",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_experience",
+                  "suggestedExperience": "prospective_buyer",
+                  "reasoning": "'I ordered, will report back' is a pending order — unit not in hand, prospective_buyer not owner."
+                },
+                {
+                  "type": "wrong_intent",
+                  "suggestedIntents": [],
+                  "reasoning": "Future-tense status update with no first-hand usage cannot be experience_report."
+                },
+                {
+                  "type": "wrong_quote_quality",
+                  "quoteId": "q0",
+                  "suggestedQuality": "low",
+                  "reasoning": "Bare acquisition language with no verdict and no named attribute. Quality should be low."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "Substantive first-hand observation labeled low — should be upgraded to high. Owner reports a concrete multi-aspect experience.",
+        "input": "[VALIDATE] @owen: \"After 4 months of daily use the colors on my MSI 341CQPX still pop and the response time feels instant in my Forza sessions.\"\n  Ref A (MSI MPG341CQPX): experience: owner, sentiment: positive\n    quotes: [q0] \"After 4 months of daily use the colors still pop and the response time feels instant in my Forza sessions\" quality: low",
+        "expected": {
+          "refs": [
+            {
+              "refLabel": "A",
+              "issues": [
+                {
+                  "type": "wrong_quote_quality",
+                  "quoteId": "q0",
+                  "suggestedQuality": "high",
+                  "reasoning": "First-hand observation from an owner naming two aspects (colors, response time) with grounded evaluation. Quality should be high, not low."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "note": "SILENT APPROVAL TEACHER. Owner gives a strong verdict + names panel-type tradeoffs + recommends. Sentiment positive, experience owner, depth comprehensive, intents [experience_report, recommendation] — every field is a defensible call. Don't second-guess plausible extractions.",
+        "input": "[VALIDATE] @max: \"I bought the MSI 341CQPX. It's not as large and immersive as I had thought but it's definitely better than 16:9. Really can't go back to a flat panel after this. Would recommend.\"\n  Ref A (MSI MPG341CQPX): experience: owner, depth: comprehensive, sentiment: positive, intents: [experience_report, recommendation]",
+        "expected": {
+          "refs": []
+        }
+      },
+      {
+        "note": "SILENT APPROVAL TEACHER. Borderline depth (detailed vs mentioned). One named aspect with light reasoning. Tier could plausibly be either — adjacent-tier rule says stay silent.",
+        "input": "[VALIDATE] @nina: \"The colors on this thing pop way more than I expected for the price.\"\n  Ref A (LG UltraGear 34GS95QE): experience: owner, depth: detailed, sentiment: positive",
+        "expected": {
+          "refs": []
+        }
+      }
+    ],
+    "labelingDiscriminators": [
+      "VRR / G-Sync discriminator: a quote using G-Sync as a proxy for the gaming experience (\"G-Sync just works for gaming\") gets PC gaming. A quote complaining about G-Sync as a feature itself (\"G-Sync caused black screens\") does NOT — that's a VRR issue (STEP 3) alone.",
+      "Use-case recall: when a quote evaluates the product while naming an activity, content type, application, or workflow that a listed use case covers, emit the use case — implicit framing is enough. \"Text is razor sharp in VS Code\" → programming. \"Movies look stunning in a dark room\" → movies. \"The curve disappears when I'm in Excel all day\" → office. Bare feature praise without an activity (\"colors pop\") does NOT earn a use case; activity context with no evaluation (\"tried 4K Blu-ray\") does NOT either.",
+      "Movies vs media consumption: 'movies' is theatrical / HDR-cinema / dark-scene film watching (Dune, Blu-ray, Dolby Vision, home theater). 'media consumption' is generic streaming and casual viewing (YouTube, Netflix in the background, TV shows). When a quote names both axes, pick the more specific one.",
+      "Dual-use is REFERENCE-LEVEL only: when the ref contains separate quotes — one evaluating the product through a work lens (office / programming / finance / heavy multitasking / etc.) and another through a gaming lens (PC gaming / immersive gaming / competitive FPS / etc.) — emit `dual use` in `referenceLabels.useCases`. NEVER on an individual quote's `useCases`. A single quote saying 'good for work and games' instead earns BOTH labels on that quote (e.g. `office` + `PC gaming`); dual-use is strictly for the cross-quote pattern."
+    ],
+    "specialInstructions": "Category-specific rules:\n- Panel type alone (IPS, VA, OLED, QD-OLED) is NOT a product — only extract when attached to a brand or model name.\n- Screen size specs: extract as { \"name\": \"screenSize\", \"value\": \"39\\\"\" } only when the commenter directly attributes a size to the reviewed product AND it differs from the cheat sheet value. NEVER extract from a 'coming from' / 'upgrading from' sentence (that size belongs to the previous device).\n- VRR feature covers G-Sync, FreeSync, and adaptive-sync behavior — black screen flickers, signal loss, VRR incompatibility with HDR.\n- Motion clarity covers ghosting, smearing, and perceived response time during fast motion — NOT the response-time spec value.\n- Refresh rate is the Hz spec itself, not VRR behavior. Do not confuse VRR issues with motion clarity.\n- When comparing this monitor to another product, a store demo, or an unnamed 'the others', keep ONLY the clause that directly evaluates this monitor. Baseline clauses like 'the 800R curve was too much when I looked at one at Best Buy' must NOT be attached to the resolved product unless they clearly refer to it.\n- For prospective buyers, reasoned preferences count (design, panel type, price, brand reputation) alongside named concerns. Skip only completely empty fragments like 'huge gamble' standing alone (without a named attribute attached either before or after in the same clause).",
+    "searchKeywordSuffix": "monitor",
+    "validationConfig": {
+      "wrongProductExamples": [
+        {
+          "mentioned": "Samsung Odyssey G9",
+          "resolvedTo": "LG 34GS95QE",
+          "shouldFlag": true,
+          "reason": "Completely different brand and size"
+        },
+        {
+          "mentioned": "MSI MPG341CQPX",
+          "resolvedTo": "MSI MAG341CQP",
+          "shouldFlag": true,
+          "reason": "Same brand but different model line (MPG vs MAG, 240Hz vs 175Hz)"
+        },
+        {
+          "mentioned": "MSI unspecified with specs:[175Hz]",
+          "resolvedTo": "MSI MPG341CQPX (240Hz)",
+          "shouldFlag": true,
+          "reason": "Specs say 175Hz but MPG341CQPX is 240Hz; MAG341CQP is 175Hz"
+        },
+        {
+          "mentioned": "LG 34GS95QE",
+          "resolvedTo": "LG 34GS95QE-B",
+          "shouldFlag": false,
+          "reason": "Color code suffix, same product"
+        },
+        {
+          "mentioned": "341CQP",
+          "resolvedTo": "MSI MAG341CQP",
+          "shouldFlag": false,
+          "reason": "Partial name, correct brand match"
+        },
+        {
+          "mentioned": "MSI MPG431CQPX",
+          "resolvedTo": "MSI MPG341CQPX",
+          "shouldFlag": true,
+          "reason": "Different size family and model digits; do not collapse 431 to 341"
+        },
+        {
+          "mentioned": "the MSI",
+          "resolvedTo": "MSI MPG341CQPX (0.92)",
+          "shouldFlag": false,
+          "reason": "High-confidence implicit resolution with matching brand"
+        }
+      ],
+      "userSettingPatterns": [
+        "I use 120Hz",
+        "set refresh to 60Hz",
+        "running at 1080p",
+        "everytime chose 144Hz",
+        "tried 60/120Hz",
+        "I game at 120fps",
+        "capped at 60fps"
+      ]
+    }
   },
+  "subreddits": [
+    {
+      "name": "r/Monitors",
+      "boost": 30
+    },
+    {
+      "name": "r/ultrawidemasterrace",
+      "boost": 25
+    },
+    {
+      "name": "r/OLED_Gaming",
+      "boost": 25
+    },
+    {
+      "name": "r/buildapc",
+      "boost": 10
+    },
+    {
+      "name": "r/pcmasterrace",
+      "boost": 8
+    }
+  ],
+  "negativeTerms": [
+    {
+      "keyword": "living room",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "couch",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "remote control",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "streaming app",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "TV stand",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "home theater",
+      "penalty": 0.65
+    },
+    {
+      "keyword": "WebOS",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "Tizen",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "viewing distance",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "throw ratio",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "projector",
+      "penalty": 0.65
+    }
+  ],
   "matchingConfig": {
     "strictness": "moderate",
     "numericTokenRules": [
@@ -149,6 +1550,107 @@
       }
     ]
   },
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "monitor"
+    },
+    {
+      "weight": 2,
+      "keyword": "display"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "G-Sync",
+      "exclusive": true
+    },
+    {
+      "weight": 2.2,
+      "keyword": "FreeSync",
+      "exclusive": true
+    },
+    {
+      "weight": 2,
+      "keyword": "ultrawide",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "IPS panel",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "VA panel",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "pixel density",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "PPI",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "response time"
+    },
+    {
+      "weight": 1.6,
+      "keyword": "refresh rate"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "1440p"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "1080p"
+    },
+    {
+      "weight": 2,
+      "keyword": "4K monitor"
+    },
+    {
+      "weight": 2,
+      "keyword": "OLED monitor",
+      "exclusive": true
+    },
+    {
+      "weight": 1.4,
+      "keyword": "desk setup"
+    },
+    {
+      "weight": 2,
+      "keyword": "gaming monitor"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "HDR monitor"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "panel uniformity",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "backlight bleed",
+      "exclusive": true
+    },
+    {
+      "weight": 1.4,
+      "keyword": "stand adjustment",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "color accuracy"
+    }
+  ],
   "keywordIdentifiers": [
     "refresh rate",
     "response time",
@@ -171,5 +1673,514 @@
     "low ppi",
     "pixel response",
     "motion clarity"
+  ],
+  "useCases": [
+    {
+      "label": "competitive FPS gaming",
+      "description": "Competitive first-person shooters — twitch reactions, frame rates, low input lag, motion clarity",
+      "implications": [
+        "Valorant",
+        "CS2",
+        "Apex",
+        "Overwatch",
+        "Fortnite",
+        "competitive shooter",
+        "esports",
+        "ranked play",
+        "1% lows"
+      ]
+    },
+    {
+      "label": "immersive gaming",
+      "description": "Visually immersive gaming — curve, ultrawide field of view, HDR, contrast, color depth, screen real estate. Covers both general 'immersive in games' praise and story-driven / open-world single-player titles where visual immersion is the buying axis. Use this whenever the quote evaluates the product through an immersion lens, even when no specific game or genre is named.",
+      "implications": [
+        "Cyberpunk",
+        "Elden Ring",
+        "Red Dead Redemption",
+        "Skyrim",
+        "AAA",
+        "single-player",
+        "story-driven",
+        "open-world",
+        "atmosphere",
+        "felt like I was there",
+        "drew me in"
+      ]
+    },
+    {
+      "label": "sim racing",
+      "description": "Sim racing with wheels and pedals — ultrawide immersion, motion clarity, VRR",
+      "implications": [
+        "iRacing",
+        "Assetto Corsa",
+        "ACC",
+        "Gran Turismo",
+        "Forza",
+        "racing wheel",
+        "sim racing",
+        "cockpit view",
+        "triple screen"
+      ]
+    },
+    {
+      "label": "flight simulation",
+      "description": "Flight simulators — wide screen real estate, high resolution, multi-monitor cockpits",
+      "implications": [
+        "MSFS",
+        "DCS",
+        "X-Plane",
+        "flight sim",
+        "HOTAS",
+        "multi-monitor cockpit",
+        "panning around the cockpit"
+      ]
+    },
+    {
+      "label": "PC gaming",
+      "description": "Generic desktop PC gaming when no specific genre or experience axis is named — use as the catch-all for general gaming mentions that don't fit competitive FPS, immersive gaming, sim racing, or flight simulation. When the quote evaluates the product through an immersion lens (curve, HDR, contrast, field of view, 'immersive in games'), prefer 'immersive gaming' over this label even when no specific title is named.",
+      "implications": [
+        "gaming PC",
+        "Steam",
+        "in games",
+        "while gaming",
+        "playing games",
+        "for AAA titles"
+      ]
+    },
+    {
+      "label": "console gaming",
+      "description": "Console gaming on PS5, Xbox, Switch — HDMI 2.1, 4K120, couch and controller setups",
+      "implications": [
+        "PS5",
+        "Xbox",
+        "Switch",
+        "Series X",
+        "console",
+        "controller",
+        "couch gaming",
+        "from the couch",
+        "playing on console"
+      ]
+    },
+    {
+      "label": "photo editing",
+      "description": "Photo editing and retouching — color accuracy, wide gamut, calibration",
+      "implications": [
+        "Photoshop",
+        "Lightroom",
+        "Capture One",
+        "photo editing",
+        "retouching",
+        "color accurate",
+        "skin tones look right",
+        "prints match the screen"
+      ]
+    },
+    {
+      "label": "video editing",
+      "description": "Video editing — timeline work, footage review, color and motion fidelity",
+      "implications": [
+        "Premiere",
+        "DaVinci Resolve",
+        "Final Cut",
+        "video editing",
+        "editing video",
+        "scrubbing the timeline",
+        "cutting footage",
+        "previewing renders"
+      ]
+    },
+    {
+      "label": "color grading",
+      "description": "Dedicated color grading — reference-grade color accuracy, HDR grading, calibration",
+      "implications": [
+        "color grading",
+        "color correction",
+        "LUT",
+        "Rec.709",
+        "HDR grading",
+        "colorist",
+        "reference monitor"
+      ]
+    },
+    {
+      "label": "streaming",
+      "description": "Live streaming and broadcasting — OBS, secondary displays, screen real estate. NOT for watching streams — that's 'media consumption'.",
+      "implications": [
+        "OBS",
+        "broadcasting",
+        "stream deck",
+        "webcam",
+        "going live",
+        "to my viewers",
+        "streaming setup"
+      ]
+    },
+    {
+      "label": "3d modeling",
+      "description": "3D modeling and rendering — viewport accuracy, PPI, wide color space",
+      "implications": [
+        "Blender",
+        "Maya",
+        "ZBrush",
+        "Cinema 4D",
+        "3D modeling",
+        "viewport",
+        "sculpting"
+      ]
+    },
+    {
+      "label": "content creation",
+      "description": "Generic creative / content-production work when no specific discipline is named — use as the catch-all for creative-professional mentions that don't fit photo editing, video editing, color grading, streaming, or 3D modeling",
+      "implications": [
+        "content creation",
+        "content creator",
+        "creative work",
+        "graphic design",
+        "for my channel",
+        "for client work"
+      ]
+    },
+    {
+      "label": "office",
+      "description": "General office productivity — spreadsheets, documents, email, video calls",
+      "implications": [
+        "spreadsheet",
+        "Excel",
+        "Word",
+        "email",
+        "productivity",
+        "video call",
+        "Zoom",
+        "Teams",
+        "for work",
+        "daily work",
+        "work from home",
+        "WFH",
+        "8 hours a day"
+      ]
+    },
+    {
+      "label": "dual use",
+      "description": "The speaker evaluates the product across both a work-context use case (office, programming, finance and trading, heavy multitasking, content creation, photo editing, video editing, color grading, 3d modeling) and a gaming-context use case (PC gaming, immersive gaming, competitive FPS gaming, console gaming, sim racing, flight simulation) within the SAME reference — but no single quote alone evidences both. Emit at the REFERENCE LEVEL only, never on an individual quote.",
+      "implications": []
+    },
+    {
+      "label": "heavy multitasking",
+      "description": "Heavy multitasking and window management — ultrawide, virtual desktops, many panes",
+      "implications": [
+        "multitasking",
+        "virtual desktops",
+        "split screen",
+        "side by side",
+        "window management",
+        "many tabs",
+        "snap windows",
+        "PiP",
+        "picture by picture"
+      ]
+    },
+    {
+      "label": "programming",
+      "description": "Software development — code readability, terminal use, IDE, multi-window layouts",
+      "implications": [
+        "coding",
+        "IDE",
+        "terminal",
+        "VS Code",
+        "JetBrains",
+        "IntelliJ",
+        "monospace",
+        "vim",
+        "reading code",
+        "coding sessions",
+        "in my IDE"
+      ]
+    },
+    {
+      "label": "finance and trading",
+      "description": "Finance, trading, and stock analysis — multi-pane dashboards, charts, tickers",
+      "implications": [
+        "trading",
+        "Bloomberg",
+        "ThinkOrSwim",
+        "TradingView",
+        "tickers",
+        "charts",
+        "day trading"
+      ]
+    },
+    {
+      "label": "movies",
+      "description": "Movie watching — HDR films, dark-scene contrast, color reproduction",
+      "implications": [
+        "movies",
+        "film",
+        "cinema",
+        "Blu-ray",
+        "4K Blu-ray",
+        "Dolby Vision",
+        "dark scenes",
+        "movie night",
+        "home theater",
+        "in a dark room"
+      ]
+    },
+    {
+      "label": "media consumption",
+      "description": "General media consumption — YouTube, streaming services, casual TV watching",
+      "implications": [
+        "YouTube",
+        "Netflix",
+        "Disney+",
+        "Hulu",
+        "TV shows",
+        "casual viewing",
+        "background",
+        "binge",
+        "binged",
+        "watching streams"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "label": "HDR",
+      "description": "High dynamic range performance including peak brightness, tone mapping, and HDR content rendering"
+    },
+    {
+      "label": "text clarity",
+      "description": "Sharpness and readability of text, font rendering quality, and subpixel layout"
+    },
+    {
+      "label": "colors",
+      "description": "Color vibrancy, saturation, and overall color presentation out of the box",
+      "shortDescription": "Vibrancy and saturation, not calibrated accuracy (that's 'color accuracy')"
+    },
+    {
+      "label": "contrast",
+      "description": "Black levels, contrast ratio, and shadow detail in dark scenes"
+    },
+    {
+      "label": "response time",
+      "description": "Pixel response time specs and measured performance",
+      "shortDescription": "The pixel response time spec/measurement, not perceived motion quality (that's 'motion clarity')"
+    },
+    {
+      "label": "motion clarity",
+      "description": "Perceived smoothness during fast motion — ghosting, smearing, black frame insertion, and trailing",
+      "shortDescription": "Ghosting, smearing, and trails during motion, not the response time spec"
+    },
+    {
+      "label": "input lag",
+      "description": "Delay between input and on-screen response, gaming responsiveness feel"
+    },
+    {
+      "label": "refresh rate",
+      "description": "The Hz spec itself and perceived smoothness benefit of higher refresh rates",
+      "shortDescription": "The Hz spec value, not VRR behavior (that's 'VRR')"
+    },
+    {
+      "label": "build quality",
+      "description": "Chassis materials, bezel construction, overall fit and finish, physical durability",
+      "shortDescription": "Materials and construction, not stand (that's 'stand quality') or design looks (that's 'design')"
+    },
+    {
+      "label": "stand quality",
+      "description": "Stand adjustability (height, tilt, swivel, pivot), stability, desk footprint, and VESA mounting options",
+      "shortDescription": "Stand adjustability and stability, not the monitor body (that's 'build quality')"
+    },
+    {
+      "label": "curvature",
+      "description": "Immersion and distortion feel of the curve radius, comfort for gaming vs productivity content",
+      "shortDescription": "The feel of the curve (e.g. 800R vs 1800R), not the spec value itself"
+    },
+    {
+      "label": "coating",
+      "description": "Matte vs glossy surface quality, impact on text sharpness and color vibrancy through the panel coating",
+      "shortDescription": "Surface finish (matte/glossy), not reflections in ambient light (that's 'glare handling')"
+    },
+    {
+      "label": "viewing angles",
+      "description": "Color and contrast consistency when viewed off-center"
+    },
+    {
+      "label": "brightness",
+      "description": "Overall luminance in SDR and typical usage, suitability for bright environments",
+      "shortDescription": "General brightness, not HDR peak brightness (that's 'HDR')"
+    },
+    {
+      "label": "burn-in",
+      "description": "OLED burn-in risk, pixel refresh effectiveness, and long-term panel degradation concerns"
+    },
+    {
+      "label": "VRR",
+      "description": "Variable refresh rate behavior — G-Sync, FreeSync, adaptive sync reliability, VRR flicker, and black screen issues",
+      "shortDescription": "G-Sync/FreeSync/adaptive sync reliability and flicker, not motion smoothness (that's 'motion clarity')"
+    },
+    {
+      "label": "connectivity",
+      "description": "Port selection (HDMI, DP, USB-C), KVM switching, daisy-chaining, USB hub, and power delivery"
+    },
+    {
+      "label": "value",
+      "description": "Price-to-performance ratio, deal quality, and whether the price is justified"
+    },
+    {
+      "label": "controls",
+      "description": "OSD menu navigation, joystick/button quality and placement, firmware, and software features"
+    },
+    {
+      "label": "design",
+      "description": "Visual design and appearance — bezel style, RGB lighting, how it looks on a desk",
+      "shortDescription": "Visual design/looks only, not generic praise ('I love it' is not design)"
+    },
+    {
+      "label": "uniformity",
+      "description": "Brightness and color evenness across the panel — dark corners, backlight bleed, dirty screen effect",
+      "shortDescription": "Evenness across a single panel, not variance between units (that's 'production quality')"
+    },
+    {
+      "label": "glare handling",
+      "description": "How well the display handles ambient light reflections and maintains visibility in bright rooms",
+      "shortDescription": "Reflections in ambient light, not the coating type itself (that's 'coating')"
+    },
+    {
+      "label": "color accuracy",
+      "description": "Measured or perceived color accuracy for professional work — sRGB/DCI-P3 coverage, Delta E, calibration results",
+      "shortDescription": "Calibrated/measured accuracy for pro work, not general vibrancy (that's 'colors')"
+    },
+    {
+      "label": "PPI",
+      "description": "Pixel density experience — perceived sharpness relative to screen size and viewing distance",
+      "shortDescription": "Pixel density experience — sharpness relative to screen size and viewing distance"
+    },
+    {
+      "label": "production quality",
+      "description": "QC consistency across units, panel lottery, dead pixels, defect rates, and manufacturer reliability",
+      "shortDescription": "Variance between units and QC, not a single panel's uniformity (that's 'uniformity')"
+    }
+  ],
+  "issues": [
+    {
+      "label": "hdr washed out",
+      "feature": "HDR",
+      "description": "HDR content appearing faded, dull, or with incorrect tone mapping"
+    },
+    {
+      "label": "hdr clipping",
+      "feature": "HDR",
+      "description": "Loss of bright detail or crushed highlights in HDR mode"
+    },
+    {
+      "label": "text fringing",
+      "feature": "text clarity",
+      "description": "Color fringing or rainbow edges around text, common on OLED subpixel layouts"
+    },
+    {
+      "label": "color banding",
+      "feature": "colors",
+      "description": "Visible stepping in gradients instead of smooth transitions"
+    },
+    {
+      "label": "oversaturation",
+      "feature": "colors",
+      "description": "Colors appear overly vivid or unrealistic, especially on desktop/UI elements"
+    },
+    {
+      "label": "black crush",
+      "feature": "contrast",
+      "description": "Near-black shades rendered as pure black, losing shadow detail"
+    },
+    {
+      "label": "ghosting",
+      "feature": "motion clarity",
+      "description": "Trailing or smearing behind moving objects, especially in dark-to-light transitions"
+    },
+    {
+      "label": "coil whine",
+      "feature": "build quality",
+      "description": "Audible high-pitched noise from the monitor's electronics"
+    },
+    {
+      "label": "curve distortion",
+      "feature": "curvature",
+      "description": "Straight lines appearing bent or content looking warped, especially off-center"
+    },
+    {
+      "label": "burn-in",
+      "feature": "burn-in",
+      "description": "Permanent image retention from static content displayed over time"
+    },
+    {
+      "label": "temporary image retention",
+      "feature": "burn-in",
+      "description": "Ghost images that fade after a short time, precursor concern to burn-in"
+    },
+    {
+      "label": "vrr flickering",
+      "feature": "VRR",
+      "description": "Screen flickers, black frames, or brightness fluctuations when VRR/adaptive sync is active"
+    },
+    {
+      "label": "vrr black screen",
+      "feature": "VRR",
+      "description": "Full black screen drops or signal-loss-like behavior with G-Sync/FreeSync enabled"
+    },
+    {
+      "label": "vrr incompatibility",
+      "feature": "VRR",
+      "description": "G-Sync or FreeSync not working correctly, not certified, or conflicting with other features like HDR"
+    },
+    {
+      "label": "signal loss",
+      "feature": "connectivity",
+      "description": "Intermittent display signal drops, black screens, or input switching issues"
+    },
+    {
+      "label": "usb-c issues",
+      "feature": "connectivity",
+      "description": "USB-C display/charging/data problems, PD negotiation failures"
+    },
+    {
+      "label": "osd bugs",
+      "feature": "controls",
+      "description": "On-screen display glitches, unresponsive menus, or firmware UI issues"
+    },
+    {
+      "label": "sleep wake issues",
+      "feature": "controls",
+      "description": "Monitor not waking from sleep, requiring power cycle, or wrong input after wake"
+    },
+    {
+      "label": "backlight bleed",
+      "feature": "uniformity",
+      "description": "Light leaking from edges or corners, visible on dark scenes"
+    },
+    {
+      "label": "blooming",
+      "feature": "uniformity",
+      "description": "Bright halos around light objects on dark backgrounds (Mini LED / local dimming)"
+    },
+    {
+      "label": "dirty screen effect",
+      "feature": "uniformity",
+      "description": "Uneven brightness patches visible on uniform-color backgrounds"
+    },
+    {
+      "label": "grey tint",
+      "feature": "glare handling",
+      "description": "Washed-out grey haze on QD-OLED/glossy panels in ambient light"
+    },
+    {
+      "label": "dead pixels",
+      "feature": "production quality",
+      "description": "Permanently stuck or dead pixels on the panel"
+    },
+    {
+      "label": "scan lines",
+      "feature": "production quality",
+      "description": "Visible horizontal or vertical lines across the panel"
+    }
   ]
 }
