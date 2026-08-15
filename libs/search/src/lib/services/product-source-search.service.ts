@@ -51,15 +51,6 @@ export class ProductSourceSearchService {
       );
     }
 
-    if (!isEmpty(params.types)) {
-      query = query.andWhere(
-        `productSource.${nameOf<ProductSource>('type')} IN (:...types)`,
-        {
-          types: params.types,
-        },
-      );
-    }
-
     query = query.orderBy(
       `productSource.${params.sort}`,
       params.order,
@@ -92,7 +83,6 @@ export class ProductSourceSearchService {
     searchResult.order = params.order;
     searchResult.searchTerm = params.searchTerm;
     searchResult.schedulingEnabled = params.schedulingEnabled;
-    searchResult.types = params.types;
 
     return searchResult;
   }

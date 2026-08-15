@@ -111,13 +111,15 @@ export class ProductMergeService {
       return;
     }
 
-    const targetTypes = new Set((target.sources ?? []).map((s) => s.type));
+    const targetSourceIds = new Set(
+      (target.sources ?? []).map((s) => s.source?.id ?? 'manual'),
+    );
 
     const toMove: string[] = [];
     const toDelete: string[] = [];
 
     for (const sourceRecord of sourceSources) {
-      if (targetTypes.has(sourceRecord.type)) {
+      if (targetSourceIds.has(sourceRecord.source?.id ?? 'manual')) {
         toDelete.push(sourceRecord.id);
       } else {
         toMove.push(sourceRecord.id);

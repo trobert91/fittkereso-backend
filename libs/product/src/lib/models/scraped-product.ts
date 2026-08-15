@@ -1,4 +1,8 @@
-import { ProductCategory, ProductSpecs } from '@fittkereso-backend/database';
+import {
+  OfferAvailability,
+  ProductCategory,
+  ProductSpecs,
+} from '@fittkereso-backend/database';
 
 export interface ScrapedProduct {
   category: ProductCategory;
@@ -9,6 +13,19 @@ export interface ScrapedProduct {
   releaseYear?: number;
   specs?: ProductSpecs;
   imageUrls?: string[];
+  offers?: ScrapedOffer[];
+}
+
+// Seller-listing data (price/availability/etc.) captured alongside a scraped
+// product. Plumbing only for now — no extractor currently populates this;
+// actual price-table scraping is future work.
+export interface ScrapedOffer {
+  sellerName: string;
+  price: number;
+  currency?: string;
+  availability?: OfferAvailability;
+  url?: string;
+  sourceListingId?: string;
 }
 
 export interface ScrapedProductSpec {

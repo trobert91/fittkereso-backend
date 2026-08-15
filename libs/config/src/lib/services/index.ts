@@ -14,4 +14,3 @@ export * from './zyte-config.service';
 export * from './mailgun-config.service';
 export * from './recaptcha-config.service';
 export * from './category-config.service';
-export * from './source-config.service';

@@ -22,7 +22,7 @@ export class ProductSpecMergeService {
 
     const specsBySource = sourceSpecs.map((sourceSpec) => ({
       priority:
-        this.sources.find((source) => source.type === sourceSpec.type)
+        this.sources.find((source) => source.id === sourceSpec.source?.id)
           ?.priority ?? 0,
       specs: sourceSpec.specs,
     }));
@@ -54,7 +54,9 @@ export class ProductSpecMergeService {
     return (
       this.sources.length !== sourceSpecs.length ||
       sourceSpecs.some(
-        (spec) => !this.sources.find((source) => source.type === spec.type),
+        (spec) =>
+          spec.source?.id &&
+          !this.sources.find((source) => source.id === spec.source?.id),
       )
     );
   }

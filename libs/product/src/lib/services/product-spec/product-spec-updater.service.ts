@@ -3,7 +3,7 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductModelSource,
-  ProductSourceType,
+  ProductSource,
   ProductSpecs,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -33,8 +33,8 @@ export class ProductSpecUpdaterService {
       return;
     }
 
-    const latestSourcePerType = this.getLatestSourcePerType(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerType);
+    const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
+    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,
       model.specs,
@@ -69,7 +69,7 @@ export class ProductSpecUpdaterService {
 
     await this.updateSpecsOnProduct({
       model: product,
-      sourceType: ProductSourceType.manual,
+      source: null,
       specs,
     });
 
@@ -80,7 +80,7 @@ export class ProductSpecUpdaterService {
 
   public async updateSpecsOnProduct(params: {
     model: ProductModel;
-    sourceType: ProductSourceType;
+    source: ProductSource | null;
     specs?: ProductSpecs;
     sourceUrl?: string;
     sourceName?: string;
@@ -88,12 +88,15 @@ export class ProductSpecUpdaterService {
   }): Promise<void> {
     const {
       model,
-      sourceType,
+      source: newSource,
       specs,
       sourceUrl,
       sourceName,
       normalizedSourceName,
     } = params;
+    // Label used only for metrics/logging — admin-entered specs have no
+    // ProductSource (source: null), everything else is scraped.
+    const sourceLabel = newSource?.name ?? 'manual';
 
     const categorySlug = model.productCategory?.slug;
     const jsonSchema = categorySlug
@@ -109,7 +112,7 @@ export class ProductSpecUpdaterService {
 
     if (!validation.isValid && categorySlug) {
       this.productMetrics.productSourceSpecValidationFailed(
-        sourceType,
+        sourceLabel,
         categorySlug,
       );
     }
@@ -117,21 +120,21 @@ export class ProductSpecUpdaterService {
     // Ensure sources loaded
     model.sources = model.sources ?? [];
 
-    // Revalidate existing sources of other types against current schema
-    for (const source of model.sources) {
-      if (source.type === sourceType) continue;
-      source.specs = this.processSpecs(source.specs);
+    // Revalidate existing sources other than the one being updated against current schema
+    for (const existingSource of model.sources) {
+      if (existingSource.source?.id === newSource?.id) continue;
+      existingSource.specs = this.processSpecs(existingSource.specs);
       const sourceValidation = this.validatorService.validateSpecs(
         jsonSchema,
-        source.specs,
+        existingSource.specs,
       );
-      source.specValid = sourceValidation.isValid;
-      source.specErrors = sourceValidation.isValid
+      existingSource.specValid = sourceValidation.isValid;
+      existingSource.specErrors = sourceValidation.isValid
         ? {}
         : sourceValidation.errors;
       if (!sourceValidation.isValid && categorySlug) {
         this.productMetrics.productSourceSpecValidationFailed(
-          source.type,
+          existingSource.source?.name ?? 'manual',
           categorySlug,
         );
       }
@@ -140,12 +143,12 @@ export class ProductSpecUpdaterService {
     // Find existing source entry by URL, or create a new one
     let source = sourceUrl
       ? model.sources.find((s) => s.url === sourceUrl)
-      : model.sources.find((s) => s.type === sourceType && !s.url);
+      : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
 
     if (!source) {
       source = new ProductModelSource();
       source.model = model;
-      source.type = sourceType;
+      source.source = newSource;
       model.sources.push(source);
     }
 
@@ -158,9 +161,9 @@ export class ProductSpecUpdaterService {
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
 
-    // For spec merging, use only the most recent entry per source type
-    const latestSourcePerType = this.getLatestSourcePerType(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerType);
+    // For spec merging, use only the most recent entry per source
+    const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
+    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,
       model.specs,
@@ -172,7 +175,7 @@ export class ProductSpecUpdaterService {
     );
 
     if (!finalValidation.isValid) {
-      this.productMetrics.productSpecValidationFailed(sourceType);
+      this.productMetrics.productSpecValidationFailed(sourceLabel);
     }
 
     model.specValid = finalValidation.isValid;
@@ -181,7 +184,7 @@ export class ProductSpecUpdaterService {
       : undefined;
 
     this.logger.debug(
-      `Updated specs for product model ${model.id ?? model.displayName} (${sourceType}). Valid: ${validation.isValid}`,
+      `Updated specs for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
     );
   }
 
@@ -194,11 +197,11 @@ export class ProductSpecUpdaterService {
       .value();
   }
 
-  private getLatestSourcePerType(
+  private getLatestSourcePerSource(
     sources: ProductModelSource[],
   ): ProductModelSource[] {
-    const byType = groupBy(sources, (s) => s.type);
-    return Object.values(byType).map(
+    const bySource = groupBy(sources, (s) => s.source?.id ?? 'manual');
+    return Object.values(bySource).map(
       (entries) => maxBy(entries, (e) => e.lastUpdated)!,
     );
   }

@@ -1,19 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ProductSource,
-  ProductSourceType,
-  ScrapeQueueName,
-  ScrapeTask,
-} from '@fittkereso-backend/database';
-import { SourceConfigService } from '@fittkereso-backend/config';
+import { ProductSource, ScrapeTask } from '@fittkereso-backend/database';
 import { ExaSearchService } from '@fittkereso-backend/exa';
 import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { IncrementalSyncMetricsService } from '@fittkereso-backend/metrics';
+import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 import { compact, isEmpty, uniq } from 'lodash';
-import { UrlClassifier } from '../interfaces/url-classifier.interface';
-import { ArukeresoUrlClassifier } from './classifiers/arukereso-url-classifier';
-import { DisplayspecsUrlClassifier } from './classifiers/displayspecs-url-classifier';
 import { ScrapeUrlDeduplicationService } from '../product-scraper';
 
 const DEFAULT_NUM_RESULTS = 40;
@@ -23,55 +15,44 @@ const DEFAULT_LOOKBACK_DAYS = 30;
 export class IncrementalSyncService {
   private readonly logger = new CustomLogger(IncrementalSyncService.name);
 
-  private readonly classifiers: Record<string, UrlClassifier>;
-
   constructor(
     private readonly exaSearchService: ExaSearchService,
-    private readonly sourceConfigService: SourceConfigService,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly scrapeUrlDedup: ScrapeUrlDeduplicationService,
-    private readonly arukeresoClassifier: ArukeresoUrlClassifier,
-    private readonly displayspecsClassifier: DisplayspecsUrlClassifier,
+    private readonly interpreter: ScrapeInterpreterService,
     private readonly incrementalSyncMetrics: IncrementalSyncMetricsService,
-  ) {
-    this.classifiers = {
-      [ProductSourceType.arukereso]: this.arukeresoClassifier,
-      [ProductSourceType.displaySpecs]: this.displayspecsClassifier,
-    };
-  }
+  ) {}
 
   async sync(source: ProductSource): Promise<void> {
     const startTime = Date.now();
-    const baseUrl = this.sourceConfigService.getBaseUrl(source.type);
+    const config = source.config;
+    const sourceName = source.name;
+
+    const baseUrl = config.baseUrl;
     if (!baseUrl) {
-      this.logger.warn(`No baseUrl configured for source type: ${source.type}`);
+      this.logger.warn(`No baseUrl configured for source: ${sourceName}`);
       return;
     }
 
-    const incrementalConfig = this.sourceConfigService.getIncrementalSyncConfig(
-      source.type,
-    );
+    const incrementalConfig = config.incrementalSync;
     const searchKeywords = incrementalConfig?.searchKeywords;
     if (isEmpty(searchKeywords)) {
       this.logger.warn(
-        `No incremental search keywords configured for source type: ${source.type}`,
+        `No incremental search keywords configured for source: ${sourceName}`,
       );
       return;
     }
 
-    const classifier = this.classifiers[source.type];
-    if (!classifier) {
-      this.logger.warn(
-        `No URL classifier available for source type: ${source.type}`,
-      );
+    if (!incrementalConfig?.urlClassify) {
+      this.logger.warn(`No URL classifier config for source: ${sourceName}`);
       return;
     }
 
     const domain = this.extractDomain(baseUrl);
-    const numResults = incrementalConfig?.numResults ?? DEFAULT_NUM_RESULTS;
+    const numResults = incrementalConfig.numResults ?? DEFAULT_NUM_RESULTS;
     const startPublishedDate = this.getStartDate(source.lastIncrementalSyncAt);
 
-    this.logger.debug(`Starting incremental sync for ${source.type}`, {
+    this.logger.debug(`Starting incremental sync for ${sourceName}`, {
       domain,
       keywords: searchKeywords,
       startPublishedDate,
@@ -83,7 +64,7 @@ export class IncrementalSyncService {
       const allUrls: string[] = [];
 
       for (const keyword of searchKeywords!) {
-        this.incrementalSyncMetrics.keywordSearched(source.type);
+        this.incrementalSyncMetrics.keywordSearched(sourceName);
         const exaStart = Date.now();
         try {
           const response = await this.exaSearchService.search({
@@ -102,7 +83,7 @@ export class IncrementalSyncService {
             (Date.now() - exaStart) / 1000,
           );
           this.incrementalSyncMetrics.recordUrlsDiscovered(
-            source.type,
+            sourceName,
             urls.length,
           );
 
@@ -123,19 +104,19 @@ export class IncrementalSyncService {
 
       // Classify URLs — only keep product detail pages
       const classifiedUrls = compact(
-        uniq(allUrls).map((url) => classifier.classify(url)),
+        uniq(allUrls).map((url) => this.interpreter.classifyIncrementalUrl(url, config)),
       );
 
       this.incrementalSyncMetrics.recordUrlsClassified(
-        source.type,
+        sourceName,
         classifiedUrls.length,
       );
 
       if (isEmpty(classifiedUrls)) {
         this.logger.debug('No product detail URLs found after classification');
-        this.incrementalSyncMetrics.syncCompleted(source.type);
+        this.incrementalSyncMetrics.syncCompleted(sourceName);
         this.incrementalSyncMetrics.recordSyncDuration(
-          source.type,
+          sourceName,
           (Date.now() - startTime) / 1000,
         );
         return;
@@ -153,7 +134,7 @@ export class IncrementalSyncService {
         await this.scrapeUrlDedup.findDuplicateUrls(urlsToCheck);
 
       this.incrementalSyncMetrics.recordUrlsDeduplicated(
-        source.type,
+        sourceName,
         existingUrls.size,
       );
 
@@ -165,9 +146,9 @@ export class IncrementalSyncService {
         this.logger.debug(
           'All discovered URLs already have pending/processing tasks',
         );
-        this.incrementalSyncMetrics.syncCompleted(source.type);
+        this.incrementalSyncMetrics.syncCompleted(sourceName);
         this.incrementalSyncMetrics.recordSyncDuration(
-          source.type,
+          sourceName,
           (Date.now() - startTime) / 1000,
         );
         return;
@@ -184,20 +165,20 @@ export class IncrementalSyncService {
 
       await this.scrapeTaskPublisher.addTasks(tasks);
 
-      this.incrementalSyncMetrics.recordTasksCreated(source.type, tasks.length);
-      this.incrementalSyncMetrics.syncCompleted(source.type);
+      this.incrementalSyncMetrics.recordTasksCreated(sourceName, tasks.length);
+      this.incrementalSyncMetrics.syncCompleted(sourceName);
       this.incrementalSyncMetrics.recordSyncDuration(
-        source.type,
+        sourceName,
         (Date.now() - startTime) / 1000,
       );
 
       this.logger.log(
-        `Incremental sync for ${source.type}: created ${tasks.length} new scrape tasks (${existingUrls.size} duplicates skipped)`,
+        `Incremental sync for ${sourceName}: created ${tasks.length} new scrape tasks (${existingUrls.size} duplicates skipped)`,
       );
     } catch (error: unknown) {
-      this.incrementalSyncMetrics.syncFailed(source.type);
+      this.incrementalSyncMetrics.syncFailed(sourceName);
       this.incrementalSyncMetrics.recordSyncDuration(
-        source.type,
+        sourceName,
         (Date.now() - startTime) / 1000,
       );
       throw error;

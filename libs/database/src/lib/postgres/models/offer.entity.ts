@@ -4,6 +4,7 @@ import { Expose } from 'class-transformer';
 import { SerializeGroup, nameOf } from '@fittkereso-backend/utils';
 import { ProductModel } from './product-model.entity';
 import { Seller } from './seller.entity';
+import { ProductSource } from './product-source.entity';
 import { OfferCondition } from '../types/offer-condition';
 import { OfferAvailability } from '../types/offer-availability';
 
@@ -23,6 +24,11 @@ export class Offer extends BasePostgresEntity {
   @ManyToOne(() => Seller, (seller) => seller.offers, { nullable: false })
   @Index()
   seller: Seller;
+
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
+  @Index()
+  source?: ProductSource | null;
 
   @Expose({ groups: [SerializeGroup.list] })
   @Index()

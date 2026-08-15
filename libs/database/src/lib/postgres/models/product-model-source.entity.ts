@@ -1,13 +1,13 @@
 import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
-import { ProductSourceType } from '../types/product-source';
+import { ProductSource } from './product-source.entity';
 import { ProductSpecs } from '../../models/product-spec';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 
 @Entity()
-@Index(['model', 'type'])
+@Index(['model', 'source'])
 export class ProductModelSource extends BasePostgresEntity {
   @ManyToOne(() => ProductModel, (model) => model.sources, {
     nullable: false,
@@ -15,9 +15,10 @@ export class ProductModelSource extends BasePostgresEntity {
   })
   model: ProductModel;
 
-  @Column({ type: 'enum', enum: ProductSourceType, nullable: false })
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  type: ProductSourceType;
+  @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
+  @Index()
+  source?: ProductSource | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', nullable: true, unique: true })

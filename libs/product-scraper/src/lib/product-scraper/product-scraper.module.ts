@@ -4,15 +4,17 @@ import { ProductListPageScraperService } from './services/product-list-page-scra
 import { ScraperModule } from '@fittkereso-backend/scraper';
 import { ProductScrapeUpdaterService } from './services/product-scrape-updater.service';
 import { ScrapeUrlDeduplicationService } from './services/scrape-url-deduplication.service';
+import { GenericProductSourceSyncService } from './services/generic-product-source-sync.service';
 import { TaskModule } from '@fittkereso-backend/task';
 import { ResolutionModule } from '@fittkereso-backend/resolution';
 import { AiModule } from '@fittkereso-backend/ai';
 import { DatabaseModule } from '@fittkereso-backend/database';
-import { ProductValueMapperService } from './services/product-value-mapper.service';
 import { StorageModule } from '@fittkereso-backend/storage';
 import { HttpModule } from '@nestjs/axios';
 import { ProductModule } from '@fittkereso-backend/product';
 import { MetricsModule } from '@fittkereso-backend/metrics';
+import { ScrapeInterpreterModule } from '@fittkereso-backend/scrape-interpreter';
+import { TranslationModule } from '@fittkereso-backend/translation';
 
 @Module({
   imports: [
@@ -25,19 +27,21 @@ import { MetricsModule } from '@fittkereso-backend/metrics';
     TaskModule,
     HttpModule,
     MetricsModule,
+    ScrapeInterpreterModule,
+    TranslationModule,
   ],
   providers: [
     ProductDetailsPageScraperService,
     ProductListPageScraperService,
     ProductScrapeUpdaterService,
     ScrapeUrlDeduplicationService,
-    ProductValueMapperService,
+    GenericProductSourceSyncService,
   ],
   exports: [
     ProductDetailsPageScraperService,
     ProductListPageScraperService,
-    ProductValueMapperService,
     ScrapeUrlDeduplicationService,
+    GenericProductSourceSyncService,
   ],
 })
 export class ProductScraperModule {}

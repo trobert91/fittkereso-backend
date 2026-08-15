@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  OfferRepository,
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
@@ -25,6 +26,7 @@ import {
   ProductImageCopyService,
   ProductNormalizerService,
   ProductSpecUpdaterService,
+  SellerResolutionService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
 import { isEmpty, minBy } from 'lodash';
@@ -59,6 +61,8 @@ export class ProductScrapeUpdaterService {
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
     private readonly productNormalizer: ProductNormalizerService,
+    private readonly sellerResolution: SellerResolutionService,
+    private readonly offerRepo: OfferRepository,
   ) {}
 
   public async createOrUpdateProduct(
@@ -67,7 +71,7 @@ export class ProductScrapeUpdaterService {
   ): Promise<ProductModel | undefined> {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'skipped_no_category',
       );
       this.logger.warn('Skipping scrape — no category identified', {
@@ -102,7 +106,7 @@ export class ProductScrapeUpdaterService {
       // do not fail the whole scraping if brand resolution fails
       if ((error as Error).message?.includes('Brand could not be identified')) {
         this.productMetricsService.productBrandResolutionFailed(
-          task.source.type,
+          task.source.name,
         );
         return undefined;
       }
@@ -148,7 +152,7 @@ export class ProductScrapeUpdaterService {
     const path1Match = this.selectPath1Match(sourceRows, task, scrapedProduct);
     if (path1Match) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'path1_hit',
       );
       return { model: path1Match.model, isExistingMatch: true };
@@ -162,11 +166,11 @@ export class ProductScrapeUpdaterService {
     const candidate = resolved.resolvedModel;
     const resolutionContext = resolved.context;
 
-    if (candidate && this.hasSourceOfType(candidate, task.source.type)) {
+    if (candidate && this.hasSourceRow(candidate, task.source.id)) {
       // The same source already has a different name pointing at this product —
       // this scrape is a distinct product by the source catalog's own definition.
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'cross_source_rejected_same_source',
       );
       this.logger.debug(
@@ -175,7 +179,7 @@ export class ProductScrapeUpdaterService {
           taskId: task.id,
           url: task.url,
           candidateId: candidate.id,
-          sourceType: task.source.type,
+          sourceName: task.source.name,
           normalizedSourceName,
         },
       );
@@ -184,10 +188,10 @@ export class ProductScrapeUpdaterService {
 
     if (candidate) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'cross_source_merge',
       );
-      this.productMetricsService.productMatched(task.source.type);
+      this.productMetricsService.productMatched(task.source.name);
       return { model: candidate, isExistingMatch: true, resolutionContext };
     }
 
@@ -210,7 +214,7 @@ export class ProductScrapeUpdaterService {
         normalizedSourceName,
       );
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'new_product',
       );
     }
@@ -220,7 +224,7 @@ export class ProductScrapeUpdaterService {
     await this.specUpdaterService.updateSpecsOnProduct({
       model,
       specs: scrapedProduct.specs,
-      sourceType: task.source.type,
+      source: task.source,
       sourceUrl: task.url,
       sourceName: scrapedProduct.displayName,
       normalizedSourceName,
@@ -234,9 +238,9 @@ export class ProductScrapeUpdaterService {
     });
 
     if (saveOutcome.created) {
-      this.productMetricsService.newProductCreated(task.source.type);
+      this.productMetricsService.newProductCreated(task.source.name);
     } else {
-      this.productMetricsService.productUpdated(task.source.type);
+      this.productMetricsService.productUpdated(task.source.name);
     }
 
     task.product = saveOutcome.model;
@@ -271,7 +275,7 @@ export class ProductScrapeUpdaterService {
     );
     if (insertedCount > 0) {
       this.productMetricsService.productAliasCreated(
-        task.source.type,
+        task.source.name,
         insertedCount,
       );
     }
@@ -290,9 +294,50 @@ export class ProductScrapeUpdaterService {
         await this.productRepo.save(model);
 
         this.productMetricsService.productImagesCreated(
-          task.source.type,
+          task.source.name,
           newImages.length,
         );
+      }
+    }
+
+    await this.createOrUpdateOffers(task, scrapedProduct, model);
+  }
+
+  // No-op today for both current sources — neither's config populates
+  // ScrapedProduct.offers yet. Wired up now so a future source only needs to
+  // populate detailPage.offers.* selectors, not touch this pipeline.
+  private async createOrUpdateOffers(
+    task: ScrapeTask,
+    scrapedProduct: ScrapedProduct,
+    model: ProductModel,
+  ): Promise<void> {
+    const offers = scrapedProduct.offers;
+    if (isEmpty(offers)) return;
+
+    for (const scraped of offers!) {
+      try {
+        const seller = await this.sellerResolution.resolveOrCreate(
+          scraped.sellerName,
+        );
+        await this.offerRepo.upsertFromScrape({
+          model,
+          seller,
+          source: task.source,
+          price: scraped.price,
+          currency: scraped.currency,
+          availability: scraped.availability,
+          url: scraped.url,
+          sourceListingId: scraped.sourceListingId,
+        });
+      } catch (error) {
+        // Do not fail the whole product scrape if one offer fails — mirrors
+        // the existing brand-resolution-failure tolerance in this service.
+        this.logger.warn('Failed to upsert offer, continuing', {
+          taskId: task.id,
+          url: task.url,
+          sellerName: scraped.sellerName,
+          error,
+        });
       }
     }
   }
@@ -331,8 +376,10 @@ export class ProductScrapeUpdaterService {
     return result.generatedMaps.length || result.identifiers.length;
   }
 
-  private hasSourceOfType(model: ProductModel, sourceType: string): boolean {
-    return model.sources?.some((source) => source.type === sourceType) ?? false;
+  private hasSourceRow(model: ProductModel, sourceId: string): boolean {
+    return (
+      model.sources?.some((source) => source.source?.id === sourceId) ?? false
+    );
   }
 
   // Pick the right Path 1 hit when multiple source rows share a normalizedSourceName
@@ -350,12 +397,12 @@ export class ProductScrapeUpdaterService {
     const incomingName = scrapedProduct.displayName?.toLowerCase();
     const exactMatch = sourceRows.find(
       (row) =>
-        row.type === task.source.type &&
+        row.source?.id === task.source.id &&
         row.sourceName?.toLowerCase() === incomingName,
     );
     if (exactMatch) return exactMatch;
 
-    return sourceRows.find((row) => row.type !== task.source.type);
+    return sourceRows.find((row) => row.source?.id !== task.source.id);
   }
 
   private async findExistingProductModel(
@@ -453,7 +500,7 @@ export class ProductScrapeUpdaterService {
       await this.specUpdaterService.updateSpecsOnProduct({
         model: existingModel,
         specs: scrapedProduct.specs,
-        sourceType: task.source.type,
+        source: task.source,
         sourceUrl: task.url,
         sourceName: scrapedProduct.displayName,
         normalizedSourceName,

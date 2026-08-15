@@ -1,8 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type {
-  ProductCategoryConfig,
-  SourceSpecConfig,
-} from '@fittkereso-backend/database';
+import type { ProductCategoryConfig } from '@fittkereso-backend/database';
 import type {
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
@@ -14,7 +11,6 @@ interface CategoryConfigFiles {
   config?: ProductCategoryConfig;
   jsonSchema?: SpecDefinitionJsonSchema;
   uiSchema?: SpecDefinitionUiSchema;
-  specMappings?: Record<string, SourceSpecConfig>;
 }
 
 @Injectable()
@@ -54,21 +50,6 @@ export class CategoryConfigService {
     return this.configCache.get(slug)?.uiSchema;
   }
 
-  getSpecMappings(
-    slug: string | null | undefined,
-  ): Record<string, SourceSpecConfig> | undefined {
-    if (!slug) return undefined;
-    return this.configCache.get(slug)?.specMappings;
-  }
-
-  getSpecMappingsForSource(
-    slug: string | null | undefined,
-    source: string,
-  ): SourceSpecConfig | undefined {
-    if (!slug) return undefined;
-    return this.configCache.get(slug)?.specMappings?.[source];
-  }
-
   // ─── Write Methods ──────────────────────────────────────────────────────────
 
   writeConfig(slug: string, config: ProductCategoryConfig): void {
@@ -89,16 +70,6 @@ export class CategoryConfigService {
     this.ensureCategoryDirectory(slug);
     const filePath = path.join(this.categoriesPath, slug, 'uiSchema.json');
     fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + '\n');
-    this.reloadCategory(slug);
-  }
-
-  writeSpecMappings(
-    slug: string,
-    mappings: Record<string, SourceSpecConfig>,
-  ): void {
-    this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, 'specMappings.json');
-    fs.writeFileSync(filePath, JSON.stringify(mappings, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -160,9 +131,6 @@ export class CategoryConfigService {
       ),
       uiSchema: this.readJsonFile<SpecDefinitionUiSchema>(
         path.join(categoryDirectory, 'uiSchema.json'),
-      ),
-      specMappings: this.readJsonFile<Record<string, SourceSpecConfig>>(
-        path.join(categoryDirectory, 'specMappings.json'),
       ),
     };
   }

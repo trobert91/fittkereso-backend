@@ -26,6 +26,7 @@ import {
   ProductSpecUpdaterService,
   ProductSpecValidatorService,
   SpecExtractionService,
+  SpecTranslationSelectorService,
 } from './services';
 import { ProductDetailService } from './services/product-detail.service';
 import { ProductUpdateService } from './services/update/product-update.service';
@@ -49,6 +50,7 @@ import { ProductAliasAutoCreateService } from './services/resolution/product-ali
 import { ProductEmbeddingMatchService } from './services/resolution/product-embedding-match.service';
 import { ProductFuzzySearchService } from './services/resolution/product-fuzzy-search.service';
 import { ProductWebSearchService } from './services/resolution/product-web-search.service';
+import { SellerResolutionService } from './services/resolution/seller-resolution.service';
 
 @Module({
   imports: [
@@ -81,6 +83,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductImageDeleteService,
     ProductSpecValidatorService,
     ProductSpecNormalizationService,
+    SpecTranslationSelectorService,
     ProductCategoryDetailService,
     CategoryUpdateMapperService,
     BrandCacheService,
@@ -103,6 +106,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingMatchService,
     ProductFuzzySearchService,
     ProductWebSearchService,
+    SellerResolutionService,
   ],
   exports: [
     ProductImageDtoService,
@@ -118,6 +122,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductSpecUpdaterService,
     ProductSpecValidatorService,
     ProductSpecNormalizationService,
+    SpecTranslationSelectorService,
     ProductCategoryDetailService,
     BrandCacheService,
     BrandCreateService,
@@ -139,6 +144,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingMatchService,
     ProductFuzzySearchService,
     ProductWebSearchService,
+    SellerResolutionService,
   ],
 })
 export class ProductModule {}

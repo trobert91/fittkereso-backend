@@ -23,8 +23,6 @@ import {
   ProductModelRepository,
   ProductModelSource,
   ProductModelSourceRepository,
-  ProductSourceRepository,
-  ProductSourceType,
   ScrapeQueueName,
   ScrapeTask,
   UserRole,
@@ -73,7 +71,6 @@ export class AdminProductController {
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly productRepo: ProductModelRepository,
     private readonly productModelSourceRepo: ProductModelSourceRepository,
-    private readonly productSourceRepo: ProductSourceRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly mergeService: ProductMergeService,
     private readonly duplicationSearchService: ProductDuplicationSearchService,
@@ -364,14 +361,17 @@ export class AdminProductController {
   ): Promise<QueueStatusDto> {
     const modelSource = await this.productModelSourceRepo.findOne({
       where: { id: body.productModelSourceId },
-      relations: [nameOf<ProductModelSource>('model')],
+      relations: [
+        nameOf<ProductModelSource>('model'),
+        nameOf<ProductModelSource>('source'),
+      ],
     });
 
     if (!modelSource || modelSource.model.id !== productId) {
       throw new NotFoundException('Product source not found for product');
     }
 
-    if (modelSource.type === ProductSourceType.manual) {
+    if (!modelSource.source) {
       throw new BadRequestException('Manual source cannot be resynced');
     }
 
@@ -379,19 +379,9 @@ export class AdminProductController {
       throw new BadRequestException('Product source url is missing');
     }
 
-    const productSource = await this.productSourceRepo.findOne({
-      where: { type: modelSource.type },
-    });
-
-    if (!productSource) {
-      throw new NotFoundException(
-        `Product source config for type ${modelSource.type} not found`,
-      );
-    }
-
     const task = new ScrapeTask();
     task.queue = ScrapeQueueName.ScrapeProductDetails;
-    task.source = productSource;
+    task.source = modelSource.source;
     task.url = modelSource.url;
     task.product = { id: productId } as ProductModel;
 

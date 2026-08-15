@@ -15,7 +15,6 @@ import {
   SupabaseConfigService,
   BunnyConfigService,
   CategoryConfigService,
-  SourceConfigService,
 } from '@fittkereso-backend/config';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 
@@ -38,7 +37,6 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     SupabaseConfigService,
     BunnyConfigService,
     CategoryConfigService,
-    SourceConfigService,
   ],
   exports: [
     AppConfigService,
@@ -56,7 +54,6 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     SupabaseConfigService,
     BunnyConfigService,
     CategoryConfigService,
-    SourceConfigService,
   ],
 })
 export class AppConfigModule {}

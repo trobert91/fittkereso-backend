@@ -4,15 +4,11 @@ import {
   ProductSource,
   ProductSourceRepository,
   ProductSourceSyncMode,
-  ProductSourceType,
 } from '@fittkereso-backend/database';
-import { SourceConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
-  ArukeresoSyncService,
-  DisplayspecsSyncService,
+  GenericProductSourceSyncService,
   IncrementalSyncService,
-  ProductSourceSyncService,
 } from '@fittkereso-backend/product-scraper';
 import { ProductSourceSyncMessage } from '@fittkereso-backend/task';
 import { isEmpty } from 'lodash';
@@ -25,9 +21,7 @@ export class ProductSourceSyncListener {
   constructor(
     private readonly sourceRepo: ProductSourceRepository,
     private readonly productCategoryRepo: ProductCategoryRepository,
-    private readonly sourceConfigService: SourceConfigService,
-    private readonly displaySpecsService: DisplayspecsSyncService,
-    private readonly arukeresoService: ArukeresoSyncService,
+    private readonly genericSyncService: GenericProductSourceSyncService,
     private readonly incrementalSyncService: IncrementalSyncService,
   ) {}
 
@@ -50,12 +44,11 @@ export class ProductSourceSyncListener {
           await this.incrementalSyncService.sync(entity);
           entity.lastIncrementalSyncAt = new Date();
         } else {
-          const service = this.getSyncService(entity.type);
           const sourceTitles = await this.resolveSourceTitles(
             entity,
             message.categoryIds,
           );
-          await service.sync(entity, {
+          await this.genericSyncService.sync(entity, {
             sourceTitles,
             brandNames: message.brandNames,
           });
@@ -79,6 +72,8 @@ export class ProductSourceSyncListener {
     source: ProductSource,
     categoryIds: string[] | undefined,
   ): Promise<string[]> {
+    const categoriesConfig = source.config.categories ?? {};
+
     let slugs: string[] | undefined;
     if (categoryIds && !isEmpty(categoryIds)) {
       const categories = await this.productCategoryRepo.repo.findBy({
@@ -89,29 +84,25 @@ export class ProductSourceSyncListener {
       if (missing > 0) {
         this.logger.warn(`Full sync: ${missing} category IDs not found`, {
           categoryIds,
-          source: source.type,
+          source: source.name,
         });
       }
     }
-    const titles = this.sourceConfigService.getSourceTitles(source.type, slugs);
+
+    const entries = Object.entries(categoriesConfig).filter(
+      ([slug, cfg]) =>
+        cfg.enabled && (!slugs || slugs.includes(slug)),
+    );
+    const titles = entries
+      .map(([, cfg]) => cfg.sourceTitle)
+      .filter((title): title is string => !!title);
+
     if (!isEmpty(slugs) && isEmpty(titles)) {
       this.logger.warn(
         `Full sync: no source titles resolved for requested slugs`,
-        { slugs, source: source.type },
+        { slugs, source: source.name },
       );
     }
     return titles;
-  }
-
-  private getSyncService(type: ProductSourceType): ProductSourceSyncService {
-    switch (type) {
-      case ProductSourceType.arukereso:
-        return this.arukeresoService;
-      case ProductSourceType.displaySpecs:
-        return this.displaySpecsService;
-
-      default:
-        throw new Error(`Unknown product source type: ${type}`);
-    }
   }
 }

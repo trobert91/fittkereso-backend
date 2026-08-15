@@ -1,24 +1,43 @@
-import { ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapeTask, SourceSpecConfig } from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
-import { ProductDetailsPageExtractor } from '../interfaces/product-details-page-extractor.interface';
 import { Injectable } from '@nestjs/common';
 import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
+import { CategoryConfigService } from '@fittkereso-backend/config';
+import { CustomLogger } from '@fittkereso-backend/logger';
+import {
+  ScrapedProduct,
+  ScrapedProductSpec,
+  SpecExtractionService,
+  SpecTranslationSelectorService,
+} from '@fittkereso-backend/product';
+import { TranslationService } from '@fittkereso-backend/translation';
+import {
+  RuntimeDataProviderService,
+  ScrapeInterpreterService,
+} from '@fittkereso-backend/scrape-interpreter';
 
 @Injectable()
 export class ProductDetailsPageScraperService {
+  private readonly logger = new CustomLogger(
+    ProductDetailsPageScraperService.name,
+  );
+
   constructor(
     private readonly scraperService: ScraperService,
     private readonly productUpdaterService: ProductScrapeUpdaterService,
     private readonly scrapingMetrics: ProductScrapingMetricsService,
+    private readonly interpreter: ScrapeInterpreterService,
+    private readonly runtime: RuntimeDataProviderService,
+    private readonly categoryConfigService: CategoryConfigService,
+    private readonly specExtraction: SpecExtractionService,
+    private readonly translationSelector: SpecTranslationSelectorService,
+    private readonly translationService: TranslationService,
   ) {}
 
-  public async scrapeProductDetailsPage(
-    task: ScrapeTask,
-    extractor: ProductDetailsPageExtractor,
-  ): Promise<void> {
-    const sourceType = task.source.type;
+  public async scrapeProductDetailsPage(task: ScrapeTask): Promise<void> {
+    const sourceName = task.source.name;
     const startTime = Date.now();
 
     try {
@@ -26,14 +45,14 @@ export class ProductDetailsPageScraperService {
       const $ = cheerio.load(html);
 
       const extractionStart = Date.now();
-      const scrapedProduct = await extractor.extractProductDetails(task, $);
+      const scrapedProduct = await this.extractProduct(task, $);
       this.scrapingMetrics.recordExtractionDuration(
-        sourceType,
+        sourceName,
         (Date.now() - extractionStart) / 1000,
       );
 
       if (!scrapedProduct) {
-        this.scrapingMetrics.recordExtractionOutcome(sourceType, 'skipped');
+        this.scrapingMetrics.recordExtractionOutcome(sourceName, 'skipped');
         return;
       }
 
@@ -43,21 +62,163 @@ export class ProductDetailsPageScraperService {
       );
 
       if (result) {
-        this.scrapingMetrics.recordExtractionOutcome(sourceType, 'success');
+        this.scrapingMetrics.recordExtractionOutcome(sourceName, 'success');
       } else {
         this.scrapingMetrics.recordExtractionOutcome(
-          sourceType,
+          sourceName,
           'skipped_brand_failed',
         );
       }
     } catch (error) {
-      this.scrapingMetrics.recordExtractionOutcome(sourceType, 'error');
+      this.scrapingMetrics.recordExtractionOutcome(sourceName, 'error');
       throw error;
     } finally {
       this.scrapingMetrics.recordScrapeDuration(
-        sourceType,
+        sourceName,
         (Date.now() - startTime) / 1000,
       );
     }
+  }
+
+  private async extractProduct(
+    task: ScrapeTask,
+    $: cheerio.CheerioAPI,
+  ): Promise<ScrapedProduct | null> {
+    const config = task.source.config;
+    const detail = await this.interpreter.runDetailPage(task, $, config);
+
+    if (!detail.categorySlug) {
+      this.logger.warn(
+        'Category could not be identified, skipping product creation',
+        { taskId: task.id, url: task.url },
+      );
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'category_not_identified',
+      );
+      throw new Error('Category could not be identified');
+    }
+
+    const categoryEnabled =
+      config.categories?.[detail.categorySlug]?.enabled ?? false;
+    if (!categoryEnabled) {
+      this.logger.debug(
+        `Skipping product — category '${detail.categorySlug}' not enabled for ${task.source.name}`,
+        { taskId: task.id, url: task.url },
+      );
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'category_not_enabled',
+      );
+      return null;
+    }
+
+    const category = await this.runtime.getCategoryBySlug(detail.categorySlug);
+    if (!category) {
+      this.logger.warn('Category slug not found in database', {
+        taskId: task.id,
+        url: task.url,
+        categorySlug: detail.categorySlug,
+      });
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'category_not_identified',
+      );
+      throw new Error('Category could not be identified');
+    }
+
+    const jsonSchema = this.categoryConfigService.getJsonSchema(category.slug);
+    if (!jsonSchema) {
+      this.logger.warn(
+        'Category has no associated JSON schema, skipping product creation',
+        { taskId: task.id, url: task.url, categorySlug: category.slug },
+      );
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'missing_schema',
+      );
+      throw new Error('Category has no associated JSON schema');
+    }
+
+    if (!detail.brand || !detail.model) {
+      this.logger.warn(
+        'Skipping product — missing required brand or model',
+        { taskId: task.id, url: task.url },
+      );
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'missing_brand_or_model',
+      );
+      return null;
+    }
+
+    const sourceConfig = config.detailPage.specMapping[category.slug];
+    const translator = await this.buildTranslator(
+      task,
+      detail.rawSpecs,
+      sourceConfig,
+      category.name,
+    );
+
+    const specs = sourceConfig
+      ? this.specExtraction.extractSpecs({
+          scrapedSpecs: detail.rawSpecs,
+          schema: jsonSchema,
+          sourceConfig,
+          translator,
+        })
+      : {};
+
+    const displayName = `${detail.brand} ${detail.model}`.trim();
+
+    return {
+      brand: detail.brand,
+      model: detail.model,
+      displayName,
+      category,
+      specs,
+      aliases: detail.aliases,
+      releaseYear: detail.releaseYear,
+      imageUrls: detail.imageUrls,
+    };
+  }
+
+  private async buildTranslator(
+    task: ScrapeTask,
+    rawSpecs: ScrapedProductSpec[],
+    sourceConfig: SourceSpecConfig | undefined,
+    categoryName: string,
+  ) {
+    const translationConfig = task.source.config.detailPage.translation;
+    if (!translationConfig?.enabled) {
+      return undefined;
+    }
+
+    const rawValues = this.translationSelector.collectTranslatableValues(
+      rawSpecs,
+      sourceConfig,
+    );
+    if (rawValues.length === 0) {
+      return undefined;
+    }
+
+    const context = translationConfig.contextTemplate.replace(
+      /\{\{\s*categoryName\s*\}\}/g,
+      categoryName,
+    );
+
+    const { lookup, stats } = await this.translationService.translateBatch({
+      texts: rawValues,
+      sourceLanguage: translationConfig.sourceLanguage,
+      targetLanguage: translationConfig.targetLanguage,
+      context,
+    });
+
+    this.logger.debug('Spec translation completed', {
+      url: task.url,
+      ...stats,
+    });
+
+    return lookup;
   }
 }

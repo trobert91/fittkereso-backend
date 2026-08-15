@@ -5,6 +5,7 @@ import {
   ProductCategory,
   ProductCategoryRepository,
   ProductModelRepository,
+  ProductSourceRepository,
   type ProductCategoryConfig,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -15,6 +16,7 @@ export class CategoryTools {
   constructor(
     private readonly categoryRepo: ProductCategoryRepository,
     private readonly productRepo: ProductModelRepository,
+    private readonly productSourceRepo: ProductSourceRepository,
     private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
@@ -52,7 +54,7 @@ export class CategoryTools {
       ? this.categoryConfigService.getUiSchema(slug)
       : undefined;
     const specMappings = slug
-      ? this.categoryConfigService.getSpecMappings(slug)
+      ? await this.getSpecMappingsForCategory(slug)
       : undefined;
 
     const L: string[] = [];
@@ -313,6 +315,26 @@ export class CategoryTools {
       );
       lines.push('');
     }
+  }
+
+  // Spec mappings now live per-ProductSource (config.detailPage.specMapping,
+  // keyed by category slug) rather than in a per-category specMappings.json
+  // file keyed by source. Collect the mapping for this category slug across
+  // every configured source.
+  private async getSpecMappingsForCategory(
+    slug: string,
+  ): Promise<Record<string, { mappings?: unknown[]; calculated?: unknown[] }>> {
+    const sources = await this.productSourceRepo.getAll();
+    const result: Record<string, { mappings?: unknown[]; calculated?: unknown[] }> = {};
+
+    for (const source of sources) {
+      const mapping = source.config?.detailPage?.specMapping?.[slug];
+      if (mapping) {
+        result[source.name] = mapping;
+      }
+    }
+
+    return result;
   }
 
   private async generateCategorySlug(entity: ProductCategory): Promise<void> {

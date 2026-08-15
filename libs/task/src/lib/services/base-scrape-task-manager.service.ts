@@ -44,7 +44,7 @@ export abstract class BaseScrapeTaskManagerService {
       `Processing scrape task ${task.id} for queue ${task.queue}`,
     );
 
-    this.taskMetricsService.taskStarted(task.queue, task.source.type);
+    this.taskMetricsService.taskStarted(task.queue, task.source.name);
 
     const startTime = Date.now();
 
@@ -67,10 +67,10 @@ export abstract class BaseScrapeTaskManagerService {
       await this.taskRepo.save(task);
 
       this.logger.debug(`Finished task ${task.id} for queue ${task.queue}`);
-      this.taskMetricsService.taskFinished(task.queue, task.source.type);
+      this.taskMetricsService.taskFinished(task.queue, task.source.name);
     } catch (error: unknown) {
       this.logger.error(`Task ${task.id} failed: ${task.url}`, error);
-      this.taskMetricsService.taskFailed(task.queue, task.source.type);
+      this.taskMetricsService.taskFailed(task.queue, task.source.name);
 
       task.executionTimeInSec = (Date.now() - startTime) / 1000;
       task.error = JSON.stringify(
@@ -95,7 +95,7 @@ export abstract class BaseScrapeTaskManagerService {
       if (task.executionTimeInSec) {
         this.taskMetricsService.recordTaskDuration(
           task.queue,
-          task.source.type,
+          task.source.name,
           task.status === TaskStatus.FAILED ? 'failed' : 'finished',
           task.executionTimeInSec,
         );

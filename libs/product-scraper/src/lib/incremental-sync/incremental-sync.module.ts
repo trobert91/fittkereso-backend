@@ -3,9 +3,8 @@ import { DatabaseModule } from '@fittkereso-backend/database';
 import { ExaModule } from '@fittkereso-backend/exa';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { TaskModule } from '@fittkereso-backend/task';
+import { ScrapeInterpreterModule } from '@fittkereso-backend/scrape-interpreter';
 import { IncrementalSyncService } from './incremental-sync.service';
-import { ArukeresoUrlClassifier } from './classifiers/arukereso-url-classifier';
-import { DisplayspecsUrlClassifier } from './classifiers/displayspecs-url-classifier';
 import { ProductScraperModule } from '../product-scraper';
 
 @Module({
@@ -15,12 +14,9 @@ import { ProductScraperModule } from '../product-scraper';
     MetricsModule,
     TaskModule,
     ProductScraperModule,
+    ScrapeInterpreterModule,
   ],
-  providers: [
-    IncrementalSyncService,
-    ArukeresoUrlClassifier,
-    DisplayspecsUrlClassifier,
-  ],
+  providers: [IncrementalSyncService],
   exports: [IncrementalSyncService],
 })
 export class IncrementalSyncModule {}

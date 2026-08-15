@@ -7,7 +7,6 @@ import {
   ProductImageRepository,
   ProductModel,
   ProductModelSource,
-  ProductSourceType,
   ProductSpecs,
 } from '@fittkereso-backend/database';
 import { isUndefined } from 'lodash';
@@ -143,9 +142,9 @@ export class ProductUpdateMapperService {
   private mapManualSpecs(entity: ProductModel, specs: ProductSpecs) {
     entity.sources = entity.sources ?? [];
 
-    let manualSource = entity.sources.find(
-      (s) => s.type === ProductSourceType.manual,
-    );
+    // Admin-entered specs have no ProductSource behind them (source: null) —
+    // that's what distinguishes them from scraped ProductModelSource rows.
+    let manualSource = entity.sources.find((s) => !s.source);
 
     if (manualSource) {
       manualSource.specs = specs;
@@ -153,7 +152,7 @@ export class ProductUpdateMapperService {
     } else {
       const newSource = new ProductModelSource();
       newSource.model = entity;
-      newSource.type = ProductSourceType.manual;
+      newSource.source = null;
       newSource.specs = specs;
       newSource.lastUpdated = new Date();
       entity.sources.push(newSource);

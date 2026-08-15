@@ -5,10 +5,10 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScrapeQueueName, ScrapeTask } from '@fittkereso-backend/database';
 import * as cheerio from 'cheerio';
 import { compact, isEmpty } from 'lodash';
-import { ListPageExtractor } from '../interfaces/list-page-extractor.interface';
 import { Injectable } from '@nestjs/common';
 import { WebLink } from '@fittkereso-backend/product';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 
 @Injectable()
 export class ProductListPageScraperService {
@@ -21,23 +21,20 @@ export class ProductListPageScraperService {
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly scrapeUrlDedup: ScrapeUrlDeduplicationService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
+    private readonly interpreter: ScrapeInterpreterService,
   ) {}
 
-  public async scrapeListPage(
-    task: ScrapeTask,
-    listPageExtractor: ListPageExtractor,
-  ): Promise<void> {
+  public async scrapeListPage(task: ScrapeTask): Promise<void> {
     const html = await this.scraperService.getHtml(task.url);
     const $ = cheerio.load(html);
 
-    const categoryName = listPageExtractor.getCategoryName(task, $);
-    const categoryLinks = await listPageExtractor.getCategoryLinks(task, $);
-    const productLinks = await listPageExtractor.getProductLinks(task, $);
+    const { categoryName, categoryLinks, productLinks } =
+      await this.interpreter.runListPage(task, $, task.source.config);
 
-    const sourceType = task.source.type;
+    const sourceName = task.source.name;
 
     this.productCollectionMetrics.recordProductsFound(
-      sourceType,
+      sourceName,
       productLinks.length,
     );
 
@@ -49,7 +46,7 @@ export class ProductListPageScraperService {
     );
 
     this.productCollectionMetrics.recordDetailTasksCreated(
-      sourceType,
+      sourceName,
       productTasks.length,
     );
 
@@ -109,7 +106,7 @@ export class ProductListPageScraperService {
 
       if (dedup.isDuplicate) {
         this.productCollectionMetrics.productSkipped(
-          parentTask.source.type,
+          parentTask.source.name,
           dedup.reason!,
         );
         return;

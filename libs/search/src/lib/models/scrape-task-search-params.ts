@@ -1,9 +1,5 @@
-import {
-  ProductSourceType,
-  ScrapeQueueName,
-  TaskStatus,
-} from '@fittkereso-backend/database';
-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
+import { ScrapeQueueName, TaskStatus } from '@fittkereso-backend/database';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class ScrapeTaskSearchParams {
   @IsOptional()
@@ -15,8 +11,8 @@ export class ScrapeTaskSearchParams {
   queues?: ScrapeQueueName[];
 
   @IsOptional()
-  @IsEnum(ProductSourceType, { each: true })
-  sourceTypes?: ProductSourceType[];
+  @IsString({ each: true })
+  sourceIds?: string[];
 
   @IsOptional()
   @IsInt()

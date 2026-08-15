@@ -7,7 +7,6 @@ import {
   SCRAPE_TASK_FAILED_TOTAL,
   SCRAPE_TASK_DURATION_SECONDS,
 } from '../metric-names';
-import { ProductSourceType } from '@fittkereso-backend/database';
 
 @Injectable()
 export class ScrapeTaskMetricsService {
@@ -47,32 +46,35 @@ export class ScrapeTaskMetricsService {
     });
   }
 
-  public taskStarted(queueName: string, type: ProductSourceType): void {
-    this.taskStartedCounter.inc({ queue_name: queueName, source_type: type });
-  }
-
-  public taskFinished(queueName: string, type: ProductSourceType): void {
-    this.taskFinishedCounter.inc({
+  public taskStarted(queueName: string, sourceName: string): void {
+    this.taskStartedCounter.inc({
       queue_name: queueName,
-      source_type: type,
+      source_type: sourceName,
     });
   }
 
-  public taskFailed(queueName: string, type: ProductSourceType): void {
+  public taskFinished(queueName: string, sourceName: string): void {
+    this.taskFinishedCounter.inc({
+      queue_name: queueName,
+      source_type: sourceName,
+    });
+  }
+
+  public taskFailed(queueName: string, sourceName: string): void {
     this.taskFailedCounter.inc({
       queue_name: queueName,
-      source_type: type,
+      source_type: sourceName,
     });
   }
 
   public recordTaskDuration(
     queueName: string,
-    type: ProductSourceType,
+    sourceName: string,
     status: 'finished' | 'failed',
     durationSeconds: number,
   ): void {
     this.taskDurationSummary.observe(
-      { queue_name: queueName, source_type: type, status },
+      { queue_name: queueName, source_type: sourceName, status },
       durationSeconds,
     );
   }
