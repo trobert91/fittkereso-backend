@@ -50,6 +50,11 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       api_key: Joi.string().allow('').required(),
       debug: Joi.boolean().default(false),
     }).required(),
+
+    zyte: Joi.object({
+      api_url: Joi.string().required(),
+      api_key: Joi.string().required(),
+    }).required(),
   }).required();
 
   const result = configValidationSchema.validate(yamlConfig, {

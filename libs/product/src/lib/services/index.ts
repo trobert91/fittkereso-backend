@@ -3,6 +3,8 @@ export * from './product-spec/product-spec-merge.service';
 export * from './product-spec/product-spec-sort.service';
 export * from './brand';
 export * from './category';
+export * from './seller';
+export * from './product-source';
 export * from './product-category-detail.service';
 export * from './product-detail.service';
 export * from './product-normalizer.service';

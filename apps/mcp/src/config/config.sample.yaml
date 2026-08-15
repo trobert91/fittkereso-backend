@@ -36,3 +36,7 @@ openrouter:
 deepseek:
   api_key: your-deepseek-api-key
   debug: true
+
+zyte:
+  api_url: https://api.zyte.com/v1
+  api_key: your-zyte-api-key

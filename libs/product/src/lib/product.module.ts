@@ -51,6 +51,11 @@ import { ProductEmbeddingMatchService } from './services/resolution/product-embe
 import { ProductFuzzySearchService } from './services/resolution/product-fuzzy-search.service';
 import { ProductWebSearchService } from './services/resolution/product-web-search.service';
 import { SellerResolutionService } from './services/resolution/seller-resolution.service';
+import { SellerCreateService } from './services/seller/seller-create.service';
+import { SellerDetailService } from './services/seller/seller-detail.service';
+import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
+import { SellerUpdateService } from './services/seller/seller-update.service';
+import { ProductSourceUpdateService } from './services/product-source/product-source-update.service';
 
 @Module({
   imports: [
@@ -107,6 +112,11 @@ import { SellerResolutionService } from './services/resolution/seller-resolution
     ProductFuzzySearchService,
     ProductWebSearchService,
     SellerResolutionService,
+    SellerCreateService,
+    SellerDetailService,
+    SellerProductSourceCreateService,
+    SellerUpdateService,
+    ProductSourceUpdateService,
   ],
   exports: [
     ProductImageDtoService,
@@ -145,6 +155,11 @@ import { SellerResolutionService } from './services/resolution/seller-resolution
     ProductFuzzySearchService,
     ProductWebSearchService,
     SellerResolutionService,
+    SellerCreateService,
+    SellerDetailService,
+    SellerProductSourceCreateService,
+    SellerUpdateService,
+    ProductSourceUpdateService,
   ],
 })
 export class ProductModule {}

@@ -3,7 +3,6 @@ import { BasePostgresEntity } from './base-postgres-entity';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { ScrapeTask } from './scrape-task.entity';
-import { ProductImage } from './product-image.entity';
 import { Seller } from './seller.entity';
 import { ProductSourceConfig } from '../types/product-source-config';
 import ms from 'ms';
@@ -32,43 +31,52 @@ export class ProductSource extends BasePostgresEntity {
   @OneToMany(() => ScrapeTask, (task) => task.source)
   tasks: ScrapeTask[];
 
-  @OneToMany(() => ProductImage, (image) => image.source)
-  images: ProductImage[];
-
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastRunAt?: Date;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'int', nullable: false, default: 1 })
   maxConcurrent: number;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'int', nullable: false, default: 60 })
   requestsPerHour: number;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'int', nullable: false, default: 10 })
   priority: number;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Index()
   @Column({ nullable: false, default: true })
   schedulingEnabled: boolean;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ nullable: false, default: true })
   processingEnabled: boolean;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'text', nullable: true })
   fullSyncInterval?: ms.StringValue;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   nextFullSyncAt?: Date;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastFullSyncAt?: Date;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'text', nullable: true })
   incrementalSyncInterval?: ms.StringValue;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   nextIncrementalSyncAt?: Date;
 
+  @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastIncrementalSyncAt?: Date;
 }

@@ -21,3 +21,6 @@ export * from './duplicate-search-result';
 
 export * from './product-duplicate-search-params';
 export * from './product-duplicate-search-result';
+
+export * from './seller-search-params';
+export * from './seller-search-result';

@@ -33,7 +33,9 @@ export class ProductSourceSearchService {
   private buildQuery(
     params: ProductSourceSearchParams,
   ): SelectQueryBuilder<ProductSource> {
-    let query = this.productSourceRepo.repo.createQueryBuilder('productSource');
+    let query = this.productSourceRepo.repo
+      .createQueryBuilder('productSource')
+      .leftJoin(`productSource.${nameOf<ProductSource>('seller')}`, 'seller');
 
     if (!isEmpty(params.searchTerm)) {
       query = query.andWhere(
@@ -42,6 +44,12 @@ export class ProductSourceSearchService {
           searchTerm: `%${params.searchTerm}%`,
         },
       );
+    }
+
+    if (!isEmpty(params.sellerId)) {
+      query = query.andWhere('seller.id = :sellerId', {
+        sellerId: params.sellerId,
+      });
     }
 
     if (!isNil(params.schedulingEnabled)) {
@@ -82,6 +90,7 @@ export class ProductSourceSearchService {
     searchResult.sort = params.sort;
     searchResult.order = params.order;
     searchResult.searchTerm = params.searchTerm;
+    searchResult.sellerId = params.sellerId;
     searchResult.schedulingEnabled = params.schedulingEnabled;
 
     return searchResult;

@@ -8,6 +8,7 @@ import {
   GeminiConfigService,
   ClaudeConfigService,
   DeepSeekConfigService,
+  ZyteConfigService,
 } from '@fittkereso-backend/config';
 
 @Global()
@@ -22,6 +23,7 @@ import {
     GeminiConfigService,
     ClaudeConfigService,
     DeepSeekConfigService,
+    ZyteConfigService,
   ],
   exports: [
     AppConfigService,
@@ -32,6 +34,7 @@ import {
     GeminiConfigService,
     ClaudeConfigService,
     DeepSeekConfigService,
+    ZyteConfigService,
   ],
 })
 export class AppConfigModule {}

@@ -1,17 +1,23 @@
 import {
   IsBoolean,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Min,
   MinLength,
 } from 'class-validator';
+import { ProductSourceConfig } from '@fittkereso-backend/database';
 
 export class UpdateProductSourceDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
   name?: string;
+
+  @IsOptional()
+  @IsObject()
+  config?: ProductSourceConfig;
 
   @IsOptional()
   @IsBoolean()

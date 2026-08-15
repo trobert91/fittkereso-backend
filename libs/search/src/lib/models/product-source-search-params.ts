@@ -13,6 +13,10 @@ export class ProductSourceSearchParams {
   searchTerm?: string;
 
   @IsOptional()
+  @IsString()
+  sellerId?: string;
+
+  @IsOptional()
   @IsBoolean()
   schedulingEnabled?: boolean;
 
