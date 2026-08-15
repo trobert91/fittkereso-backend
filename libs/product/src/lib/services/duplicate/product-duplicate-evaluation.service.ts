@@ -78,7 +78,7 @@ export class ProductDuplicateEvaluationService {
       });
     } else {
       categories = await this.categoryRepo.find({
-        where: { enabled: true, autoDeduplicationEnabled: true },
+        where: { enabled: true },
       });
     }
 

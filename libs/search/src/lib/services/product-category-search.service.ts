@@ -61,24 +61,10 @@ export class ProductCategorySearchService {
     }
 
     // --- Boolean filters ---
-    if (params.autoDeduplicationEnabled !== undefined) {
-      query = query.andWhere(
-        `category.${nameOf<ProductCategory>('autoDeduplicationEnabled')} = :autoDedup`,
-        { autoDedup: params.autoDeduplicationEnabled },
-      );
-    }
-
     if (params.enabled !== undefined) {
       query = query.andWhere(
         `category.${nameOf<ProductCategory>('enabled')} = :enabled`,
         { enabled: params.enabled },
-      );
-    }
-
-    if (params.searchEnabled !== undefined) {
-      query = query.andWhere(
-        `category.${nameOf<ProductCategory>('searchEnabled')} = :searchEnabled`,
-        { searchEnabled: params.searchEnabled },
       );
     }
 

@@ -23,23 +23,8 @@ export class CategorySearchParams {
   pageSize?: number;
 
   @IsOptional()
-  @IsIn([
-    'name',
-    'createdAt',
-    'updatedAt',
-    'enabled',
-    'extractionEnabled',
-    'searchEnabled',
-    'searchPriority',
-  ])
-  sort?:
-    | 'name'
-    | 'createdAt'
-    | 'updatedAt'
-    | 'enabled'
-    | 'extractionEnabled'
-    | 'searchEnabled'
-    | 'searchPriority';
+  @IsIn(['name', 'createdAt', 'updatedAt', 'enabled'])
+  sort?: 'name' | 'createdAt' | 'updatedAt' | 'enabled';
 
   @IsOptional()
   @IsIn(['ASC', 'DESC'])
@@ -51,13 +36,5 @@ export class CategorySearchParams {
 
   @IsOptional()
   @IsBoolean()
-  autoDeduplicationEnabled?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
   enabled?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  searchEnabled?: boolean;
 }

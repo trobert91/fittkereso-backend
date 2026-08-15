@@ -33,7 +33,7 @@ export class CategoryCacheService {
     }
 
     const categories = await this.productCategoryRepository.repo.find({
-      where: { extractionEnabled: true },
+      where: { enabled: true },
     });
 
     this.logger.debug(

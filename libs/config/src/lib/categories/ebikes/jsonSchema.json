@@ -1,0 +1,192 @@
+{
+  "type": "object",
+  "title": "E-bike",
+  "properties": {
+    "gender": {
+      "meta": {
+        "order": 4,
+        "examples": ["Male", "Female", "Unisex"]
+      },
+      "type": "string",
+      "title": "Gender"
+    },
+    "frameType": {
+      "meta": {
+        "order": 1,
+        "examples": [
+          "All Mountain",
+          "Rigid MTB",
+          "Road",
+          "High-step",
+          "Trapeze",
+          "Low-step",
+          "Full-suspension",
+          "Cross",
+          "Folding",
+          "Compact"
+        ]
+      },
+      "type": "string",
+      "title": "Frame type"
+    },
+    "frameSize": {
+      "meta": {
+        "unit": "cm",
+        "examples": ["46", "51", "56"],
+        "unitFormat": "none"
+      },
+      "type": "number",
+      "title": "Frame size"
+    },
+    "usageType": {
+      "meta": {
+        "order": 5,
+        "examples": [
+          "Trekking",
+          "MTB",
+          "Cross",
+          "Cross-Trekking",
+          "Urban",
+          "Compact urban",
+          "Road"
+        ]
+      },
+      "type": "string",
+      "title": "Usage type"
+    },
+    "batteryPosition": {
+      "meta": {
+        "examples": ["Frame-integrated", "External", "Rear rack-mounted"]
+      },
+      "type": "string",
+      "title": "Battery position"
+    },
+    "wheelSize": {
+      "meta": {
+        "order": 3,
+        "unit": "\"",
+        "examples": ["26", "27.5", "28", "29"],
+        "unitFormat": "none"
+      },
+      "type": "number",
+      "title": "Wheel size"
+    },
+    "drivetrain": {
+      "meta": {
+        "examples": ["Chain", "Belt"]
+      },
+      "type": "string",
+      "title": "Drivetrain"
+    },
+    "suspension": {
+      "meta": {
+        "examples": ["Hardtail", "Full-suspension", "Rigid"]
+      },
+      "type": "string",
+      "title": "Suspension"
+    },
+    "brakeType": {
+      "meta": {
+        "examples": ["Disc", "Rim", "Disc + coaster brake"]
+      },
+      "type": "string",
+      "title": "Brake type"
+    },
+    "gearType": {
+      "meta": {
+        "examples": ["Derailleur", "Motor-integrated gearing", "Hub gears"]
+      },
+      "type": "string",
+      "title": "Gear type"
+    },
+    "batteryCapacity": {
+      "meta": {
+        "order": 2,
+        "unit": "Wh",
+        "examples": ["375", "500", "625", "750"]
+      },
+      "type": "number",
+      "title": "Battery capacity"
+    },
+    "torque": {
+      "meta": {
+        "unit": "Nm",
+        "examples": ["50", "65", "85"]
+      },
+      "type": "number",
+      "title": "Torque"
+    },
+    "motorPosition": {
+      "meta": {
+        "examples": ["Mid-drive", "Rear hub", "Front hub"]
+      },
+      "type": "string",
+      "title": "Motor position"
+    },
+    "motorPower": {
+      "meta": {
+        "unit": "W",
+        "examples": ["250", "350", "500", "750"]
+      },
+      "type": "number",
+      "title": "Motor power"
+    },
+    "topSpeed": {
+      "meta": {
+        "unit": "km/h",
+        "examples": ["25", "45"]
+      },
+      "type": "number",
+      "title": "Assisted top speed"
+    },
+    "range": {
+      "meta": {
+        "unit": "km",
+        "examples": ["60", "100", "150"]
+      },
+      "type": "number",
+      "title": "Range"
+    },
+    "chargingTime": {
+      "meta": {
+        "unit": "h",
+        "examples": ["3.5", "6"]
+      },
+      "type": "number",
+      "title": "Charging time"
+    },
+    "display": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Display/controller"
+    },
+    "maxLoad": {
+      "meta": {
+        "unit": "kg",
+        "examples": ["120", "150"]
+      },
+      "type": "number",
+      "title": "Max load capacity"
+    },
+    "weight": {
+      "meta": {
+        "unit": "kg",
+        "examples": ["22", "25"]
+      },
+      "type": "number",
+      "title": "Weight"
+    },
+    "waterResistance": {
+      "meta": {
+        "examples": ["IPX4", "IPX5", "IPX6"]
+      },
+      "type": "string",
+      "title": "Water resistance"
+    },
+    "smartConnectivity": {
+      "meta": {},
+      "type": "boolean",
+      "title": "App/GPS connectivity"
+    }
+  }
+}

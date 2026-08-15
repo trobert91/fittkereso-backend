@@ -1,0 +1,104 @@
+{
+  "arukereso": {
+    "mappings": [
+      {
+        "key": "gender",
+        "labels": ["Nem"]
+      },
+      {
+        "key": "frameType",
+        "labels": ["Váztípus"]
+      },
+      {
+        "key": "frameSize",
+        "labels": ["Vázméret"],
+        "extract": "number"
+      },
+      {
+        "key": "usageType",
+        "labels": ["Felhasználás módja"]
+      },
+      {
+        "key": "batteryPosition",
+        "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"]
+      },
+      {
+        "key": "wheelSize",
+        "labels": ["Kerékméret"],
+        "extract": "number"
+      },
+      {
+        "key": "drivetrain",
+        "labels": ["Erőátvitel"]
+      },
+      {
+        "key": "suspension",
+        "labels": ["Rugózás"]
+      },
+      {
+        "key": "brakeType",
+        "labels": ["Fékfajta", "Fék típusa"]
+      },
+      {
+        "key": "gearType",
+        "labels": ["Váltó típusa"]
+      },
+      {
+        "key": "batteryCapacity",
+        "labels": ["Akku kapacitás", "Akkumulátor kapacitása"],
+        "extract": "number"
+      },
+      {
+        "key": "torque",
+        "labels": ["Nyomaték", "Motor nyomaték"],
+        "extract": "number"
+      },
+      {
+        "key": "motorPosition",
+        "labels": ["Motor elhelyezkedése"]
+      },
+      {
+        "key": "motorPower",
+        "labels": ["Motor teljesítménye"],
+        "extract": "number"
+      },
+      {
+        "key": "topSpeed",
+        "labels": ["Maximális sebesség", "Motoros rásegítés sebessége"],
+        "extract": "number"
+      },
+      {
+        "key": "range",
+        "labels": ["Hatótávolság"],
+        "extract": "number"
+      },
+      {
+        "key": "chargingTime",
+        "labels": ["Töltési idő"],
+        "extract": "number"
+      },
+      {
+        "key": "display",
+        "labels": ["Kijelző", "Kijelzővel rendelkezik"]
+      },
+      {
+        "key": "maxLoad",
+        "labels": ["Maximális terhelhetőség"],
+        "extract": "number"
+      },
+      {
+        "key": "weight",
+        "labels": ["Tömeg", "Súly"],
+        "extract": "number"
+      },
+      {
+        "key": "waterResistance",
+        "labels": ["Védettségi szint", "Vízállóság"]
+      },
+      {
+        "key": "smartConnectivity",
+        "labels": ["Applikáció", "GPS követés"]
+      }
+    ]
+  }
+}

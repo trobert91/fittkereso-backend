@@ -31,23 +31,6 @@ export class ProductCategory extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   enabled: boolean;
 
-  @Column({ nullable: false, default: false })
-  @Expose({ groups: [SerializeGroup.adminList] })
-  extractionEnabled: boolean;
-
-  @Column({ type: 'boolean', nullable: false, default: false })
-  @Expose({ groups: [SerializeGroup.adminList] })
-  searchEnabled: boolean;
-
-  @Column({ type: 'smallint', nullable: false, default: 5 })
-  @Expose({ groups: [SerializeGroup.adminList] })
-  searchPriority: number;
-
-  @Index()
-  @Column({ type: 'boolean', nullable: false, default: false })
-  @Expose({ groups: [SerializeGroup.adminList] })
-  autoDeduplicationEnabled: boolean;
-
   @OneToMany(() => ProductModel, (model) => model.productCategory)
   models: ProductModel[];
 

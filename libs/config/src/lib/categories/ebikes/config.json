@@ -1,0 +1,453 @@
+{
+  "filterSpecs": [
+    {
+      "key": "frameType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "usageType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "motorPosition",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "motorPower",
+      "buckets": [
+        {
+          "max": 250,
+          "min": 0,
+          "label": "Up to 250 W"
+        },
+        {
+          "max": 500,
+          "min": 251,
+          "label": "251–500 W"
+        },
+        {
+          "max": 750,
+          "min": 501,
+          "label": "501–750 W"
+        },
+        {
+          "min": 751,
+          "label": "750+ W"
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "torque",
+      "filterType": "range"
+    },
+    {
+      "key": "batteryCapacity",
+      "filterType": "range"
+    },
+    {
+      "key": "batteryPosition",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "range",
+      "filterType": "range"
+    },
+    {
+      "key": "topSpeed",
+      "buckets": [
+        {
+          "max": 25,
+          "min": 0,
+          "label": "Up to 25 km/h"
+        },
+        {
+          "min": 26,
+          "max": 45,
+          "label": "26–45 km/h"
+        },
+        {
+          "min": 46,
+          "label": "Unrestricted"
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "wheelSize",
+      "buckets": [
+        {
+          "max": 20,
+          "label": "20\""
+        },
+        {
+          "min": 24,
+          "max": 24,
+          "label": "24\""
+        },
+        {
+          "min": 26,
+          "max": 26,
+          "label": "26\""
+        },
+        {
+          "min": 27.5,
+          "max": 27.5,
+          "label": "27.5\""
+        },
+        {
+          "min": 28,
+          "max": 28,
+          "label": "28\""
+        },
+        {
+          "min": 29,
+          "label": "29\""
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "frameSize",
+      "filterType": "range"
+    },
+    {
+      "key": "gender",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "suspension",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "drivetrain",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "gearType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "brakeType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "weight",
+      "filterType": "range"
+    },
+    {
+      "key": "maxLoad",
+      "filterType": "range"
+    },
+    {
+      "key": "chargingTime",
+      "filterType": "range"
+    },
+    {
+      "key": "display",
+      "filterType": "boolean"
+    },
+    {
+      "key": "smartConnectivity",
+      "filterType": "boolean"
+    },
+    {
+      "key": "waterResistance",
+      "filterType": "multiselect"
+    }
+  ],
+  "primarySpecs": [
+    "frameType",
+    "motorPosition",
+    "batteryCapacity",
+    "wheelSize",
+    "torque"
+  ],
+  "matcherSpecs": [
+    "motorPower",
+    "range",
+    "weight",
+    "topSpeed"
+  ],
+  "maxMatcherSpecMismatches": 1,
+  "promptConfig": {
+    "validSpecs": [
+      {
+        "name": "motorPower",
+        "format": "integer followed by 'W', no space",
+        "examples": "250W, 500W, 750W"
+      },
+      {
+        "name": "torque",
+        "format": "integer followed by 'Nm', no space",
+        "examples": "50Nm, 65Nm, 85Nm"
+      },
+      {
+        "name": "batteryCapacity",
+        "format": "integer followed by 'Wh', no space",
+        "examples": "375Wh, 500Wh, 625Wh, 750Wh"
+      },
+      {
+        "name": "wheelSize",
+        "format": "number followed by the inch mark \"",
+        "examples": "26\", 27.5\", 28\", 29\"",
+        "avoid": ["26 inch", "26in"]
+      },
+      {
+        "name": "topSpeed",
+        "format": "integer followed by 'km/h'",
+        "examples": "25km/h, 45km/h"
+      }
+    ],
+    "productTypeWord": "e-bike",
+    "technologyDescriptors": [
+      "mid-drive",
+      "rear hub motor",
+      "front hub motor",
+      "belt drive",
+      "hub gears",
+      "full-suspension"
+    ],
+    "specialInstructions": "Category-specific rules:\n- Motor power (W) is the nominal/rated power, not peak power — do not conflate the two if both are mentioned.\n- Assisted top speed reflects the legal pedelec class (25 km/h EU pedelec, 45 km/h S-pedelec) — do not confuse with the bike's actual maximum speed under manual pedaling.\n- Range is highly ride-condition-dependent (terrain, assist level, rider weight) — only extract as a spec when the commenter states manufacturer/official range, not their own real-world mileage anecdote (that belongs in review quotes/features instead).\n- Frame type describes physical geometry (e.g. step-through, full-suspension); usage type describes the riding discipline (e.g. trekking, urban) — do not conflate the two fields even though some values sound similar (e.g. 'Cross' appears in both)."
+  },
+  "useCases": [
+    {
+      "label": "commuting",
+      "description": "Daily commuting to work or school — reliability, range for round trips, comfort, weather protection",
+      "implications": [
+        "commute",
+        "commuting",
+        "to work",
+        "daily ride",
+        "work from home",
+        "office"
+      ]
+    },
+    {
+      "label": "trekking",
+      "description": "Long-distance touring and trekking rides — endurance, comfort, range, luggage capacity",
+      "implications": [
+        "touring",
+        "trekking",
+        "long rides",
+        "multi-day",
+        "bikepacking"
+      ]
+    },
+    {
+      "label": "mountain biking",
+      "description": "Off-road trail riding — suspension performance, traction, climbing torque, durability",
+      "implications": [
+        "trail",
+        "singletrack",
+        "off-road",
+        "MTB",
+        "downhill",
+        "climbing"
+      ]
+    },
+    {
+      "label": "urban riding",
+      "description": "City riding — maneuverability, compact size, traffic-friendly handling, parking/storage",
+      "implications": [
+        "city",
+        "urban",
+        "around town",
+        "errands",
+        "traffic"
+      ]
+    },
+    {
+      "label": "cargo and family",
+      "description": "Carrying cargo, groceries, or children — load capacity, stability, rack/basket compatibility",
+      "implications": [
+        "cargo",
+        "groceries",
+        "kids",
+        "child seat",
+        "carrying"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "label": "motor power",
+      "description": "Perceived strength and responsiveness of motor assistance, including hill-climbing ability"
+    },
+    {
+      "label": "torque",
+      "description": "Pulling power felt when accelerating or climbing, independent of top-end motor power"
+    },
+    {
+      "label": "range",
+      "description": "Real-world distance achieved on a single charge under typical riding conditions"
+    },
+    {
+      "label": "battery life",
+      "description": "Long-term battery capacity retention and charge-cycle degradation over time"
+    },
+    {
+      "label": "build quality",
+      "description": "Frame and component materials, welds, overall fit and finish, physical durability"
+    },
+    {
+      "label": "comfort",
+      "description": "Riding position, saddle comfort, vibration damping, suitability for long rides"
+    },
+    {
+      "label": "handling",
+      "description": "Steering responsiveness, stability at speed, and balance when loaded or cornering"
+    },
+    {
+      "label": "suspension performance",
+      "description": "How well the fork/rear shock absorbs bumps and impacts on rough terrain"
+    },
+    {
+      "label": "brake performance",
+      "description": "Stopping power, modulation, and reliability of the braking system"
+    },
+    {
+      "label": "display and controls",
+      "description": "Readability and usability of the onboard display, buttons, and ride-mode switching"
+    },
+    {
+      "label": "app connectivity",
+      "description": "Companion app features — GPS tracking, theft alerts, ride stats, firmware updates"
+    },
+    {
+      "label": "value",
+      "description": "Price-to-performance ratio, deal quality, and whether the price is justified"
+    },
+    {
+      "label": "weight",
+      "description": "How manageable the bike feels to lift, carry, or maneuver when unpowered"
+    }
+  ],
+  "issues": [
+    {
+      "label": "battery degradation",
+      "feature": "battery life",
+      "description": "Noticeable loss of range or charge capacity over time"
+    },
+    {
+      "label": "motor cutout",
+      "feature": "motor power",
+      "description": "Motor assistance intermittently stopping or failing to engage"
+    },
+    {
+      "label": "display malfunction",
+      "feature": "display and controls",
+      "description": "Display freezing, blanking out, or showing incorrect readings"
+    },
+    {
+      "label": "brake squeal",
+      "feature": "brake performance",
+      "description": "Audible noise from the brakes during normal use"
+    },
+    {
+      "label": "creaking frame",
+      "feature": "build quality",
+      "description": "Unwanted noise from the frame or components under load"
+    },
+    {
+      "label": "app connectivity issues",
+      "feature": "app connectivity",
+      "description": "Companion app failing to pair, sync, or maintain a stable connection"
+    }
+  ],
+  "subreddits": [
+    {
+      "name": "r/ebikes",
+      "boost": 30
+    },
+    {
+      "name": "r/ElectricBike",
+      "boost": 25
+    },
+    {
+      "name": "r/bicycling",
+      "boost": 10
+    }
+  ],
+  "negativeTerms": [
+    {
+      "keyword": "motorcycle",
+      "penalty": 0.7
+    },
+    {
+      "keyword": "moped",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "scooter",
+      "penalty": 0.6
+    },
+    {
+      "keyword": "acoustic bike",
+      "penalty": 0.5
+    },
+    {
+      "keyword": "no motor",
+      "penalty": 0.6
+    }
+  ],
+  "relevanceTerms": [
+    {
+      "weight": 2.5,
+      "keyword": "e-bike"
+    },
+    {
+      "weight": 2.5,
+      "keyword": "ebike"
+    },
+    {
+      "weight": 2,
+      "keyword": "electric bike"
+    },
+    {
+      "weight": 2.2,
+      "keyword": "pedelec",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "mid-drive motor",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "hub motor",
+      "exclusive": true
+    },
+    {
+      "weight": 1.8,
+      "keyword": "torque sensor",
+      "exclusive": true
+    },
+    {
+      "weight": 1.6,
+      "keyword": "battery range"
+    },
+    {
+      "weight": 1.4,
+      "keyword": "throttle"
+    },
+    {
+      "weight": 1.8,
+      "keyword": "cargo bike",
+      "exclusive": true
+    }
+  ],
+  "keywordIdentifiers": [
+    "motor power",
+    "torque",
+    "battery capacity",
+    "range",
+    "top speed",
+    "mid-drive",
+    "hub motor",
+    "pedelec",
+    "throttle",
+    "regenerative braking"
+  ]
+}

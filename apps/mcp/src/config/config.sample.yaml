@@ -1,0 +1,38 @@
+environment: "dev"
+port: 8090
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: fittkereso
+  password: fittkereso
+  database: fittkereso
+  sync: true
+  run_migrations: true
+  ssl: false
+  logging: false
+
+logging:
+  app_name: mcp
+  url: http://localhost:3100
+  environment: "dev"
+
+openai:
+  api_key: your-openai-api-key
+  debug: true
+
+gemini:
+  api_key: your-gemini-api-key
+  debug: true
+
+claude:
+  api_key: your-claude-api-key
+  debug: true
+
+openrouter:
+  api_key: your-openrouter-api-key
+  debug: true
+
+deepseek:
+  api_key: your-deepseek-api-key
+  debug: true

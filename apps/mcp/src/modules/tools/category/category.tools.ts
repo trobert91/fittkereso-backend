@@ -62,7 +62,6 @@ export class CategoryTools {
     L.push(`- **ID**: ${category.id}`);
     L.push(`- **Slug**: ${slug ?? '_not set_'}`);
     L.push(`- **Enabled**: ${category.enabled}`);
-    L.push(`- **Extraction Enabled**: ${category.extractionEnabled}`);
     if (category.aliases?.length) {
       L.push(`- **Aliases**: ${category.aliases.join(', ')}`);
     }
@@ -149,9 +148,7 @@ export class CategoryTools {
         : {};
 
       L.push(`## ${category.name} (${category.id})`);
-      L.push(
-        `Enabled: ${category.enabled} | Extraction: ${category.extractionEnabled}`,
-      );
+      L.push(`Enabled: ${category.enabled}`);
 
       const keywordIds = config.keywordIdentifiers ?? [];
       L.push(
@@ -169,26 +166,19 @@ export class CategoryTools {
   @Tool({
     name: 'create_category',
     description:
-      'Create a new product category with enabled/extractionEnabled flags. Config must be added separately by creating libs/config/src/lib/categories/<slug>/config.json.',
+      'Create a new product category with an enabled flag. Config must be added separately by creating libs/config/src/lib/categories/<slug>/config.json.',
     parameters: z.object({
       name: z.string().describe('Unique category name'),
       enabled: z
         .boolean()
         .optional()
         .describe('Whether the category is enabled (default: true)'),
-      extractionEnabled: z
-        .boolean()
-        .optional()
-        .describe(
-          'Whether extraction is enabled for this category (default: false)',
-        ),
     }),
     annotations: { destructiveHint: false, idempotentHint: false },
   })
   async createCategory(args: {
     name: string;
     enabled?: boolean;
-    extractionEnabled?: boolean;
   }): Promise<string> {
     const existing = await this.categoryRepo.findByName(args.name);
     if (existing) {
@@ -198,7 +188,6 @@ export class CategoryTools {
     const category = new ProductCategory();
     category.name = args.name;
     category.enabled = args.enabled ?? true;
-    category.extractionEnabled = args.extractionEnabled ?? false;
 
     const saved = await this.categoryRepo.save(category);
 
@@ -212,7 +201,7 @@ export class CategoryTools {
   @Tool({
     name: 'update_category',
     description:
-      'Update database entity fields of an existing category — name, enabled, extractionEnabled, aliases. All file-based config (config.json, jsonSchema.json, uiSchema.json, specMappings.json) must be edited directly in libs/config/src/lib/categories/<slug>/.',
+      'Update database entity fields of an existing category — name, enabled, aliases. All file-based config (config.json, jsonSchema.json, uiSchema.json, specMappings.json) must be edited directly in libs/config/src/lib/categories/<slug>/.',
     parameters: z.object({
       categoryId: z.string().describe('Category UUID to update'),
       name: z.string().optional().describe('New unique name for the category'),
@@ -220,10 +209,6 @@ export class CategoryTools {
         .boolean()
         .optional()
         .describe('Enable or disable the category'),
-      extractionEnabled: z
-        .boolean()
-        .optional()
-        .describe('Enable or disable extraction for this category'),
       aliases: z
         .array(z.string())
         .optional()
@@ -235,7 +220,6 @@ export class CategoryTools {
     categoryId: string;
     name?: string;
     enabled?: boolean;
-    extractionEnabled?: boolean;
     aliases?: string[];
   }): Promise<string> {
     const category = await this.categoryRepo.findOneOrFail({
@@ -256,11 +240,6 @@ export class CategoryTools {
     if (args.enabled !== undefined) {
       category.enabled = args.enabled;
       changes.push('enabled');
-    }
-
-    if (args.extractionEnabled !== undefined) {
-      category.extractionEnabled = args.extractionEnabled;
-      changes.push('extractionEnabled');
     }
 
     if (args.aliases !== undefined) {

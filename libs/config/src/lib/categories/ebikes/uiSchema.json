@@ -1,0 +1,94 @@
+{
+  "gender": {
+    "ui:widget": "select"
+  },
+  "frameType": {
+    "ui:widget": "select"
+  },
+  "frameSize": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 51"
+  },
+  "usageType": {
+    "ui:widget": "select"
+  },
+  "batteryPosition": {
+    "ui:widget": "select"
+  },
+  "wheelSize": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 28"
+  },
+  "drivetrain": {
+    "ui:widget": "select"
+  },
+  "suspension": {
+    "ui:widget": "select"
+  },
+  "brakeType": {
+    "ui:widget": "select"
+  },
+  "gearType": {
+    "ui:widget": "select"
+  },
+  "batteryCapacity": {
+    "ui:widget": "updown"
+  },
+  "torque": {
+    "ui:widget": "updown"
+  },
+  "motorPosition": {
+    "ui:widget": "select"
+  },
+  "motorPower": {
+    "ui:widget": "updown"
+  },
+  "topSpeed": {
+    "ui:widget": "updown"
+  },
+  "range": {
+    "ui:widget": "updown"
+  },
+  "chargingTime": {
+    "ui:widget": "updown"
+  },
+  "display": {
+    "ui:widget": "checkbox"
+  },
+  "maxLoad": {
+    "ui:widget": "updown"
+  },
+  "weight": {
+    "ui:widget": "updown"
+  },
+  "waterResistance": {
+    "ui:widget": "select"
+  },
+  "smartConnectivity": {
+    "ui:widget": "checkbox"
+  },
+  "ui:order": [
+    "frameType",
+    "usageType",
+    "motorPosition",
+    "motorPower",
+    "torque",
+    "topSpeed",
+    "batteryCapacity",
+    "batteryPosition",
+    "range",
+    "chargingTime",
+    "wheelSize",
+    "frameSize",
+    "gender",
+    "suspension",
+    "drivetrain",
+    "gearType",
+    "brakeType",
+    "weight",
+    "maxLoad",
+    "display",
+    "smartConnectivity",
+    "waterResistance"
+  ]
+}

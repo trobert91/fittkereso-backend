@@ -17,24 +17,8 @@ export class CategoryUpdateMapperService {
       entity.enabled = dto.enabled;
     }
 
-    if (!isUndefined(dto.extractionEnabled)) {
-      entity.extractionEnabled = dto.extractionEnabled;
-    }
-
-    if (!isUndefined(dto.searchEnabled)) {
-      entity.searchEnabled = dto.searchEnabled;
-    }
-
-    if (!isUndefined(dto.searchPriority)) {
-      entity.searchPriority = dto.searchPriority;
-    }
-
     if (!isUndefined(dto.aliases)) {
       entity.aliases = dto.aliases;
-    }
-
-    if (!isUndefined(dto.autoDeduplicationEnabled)) {
-      entity.autoDeduplicationEnabled = dto.autoDeduplicationEnabled;
     }
 
     return entity;
