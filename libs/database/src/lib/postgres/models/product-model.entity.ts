@@ -17,6 +17,8 @@ import { OrderedSpec, ProductSpecs } from '../../models/product-spec';
 import { ProductModelSource } from './product-model-source.entity';
 import { ProductImage } from './product-image.entity';
 import { ScrapeTask } from './scrape-task.entity';
+import { Offer } from './offer.entity';
+import { PriceHistory } from './price-history.entity';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Expose, Transform } from 'class-transformer';
 
@@ -132,4 +134,12 @@ export class ProductModel extends BasePostgresEntity {
   })
   @JoinColumn()
   embedding?: ProductEmbedding;
+
+  @OneToMany(() => Offer, (offer) => offer.model)
+  @Expose({ groups: [SerializeGroup.details] })
+  offers?: Offer[];
+
+  @OneToMany(() => PriceHistory, (priceHistory) => priceHistory.model)
+  @Expose({ groups: [SerializeGroup.details] })
+  priceHistory?: PriceHistory[];
 }

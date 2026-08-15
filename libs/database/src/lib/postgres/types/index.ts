@@ -4,3 +4,6 @@ export * from './queues';
 export * from './product-source-sync-mode';
 export * from './product-duplicate-decision';
 export * from './spec-match-details';
+export * from './seller-type';
+export * from './offer-condition';
+export * from './offer-availability';

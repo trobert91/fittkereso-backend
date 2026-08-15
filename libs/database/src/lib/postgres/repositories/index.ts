@@ -11,3 +11,7 @@ export * from './scrape-task-repository';
 export * from './task-repository';
 export * from './product-duplicate-repository';
 export * from './translation-cache.repository';
+export * from './seller-repository';
+export * from './billing-info-repository';
+export * from './offer-repository';
+export * from './price-history-repository';

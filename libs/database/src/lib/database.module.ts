@@ -27,6 +27,14 @@ import { ProductDuplicate } from './postgres/models/product-duplicate.entity';
 import { ProductDuplicateRepository } from './postgres/repositories/product-duplicate-repository';
 import { TranslationCache } from './postgres/models/translation-cache.entity';
 import { TranslationCacheRepository } from './postgres/repositories/translation-cache.repository';
+import { Seller } from './postgres/models/seller.entity';
+import { SellerRepository } from './postgres/repositories/seller-repository';
+import { BillingInfo } from './postgres/models/billing-info.entity';
+import { BillingInfoRepository } from './postgres/repositories/billing-info-repository';
+import { Offer } from './postgres/models/offer.entity';
+import { OfferRepository } from './postgres/repositories/offer-repository';
+import { PriceHistory } from './postgres/models/price-history.entity';
+import { PriceHistoryRepository } from './postgres/repositories/price-history-repository';
 
 export const entityList = [
   Brand,
@@ -42,6 +50,10 @@ export const entityList = [
   Task,
   ProductDuplicate,
   TranslationCache,
+  Seller,
+  BillingInfo,
+  Offer,
+  PriceHistory,
 ];
 
 @Module({
@@ -59,6 +71,10 @@ export const entityList = [
     TaskRepository,
     ProductDuplicateRepository,
     TranslationCacheRepository,
+    SellerRepository,
+    BillingInfoRepository,
+    OfferRepository,
+    PriceHistoryRepository,
   ],
   exports: [
     BrandAliasRepository,
@@ -73,6 +89,10 @@ export const entityList = [
     TaskRepository,
     ProductDuplicateRepository,
     TranslationCacheRepository,
+    SellerRepository,
+    BillingInfoRepository,
+    OfferRepository,
+    PriceHistoryRepository,
   ],
 })
 export class DatabaseModule {}
