@@ -11,6 +11,31 @@ import { isEmpty } from 'lodash';
 
 const DEFAULT_REQUEST_PER_HOUR = 50;
 
+// Per-candidate reason(s) a task sitting in a claimable status/queue was not
+// actually claimed by fetchNextScrapeTask — surfaced so a caller (e.g.
+// BaseScrapeTaskManagerService, which owns logging) can explain an otherwise
+// silent "nothing to do" poll tick instead of just returning null.
+export interface ScrapeTaskClaimBlockedInfo {
+  taskId: string;
+  status: TaskStatus;
+  sourceId: string;
+  sourceName: string;
+  maxConcurrent: number;
+  requestsPerHour: number;
+  blockedReasons: string[];
+}
+
+export interface FetchNextScrapeTaskResult {
+  task: ScrapeTask | null;
+  // Only populated when task is null; libs/database can't depend on
+  // libs/logger (circular via libs/config), so diagnostics are returned as
+  // data for the caller to log rather than logged here.
+  noTaskDiagnostics?: {
+    candidateCount: number;
+    blocked: ScrapeTaskClaimBlockedInfo[];
+  };
+}
+
 @Injectable()
 export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
   constructor(
@@ -27,7 +52,7 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
   async fetchNextScrapeTask(
     queues: ScrapeQueueName[],
     staleTaskTimeoutMinutes = 240,
-  ): Promise<ScrapeTask | null> {
+  ): Promise<FetchNextScrapeTaskResult> {
     const queryRunner = this.repo.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -107,7 +132,11 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
       if (!lockedTask) {
         await queryRunner.rollbackTransaction();
         await queryRunner.release();
-        return null;
+        const noTaskDiagnostics = await this.buildNoTaskClaimedDiagnostics(
+          queues,
+          staleTaskTimeoutMinutes,
+        );
+        return { task: null, noTaskDiagnostics };
       }
 
       // Load full task with relations now that the row is locked
@@ -126,12 +155,76 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
       await queryRunner.commitTransaction();
       await queryRunner.release();
 
-      return task;
+      return { task };
     } catch (err) {
       await queryRunner.rollbackTransaction();
       await queryRunner.release();
       throw err;
     }
+  }
+
+  // Runs when the claim query returns nothing, to make otherwise-invisible
+  // gating conditions (processingEnabled, maxConcurrent, requestsPerHour
+  // throttle, scheduledAt, stale-lock timeout) diagnosable by the caller
+  // instead of the poller silently doing nothing every 5s. Returns data
+  // rather than logging directly — libs/database can't depend on
+  // libs/logger (circular via libs/config).
+  private async buildNoTaskClaimedDiagnostics(
+    queues: ScrapeQueueName[],
+    staleTaskTimeoutMinutes: number,
+  ): Promise<FetchNextScrapeTaskResult['noTaskDiagnostics']> {
+    const candidateStatuses = [TaskStatus.PENDING, TaskStatus.FAILED, TaskStatus.PROCESSING];
+    const candidates = await this.repo
+      .createQueryBuilder('task')
+      .innerJoinAndSelect(`task.${nameOf<ScrapeTask>('source')}`, 'source')
+      .where(`task.${nameOf<ScrapeTask>('status')} IN (:...statuses)`, {
+        statuses: candidateStatuses,
+      })
+      .andWhere(`task.${nameOf<ScrapeTask>('queue')} IN (:...queues)`, { queues })
+      .orderBy(`task.${nameOf<ScrapeTask>('createdAt')}`, 'ASC')
+      .limit(20)
+      .getMany();
+
+    if (candidates.length === 0) {
+      return { candidateCount: 0, blocked: [] };
+    }
+
+    const now = Date.now();
+    const blocked: ScrapeTaskClaimBlockedInfo[] = candidates.map((task) => {
+      const blockedReasons: string[] = [];
+      if (!task.source.processingEnabled) {
+        blockedReasons.push('source.processingEnabled=false');
+      }
+      if (task.scheduledAt && task.scheduledAt.getTime() > now) {
+        blockedReasons.push(`scheduledAt in future (${task.scheduledAt.toISOString()})`);
+      }
+      if (
+        task.status === TaskStatus.PROCESSING &&
+        task.lockedAt &&
+        now - task.lockedAt.getTime() < staleTaskTimeoutMinutes * 60 * 1000
+      ) {
+        blockedReasons.push(
+          `status=processing and lockedAt not yet stale (staleTimeout=${staleTaskTimeoutMinutes}min)`,
+        );
+      }
+      if (task.status === TaskStatus.FAILED && task.attempts >= 3) {
+        blockedReasons.push(`attempts (${task.attempts}) >= max (3)`);
+      }
+      return {
+        taskId: task.id,
+        status: task.status,
+        sourceId: task.source.id,
+        sourceName: task.source.name,
+        maxConcurrent: task.source.maxConcurrent,
+        requestsPerHour: task.source.requestsPerHour,
+        blockedReasons:
+          blockedReasons.length > 0
+            ? blockedReasons
+            : ['none of the simple gates — likely maxConcurrent cap or requestsPerHour throttle window'],
+      };
+    });
+
+    return { candidateCount: candidates.length, blocked };
   }
 
   async findExistingUrl(

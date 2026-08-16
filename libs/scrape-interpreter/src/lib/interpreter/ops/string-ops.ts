@@ -2,6 +2,7 @@ import {
   AppendSuffixOp,
   CoalesceOp,
   IdentityOp,
+  LiteralOp,
   SplitAndSliceOp,
   SplitAndTakeOp,
   StripPatternOp,
@@ -81,6 +82,10 @@ export const coalesce: OpHandler<CoalesceOp> = (ctx, _input, op) => {
 
 export const identity: OpHandler<IdentityOp> = (ctx, input, op) => {
   return op.value !== undefined ? ctx.vars[op.value] : input;
+};
+
+export const literal: OpHandler<LiteralOp> = (ctx, _input, op) => {
+  return interpolate(op.value, ctx);
 };
 
 function escapeRegExp(value: string): string {

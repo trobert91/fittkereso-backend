@@ -23,8 +23,12 @@ export function makeBranch(
       conditionTrue = ctx.$(op.condition.selectorExists).length > 0;
     } else if (op.condition.isEmpty !== undefined) {
       conditionTrue = isEmptyValue(ctx.vars[op.condition.isEmpty]);
+    } else if (op.condition.equals !== undefined) {
+      conditionTrue = ctx.vars[op.condition.equals.value] === op.condition.equals.to;
     } else {
-      throw new Error('branch: condition must specify selectorExists or isEmpty');
+      throw new Error(
+        'branch: condition must specify selectorExists, isEmpty, or equals',
+      );
     }
 
     const branchOps = conditionTrue ? op.ifTrue : op.ifFalse;

@@ -20,6 +20,14 @@ export class ScrapeTaskProcessorService {
   ) {}
 
   public async process(task: ScrapeTask): Promise<void> {
+    this.logger.debug(`Dispatching scrape task to ${task.queue} handler`, {
+      taskId: task.id,
+      queue: task.queue,
+      url: task.url,
+      sourceId: task.source.id,
+      sourceName: task.source.name,
+    });
+
     switch (task.queue) {
       case ScrapeQueueName.ScrapeProductList:
         await this.listScraper.scrapeListPage(task);
@@ -28,7 +36,7 @@ export class ScrapeTaskProcessorService {
         await this.detailsScraper.scrapeProductDetailsPage(task);
         break;
       default:
-        this.logger.error(`Unknown queue name: ${task.queue}`, {
+        this.logger.error(`Unknown queue name: ${task.queue}`, undefined, {
           taskId: task.id,
           url: task.url,
         });

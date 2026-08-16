@@ -1,12 +1,16 @@
 /**
- * One-time idempotent seed for the two ProductSource.config JSONB rows
- * (Arukereso, DisplaySpecs), reading the hand-authored config JSON from
- * libs/scrape-interpreter's fixtures directory (same files validated by
- * that library's test suite).
+ * One-time idempotent seed for the ProductSource.config JSONB rows
+ * (Arukereso, DisplaySpecs, ebikeshop), reading the hand-authored config
+ * JSON from libs/scrape-interpreter's fixtures directory (same files
+ * validated by that library's test suite).
  *
- * No production ProductSource rows exist yet, so this always creates rather
- * than needing to preserve pre-existing scheduling state — but it upserts by
- * name regardless, so it's safe to re-run.
+ * Upserts by name, so it's safe to re-run. Sources with a `seller` spec
+ * (single-storefront sources like ebikeshop, as opposed to aggregators like
+ * Arukereso/DisplaySpecs which have none) also resolve-or-create the
+ * matching Seller row by exact name and link it via ProductSource.seller —
+ * the name here must match byte-for-byte what the config's
+ * detailPage.offers.sellerName pipeline emits, since SellerResolutionService
+ * (used at scrape time) does exact-name lookup, not fuzzy matching.
  *
  * Usage:
  *   npx ts-node -r tsconfig-paths/register apps/product-collector/scripts/seed-product-source-configs.ts
@@ -17,6 +21,9 @@ import {
   ProductSource,
   ProductSourceConfig,
   ProductSourceRepository,
+  Seller,
+  SellerRepository,
+  SellerType,
 } from '@fittkereso-backend/database';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -27,6 +34,12 @@ const FIXTURES_DIR = path.resolve(
   '../../../libs/scrape-interpreter/src/lib/interpreter/__fixtures__',
 );
 
+interface SeedSellerSpec {
+  name: string;
+  slug: string;
+  domains: string[];
+}
+
 interface SeedSourceSpec {
   name: string;
   configFile: string;
@@ -35,6 +48,12 @@ interface SeedSourceSpec {
   priority: number;
   fullSyncInterval: string;
   incrementalSyncInterval: string;
+  seller?: SeedSellerSpec;
+  // Only applied when creating the row for the first time (existing rows
+  // keep whatever scheduling state an operator already set). Defaults to
+  // true when omitted — set false for a new source pending a manual dry-run
+  // verification pass before it's allowed to run on the cron schedule.
+  schedulingEnabled?: boolean;
 }
 
 const SOURCES: SeedSourceSpec[] = [
@@ -56,11 +75,47 @@ const SOURCES: SeedSourceSpec[] = [
     fullSyncInterval: '7 days',
     incrementalSyncInterval: '1 day',
   },
+  {
+    name: 'ebikeshop',
+    configFile: 'ebikeshop.config.json',
+    maxConcurrent: 2,
+    requestsPerHour: 60,
+    priority: 10,
+    fullSyncInterval: '7 days',
+    incrementalSyncInterval: '1 day',
+    seller: {
+      name: 'ebikeshop.hu',
+      slug: 'ebikeshop',
+      domains: ['ebikeshop.hu'],
+    },
+    // First-time source: keep scheduling off until a manual dry run (one
+    // list-page task run by hand, resulting Offer/ProductModel rows
+    // inspected) confirms the config behaves as expected end to end.
+    schedulingEnabled: false,
+  },
 ];
+
+async function resolveOrCreateSeller(
+  sellerRepo: SellerRepository,
+  spec: SeedSellerSpec,
+): Promise<Seller> {
+  const existing = await sellerRepo.findOne({ where: { name: spec.name } });
+  if (existing) return existing;
+
+  const seller = new Seller();
+  seller.name = spec.name;
+  seller.slug = spec.slug;
+  seller.domains = spec.domains;
+  seller.type = SellerType.business;
+  seller.verified = true;
+  seller.active = true;
+  return sellerRepo.save(seller);
+}
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const sourceRepo = app.get(ProductSourceRepository);
+  const sellerRepo = app.get(SellerRepository);
 
   try {
     for (const spec of SOURCES) {
@@ -71,6 +126,7 @@ async function main(): Promise<void> {
 
       const existing = await sourceRepo.findOne({
         where: { name: spec.name },
+        relations: ['seller'],
       });
 
       const source = existing ?? new ProductSource();
@@ -79,11 +135,15 @@ async function main(): Promise<void> {
         source.maxConcurrent = spec.maxConcurrent;
         source.requestsPerHour = spec.requestsPerHour;
         source.priority = spec.priority;
-        source.schedulingEnabled = true;
+        source.schedulingEnabled = spec.schedulingEnabled ?? true;
         source.processingEnabled = true;
         source.fullSyncInterval = spec.fullSyncInterval as ms.StringValue;
         source.incrementalSyncInterval =
           spec.incrementalSyncInterval as ms.StringValue;
+      }
+
+      if (spec.seller) {
+        source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);
       }
 
       source.config = config;

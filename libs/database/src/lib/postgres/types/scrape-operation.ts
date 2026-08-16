@@ -61,6 +61,50 @@ export interface SelectSiblingContainerOp extends OpBase {
   first?: boolean;
 }
 
+// ─── JSON-in-HTML extraction ─────────────────────────────────────────────
+//
+// For sources whose page state is embedded as a JSON blob (e.g. a hydration
+// payload like Inertia's `data-page` attribute or a Next.js/Nuxt-style
+// `__NEXT_DATA__` script) rather than rendered as scrapeable HTML.
+
+export interface ParseJsonAttrOp extends OpBase {
+  op: 'parseJsonAttr';
+  selector: string; // e.g. "#app"
+  attr: string; // e.g. "data-page"
+  path?: string; // dot-path into the parsed JSON, e.g. "props.product.properties"
+  first?: boolean;
+}
+
+export interface MapJsonArrayFieldSpec {
+  path: string; // dot-path into each array item
+  template?: string; // e.g. "{{value}} {{quantityUnit}}" — {{field}} resolves against the same item
+  asArray?: boolean; // wrap the resolved value in a single-element array
+}
+
+export interface MapJsonArrayOp extends OpBase {
+  op: 'mapJsonArray';
+  fields: Record<string, MapJsonArrayFieldSpec>;
+  // When set, use this single field's resolved value directly as each output
+  // array element (a flat string[]/number[]) instead of a {key: value}[]
+  // object array. `fields` must still declare that one key.
+  flattenField?: string;
+}
+
+export interface FilterJsonArrayOp extends OpBase {
+  op: 'filterJsonArray';
+  path: string; // dot-path into each item to test
+  equals: string | number | boolean; // keep items where the value strictly equals this
+  negate?: boolean; // keep items where it does NOT equal (e.g. exclude used items)
+}
+
+// Concatenates a nested array (each outer item holding an inner array at
+// `path`) into one flat array — e.g. several image gallery groups, each with
+// its own `images[]`, collapsed into a single list of image records.
+export interface FlattenJsonArrayOp extends OpBase {
+  op: 'flattenJsonArray';
+  path: string; // dot-path to the inner array within each outer item
+}
+
 // ─── String manipulation ─────────────────────────────────────────────────
 
 export interface TrimOp extends OpBase {
@@ -115,6 +159,11 @@ export interface CoalesceOp extends OpBase {
 export interface IdentityOp extends OpBase {
   op: 'identity';
   value?: string;
+}
+
+export interface LiteralOp extends OpBase {
+  op: 'literal';
+  value: string; // fixed constant, e.g. a hardcoded sellerName/currency
 }
 
 // ─── Regex ───────────────────────────────────────────────────────────────
@@ -328,11 +377,23 @@ export interface MapSpecValueOp extends OpBase {
   cast?: 'number';
 }
 
+// Plain lookup-table mapping of the current pipeline value (e.g. a raw stock
+// status string) to a fixed output, with a default for unmatched values —
+// distinct from mapSpecValue, which reads from `rawSpecs` rather than the
+// pipeline's current value.
+export interface MapValueOp extends OpBase {
+  op: 'mapValue';
+  value?: string; // vars key; defaults to current pipeline value
+  cases: Record<string, string>;
+  default?: string;
+}
+
 // ─── Control flow ─────────────────────────────────────────────────────────
 
 export interface BranchCondition {
   selectorExists?: string;
   isEmpty?: string; // vars key
+  equals?: { value: string; to: string | number | boolean }; // vars key compared to a fixed constant
 }
 
 export interface BranchOp extends OpBase {
@@ -349,6 +410,10 @@ export type ScrapeOperation =
   | SelectAttrOp
   | SelectNestedTextOp
   | SelectSiblingContainerOp
+  | ParseJsonAttrOp
+  | MapJsonArrayOp
+  | FilterJsonArrayOp
+  | FlattenJsonArrayOp
   | TrimOp
   | TrimEndOp
   | AppendSuffixOp
@@ -358,6 +423,7 @@ export type ScrapeOperation =
   | SplitAndSliceOp
   | CoalesceOp
   | IdentityOp
+  | LiteralOp
   | RegexCaptureOp
   | FindScriptContainingOp
   | AssertContainsOp
@@ -384,6 +450,7 @@ export type ScrapeOperation =
   | ExtractAttrListOp
   | ExtractImageWithFallbackOp
   | MapSpecValueOp
+  | MapValueOp
   | BranchOp;
 
 // ─── Category slug resolution rules ────────────────────────────────────────

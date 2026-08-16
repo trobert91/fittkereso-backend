@@ -1,4 +1,8 @@
-import { ScrapeTask, SourceSpecConfig } from '@fittkereso-backend/database';
+import {
+  OfferAvailability,
+  ScrapeTask,
+  SourceSpecConfig,
+} from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
 import { Injectable } from '@nestjs/common';
@@ -7,11 +11,13 @@ import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
+  ScrapedOffer,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
 } from '@fittkereso-backend/product';
+import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
 import {
   RuntimeDataProviderService,
@@ -40,6 +46,12 @@ export class ProductDetailsPageScraperService {
     const sourceName = task.source.name;
     const startTime = Date.now();
 
+    this.logger.debug('Scraping product detail page', {
+      taskId: task.id,
+      url: task.url,
+      sourceName,
+    });
+
     try {
       const html = await this.scraperService.getHtml(task.url);
       const $ = cheerio.load(html);
@@ -52,6 +64,11 @@ export class ProductDetailsPageScraperService {
       );
 
       if (!scrapedProduct) {
+        this.logger.debug('Product extraction skipped', {
+          taskId: task.id,
+          url: task.url,
+          sourceName,
+        });
         this.scrapingMetrics.recordExtractionOutcome(sourceName, 'skipped');
         return;
       }
@@ -62,14 +79,33 @@ export class ProductDetailsPageScraperService {
       );
 
       if (result) {
+        this.logger.debug('Product scrape succeeded', {
+          taskId: task.id,
+          url: task.url,
+          sourceName,
+          brand: scrapedProduct.brand,
+          model: scrapedProduct.model,
+          categorySlug: scrapedProduct.category.slug,
+          offersFound: scrapedProduct.offers?.length ?? 0,
+        });
         this.scrapingMetrics.recordExtractionOutcome(sourceName, 'success');
       } else {
+        this.logger.warn('Product scrape skipped — brand resolution failed', {
+          taskId: task.id,
+          url: task.url,
+          sourceName,
+        });
         this.scrapingMetrics.recordExtractionOutcome(
           sourceName,
           'skipped_brand_failed',
         );
       }
     } catch (error) {
+      this.logger.error('Product detail scrape failed', error, {
+        taskId: task.id,
+        url: task.url,
+        sourceName,
+      });
       this.scrapingMetrics.recordExtractionOutcome(sourceName, 'error');
       throw error;
     } finally {
@@ -180,7 +216,35 @@ export class ProductDetailsPageScraperService {
       aliases: detail.aliases,
       releaseYear: detail.releaseYear,
       imageUrls: detail.imageUrls,
+      offers: this.toScrapedOffers(detail.rawOffers),
     };
+  }
+
+  // RawOfferRecord's fields are all optional (interpreter output before
+  // validation); ScrapedOffer requires sellerName/price, so entries missing
+  // either are dropped here rather than persisted as broken Offer rows.
+  private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
+    return rawOffers
+      .filter(
+        (offer): offer is RawOfferRecord & { sellerName: string; price: number } =>
+          !!offer.sellerName && typeof offer.price === 'number' && Number.isFinite(offer.price),
+      )
+      .map((offer) => ({
+        sellerName: offer.sellerName,
+        price: offer.price,
+        currency: offer.currency,
+        availability: this.parseAvailability(offer.availability),
+        url: offer.url,
+        sourceListingId: offer.sourceListingId,
+      }));
+  }
+
+  private parseAvailability(
+    value: string | undefined,
+  ): OfferAvailability | undefined {
+    return value && (Object.values(OfferAvailability) as string[]).includes(value)
+      ? (value as OfferAvailability)
+      : undefined;
   }
 
   private async buildTranslator(

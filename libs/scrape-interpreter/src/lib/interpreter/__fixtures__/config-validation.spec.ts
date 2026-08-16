@@ -5,6 +5,7 @@ import { ProductValueMapperService } from '../services/product-value-mapper.serv
 import { registerOps } from '../ops/register-ops';
 import arukeresoConfig from './arukereso.config.json';
 import displayspecsConfig from './displayspecs.config.json';
+import ebikeshopConfig from './ebikeshop.config.json';
 
 // Structural/registry validation of the hand-authored production configs —
 // not a live-site test, but catches typos in op names, missing required
@@ -62,6 +63,10 @@ describe('hand-authored source configs', () => {
     );
   });
 
+  it('validates the ebikeshop config against the op registry', () => {
+    assertConfigValid(ebikeshopConfig as unknown as ProductSourceConfig, 'ebikeshop');
+  });
+
   it('Arukereso config resolves all 15 category slugLookup rules to distinct slugs (headphones covered twice by design)', () => {
     const config = arukeresoConfig as unknown as ProductSourceConfig;
     const slugs = config.detailPage.category.slugLookup.map((r) => r.slug);
@@ -81,6 +86,13 @@ describe('hand-authored source configs', () => {
       'internal-ssds',
       'tvs',
       'wifi-routers',
+    ]);
+  });
+
+  it('ebikeshop config resolves every product to the single ebikes category', () => {
+    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    expect(config.detailPage.category.slugLookup).toEqual([
+      { when: { always: true }, slug: 'ebikes' },
     ]);
   });
 

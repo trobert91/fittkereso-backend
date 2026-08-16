@@ -1,4 +1,4 @@
-import { MapSpecValueOp } from '@fittkereso-backend/database';
+import { MapSpecValueOp, MapValueOp } from '@fittkereso-backend/database';
 import { ScrapedProductSpec } from '@fittkereso-backend/product';
 import { ProductValueMapperService } from '../services/product-value-mapper.service';
 import { OpHandler } from '../services/scrape-op-registry.service';
@@ -18,3 +18,9 @@ export function makeMapSpecValue(
     return mapper.mapSingleValue({ specs: rawSpecs, label: op.label });
   };
 }
+
+export const mapValue: OpHandler<MapValueOp> = (ctx, input, op) => {
+  const value = op.value !== undefined ? ctx.vars[op.value] : input;
+  if (typeof value !== 'string') return op.default;
+  return op.cases[value] ?? op.default;
+};

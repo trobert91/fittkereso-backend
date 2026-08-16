@@ -55,6 +55,23 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       api_url: Joi.string().required(),
       api_key: Joi.string().required(),
     }).required(),
+
+    dataforseo: Joi.object({
+      api_url: Joi.string().required(),
+      email: Joi.string().required(),
+      password: Joi.string().required(),
+    }).required(),
+
+    bunny: Joi.object({
+      url: Joi.string().required(),
+      api_key: Joi.string().required(),
+      cdn_url: Joi.string().required(),
+    }).required(),
+
+    exa: Joi.object({
+      api_key: Joi.string().required(),
+      api_url: Joi.string().optional(),
+    }).required(),
   }).required();
 
   const result = configValidationSchema.validate(yamlConfig, {

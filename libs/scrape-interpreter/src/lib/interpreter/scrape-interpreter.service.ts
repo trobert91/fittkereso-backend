@@ -198,6 +198,14 @@ export class ScrapeInterpreterService {
     return null;
   }
 
+  // `listItems` gates whether this source populates offers at all (empty ->
+  // opted out, matching every source's config today). There's no per-item
+  // iteration op in the vocabulary yet, so this only supports a source
+  // exposing a single implicit offer per detail page (e.g. a single-seller
+  // storefront selling its own listing) — sellerName/price/etc. run once as
+  // page-global pipelines rather than once per `listItems` entry. A true
+  // multi-offer aggregator (several sellers' prices on one page) would need
+  // a per-item iteration primitive added first.
   private async runDetailPageOffers(
     ctx: ScrapeExecutionContext,
     config: ProductSourceConfig,
@@ -206,11 +214,44 @@ export class ScrapeInterpreterService {
     if (!offersConfig || offersConfig.listItems.length === 0) return [];
 
     const listItems = await this.runner.run(offersConfig.listItems, ctx);
-    void listItems;
-    // No source populates the offers pipelines yet — real per-item extraction
-    // (iterating listItems and running sellerName/price/etc. against each)
-    // is future work once a source's config actually defines them.
-    return [];
+    if (!listItems || (Array.isArray(listItems) && listItems.length === 0)) {
+      return [];
+    }
+
+    const sellerName = (await this.runner.run(
+      offersConfig.sellerName,
+      ctx,
+    )) as string | undefined;
+
+    const rawPrice = await this.runner.run(offersConfig.price, ctx);
+    const price =
+      typeof rawPrice === 'number'
+        ? rawPrice
+        : typeof rawPrice === 'string'
+          ? Number(rawPrice)
+          : undefined;
+    if (!sellerName || !Number.isFinite(price)) return [];
+
+    const currency = offersConfig.currency
+      ? ((await this.runner.run(offersConfig.currency, ctx)) as
+          | string
+          | undefined)
+      : undefined;
+    const availability = offersConfig.availability
+      ? ((await this.runner.run(offersConfig.availability, ctx)) as
+          | string
+          | undefined)
+      : undefined;
+    const url = offersConfig.url
+      ? ((await this.runner.run(offersConfig.url, ctx)) as string | undefined)
+      : undefined;
+    const sourceListingId = offersConfig.sourceListingId
+      ? ((await this.runner.run(offersConfig.sourceListingId, ctx)) as
+          | string
+          | undefined)
+      : undefined;
+
+    return [{ sellerName, price, currency, availability, url, sourceListingId }];
   }
 
   private resolveCategorySlug(

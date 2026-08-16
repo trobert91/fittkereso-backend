@@ -313,6 +313,99 @@ describe('ScrapeInterpreterService', () => {
     });
   });
 
+  describe('runDetailPage offers', () => {
+    const baseDetailPage = () => ({
+      rawSpecs: [],
+      category: {
+        breadcrumbOrSource: [],
+        slugLookup: [{ when: { always: true } as const, slug: 'ebikes' }],
+      },
+      brand: [{ op: 'identity' as const, value: undefined }],
+      model: [{ op: 'identity' as const, value: undefined }],
+      images: [],
+      specMapping: {},
+    });
+
+    it('extracts a single self-offer when listItems and price both resolve', async () => {
+      const $ = cheerio.load(`
+        <div id="app" data-page='{"props":{"product":{"prices":{"price":3879000},"productCode":"1260040108"}}}'></div>
+      `);
+
+      const config: ProductSourceConfig = {
+        baseUrl: 'https://ebikeshop.hu',
+        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        detailPage: {
+          ...baseDetailPage(),
+          offers: {
+            listItems: [{ op: 'literal', value: 'present' } as never],
+            sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
+            price: [
+              {
+                op: 'parseJsonAttr',
+                selector: '#app',
+                attr: 'data-page',
+                path: 'props.product.prices.price',
+              } as never,
+            ],
+            currency: [{ op: 'literal', value: 'HUF' } as never],
+            sourceListingId: [
+              {
+                op: 'parseJsonAttr',
+                selector: '#app',
+                attr: 'data-page',
+                path: 'props.product.productCode',
+              } as never,
+            ],
+          },
+        },
+      };
+
+      const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+      expect(result.rawOffers).toEqual([
+        {
+          sellerName: 'ebikeshop.hu',
+          price: 3879000,
+          currency: 'HUF',
+          availability: undefined,
+          url: undefined,
+          sourceListingId: '1260040108',
+        },
+      ]);
+    });
+
+    it('returns no offers when offers config is absent', async () => {
+      const $ = cheerio.load('<div></div>');
+      const config: ProductSourceConfig = {
+        baseUrl: 'https://ebikeshop.hu',
+        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        detailPage: baseDetailPage(),
+      };
+
+      const result = await interpreter.runDetailPage(makeTask(), $, config);
+      expect(result.rawOffers).toEqual([]);
+    });
+
+    it('returns no offers when price fails to resolve to a number', async () => {
+      const $ = cheerio.load('<div></div>');
+      const config: ProductSourceConfig = {
+        baseUrl: 'https://ebikeshop.hu',
+        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        detailPage: {
+          ...baseDetailPage(),
+          offers: {
+            listItems: [{ op: 'literal', value: 'present' } as never],
+            sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
+            price: [{ op: 'identity', value: undefined } as never],
+          },
+        },
+      };
+
+      const result = await interpreter.runDetailPage(makeTask(), $, config);
+      expect(result.rawOffers).toEqual([]);
+    });
+  });
+
   describe('classifyIncrementalUrl', () => {
     it('routes a matching URL to ScrapeProductDetails', () => {
       const config: ProductSourceConfig = {

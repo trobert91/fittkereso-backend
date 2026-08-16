@@ -380,7 +380,7 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
-  it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is absent (both current sources today)', async () => {
+  it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is absent', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct(); // no `offers` field
 

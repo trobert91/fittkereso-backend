@@ -17,7 +17,11 @@ import { registerOps } from './ops/register-ops';
     RuntimeDataProviderService,
     ProductValueMapperService,
   ],
-  exports: [ScrapeInterpreterService, ProductValueMapperService],
+  exports: [
+    ScrapeInterpreterService,
+    ProductValueMapperService,
+    RuntimeDataProviderService,
+  ],
 })
 export class ScrapeInterpreterModule implements OnModuleInit {
   constructor(

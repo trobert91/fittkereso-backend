@@ -25,6 +25,12 @@ export class ProductListPageScraperService {
   ) {}
 
   public async scrapeListPage(task: ScrapeTask): Promise<void> {
+    this.logger.debug('Scraping list page', {
+      taskId: task.id,
+      url: task.url,
+      sourceName: task.source.name,
+    });
+
     const html = await this.scraperService.getHtml(task.url);
     const $ = cheerio.load(html);
 
@@ -32,6 +38,15 @@ export class ProductListPageScraperService {
       await this.interpreter.runListPage(task, $, task.source.config);
 
     const sourceName = task.source.name;
+
+    this.logger.debug('List page interpreter result', {
+      taskId: task.id,
+      url: task.url,
+      sourceName,
+      categoryName,
+      categoryLinksFound: categoryLinks.length,
+      productLinksFound: productLinks.length,
+    });
 
     this.productCollectionMetrics.recordProductsFound(
       sourceName,
@@ -54,6 +69,16 @@ export class ProductListPageScraperService {
       ...categoryTasks,
       ...productTasks,
     ]);
+
+    this.logger.debug('List page scrape complete', {
+      taskId: task.id,
+      url: task.url,
+      sourceName,
+      categoryTasksCreated: categoryTasks.length,
+      productTasksCreated: productTasks.length,
+      productLinksSkippedOrDeduped:
+        productLinks.length - productTasks.length,
+    });
   }
 
   private async createCategoryTasks(
@@ -119,12 +144,11 @@ export class ProductListPageScraperService {
 
       return task;
     } catch (error) {
-      this.logger.error('Error checking dedup for product link', {
+      this.logger.error('Error checking dedup for product link', error, {
         taskId: parentTask.id,
         parentUrl: parentTask.url,
         linkUrl: link.url,
         linkTitle: link.title,
-        error,
       });
       return;
     }

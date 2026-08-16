@@ -13,6 +13,7 @@ import {
   appendSuffix,
   coalesce,
   identity,
+  literal,
   splitAndSlice,
   splitAndTake,
   stripPattern,
@@ -21,6 +22,12 @@ import {
   trimEnd,
 } from './string-ops';
 import { findScriptContaining, regexCapture } from './regex-ops';
+import {
+  filterJsonArray,
+  flattenJsonArray,
+  mapJsonArray,
+  parseJsonAttr,
+} from './json-ops';
 import {
   assertContains,
   dedupe,
@@ -49,7 +56,7 @@ import {
   makeAppendSyntheticSpec,
 } from './spec-table-ops';
 import { extractAttrList, extractImageWithFallback } from './image-ops';
-import { makeMapSpecValue } from './value-map-ops';
+import { makeMapSpecValue, mapValue } from './value-map-ops';
 import { makeBranch } from './control-ops';
 
 // Registers every op handler in the vocabulary. Ops that need to recursively
@@ -68,6 +75,11 @@ export function registerOps(
   registry.register('selectNestedText', selectNestedText);
   registry.register('selectSiblingContainer', selectSiblingContainer);
 
+  registry.register('parseJsonAttr', parseJsonAttr);
+  registry.register('mapJsonArray', mapJsonArray);
+  registry.register('filterJsonArray', filterJsonArray);
+  registry.register('flattenJsonArray', flattenJsonArray);
+
   registry.register('trim', trim);
   registry.register('trimEnd', trimEnd);
   registry.register('appendSuffix', appendSuffix);
@@ -77,6 +89,7 @@ export function registerOps(
   registry.register('splitAndSlice', splitAndSlice);
   registry.register('coalesce', coalesce);
   registry.register('identity', identity);
+  registry.register('literal', literal);
 
   registry.register('regexCapture', regexCapture);
   registry.register('findScriptContaining', findScriptContaining);
@@ -112,6 +125,7 @@ export function registerOps(
   registry.register('extractImageWithFallback', extractImageWithFallback);
 
   registry.register('mapSpecValue', makeMapSpecValue(valueMapper));
+  registry.register('mapValue', mapValue);
 
   registry.register('branch', makeBranch(runner));
 }

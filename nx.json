@@ -59,6 +59,9 @@
       "cache": true,
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
+    },
+    "build": {
+      "inputs": ["production", "^production", "{projectRoot}/src/config/config.yaml"]
     }
   }
 }

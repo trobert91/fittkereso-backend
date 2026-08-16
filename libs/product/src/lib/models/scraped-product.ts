@@ -17,8 +17,7 @@ export interface ScrapedProduct {
 }
 
 // Seller-listing data (price/availability/etc.) captured alongside a scraped
-// product. Plumbing only for now — no extractor currently populates this;
-// actual price-table scraping is future work.
+// product, populated when a source's config defines detailPage.offers.
 export interface ScrapedOffer {
   sellerName: string;
   price: number;
