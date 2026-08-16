@@ -99,6 +99,13 @@
       "type": "string",
       "title": "Gear type"
     },
+    "gearCount": {
+      "meta": {
+        "examples": ["1", "9", "11", "12"]
+      },
+      "type": "number",
+      "title": "Number of gears"
+    },
     "batteryCapacity": {
       "meta": {
         "order": 2,

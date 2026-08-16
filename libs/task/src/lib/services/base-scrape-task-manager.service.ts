@@ -32,11 +32,6 @@ export abstract class BaseScrapeTaskManagerService {
       this.dynamicConfigService.scheduling?.staleScrapeTaskTimeoutMinutes ??
       SCHEDULING_DEFAULTS.staleScrapeTaskTimeoutMinutes;
 
-    this.logger.verbose('Scrape task poll tick', {
-      queues: this.queues,
-      staleTimeoutMinutes,
-    });
-
     const { task, noTaskDiagnostics } = await this.taskRepo.fetchNextScrapeTask(
       this.queues,
       staleTimeoutMinutes,
@@ -47,10 +42,6 @@ export abstract class BaseScrapeTaskManagerService {
           `Scrape task poll tick found ${noTaskDiagnostics.candidateCount} candidate row(s) but claimed none — see blockedReasons per task`,
           { queues: this.queues, ...noTaskDiagnostics },
         );
-      } else {
-        this.logger.verbose('Scrape task poll tick found nothing to claim', {
-          queues: this.queues,
-        });
       }
       return;
     }

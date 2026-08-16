@@ -121,6 +121,12 @@ export interface AppendSuffixOp extends OpBase {
   value: string;
 }
 
+export interface PrependPrefixOp extends OpBase {
+  op: 'prependPrefix';
+  value?: string; // vars key; defaults to current pipeline value
+  prefix: string; // supports {{var}} interpolation
+}
+
 export interface StripPatternOp extends OpBase {
   op: 'stripPattern';
   value?: string; // vars key; defaults to current pipeline value
@@ -417,6 +423,7 @@ export type ScrapeOperation =
   | TrimOp
   | TrimEndOp
   | AppendSuffixOp
+  | PrependPrefixOp
   | StripPatternOp
   | StripPrefixOp
   | SplitAndTakeOp

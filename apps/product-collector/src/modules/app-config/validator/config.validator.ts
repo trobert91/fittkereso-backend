@@ -90,6 +90,7 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       username: Joi.string().optional(),
       password: Joi.string().optional(),
       token: Joi.string().optional(),
+      level: Joi.string().optional(),
     }).required(),
 
     zyte: Joi.object({

@@ -14,6 +14,7 @@ import {
   coalesce,
   identity,
   literal,
+  prependPrefix,
   splitAndSlice,
   splitAndTake,
   stripPattern,
@@ -83,6 +84,7 @@ export function registerOps(
   registry.register('trim', trim);
   registry.register('trimEnd', trimEnd);
   registry.register('appendSuffix', appendSuffix);
+  registry.register('prependPrefix', prependPrefix);
   registry.register('stripPattern', stripPattern);
   registry.register('stripPrefix', stripPrefix);
   registry.register('splitAndTake', splitAndTake);

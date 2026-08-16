@@ -161,6 +161,12 @@
       }
     ],
 
+    "releaseYear": [
+      { "op": "mapSpecValue", "label": "Modellév", "single": true },
+      { "op": "prependPrefix", "prefix": "20" },
+      { "op": "regexCapture", "pattern": "\\d+", "group": 0, "cast": "number" }
+    ],
+
     "images": [
       {
         "op": "parseJsonAttr",
@@ -204,6 +210,7 @@
           { "key": "suspension", "labels": ["Rugózás"] },
           { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
           { "key": "gearType", "labels": ["Váltó típusa"] },
+          { "key": "gearCount", "labels": ["Váltó sebességfokozatainak száma"], "extract": "number" },
           { "key": "batteryCapacity", "labels": ["Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
           { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
           { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
@@ -294,7 +301,7 @@
     },
 
     "translation": {
-      "enabled": true,
+      "enabled": false,
       "sourceLanguage": "hu",
       "targetLanguage": "en",
       "contextTemplate": "Technical specification values from an ebikeshop.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."

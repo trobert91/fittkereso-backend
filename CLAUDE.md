@@ -11,3 +11,4 @@
 
 - Do **not** write TypeORM migration files for now. The dev config (`apps/api/src/config/config.yaml`) has `sync: true`, so schema changes apply automatically via TypeORM's `synchronize`.
 - Once the current phase of development settles, we'll generate one consolidated migration capturing the schema at that point — don't generate incremental ones per change in the meantime.
+- Whenever a query needs a field or relation name as a string (`relations: [...]`, `order: {...}`, `select`, etc.), use `nameOf<Entity>('field')` from `@fittkereso-backend/utils` instead of a hardcoded string literal, so renames stay type-checked. For nested/dotted paths, build them as `` `relation.${nameOf<RelationEntity>('field')}` ``.

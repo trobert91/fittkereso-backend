@@ -132,6 +132,10 @@
       "filterType": "multiselect"
     },
     {
+      "key": "gearCount",
+      "filterType": "range"
+    },
+    {
       "key": "weight",
       "filterType": "range"
     },

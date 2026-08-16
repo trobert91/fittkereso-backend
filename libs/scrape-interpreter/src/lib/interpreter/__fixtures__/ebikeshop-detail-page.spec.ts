@@ -65,6 +65,16 @@ const EBIKESHOP_DETAIL_PAGE_DATA = {
           categoryTitle: 'Vázméret',
           quantityUnit: 'cm',
         },
+        {
+          value: '26',
+          categoryTitle: 'Modellév',
+          quantityUnit: '',
+        },
+        {
+          value: '11',
+          categoryTitle: 'Váltó sebességfokozatainak száma',
+          quantityUnit: '',
+        },
       ],
     },
   },
@@ -114,7 +124,11 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
       { name: 'Állapot', values: ['Új'] },
       { name: 'Nyomaték', values: ['60 Nm'] },
       { name: 'Vázméret', values: ['48 cm'] },
+      { name: 'Modellév', values: ['26'] },
+      { name: 'Váltó sebességfokozatainak száma', values: ['11'] },
     ]);
+
+    expect(result.releaseYear).toBe(2026);
 
     expect(result.imageUrls).toEqual(['https://ebikeshop.hu/img/a.webp']);
 

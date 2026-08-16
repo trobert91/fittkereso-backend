@@ -3,6 +3,7 @@ import {
   CoalesceOp,
   IdentityOp,
   LiteralOp,
+  PrependPrefixOp,
   SplitAndSliceOp,
   SplitAndTakeOp,
   StripPatternOp,
@@ -36,6 +37,13 @@ export const trimEnd: OpHandler<TrimEndOp> = (_ctx, input, op) => {
 export const appendSuffix: OpHandler<AppendSuffixOp> = (_ctx, input, op) => {
   const value = typeof input === 'string' ? input : '';
   return value + op.value;
+};
+
+export const prependPrefix: OpHandler<PrependPrefixOp> = (ctx, input, op) => {
+  const value = resolveValue(ctx, input, op.value);
+  if (value === undefined) return undefined;
+  const prefix = interpolate(op.prefix, ctx);
+  return prefix + value;
 };
 
 export const stripPattern: OpHandler<StripPatternOp> = (ctx, input, op) => {
