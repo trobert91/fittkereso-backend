@@ -16,12 +16,12 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { hashRawSpecs } from '@fittkereso-backend/utils';
 import {
+  ProductSourcePostProcessService,
   ScrapedOffer,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
-  SpecUnificationService,
 } from '@fittkereso-backend/product';
 import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
@@ -44,7 +44,7 @@ export class ProductDetailsPageScraperService {
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
-    private readonly specUnification: SpecUnificationService,
+    private readonly postProcess: ProductSourcePostProcessService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
@@ -184,6 +184,11 @@ export class ProductDetailsPageScraperService {
       throw new Error('Category has no associated JSON schema');
     }
 
+    // `detail.model` is only required to be present, not already clean — some
+    // sources (e.g. speedbike.hu) only expose the full marketing title as
+    // their "model" field; maybePostProcess below cleans it via the LLM when
+    // configured. Brand stays a hard requirement: every source's brand field
+    // observed so far is a clean, reliable value, unlike model/title.
     if (!detail.brand || !detail.model) {
       this.logger.warn(
         'Skipping product — missing required brand or model',
@@ -196,16 +201,19 @@ export class ProductDetailsPageScraperService {
       return null;
     }
 
-    const displayName = `${detail.brand} ${detail.model}`.trim();
     const rawSpecsHash = hashRawSpecs(detail.rawSpecs);
 
-    // Skip re-extraction (deterministic mapping + optional LLM unification)
+    // Skip re-extraction (deterministic mapping + optional LLM post-process)
     // when this exact listing was already scraped with an identical raw spec
     // table. `specs`/`rawSpecs` stay undefined on the returned ScrapedProduct
     // in that case — ProductSpecUpdaterService leaves the existing
     // ProductSourceRecord row's specs/rawSpecs untouched when both are absent.
+    // The model name is also reused from the already-persisted ProductModel
+    // rather than re-derived from the raw title, so a skipped re-scrape never
+    // needs an LLM call either.
     const existingSource = await this.findExistingSource(task, detail.externalId);
-    if (existingSource?.rawSpecsHash === rawSpecsHash) {
+    if (!task.force && existingSource?.rawSpecsHash === rawSpecsHash) {
+      const model = existingSource.model?.model ?? detail.model;
       this.logger.debug('Raw specs unchanged since last scrape, skipping extraction', {
         taskId: task.id,
         url: task.url,
@@ -217,8 +225,8 @@ export class ProductDetailsPageScraperService {
       );
       return {
         brand: detail.brand,
-        model: detail.model,
-        displayName,
+        model,
+        displayName: `${detail.brand} ${model}`.trim(),
         category,
         aliases: detail.aliases,
         releaseYear: detail.releaseYear,
@@ -245,17 +253,20 @@ export class ProductDetailsPageScraperService {
         })
       : {};
 
-    const specs = await this.maybeUnifySpecs({
+    const { specs, model } = await this.maybePostProcess({
       task,
       deterministicSpecs,
+      rawSpecs: detail.rawSpecs,
+      rawModel: detail.model,
+      brand: detail.brand,
       jsonSchema,
       categorySlug: category.slug,
     });
 
     return {
       brand: detail.brand,
-      model: detail.model,
-      displayName,
+      model,
+      displayName: `${detail.brand} ${model}`.trim(),
       category,
       specs,
       rawSpecs: detail.rawSpecs,
@@ -288,33 +299,42 @@ export class ProductDetailsPageScraperService {
     return this.sourceRecordRepo.findByUrl(task.url);
   }
 
-  private async maybeUnifySpecs(params: {
+  private async maybePostProcess(params: {
     task: ScrapeTask;
     deterministicSpecs: ProductSpecs;
+    rawSpecs: ScrapedProductSpec[];
+    rawModel: string;
+    brand: string;
     jsonSchema: SpecDefinitionJsonSchema;
     categorySlug: string;
-  }): Promise<ProductSpecs> {
-    const { task, deterministicSpecs, jsonSchema, categorySlug } = params;
+  }): Promise<{ specs: ProductSpecs; model: string }> {
+    const { task, deterministicSpecs, rawSpecs, rawModel, brand, jsonSchema, categorySlug } =
+      params;
     const unificationConfig = task.source.config.detailPage.specUnification;
     if (!unificationConfig?.enabled) {
-      return deterministicSpecs;
+      return { specs: deterministicSpecs, model: rawModel };
     }
 
     const goldenSample = this.categoryConfigService.getGoldenSample(categorySlug);
     if (!goldenSample) {
       this.logger.warn(
-        `Spec unification enabled for source '${task.source.name}' but category '${categorySlug}' has no golden sample, skipping`,
+        `Post-processing enabled for source '${task.source.name}' but category '${categorySlug}' has no golden sample, skipping`,
         { taskId: task.id, url: task.url },
       );
-      return deterministicSpecs;
+      return { specs: deterministicSpecs, model: rawModel };
     }
 
-    return this.specUnification.unify({
+    const result = await this.postProcess.process({
       extractedSpecs: deterministicSpecs,
+      rawSpecs,
+      rawModel,
+      brand,
       schema: jsonSchema,
       goldenSample,
       model: unificationConfig.model,
     });
+
+    return { specs: result.specs, model: result.model ?? rawModel };
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before

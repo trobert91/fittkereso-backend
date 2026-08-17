@@ -54,8 +54,8 @@ export class CategoryConfigService {
 
   /**
    * One real, fully-populated ProductSpecs example in the category's target
-   * canonical shape — used to anchor SpecUnificationService's LLM output
-   * format. Absent for categories that don't use LLM spec unification.
+   * canonical shape — used to anchor ProductSourcePostProcessService's LLM
+   * output format. Absent for categories that don't use LLM post-processing.
    */
   getGoldenSample(slug: string | null | undefined): ProductSpecs | undefined {
     if (!slug) return undefined;

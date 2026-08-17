@@ -43,10 +43,12 @@ export interface ProductSourceTranslationConfig {
 }
 
 /**
- * Per-source switch for the LLM spec-unification pass (SpecUnificationService),
- * which runs after the deterministic SourceSpecMapping[] extraction. The
- * category-level pieces the LLM call needs (canonical schema, golden sample)
- * live in category config, not here — every source in a category shares them.
+ * Per-source switch for the LLM post-processing pass
+ * (ProductSourcePostProcessService) — spec unification plus model-name
+ * cleanup — which runs after the deterministic SourceSpecMapping[]
+ * extraction. The category-level pieces the LLM call needs (canonical
+ * schema, golden sample) live in category config, not here — every source
+ * in a category shares them.
  */
 export interface ProductSourceSpecUnificationConfig {
   enabled: boolean;

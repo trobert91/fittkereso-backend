@@ -5,7 +5,8 @@
     "gender": {
       "meta": {
         "order": 4,
-        "examples": ["Male", "Female", "Unisex"]
+        "options": ["Férfi", "Női", "Unisex"],
+        "examples": ["Férfi", "Női", "Unisex"]
       },
       "type": "string",
       "title": "Gender"
@@ -13,17 +14,29 @@
     "frameType": {
       "meta": {
         "order": 1,
+        "options": [
+          "All Mountain",
+          "Merev MTB",
+          "Országúti",
+          "Magas vázú",
+          "Trapéz",
+          "Alacsony vázú (női)",
+          "Összteleszkópos",
+          "Cross",
+          "Összecsukható",
+          "Kompakt"
+        ],
         "examples": [
           "All Mountain",
-          "Rigid MTB",
-          "Road",
-          "High-step",
-          "Trapeze",
-          "Low-step",
-          "Full-suspension",
+          "Merev MTB",
+          "Országúti",
+          "Magas vázú",
+          "Trapéz",
+          "Alacsony vázú (női)",
+          "Összteleszkópos",
           "Cross",
-          "Folding",
-          "Compact"
+          "Összecsukható",
+          "Kompakt"
         ]
       },
       "type": "string",
@@ -41,14 +54,23 @@
     "usageType": {
       "meta": {
         "order": 5,
+        "options": [
+          "Trekking",
+          "MTB",
+          "Cross",
+          "Cross-Trekking",
+          "Városi",
+          "Kompakt városi",
+          "Országúti"
+        ],
         "examples": [
           "Trekking",
           "MTB",
           "Cross",
           "Cross-Trekking",
-          "Urban",
-          "Compact urban",
-          "Road"
+          "Városi",
+          "Kompakt városi",
+          "Országúti"
         ]
       },
       "type": "string",
@@ -56,7 +78,8 @@
     },
     "batteryPosition": {
       "meta": {
-        "examples": ["Frame-integrated", "External", "Rear rack-mounted"]
+        "options": ["Vázba integrált", "Külső", "Csomagtartóra szerelt"],
+        "examples": ["Vázba integrált", "Külső", "Csomagtartóra szerelt"]
       },
       "type": "string",
       "title": "Battery position"
@@ -73,28 +96,40 @@
     },
     "drivetrain": {
       "meta": {
-        "examples": ["Chain", "Belt"]
+        "options": ["Lánc", "Szíj"],
+        "examples": ["Lánc", "Szíj"]
       },
       "type": "string",
       "title": "Drivetrain"
     },
     "suspension": {
       "meta": {
-        "examples": ["Hardtail", "Full-suspension", "Rigid"]
+        "options": [
+          "Első teleszkóp",
+          "Első teleszkóp, hátsó rugóstag",
+          "Rugózatlan"
+        ],
+        "examples": [
+          "Első teleszkóp",
+          "Első teleszkóp, hátsó rugóstag",
+          "Rugózatlan"
+        ]
       },
       "type": "string",
       "title": "Suspension"
     },
     "brakeType": {
       "meta": {
-        "examples": ["Disc", "Rim", "Disc + coaster brake"]
+        "options": ["Tárcsa", "Racker (Felni)", "Tárcsa + kontrafék"],
+        "examples": ["Tárcsa", "Racker (Felni)", "Tárcsa + kontrafék"]
       },
       "type": "string",
       "title": "Brake type"
     },
     "gearType": {
       "meta": {
-        "examples": ["Derailleur", "Motor-integrated gearing", "Hub gears"]
+        "options": ["Láncváltó", "Motorba integrált váltó", "Agyváltó"],
+        "examples": ["Láncváltó", "Motorba integrált váltó", "Agyváltó"]
       },
       "type": "string",
       "title": "Gear type"
@@ -125,7 +160,8 @@
     },
     "motorPosition": {
       "meta": {
-        "examples": ["Mid-drive", "Rear hub", "Front hub"]
+        "options": ["Középmotor", "Hátsó kerékagy motor", "Első kerékagy motor"],
+        "examples": ["Középmotor", "Hátsó kerékagy motor", "Első kerékagy motor"]
       },
       "type": "string",
       "title": "Motor position"

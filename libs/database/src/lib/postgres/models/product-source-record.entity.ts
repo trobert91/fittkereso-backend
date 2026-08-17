@@ -32,8 +32,9 @@ export class ProductSourceRecord extends BasePostgresEntity {
 
   /**
    * Raw label/value pairs as scraped, before SpecExtractionService/
-   * SpecUnificationService map them into canonical `specs` keys. Hashed via
-   * `rawSpecsHash` so re-scrapes can skip re-extraction when unchanged.
+   * ProductSourcePostProcessService map them into canonical `specs` keys.
+   * Hashed via `rawSpecsHash` so re-scrapes can skip re-extraction when
+   * unchanged.
    */
   @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })

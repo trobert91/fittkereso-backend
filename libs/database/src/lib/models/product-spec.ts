@@ -5,8 +5,8 @@ export type ProductSpecs = Record<
 
 /**
  * Raw label/value pair as extracted from a source's spec table, before
- * SpecExtractionService/SpecUnificationService map it into canonical
- * ProductSpecs keys. Lives in @fittkereso-backend/database (not
+ * SpecExtractionService/ProductSourcePostProcessService map it into
+ * canonical ProductSpecs keys. Lives in @fittkereso-backend/database (not
  * @fittkereso-backend/product, which re-exports it) because
  * ProductSourceRecord.rawSpecs needs the type and database cannot depend on
  * product (product already depends on database).

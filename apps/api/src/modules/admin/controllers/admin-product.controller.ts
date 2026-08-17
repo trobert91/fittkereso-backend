@@ -384,6 +384,7 @@ export class AdminProductController {
     task.source = modelSource.source;
     task.url = modelSource.url;
     task.product = { id: productId } as ProductModel;
+    task.force = body.force ?? false;
 
     await this.scrapeTaskPublisher.addTask(task);
 
