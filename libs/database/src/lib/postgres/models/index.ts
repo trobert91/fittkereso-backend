@@ -6,7 +6,7 @@ export * from './product-category.entity';
 export * from './product-embedding.entity';
 export * from './product-image.entity';
 export * from './product-model.entity';
-export * from './product-model-source.entity';
+export * from './product-source-record.entity';
 export * from './product-source.entity';
 export * from './scrape-task.entity';
 export * from './task.entity';

@@ -5,14 +5,14 @@ import { BasePostgresRepository } from './base-postgres-repository';
 import { Offer } from '../models/offer.entity';
 import { ProductModel } from '../models/product-model.entity';
 import { Seller } from '../models/seller.entity';
-import { ProductSource } from '../models/product-source.entity';
+import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { OfferCondition } from '../types/offer-condition';
 import { OfferAvailability } from '../types/offer-availability';
 
 export interface UpsertOfferFromScrapeParams {
   model: ProductModel;
   seller: Seller;
-  source: ProductSource;
+  sourceRecord: ProductSourceRecord;
   price: number;
   currency?: string;
   availability?: OfferAvailability;
@@ -36,7 +36,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   async upsertFromScrape(
     params: UpsertOfferFromScrapeParams,
   ): Promise<Offer> {
-    const { model, seller, source, price, currency, availability, url, sourceListingId } =
+    const { model, seller, sourceRecord, price, currency, availability, url, sourceListingId } =
       params;
 
     const existing = sourceListingId
@@ -48,7 +48,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     const offer = existing ?? new Offer();
     offer.model = model;
     offer.seller = seller;
-    offer.source = source;
+    offer.sourceRecord = sourceRecord;
     offer.condition = offer.condition ?? OfferCondition.new;
     offer.price = price;
     offer.currency = currency ?? 'HUF';

@@ -6,7 +6,7 @@ import {
   ProductEmbedding,
   ProductImageRepository,
   ProductModel,
-  ProductModelSource,
+  ProductSourceRecord,
   ProductSpecs,
 } from '@fittkereso-backend/database';
 import { isUndefined } from 'lodash';
@@ -143,14 +143,14 @@ export class ProductUpdateMapperService {
     entity.sources = entity.sources ?? [];
 
     // Admin-entered specs have no ProductSource behind them (source: null) —
-    // that's what distinguishes them from scraped ProductModelSource rows.
+    // that's what distinguishes them from scraped ProductSourceRecord rows.
     let manualSource = entity.sources.find((s) => !s.source);
 
     if (manualSource) {
       manualSource.specs = specs;
       manualSource.lastUpdated = new Date();
     } else {
-      const newSource = new ProductModelSource();
+      const newSource = new ProductSourceRecord();
       newSource.model = entity;
       newSource.source = null;
       newSource.specs = specs;

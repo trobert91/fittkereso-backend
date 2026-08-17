@@ -2,7 +2,14 @@ import {
   OfferAvailability,
   ProductCategory,
   ProductSpecs,
+  ScrapedProductSpec,
 } from '@fittkereso-backend/database';
+
+// Re-exported for backward compatibility — callers importing ScrapedProductSpec
+// from @fittkereso-backend/product keep working. The type itself now lives in
+// @fittkereso-backend/database (see that lib's models/product-spec.ts) because
+// ProductSourceRecord.rawSpecs needs it and database cannot depend on product.
+export type { ScrapedProductSpec };
 
 export interface ScrapedProduct {
   category: ProductCategory;
@@ -12,6 +19,8 @@ export interface ScrapedProduct {
   aliases?: string[];
   releaseYear?: number;
   specs?: ProductSpecs;
+  rawSpecs?: ScrapedProductSpec[];
+  externalId?: string;
   imageUrls?: string[];
   offers?: ScrapedOffer[];
 }
@@ -25,13 +34,6 @@ export interface ScrapedOffer {
   availability?: OfferAvailability;
   url?: string;
   sourceListingId?: string;
-}
-
-export interface ScrapedProductSpec {
-  name: string;
-  sectionTitle?: string;
-  description?: string;
-  values?: string[];
 }
 
 export interface ProcessedProductSpec {

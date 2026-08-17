@@ -14,7 +14,7 @@ import { ProductAlias } from './product-alias.entity';
 import { ProductEmbedding } from './product-embedding.entity';
 import { Brand } from './brand.entity';
 import { OrderedSpec, ProductSpecs } from '../../models/product-spec';
-import { ProductModelSource } from './product-model-source.entity';
+import { ProductSourceRecord } from './product-source-record.entity';
 import { ProductImage } from './product-image.entity';
 import { ScrapeTask } from './scrape-task.entity';
 import { Offer } from './offer.entity';
@@ -57,12 +57,12 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   aliases?: ProductAlias[];
 
-  @OneToMany(() => ProductModelSource, (source) => source.model, {
+  @OneToMany(() => ProductSourceRecord, (source) => source.model, {
     cascade: true,
     eager: false,
   })
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  sources: ProductModelSource[];
+  sources: ProductSourceRecord[];
 
   /**
    * All product specifications stored as a JSONB object.

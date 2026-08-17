@@ -3,7 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
   OfferRepository,
-  ProductModelSourceRepository,
+  ProductSourceRecordRepository,
   ScrapeQueueName,
   ScrapeTask,
   ScrapeTaskRepository,
@@ -23,7 +23,7 @@ export class ScrapeRunTools {
   constructor(
     private readonly scrapeTaskCreator: ScrapeTaskCreatorService,
     private readonly scrapeTaskRepo: ScrapeTaskRepository,
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerRepo: OfferRepository,
   ) {}
 
@@ -66,7 +66,7 @@ export class ScrapeRunTools {
   @Tool({
     name: 'get_scrape_task',
     description:
-      'Get the current status and result of a ScrapeTask by id — status (pending/processing/done/failed), attempts, timing, any error, and (for a done detail-page task) the ProductModelSource/Offer rows it produced. Use after enqueue_scrape_task to check whether the run succeeded.',
+      'Get the current status and result of a ScrapeTask by id — status (pending/processing/done/failed), attempts, timing, any error, and (for a done detail-page task) the ProductSourceRecord/Offer rows it produced. Use after enqueue_scrape_task to check whether the run succeeded.',
     parameters: z.object({
       taskId: z.string().describe('ScrapeTask UUID'),
     }),
@@ -103,15 +103,18 @@ export class ScrapeRunTools {
       L.push('## Resulting Product');
       L.push(`- ${task.product.displayName ?? task.product.id} (${task.product.id})`);
 
-      const sourceRow = await this.productModelSourceRepo.findOne({
+      const sourceRow = await this.sourceRecordRepo.findOne({
         where: { model: { id: task.product.id }, source: { id: task.source.id } },
       });
       if (sourceRow) {
-        L.push(`- ProductModelSource: ${sourceRow.id} (created ${sourceRow.createdAt?.toISOString?.() ?? ''})`);
+        L.push(`- ProductSourceRecord: ${sourceRow.id} (created ${sourceRow.createdAt?.toISOString?.() ?? ''})`);
       }
 
       const offers = await this.offerRepo.find({
-        where: { model: { id: task.product.id }, source: { id: task.source.id } },
+        where: {
+          model: { id: task.product.id },
+          sourceRecord: { source: { id: task.source.id } },
+        },
       });
       if (offers.length) {
         L.push('');

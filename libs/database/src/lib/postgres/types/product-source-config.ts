@@ -42,6 +42,17 @@ export interface ProductSourceTranslationConfig {
   contextTemplate: string;
 }
 
+/**
+ * Per-source switch for the LLM spec-unification pass (SpecUnificationService),
+ * which runs after the deterministic SourceSpecMapping[] extraction. The
+ * category-level pieces the LLM call needs (canonical schema, golden sample)
+ * live in category config, not here — every source in a category shares them.
+ */
+export interface ProductSourceSpecUnificationConfig {
+  enabled: boolean;
+  model?: string;
+}
+
 export interface ProductSourceDetailPageConfig {
   rawSpecs: ScrapeOperation[];
   category: {
@@ -52,6 +63,11 @@ export interface ProductSourceDetailPageConfig {
   model: ScrapeOperation[];
   aliases?: ScrapeOperation[];
   releaseYear?: ScrapeOperation[];
+  // Source-native listing identifier (SKU/model code/slug), stable across URL
+  // changes. Extracted once here (not only inside offers.sourceListingId) so
+  // ProductSourceRecord.externalId can be populated independent of whether the
+  // source's config populates `offers` at all.
+  externalId?: ScrapeOperation[];
   images: ScrapeOperation[];
   // Keyed by category slug — replaces the old per-category specMappings.json
   // file (which was keyed by source instead, now implicit in "which
@@ -59,6 +75,7 @@ export interface ProductSourceDetailPageConfig {
   specMapping: Record<string, SourceSpecConfig>;
   offers?: ProductSourceOffersConfig;
   translation?: ProductSourceTranslationConfig;
+  specUnification?: ProductSourceSpecUnificationConfig;
 }
 
 export interface ProductSourceConfig {

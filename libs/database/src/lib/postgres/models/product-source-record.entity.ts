@@ -2,13 +2,13 @@ import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
-import { ProductSpecs } from '../../models/product-spec';
+import { ProductSpecs, ScrapedProductSpec } from '../../models/product-spec';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 
 @Entity()
 @Index(['model', 'source'])
-export class ProductModelSource extends BasePostgresEntity {
+export class ProductSourceRecord extends BasePostgresEntity {
   @ManyToOne(() => ProductModel, (model) => model.sources, {
     nullable: false,
     onDelete: 'CASCADE',
@@ -29,6 +29,31 @@ export class ProductModelSource extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Transform(transfromExposeAll())
   specs: ProductSpecs;
+
+  /**
+   * Raw label/value pairs as scraped, before SpecExtractionService/
+   * SpecUnificationService map them into canonical `specs` keys. Hashed via
+   * `rawSpecsHash` so re-scrapes can skip re-extraction when unchanged.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Transform(transfromExposeAll())
+  rawSpecs?: ScrapedProductSpec[];
+
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  rawSpecsHash?: string;
+
+  /**
+   * Source-native listing identifier (SKU/model code/slug), stable across URL
+   * changes. Used to recognize an already-known listing independent of
+   * `url` matching byte-for-byte.
+   */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  externalId?: string;
 
   @Column({ nullable: true, default: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })

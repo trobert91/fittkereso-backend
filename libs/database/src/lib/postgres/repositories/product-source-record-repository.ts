@@ -2,24 +2,43 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
-import { ProductModelSource } from '../models/product-model-source.entity';
+import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { ProductModel } from '../models/product-model.entity';
 import { isEmpty } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
-export class ProductModelSourceRepository extends BasePostgresRepository<ProductModelSource> {
+export class ProductSourceRecordRepository extends BasePostgresRepository<ProductSourceRecord> {
   constructor(
-    @InjectRepository(ProductModelSource, 'postgres')
-    repository: Repository<ProductModelSource>,
+    @InjectRepository(ProductSourceRecord, 'postgres')
+    repository: Repository<ProductSourceRecord>,
   ) {
-    super(repository, ProductModelSource);
+    super(repository, ProductSourceRecord);
   }
 
-  async findByUrl(url: string): Promise<ProductModelSource | null> {
+  async findByUrl(url: string): Promise<ProductSourceRecord | null> {
     return this.repo.findOne({
       where: { url },
-      relations: [nameOf<ProductModelSource>('model')],
+      relations: [nameOf<ProductSourceRecord>('model')],
+    });
+  }
+
+  /**
+   * Cheap identity lookup by (source, externalId) — the source-native SKU/
+   * model code/slug, stable across URL changes. Used ahead of full identity
+   * resolution to recognize an already-known listing so extraction/LLM
+   * unification can be skipped when its rawSpecsHash is unchanged.
+   */
+  async findBySourceAndExternalId(
+    sourceId: string,
+    externalId: string,
+  ): Promise<ProductSourceRecord | null> {
+    return this.repo.findOne({
+      where: {
+        source: { id: sourceId },
+        externalId,
+      },
+      relations: [nameOf<ProductSourceRecord>('model')],
     });
   }
 
@@ -28,8 +47,8 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
 
     const results = await this.repo
       .createQueryBuilder('source')
-      .select(`source.${nameOf<ProductModelSource>('url')}`)
-      .where(`source.${nameOf<ProductModelSource>('url')} IN (:...urls)`, {
+      .select(`source.${nameOf<ProductSourceRecord>('url')}`)
+      .where(`source.${nameOf<ProductSourceRecord>('url')} IN (:...urls)`, {
         urls,
       })
       .getMany();
@@ -40,11 +59,11 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
   async findAllByNormalizedName(
     normalizedSourceName: string,
     categoryId: string,
-  ): Promise<ProductModelSource[]> {
+  ): Promise<ProductSourceRecord[]> {
     return this.repo
       .createQueryBuilder('source')
       .innerJoinAndSelect(
-        `source.${nameOf<ProductModelSource>('model')}`,
+        `source.${nameOf<ProductSourceRecord>('model')}`,
         'model',
       )
       .innerJoinAndSelect(
@@ -62,7 +81,7 @@ export class ProductModelSourceRepository extends BasePostgresRepository<Product
       )
       .leftJoinAndSelect(`model.${nameOf<ProductModel>('sources')}`, 'sources')
       .where(
-        `source.${nameOf<ProductModelSource>('normalizedSourceName')} = :normalizedSourceName`,
+        `source.${nameOf<ProductSourceRecord>('normalizedSourceName')} = :normalizedSourceName`,
         { normalizedSourceName },
       )
       .andWhere('category.id = :categoryId', { categoryId })

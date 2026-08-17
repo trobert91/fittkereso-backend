@@ -4,7 +4,7 @@ import { Expose } from 'class-transformer';
 import { SerializeGroup, nameOf } from '@fittkereso-backend/utils';
 import { ProductModel } from './product-model.entity';
 import { Seller } from './seller.entity';
-import { ProductSource } from './product-source.entity';
+import { ProductSourceRecord } from './product-source-record.entity';
 import { OfferCondition } from '../types/offer-condition';
 import { OfferAvailability } from '../types/offer-availability';
 
@@ -25,10 +25,15 @@ export class Offer extends BasePostgresEntity {
   @Index()
   seller: Seller;
 
+  /**
+   * The specific listing this offer belongs to — carries both the source
+   * site (via sourceRecord.source) and that listing's URL/specs, so callers
+   * don't need a second join to get from an offer to its source.
+   */
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => ProductSourceRecord, { nullable: true, onDelete: 'SET NULL' })
   @Index()
-  source?: ProductSource | null;
+  sourceRecord?: ProductSourceRecord | null;
 
   @Expose({ groups: [SerializeGroup.list] })
   @Index()

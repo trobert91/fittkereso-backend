@@ -21,8 +21,8 @@ import {
   ProductImage,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
   ScrapeQueueName,
   ScrapeTask,
   UserRole,
@@ -70,7 +70,7 @@ export class AdminProductController {
     private readonly imageDeleteService: ProductImageDeleteService,
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly productRepo: ProductModelRepository,
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly mergeService: ProductMergeService,
     private readonly duplicationSearchService: ProductDuplicationSearchService,
@@ -339,9 +339,9 @@ export class AdminProductController {
     @Param('id') id: string,
     @Param('sourceId') sourceId: string,
   ): Promise<ProductModel> {
-    const source = await this.productModelSourceRepo.findOne({
+    const source = await this.sourceRecordRepo.findOne({
       where: { id: sourceId },
-      relations: [nameOf<ProductModelSource>('model')],
+      relations: [nameOf<ProductSourceRecord>('model')],
     });
 
     if (!source || source.model.id !== id) {
@@ -350,7 +350,7 @@ export class AdminProductController {
       );
     }
 
-    await this.productModelSourceRepo.deleteById(sourceId);
+    await this.sourceRecordRepo.deleteById(sourceId);
     return this.detailService.getProductById(id);
   }
 
@@ -359,11 +359,11 @@ export class AdminProductController {
     @Param('id') productId: string,
     @Body() body: ResyncProductSourceDto,
   ): Promise<QueueStatusDto> {
-    const modelSource = await this.productModelSourceRepo.findOne({
-      where: { id: body.productModelSourceId },
+    const modelSource = await this.sourceRecordRepo.findOne({
+      where: { id: body.sourceRecordId },
       relations: [
-        nameOf<ProductModelSource>('model'),
-        nameOf<ProductModelSource>('source'),
+        nameOf<ProductSourceRecord>('model'),
+        nameOf<ProductSourceRecord>('source'),
       ],
     });
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
-  ProductModelSource,
+  ProductSourceRecord,
   ProductSource,
   ProductSourceRepository,
   ProductSpecs,
@@ -14,7 +14,7 @@ export class ProductSpecMergeService {
   constructor(private readonly sourceRepo: ProductSourceRepository) {}
 
   public async mergeSpecs(
-    sourceSpecs: ProductModelSource[],
+    sourceSpecs: ProductSourceRecord[],
   ): Promise<ProductSpecs> {
     await this.loadSourcesIfNeeded(sourceSpecs);
 
@@ -41,7 +41,7 @@ export class ProductSpecMergeService {
   }
 
   private async loadSourcesIfNeeded(
-    sourceSpecs: ProductModelSource[],
+    sourceSpecs: ProductSourceRecord[],
   ): Promise<void> {
     if (!this.isLoadingNeeded(sourceSpecs)) {
       return;
@@ -50,7 +50,7 @@ export class ProductSpecMergeService {
     this.sources = await this.sourceRepo.getAll();
   }
 
-  private isLoadingNeeded(sourceSpecs: ProductModelSource[]): boolean {
+  private isLoadingNeeded(sourceSpecs: ProductSourceRecord[]): boolean {
     return (
       this.sources.length !== sourceSpecs.length ||
       sourceSpecs.some(

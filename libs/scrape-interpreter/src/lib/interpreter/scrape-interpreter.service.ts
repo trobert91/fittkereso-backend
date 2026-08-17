@@ -33,6 +33,7 @@ export interface DetailPageResult {
   model: string | undefined;
   aliases?: string[];
   releaseYear?: number;
+  externalId?: string;
   imageUrls: string[];
   rawOffers: RawOfferRecord[];
 }
@@ -143,6 +144,14 @@ export class ScrapeInterpreterService {
         )) as number | undefined)
       : undefined;
 
+    const externalId = config.detailPage.externalId
+      ? ((await this.runner.run(
+          config.detailPage.externalId,
+          ctx,
+        )) as string | undefined)
+      : undefined;
+    ctx.vars['externalId'] = externalId;
+
     const imageUrls =
       ((await this.runner.run(
         config.detailPage.images,
@@ -158,6 +167,7 @@ export class ScrapeInterpreterService {
       model,
       aliases,
       releaseYear,
+      externalId,
       imageUrls,
       rawOffers,
     };

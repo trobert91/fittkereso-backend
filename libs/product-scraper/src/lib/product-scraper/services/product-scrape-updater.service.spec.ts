@@ -5,7 +5,7 @@ import {
   ProductCategory,
   ProductModel,
   ProductModelRepository,
-  ProductModelSourceRepository,
+  ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
@@ -107,7 +107,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
-  let mockProductModelSourceRepo: jest.Mocked<ProductModelSourceRepository>;
+  let mockSourceRecordRepo: jest.Mocked<ProductSourceRecordRepository>;
   let mockSpecUpdaterService: jest.Mocked<ProductSpecUpdaterService>;
   let mockImageCopyService: jest.Mocked<ProductImageCopyService>;
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
@@ -146,12 +146,14 @@ describe('ProductScrapeUpdaterService', () => {
       },
     } as unknown as jest.Mocked<ProductAliasRepository>;
 
-    mockProductModelSourceRepo = {
+    mockSourceRecordRepo = {
       findAllByNormalizedName: jest.fn().mockResolvedValue([]),
-    } as unknown as jest.Mocked<ProductModelSourceRepository>;
+    } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSpecUpdaterService = {
-      updateSpecsOnProduct: jest.fn().mockResolvedValue(undefined),
+      updateSpecsOnProduct: jest
+        .fn()
+        .mockResolvedValue({ id: 'source-record-1' }),
     } as unknown as jest.Mocked<ProductSpecUpdaterService>;
 
     mockImageCopyService = {
@@ -187,7 +189,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockProductRepo,
       mockTaskRepo,
       mockAliasRepo,
-      mockProductModelSourceRepo,
+      mockSourceRecordRepo,
       mockSpecUpdaterService,
       mockImageCopyService,
       mockMetricsService,
@@ -202,7 +204,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
         source: { id: 'source-arukereso' },
@@ -231,7 +233,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
         source: { id: 'source-displayspecs' },
@@ -261,7 +263,7 @@ describe('ProductScrapeUpdaterService', () => {
     otherVariant.id = 'model-variant-b';
     otherVariant.sources = [{ source: { id: 'source-arukereso' } } as never];
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: otherVariant,
         source: { id: 'source-arukereso' },
@@ -445,7 +447,7 @@ describe('ProductScrapeUpdaterService', () => {
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledWith(
       expect.objectContaining({
         seller: mockSeller,
-        source: task.source,
+        sourceRecord: { id: 'source-record-1' },
         price: 199990,
         currency: 'HUF',
         url: 'https://alza.hu/product/1',

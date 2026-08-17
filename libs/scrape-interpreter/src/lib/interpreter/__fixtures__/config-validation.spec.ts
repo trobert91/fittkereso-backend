@@ -6,6 +6,7 @@ import { registerOps } from '../ops/register-ops';
 import arukeresoConfig from './arukereso.config.json';
 import displayspecsConfig from './displayspecs.config.json';
 import ebikeshopConfig from './ebikeshop.config.json';
+import speedbikeConfig from './speedbike.config.json';
 
 // Structural/registry validation of the hand-authored production configs —
 // not a live-site test, but catches typos in op names, missing required
@@ -67,6 +68,10 @@ describe('hand-authored source configs', () => {
     assertConfigValid(ebikeshopConfig as unknown as ProductSourceConfig, 'ebikeshop');
   });
 
+  it('validates the speedbike config against the op registry', () => {
+    assertConfigValid(speedbikeConfig as unknown as ProductSourceConfig, 'speedbike');
+  });
+
   it('Arukereso config resolves all 15 category slugLookup rules to distinct slugs (headphones covered twice by design)', () => {
     const config = arukeresoConfig as unknown as ProductSourceConfig;
     const slugs = config.detailPage.category.slugLookup.map((r) => r.slug);
@@ -94,6 +99,18 @@ describe('hand-authored source configs', () => {
     expect(config.detailPage.category.slugLookup).toEqual([
       { when: { always: true }, slug: 'ebikes' },
     ]);
+  });
+
+  it('speedbike config resolves E-BIKE breadcrumb text to the ebikes category', () => {
+    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    expect(config.detailPage.category.slugLookup).toEqual([
+      { when: { equalsIgnoreCase: 'E-BIKE' }, slug: 'ebikes' },
+    ]);
+  });
+
+  it('speedbike config enables LLM spec unification', () => {
+    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    expect(config.detailPage.specUnification?.enabled).toBe(true);
   });
 
   it('DisplaySpecs config resolves TV vs monitor via specSectionTitleIn with a monitor fallback', () => {

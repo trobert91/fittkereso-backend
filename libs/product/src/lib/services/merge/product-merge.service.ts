@@ -9,7 +9,7 @@ import {
   ProductImage,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
+  ProductSourceRecord,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -66,7 +66,7 @@ export class ProductMergeService {
           targetDisplayName: target.displayName,
         });
 
-        await this.moveProductModelSources(manager, source, target);
+        await this.moveProductSourceRecords(manager, source, target);
         await this.moveProductImages(manager, source, target);
         await this.createAliasesFromSource(manager, source, target);
         await this.moveProductAliases(manager, sourceId, targetId);
@@ -101,7 +101,7 @@ export class ProductMergeService {
     });
   }
 
-  private async moveProductModelSources(
+  private async moveProductSourceRecords(
     manager: EntityManager,
     source: ProductModel,
     target: ProductModel,
@@ -129,7 +129,7 @@ export class ProductMergeService {
     if (!isEmpty(toMove)) {
       await manager
         .createQueryBuilder()
-        .update(ProductModelSource)
+        .update(ProductSourceRecord)
         .set({ model: { id: target.id }, deduplicated: true })
         .where('id IN (:...ids)', { ids: toMove })
         .execute();
@@ -139,7 +139,7 @@ export class ProductMergeService {
       await manager
         .createQueryBuilder()
         .delete()
-        .from(ProductModelSource)
+        .from(ProductSourceRecord)
         .where('id IN (:...ids)', { ids: toDelete })
         .execute();
     }

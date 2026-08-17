@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
-  ProductModelSourceRepository,
+  ProductSourceRecordRepository,
   ScrapeTaskRepository,
   TaskStatus,
 } from '@fittkereso-backend/database';
@@ -21,7 +21,7 @@ export class ScrapeUrlDeduplicationService {
   );
 
   constructor(
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly scrapeTaskRepo: ScrapeTaskRepository,
   ) {}
 
@@ -30,7 +30,7 @@ export class ScrapeUrlDeduplicationService {
     logContext?: Record<string, string>,
   ): Promise<DeduplicationResult> {
     // Layer 1: permanent — URL already scraped into a product
-    const existingSource = await this.productModelSourceRepo.findByUrl(url);
+    const existingSource = await this.sourceRecordRepo.findByUrl(url);
     if (existingSource) {
       this.logger.debug(
         `Skipped: URL already exists as product source on "${existingSource.model?.displayName}"`,
@@ -68,7 +68,7 @@ export class ScrapeUrlDeduplicationService {
 
     // Layer 1: permanent — already scraped into products
     const existingProductUrls =
-      await this.productModelSourceRepo.findExistingUrls(urls);
+      await this.sourceRecordRepo.findExistingUrls(urls);
 
     // Layer 2: in-flight — already queued/processing
     const remainingUrls = urls.filter((url) => !existingProductUrls.has(url));

@@ -5,7 +5,7 @@ export * from './product-alias-repository';
 export * from './product-category-repository';
 export * from './product-image-repository';
 export * from './product-model-repository';
-export * from './product-model-source-repository';
+export * from './product-source-record-repository';
 export * from './product-source-repository';
 export * from './scrape-task-repository';
 export * from './task-repository';

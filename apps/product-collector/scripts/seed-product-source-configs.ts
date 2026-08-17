@@ -1,7 +1,7 @@
 /**
  * One-time idempotent seed for the ProductSource.config JSONB rows
- * (Arukereso, DisplaySpecs, ebikeshop), reading the hand-authored config
- * JSON from libs/scrape-interpreter's fixtures directory (same files
+ * (Arukereso, DisplaySpecs, ebikeshop, speedbike), reading the hand-authored
+ * config JSON from libs/scrape-interpreter's fixtures directory (same files
  * validated by that library's test suite).
  *
  * Upserts by name, so it's safe to re-run. Sources with a `seller` spec
@@ -91,6 +91,24 @@ const SOURCES: SeedSourceSpec[] = [
     // First-time source: keep scheduling off until a manual dry run (one
     // list-page task run by hand, resulting Offer/ProductModel rows
     // inspected) confirms the config behaves as expected end to end.
+    schedulingEnabled: false,
+  },
+  {
+    name: 'speedbike',
+    configFile: 'speedbike.config.json',
+    maxConcurrent: 2,
+    requestsPerHour: 60,
+    priority: 10,
+    fullSyncInterval: '7 days',
+    incrementalSyncInterval: '1 day',
+    seller: {
+      name: 'speedbike.hu',
+      slug: 'speedbike',
+      domains: ['speedbike.hu'],
+    },
+    // First-time source, also the first to use detailPage.specUnification —
+    // keep scheduling off until a manual dry run confirms both the scrape
+    // config and the LLM unification pass behave as expected end to end.
     schedulingEnabled: false,
   },
 ];

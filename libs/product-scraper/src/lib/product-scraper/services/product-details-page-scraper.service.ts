@@ -1,7 +1,11 @@
 import {
   OfferAvailability,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
+  ProductSpecs,
   ScrapeTask,
   SourceSpecConfig,
+  SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
@@ -10,12 +14,14 @@ import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { hashRawSpecs } from '@fittkereso-backend/utils';
 import {
   ScrapedOffer,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
+  SpecUnificationService,
 } from '@fittkereso-backend/product';
 import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
@@ -38,8 +44,10 @@ export class ProductDetailsPageScraperService {
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
+    private readonly specUnification: SpecUnificationService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
   public async scrapeProductDetailsPage(task: ScrapeTask): Promise<void> {
@@ -188,6 +196,38 @@ export class ProductDetailsPageScraperService {
       return null;
     }
 
+    const displayName = `${detail.brand} ${detail.model}`.trim();
+    const rawSpecsHash = hashRawSpecs(detail.rawSpecs);
+
+    // Skip re-extraction (deterministic mapping + optional LLM unification)
+    // when this exact listing was already scraped with an identical raw spec
+    // table. `specs`/`rawSpecs` stay undefined on the returned ScrapedProduct
+    // in that case — ProductSpecUpdaterService leaves the existing
+    // ProductSourceRecord row's specs/rawSpecs untouched when both are absent.
+    const existingSource = await this.findExistingSource(task, detail.externalId);
+    if (existingSource?.rawSpecsHash === rawSpecsHash) {
+      this.logger.debug('Raw specs unchanged since last scrape, skipping extraction', {
+        taskId: task.id,
+        url: task.url,
+        externalId: detail.externalId,
+      });
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'raw_specs_unchanged',
+      );
+      return {
+        brand: detail.brand,
+        model: detail.model,
+        displayName,
+        category,
+        aliases: detail.aliases,
+        releaseYear: detail.releaseYear,
+        externalId: detail.externalId,
+        imageUrls: detail.imageUrls,
+        offers: this.toScrapedOffers(detail.rawOffers),
+      };
+    }
+
     const sourceConfig = config.detailPage.specMapping[category.slug];
     const translator = await this.buildTranslator(
       task,
@@ -196,7 +236,7 @@ export class ProductDetailsPageScraperService {
       category.name,
     );
 
-    const specs = sourceConfig
+    const deterministicSpecs = sourceConfig
       ? this.specExtraction.extractSpecs({
           scrapedSpecs: detail.rawSpecs,
           schema: jsonSchema,
@@ -205,7 +245,12 @@ export class ProductDetailsPageScraperService {
         })
       : {};
 
-    const displayName = `${detail.brand} ${detail.model}`.trim();
+    const specs = await this.maybeUnifySpecs({
+      task,
+      deterministicSpecs,
+      jsonSchema,
+      categorySlug: category.slug,
+    });
 
     return {
       brand: detail.brand,
@@ -213,11 +258,63 @@ export class ProductDetailsPageScraperService {
       displayName,
       category,
       specs,
+      rawSpecs: detail.rawSpecs,
+      externalId: detail.externalId,
       aliases: detail.aliases,
       releaseYear: detail.releaseYear,
       imageUrls: detail.imageUrls,
       offers: this.toScrapedOffers(detail.rawOffers),
     };
+  }
+
+  /**
+   * Identity lookup ahead of full resolution — prefers the source-native
+   * externalId (stable across URL changes) via a dedicated repository query;
+   * falls back to a URL lookup when the source has no externalId pipeline
+   * configured. `ScrapeTask.product` is loaded without its `sources`
+   * relation at this point (see ScrapeTaskRepository), so this always does a
+   * fresh lookup rather than relying on task.product.sources being populated.
+   */
+  private async findExistingSource(
+    task: ScrapeTask,
+    externalId: string | undefined,
+  ): Promise<ProductSourceRecord | null> {
+    if (externalId) {
+      return this.sourceRecordRepo.findBySourceAndExternalId(
+        task.source.id,
+        externalId,
+      );
+    }
+    return this.sourceRecordRepo.findByUrl(task.url);
+  }
+
+  private async maybeUnifySpecs(params: {
+    task: ScrapeTask;
+    deterministicSpecs: ProductSpecs;
+    jsonSchema: SpecDefinitionJsonSchema;
+    categorySlug: string;
+  }): Promise<ProductSpecs> {
+    const { task, deterministicSpecs, jsonSchema, categorySlug } = params;
+    const unificationConfig = task.source.config.detailPage.specUnification;
+    if (!unificationConfig?.enabled) {
+      return deterministicSpecs;
+    }
+
+    const goldenSample = this.categoryConfigService.getGoldenSample(categorySlug);
+    if (!goldenSample) {
+      this.logger.warn(
+        `Spec unification enabled for source '${task.source.name}' but category '${categorySlug}' has no golden sample, skipping`,
+        { taskId: task.id, url: task.url },
+      );
+      return deterministicSpecs;
+    }
+
+    return this.specUnification.unify({
+      extractedSpecs: deterministicSpecs,
+      schema: jsonSchema,
+      goldenSample,
+      model: unificationConfig.model,
+    });
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before

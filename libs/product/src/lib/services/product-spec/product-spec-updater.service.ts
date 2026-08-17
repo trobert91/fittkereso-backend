@@ -2,16 +2,17 @@ import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
+  ProductSourceRecord,
   ProductSource,
   ProductSpecs,
+  ScrapedProductSpec,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductSpecMergeService } from './product-spec-merge.service';
 import { ProductSpecSortService } from './product-spec-sort.service';
 import { chain, groupBy, isBoolean, isEmpty, isNumber, maxBy } from 'lodash';
-import { nameOf } from '@fittkereso-backend/utils';
+import { hashRawSpecs, nameOf } from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
@@ -82,14 +83,18 @@ export class ProductSpecUpdaterService {
     model: ProductModel;
     source: ProductSource | null;
     specs?: ProductSpecs;
+    rawSpecs?: ScrapedProductSpec[];
+    externalId?: string;
     sourceUrl?: string;
     sourceName?: string;
     normalizedSourceName?: string;
-  }): Promise<void> {
+  }): Promise<ProductSourceRecord | undefined> {
     const {
       model,
       source: newSource,
       specs,
+      rawSpecs,
+      externalId,
       sourceUrl,
       sourceName,
       normalizedSourceName,
@@ -97,6 +102,22 @@ export class ProductSpecUpdaterService {
     // Label used only for metrics/logging — admin-entered specs have no
     // ProductSource (source: null), everything else is scraped.
     const sourceLabel = newSource?.name ?? 'manual';
+
+    // Ensure sources loaded
+    model.sources = model.sources ?? [];
+
+    // Find existing source entry by URL, or create a new one
+    let source = sourceUrl
+      ? model.sources.find((s) => s.url === sourceUrl)
+      : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
+
+    // `specs` is absent when the caller already determined (via rawSpecsHash
+    // comparison) that this listing's raw spec table is unchanged since the
+    // last scrape — see ProductDetailsPageScraperService.extractProduct.
+    // Nothing to re-extract/re-merge; just report the existing row as-is.
+    if (specs === undefined && source) {
+      return source;
+    }
 
     const categorySlug = model.productCategory?.slug;
     const jsonSchema = categorySlug
@@ -116,9 +137,6 @@ export class ProductSpecUpdaterService {
         categorySlug,
       );
     }
-
-    // Ensure sources loaded
-    model.sources = model.sources ?? [];
 
     // Revalidate existing sources other than the one being updated against current schema
     for (const existingSource of model.sources) {
@@ -140,13 +158,8 @@ export class ProductSpecUpdaterService {
       }
     }
 
-    // Find existing source entry by URL, or create a new one
-    let source = sourceUrl
-      ? model.sources.find((s) => s.url === sourceUrl)
-      : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
-
     if (!source) {
-      source = new ProductModelSource();
+      source = new ProductSourceRecord();
       source.model = model;
       source.source = newSource;
       model.sources.push(source);
@@ -154,6 +167,9 @@ export class ProductSpecUpdaterService {
 
     source.url = sourceUrl;
     source.specs = processedSpecs;
+    source.rawSpecs = rawSpecs;
+    source.rawSpecsHash = rawSpecs ? hashRawSpecs(rawSpecs) : undefined;
+    source.externalId = externalId;
     source.specValid = validation.isValid;
     source.specErrors = validation.isValid ? {} : validation.errors;
     source.lastUpdated = new Date();
@@ -186,6 +202,8 @@ export class ProductSpecUpdaterService {
     this.logger.debug(
       `Updated specs for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
     );
+
+    return source;
   }
 
   private processSpecs(specs: ProductSpecs): ProductSpecs {
@@ -198,8 +216,8 @@ export class ProductSpecUpdaterService {
   }
 
   private getLatestSourcePerSource(
-    sources: ProductModelSource[],
-  ): ProductModelSource[] {
+    sources: ProductSourceRecord[],
+  ): ProductSourceRecord[] {
     const bySource = groupBy(sources, (s) => s.source?.id ?? 'manual');
     return Object.values(bySource).map(
       (entries) => maxBy(entries, (e) => e.lastUpdated)!,

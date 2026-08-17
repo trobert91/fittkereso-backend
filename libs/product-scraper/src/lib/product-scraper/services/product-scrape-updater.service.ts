@@ -7,8 +7,8 @@ import {
   ProductEmbedding,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
@@ -41,6 +41,7 @@ interface ResolvedIdentity {
 interface PersistResult {
   model: ProductModel;
   created: boolean;
+  sourceRecord?: ProductSourceRecord;
 }
 
 @Injectable()
@@ -56,7 +57,7 @@ export class ProductScrapeUpdaterService {
     private readonly productRepo: ProductModelRepository,
     private readonly taskRepo: ScrapeTaskRepository,
     private readonly aliasRepo: ProductAliasRepository,
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
@@ -100,6 +101,7 @@ export class ProductScrapeUpdaterService {
         task,
         scrapedProduct,
         model: persisted.model,
+        sourceRecord: persisted.sourceRecord,
       });
       return persisted.model;
     } catch (error) {
@@ -115,7 +117,7 @@ export class ProductScrapeUpdaterService {
   }
 
   // One canonical name for this scrape, used for Path 1 lookup, for the new
-  // ProductModelSource row, and for ProductModel.normalizedName on new products.
+  // ProductSourceRecord row, and for ProductModel.normalizedName on new products.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
     return this.productNormalizer.normalizeProduct({
       brand: scrapedProduct.brand,
@@ -145,7 +147,7 @@ export class ProductScrapeUpdaterService {
       return { isExistingMatch: false };
     }
     const sourceRows =
-      await this.productModelSourceRepo.findAllByNormalizedName(
+      await this.sourceRecordRepo.findAllByNormalizedName(
         normalizedSourceName,
         categoryId,
       );
@@ -221,9 +223,11 @@ export class ProductScrapeUpdaterService {
 
     this.applyScrapedProductDetails(model, scrapedProduct);
 
-    await this.specUpdaterService.updateSpecsOnProduct({
+    const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
       model,
       specs: scrapedProduct.specs,
+      rawSpecs: scrapedProduct.rawSpecs,
+      externalId: scrapedProduct.externalId,
       source: task.source,
       sourceUrl: task.url,
       sourceName: scrapedProduct.displayName,
@@ -236,6 +240,7 @@ export class ProductScrapeUpdaterService {
       scrapedProduct,
       task,
     });
+    saveOutcome.sourceRecord ??= sourceRecord;
 
     if (saveOutcome.created) {
       this.productMetricsService.newProductCreated(task.source.name);
@@ -256,8 +261,9 @@ export class ProductScrapeUpdaterService {
     task: ScrapeTask;
     scrapedProduct: ScrapedProduct;
     model: ProductModel;
+    sourceRecord?: ProductSourceRecord;
   }): Promise<void> {
-    const { task, scrapedProduct, model } = params;
+    const { task, scrapedProduct, model, sourceRecord } = params;
 
     if (!model.slug) {
       await this.generateProductSlug(model);
@@ -300,19 +306,26 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    await this.createOrUpdateOffers(task, scrapedProduct, model);
+    await this.createOrUpdateOffers(task, scrapedProduct, model, sourceRecord);
   }
 
-  // No-op today for both current sources — neither's config populates
-  // ScrapedProduct.offers yet. Wired up now so a future source only needs to
-  // populate detailPage.offers.* selectors, not touch this pipeline.
+  // No-op for sources whose config doesn't populate ScrapedProduct.offers.
   private async createOrUpdateOffers(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
     model: ProductModel,
+    sourceRecord: ProductSourceRecord | undefined,
   ): Promise<void> {
     const offers = scrapedProduct.offers;
     if (isEmpty(offers)) return;
+
+    if (!sourceRecord) {
+      this.logger.warn(
+        'No ProductSourceRecord resolved for this scrape, skipping offer upsert',
+        { taskId: task.id, url: task.url },
+      );
+      return;
+    }
 
     for (const scraped of offers!) {
       try {
@@ -322,7 +335,7 @@ export class ProductScrapeUpdaterService {
         await this.offerRepo.upsertFromScrape({
           model,
           seller,
-          source: task.source,
+          sourceRecord,
           price: scraped.price,
           currency: scraped.currency,
           availability: scraped.availability,
@@ -388,10 +401,10 @@ export class ProductScrapeUpdaterService {
   // cross-source row; reject same-source-different-name rows so Path 2's same-source
   // gate can treat the scrape as a distinct product.
   private selectPath1Match(
-    sourceRows: ProductModelSource[],
+    sourceRows: ProductSourceRecord[],
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
-  ): ProductModelSource | undefined {
+  ): ProductSourceRecord | undefined {
     if (isEmpty(sourceRows)) return undefined;
 
     const incomingName = scrapedProduct.displayName?.toLowerCase();
@@ -497,9 +510,11 @@ export class ProductScrapeUpdaterService {
       );
 
       this.applyScrapedProductDetails(existingModel, scrapedProduct);
-      await this.specUpdaterService.updateSpecsOnProduct({
+      const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
         model: existingModel,
         specs: scrapedProduct.specs,
+        rawSpecs: scrapedProduct.rawSpecs,
+        externalId: scrapedProduct.externalId,
         source: task.source,
         sourceUrl: task.url,
         sourceName: scrapedProduct.displayName,
@@ -509,6 +524,7 @@ export class ProductScrapeUpdaterService {
       return {
         model: await this.productRepo.save(existingModel),
         created: false,
+        sourceRecord,
       };
     }
   }

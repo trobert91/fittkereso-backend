@@ -6,3 +6,4 @@ export * from './product-spec-normalization.service';
 export * from './product-spec-context.service';
 export * from './spec-extraction.service';
 export * from './spec-translation-selector.service';
+export * from './spec-unification.service';

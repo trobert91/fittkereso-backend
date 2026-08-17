@@ -3,8 +3,8 @@ import { AppModule } from '../app.module';
 import {
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -15,7 +15,7 @@ async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
 
   const productRepo = app.get(ProductModelRepository);
-  const sourceRepo = app.get(ProductModelSourceRepository);
+  const sourceRepo = app.get(ProductSourceRecordRepository);
   const normalizer = app.get(ProductNormalizerService);
 
   // 1. Backfill ProductModel.normalizedName
@@ -71,12 +71,12 @@ async function bootstrap() {
     `  ProductModel: ${modelsUpdated} updated, ${modelsSkipped} unchanged, ${modelsFailed} failed.`,
   );
 
-  // 2. Backfill ProductModelSource.normalizedSourceName
-  console.log('Backfilling ProductModelSource.normalizedSourceName...');
+  // 2. Backfill ProductSourceRecord.normalizedSourceName
+  console.log('Backfilling ProductSourceRecord.normalizedSourceName...');
   const sources = await sourceRepo.find({
     relations: [
-      nameOf<ProductModelSource>('model'),
-      `${nameOf<ProductModelSource>('model')}.${nameOf<ProductModel>('brand')}`,
+      nameOf<ProductSourceRecord>('model'),
+      `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('brand')}`,
     ],
   });
 
@@ -85,7 +85,7 @@ async function bootstrap() {
   let sourcesFailed = 0;
   for (let i = 0; i < sources.length; i += BATCH_SIZE) {
     const batch = sources.slice(i, i + BATCH_SIZE);
-    const toSave: ProductModelSource[] = [];
+    const toSave: ProductSourceRecord[] = [];
     for (const source of batch) {
       const brandName = source.model?.brand?.name ?? '';
       const displayName = source.sourceName ?? source.model?.displayName;
@@ -129,7 +129,7 @@ async function bootstrap() {
     );
   }
   console.log(
-    `  ProductModelSource: ${sourcesUpdated} updated, ${sourcesSkipped} unchanged, ${sourcesFailed} failed.`,
+    `  ProductSourceRecord: ${sourcesUpdated} updated, ${sourcesSkipped} unchanged, ${sourcesFailed} failed.`,
   );
 
   console.log('Normalized-name backfill complete.');

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ProductCategoryConfig } from '@fittkereso-backend/database';
 import type {
+  ProductSpecs,
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
 } from '@fittkereso-backend/database';
@@ -11,6 +12,7 @@ interface CategoryConfigFiles {
   config?: ProductCategoryConfig;
   jsonSchema?: SpecDefinitionJsonSchema;
   uiSchema?: SpecDefinitionUiSchema;
+  goldenSample?: ProductSpecs;
 }
 
 @Injectable()
@@ -50,6 +52,16 @@ export class CategoryConfigService {
     return this.configCache.get(slug)?.uiSchema;
   }
 
+  /**
+   * One real, fully-populated ProductSpecs example in the category's target
+   * canonical shape — used to anchor SpecUnificationService's LLM output
+   * format. Absent for categories that don't use LLM spec unification.
+   */
+  getGoldenSample(slug: string | null | undefined): ProductSpecs | undefined {
+    if (!slug) return undefined;
+    return this.configCache.get(slug)?.goldenSample;
+  }
+
   // ─── Write Methods ──────────────────────────────────────────────────────────
 
   writeConfig(slug: string, config: ProductCategoryConfig): void {
@@ -70,6 +82,13 @@ export class CategoryConfigService {
     this.ensureCategoryDirectory(slug);
     const filePath = path.join(this.categoriesPath, slug, 'uiSchema.json');
     fs.writeFileSync(filePath, JSON.stringify(schema, null, 2) + '\n');
+    this.reloadCategory(slug);
+  }
+
+  writeGoldenSample(slug: string, goldenSample: ProductSpecs): void {
+    this.ensureCategoryDirectory(slug);
+    const filePath = path.join(this.categoriesPath, slug, 'goldenSample.json');
+    fs.writeFileSync(filePath, JSON.stringify(goldenSample, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -131,6 +150,9 @@ export class CategoryConfigService {
       ),
       uiSchema: this.readJsonFile<SpecDefinitionUiSchema>(
         path.join(categoryDirectory, 'uiSchema.json'),
+      ),
+      goldenSample: this.readJsonFile<ProductSpecs>(
+        path.join(categoryDirectory, 'goldenSample.json'),
       ),
     };
   }

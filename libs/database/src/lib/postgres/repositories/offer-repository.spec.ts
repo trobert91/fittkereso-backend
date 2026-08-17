@@ -7,7 +7,7 @@ function makeParams(overrides: Partial<Parameters<OfferRepository['upsertFromScr
   return {
     model: { id: 'model-1' } as never,
     seller: { id: 'seller-1' } as never,
-    source: { id: 'source-1' } as never,
+    sourceRecord: { id: 'source-record-1' } as never,
     price: 199990,
     currency: 'HUF',
     availability: OfferAvailability.in_stock,

@@ -5,8 +5,8 @@ import { ProductCategory } from './postgres/models/product-category.entity';
 import { ProductAlias } from './postgres/models/product-alias.entity';
 import { ProductCategoryRepository } from './postgres/repositories/product-category-repository';
 import { ProductModelRepository } from './postgres/repositories/product-model-repository';
-import { ProductModelSource } from './postgres/models/product-model-source.entity';
-import { ProductModelSourceRepository } from './postgres/repositories/product-model-source-repository';
+import { ProductSourceRecord } from './postgres/models/product-source-record.entity';
+import { ProductSourceRecordRepository } from './postgres/repositories/product-source-record-repository';
 import { ProductAliasRepository } from './postgres/repositories/product-alias-repository';
 import { Task } from './postgres/models/task.entity';
 import { TaskRepository } from './postgres/repositories/task-repository';
@@ -42,7 +42,7 @@ export const entityList = [
   ProductAlias,
   ProductCategory,
   ProductModel,
-  ProductModelSource,
+  ProductSourceRecord,
   ProductEmbedding,
   ProductImage,
   ProductSource,
@@ -64,7 +64,7 @@ export const entityList = [
     ProductAliasRepository,
     ProductCategoryRepository,
     ProductModelRepository,
-    ProductModelSourceRepository,
+    ProductSourceRecordRepository,
     ProductImageRepository,
     ProductSourceRepository,
     ScrapeTaskRepository,
@@ -82,7 +82,7 @@ export const entityList = [
     ProductAliasRepository,
     ProductCategoryRepository,
     ProductModelRepository,
-    ProductModelSourceRepository,
+    ProductSourceRecordRepository,
     ProductImageRepository,
     ProductSourceRepository,
     ScrapeTaskRepository,
