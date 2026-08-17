@@ -2,7 +2,6 @@ import {
   OfferAvailability,
   ProductSourceRecord,
   ProductSourceRecordRepository,
-  ProductSpecs,
   ScrapeTask,
   SourceSpecConfig,
   SpecDefinitionJsonSchema,
@@ -16,6 +15,9 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { hashRawSpecs } from '@fittkereso-backend/utils';
 import {
+  DeterministicProductData,
+  MergedProductData,
+  ProductSourcePostProcessMergeService,
   ProductSourcePostProcessService,
   ScrapedOffer,
   ScrapedProduct,
@@ -45,6 +47,7 @@ export class ProductDetailsPageScraperService {
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
     private readonly postProcess: ProductSourcePostProcessService,
+    private readonly postProcessMerge: ProductSourcePostProcessMergeService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
@@ -253,26 +256,31 @@ export class ProductDetailsPageScraperService {
         })
       : {};
 
-    const { specs, model } = await this.maybePostProcess({
-      task,
-      deterministicSpecs,
-      rawSpecs: detail.rawSpecs,
-      rawModel: detail.model,
+    const deterministicData: DeterministicProductData = {
       brand: detail.brand,
+      model: detail.model,
+      specs: deterministicSpecs,
+      releaseYear: detail.releaseYear,
+    };
+
+    const { brand, model, specs, releaseYear } = await this.maybePostProcess({
+      task,
+      data: deterministicData,
+      rawSpecs: detail.rawSpecs,
       jsonSchema,
       categorySlug: category.slug,
     });
 
     return {
-      brand: detail.brand,
+      brand,
       model,
-      displayName: `${detail.brand} ${model}`.trim(),
+      displayName: `${brand} ${model}`.trim(),
       category,
       specs,
       rawSpecs: detail.rawSpecs,
       externalId: detail.externalId,
       aliases: detail.aliases,
-      releaseYear: detail.releaseYear,
+      releaseYear,
       imageUrls: detail.imageUrls,
       offers: this.toScrapedOffers(detail.rawOffers),
     };
@@ -301,18 +309,16 @@ export class ProductDetailsPageScraperService {
 
   private async maybePostProcess(params: {
     task: ScrapeTask;
-    deterministicSpecs: ProductSpecs;
+    data: DeterministicProductData;
     rawSpecs: ScrapedProductSpec[];
-    rawModel: string;
-    brand: string;
     jsonSchema: SpecDefinitionJsonSchema;
     categorySlug: string;
-  }): Promise<{ specs: ProductSpecs; model: string }> {
-    const { task, deterministicSpecs, rawSpecs, rawModel, brand, jsonSchema, categorySlug } =
-      params;
-    const unificationConfig = task.source.config.detailPage.specUnification;
-    if (!unificationConfig?.enabled) {
-      return { specs: deterministicSpecs, model: rawModel };
+  }): Promise<MergedProductData> {
+    const { task, data, rawSpecs, jsonSchema, categorySlug } = params;
+    const postProcessConfig = task.source.config.detailPage.postProcess;
+
+    if (!postProcessConfig?.enabled) {
+      return this.postProcessMerge.merge(data, undefined);
     }
 
     const goldenSample = this.categoryConfigService.getGoldenSample(categorySlug);
@@ -321,20 +327,18 @@ export class ProductDetailsPageScraperService {
         `Post-processing enabled for source '${task.source.name}' but category '${categorySlug}' has no golden sample, skipping`,
         { taskId: task.id, url: task.url },
       );
-      return { specs: deterministicSpecs, model: rawModel };
+      return this.postProcessMerge.merge(data, undefined);
     }
 
-    const result = await this.postProcess.process({
-      extractedSpecs: deterministicSpecs,
+    const llmContribution = await this.postProcess.process({
+      data,
       rawSpecs,
-      rawModel,
-      brand,
       schema: jsonSchema,
       goldenSample,
-      model: unificationConfig.model,
+      model: postProcessConfig.model,
     });
 
-    return { specs: result.specs, model: result.model ?? rawModel };
+    return this.postProcessMerge.merge(data, llmContribution);
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before

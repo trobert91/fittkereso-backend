@@ -12,12 +12,22 @@ import speedbikeConfig from './speedbike.config.json';
 // (KTM Macina Scarp SX Prestige Di2, Olive Pearl — saved from
 // docs/products/... in this repo's working directory during onboarding),
 // reduced to the structural pieces the config actually reads: the inline
-// `ShopRenter.product` script blob, the schema.org breadcrumb, and the
-// `table.parameter_table` spec sheet.
+// `ShopRenter.product` script blob, the schema.org breadcrumb, the
+// `table.parameter_table` spec sheet, and the `og:image` meta tag.
+//
+// Note: the site's actual product image gallery (`#productimages_wrapper`,
+// `.fancybox`/`.product-images img`) is injected client-side by JS after
+// page load and is NOT present in the server-rendered HTML a non-JS-
+// rendering fetch (e.g. Zyte extract) sees — confirmed by fetching the real
+// page and finding no `<img>` elements under those selectors, only the
+// fancybox library's own <script>/<link> tags. The one reliable
+// statically-rendered product image reference is the `og:image` meta tag,
+// which is what `detailPage.images` targets instead.
 function buildHtml(): string {
   return `
     <html>
       <head>
+        <meta property="og:image" content="https://speedbike2.cdn.shoprenter.hu/custom/speedbike2/image/cache/w1955h1024q100/KTM-2026/1260044108.webp?lastmod=1761570968.1772457778" />
         <script>
           var BASEURL = 'https://speedbike.hu';
           var ShopRenter = ShopRenter || {}; ShopRenter.product = {"id":92513,"sku":"1260044103","currency":"HUF","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben","brand":"KTM","currentVariant":[],"parent":{"id":92513,"sku":"1260044103","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben"}};
@@ -105,6 +115,10 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
     ]);
 
     expect(result.releaseYear).toBe(2026);
+
+    expect(result.imageUrls).toEqual([
+      'https://speedbike2.cdn.shoprenter.hu/custom/speedbike2/image/cache/w1955h1024q100/KTM-2026/1260044108.webp?lastmod=1761570968.1772457778',
+    ]);
 
     expect(result.rawOffers).toEqual([
       {

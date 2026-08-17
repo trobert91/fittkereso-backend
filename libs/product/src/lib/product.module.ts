@@ -28,6 +28,7 @@ import {
   SpecExtractionService,
   SpecTranslationSelectorService,
   ProductSourcePostProcessService,
+  ProductSourcePostProcessMergeService,
 } from './services';
 import { ProductDetailService } from './services/product-detail.service';
 import { ProductUpdateService } from './services/update/product-update.service';
@@ -103,6 +104,7 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductMergeService,
     SpecExtractionService,
     ProductSourcePostProcessService,
+    ProductSourcePostProcessMergeService,
     SpecComparisonService,
     ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,
@@ -147,6 +149,7 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductMergeService,
     SpecExtractionService,
     ProductSourcePostProcessService,
+    ProductSourcePostProcessMergeService,
     SpecComparisonService,
     ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,

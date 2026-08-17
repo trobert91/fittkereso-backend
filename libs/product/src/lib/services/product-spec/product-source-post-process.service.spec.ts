@@ -37,23 +37,27 @@ describe('ProductSourcePostProcessService', () => {
     specNormalizer.normalize.mockReturnValueOnce({ weight: 21.5, frameType: 'Full-suspension' });
 
     const result = await service.process({
-      extractedSpecs: { Súly: '21,5 kg' } as any,
+      data: {
+        brand: 'KTM',
+        model: 'Macina Scarp',
+        specs: { Súly: '21,5 kg' } as any,
+      },
       schema,
       goldenSample,
     });
 
-    expect(result.specs).toEqual({ weight: 21.5, frameType: 'Full-suspension' });
+    expect(result?.specs).toEqual({ weight: 21.5, frameType: 'Full-suspension' });
     expect(specNormalizer.normalize).toHaveBeenCalledWith(unifiedSpecs, schema);
   });
 
-  it('sends the deterministic extracted specs as the user message and the schema/golden sample in the system prompt', async () => {
+  it('sends the deterministic data as the user message and the schema/golden sample in the system prompt', async () => {
     aiChat.createChat.mockResolvedValueOnce({
       content: '{}',
       parsed: {},
     });
 
     await service.process({
-      extractedSpecs: { weight: 22 },
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
       schema,
       goldenSample,
       model: 'custom-model',
@@ -71,7 +75,12 @@ describe('ProductSourcePostProcessService', () => {
           }),
           expect.objectContaining({
             role: 'user',
-            content: JSON.stringify({ deterministicSpecs: { weight: 22 } }),
+            content: JSON.stringify({
+              deterministicSpecs: { weight: 22 },
+              rawModel: 'Macina Scarp',
+              brand: 'KTM',
+              releaseYear: undefined,
+            }),
           }),
         ],
       }),
@@ -82,7 +91,7 @@ describe('ProductSourcePostProcessService', () => {
     aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
     await service.process({
-      extractedSpecs: { weight: 22 },
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
       rawSpecs: [
         { name: 'Motor', description: 'Bosch PERFORMANCE SX BDU3144' },
         { name: 'Váz', sectionTitle: 'Alváz', values: ['Macina Scarp Prem'] },
@@ -99,6 +108,9 @@ describe('ProductSourcePostProcessService', () => {
             role: 'user',
             content: JSON.stringify({
               deterministicSpecs: { weight: 22 },
+              rawModel: 'Macina Scarp',
+              brand: 'KTM',
+              releaseYear: undefined,
               rawSpecs: [
                 { name: 'Motor', description: 'Bosch PERFORMANCE SX BDU3144' },
                 { name: 'Váz', section: 'Alváz', values: ['Macina Scarp Prem'] },
@@ -125,7 +137,7 @@ describe('ProductSourcePostProcessService', () => {
     };
 
     await service.process({
-      extractedSpecs: {},
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
       schema: enumSchema,
       goldenSample: { drivetrain: 'Lánc' },
     });
@@ -152,49 +164,136 @@ describe('ProductSourcePostProcessService', () => {
     );
   });
 
+  it('includes brand and releaseYear as optional properties in the response schema, with no required array', async () => {
+    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+    await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+    });
+
+    expect(aiChat.createChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schema: expect.objectContaining({
+          properties: expect.objectContaining({
+            brand: { type: 'string' },
+            model: { type: 'string' },
+            releaseYear: { type: 'number' },
+          }),
+        }),
+      }),
+    );
+
+    const callArgs = aiChat.createChat.mock.calls[0][0];
+    expect(callArgs.schema.required).toBeUndefined();
+    expect(callArgs.schema.properties.specs.required).toBeUndefined();
+  });
+
   it('defaults to deepseek-v4-flash when no model override is given', async () => {
     aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-    await service.process({ extractedSpecs: {}, schema, goldenSample });
+    await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+    });
 
     expect(aiChat.createChat).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'deepseek-v4-flash' }),
     );
   });
 
-  it('falls back to the deterministic specs and raw model when the LLM call throws', async () => {
+  it('returns undefined when the LLM call throws', async () => {
     aiChat.createChat.mockRejectedValueOnce(new Error('provider error'));
-    const extractedSpecs = { weight: 22 };
 
     const result = await service.process({
-      extractedSpecs,
-      rawModel: 'KTM MACINA SCARP SX PRESTIGE Di2 M/43 electric bike',
-      brand: 'KTM',
+      data: {
+        brand: 'KTM',
+        model: 'KTM MACINA SCARP SX PRESTIGE Di2 M/43 electric bike',
+        specs: { weight: 22 },
+      },
       schema,
       goldenSample,
     });
 
-    expect(result.specs).toBe(extractedSpecs);
-    expect(result.model).toBe('KTM MACINA SCARP SX PRESTIGE Di2 M/43 electric bike');
+    expect(result).toBeUndefined();
     expect(specNormalizer.normalize).not.toHaveBeenCalled();
   });
 
-  it('falls back to the deterministic specs and raw model when the response has no parsed output', async () => {
+  it('returns undefined when the response has no parsed output', async () => {
     aiChat.createChat.mockResolvedValueOnce({ content: 'not json', parsed: undefined });
-    const extractedSpecs = { weight: 22 };
 
     const result = await service.process({
-      extractedSpecs,
-      rawModel: 'raw title',
+      data: { brand: 'brand', model: 'raw title', specs: { weight: 22 } },
       schema,
       goldenSample,
     });
 
-    expect(result.specs).toBe(extractedSpecs);
-    expect(result.model).toBe('raw title');
+    expect(result).toBeUndefined();
   });
 
-  it('cleans the raw model via the LLM when rawModel is provided, stripping brand/boilerplate', async () => {
+  it('returns undefined when parsed output contributes nothing on any field', async () => {
+    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+    const result = await service.process({
+      data: { brand: 'brand', model: 'raw title', specs: { weight: 22 } },
+      schema,
+      goldenSample,
+    });
+
+    expect(result).toBeUndefined();
+  });
+
+  it('trims a whitespace-only LLM model to undefined rather than passing it through', async () => {
+    aiChat.createChat.mockResolvedValueOnce({
+      content: JSON.stringify({ model: '   ' }),
+      parsed: { model: '   ' },
+    });
+
+    const result = await service.process({
+      data: { brand: 'KTM', model: 'raw title', specs: {} },
+      schema,
+      goldenSample,
+    });
+
+    // Model alone resolving to nothing means the whole contribution is empty.
+    expect(result).toBeUndefined();
+  });
+
+  it('trims a whitespace-only LLM brand to undefined rather than passing it through', async () => {
+    aiChat.createChat.mockResolvedValueOnce({
+      content: JSON.stringify({ brand: '  ', model: 'Macina Scarp' }),
+      parsed: { brand: '  ', model: 'Macina Scarp' },
+    });
+
+    const result = await service.process({
+      data: { brand: 'KTM', model: 'raw title', specs: {} },
+      schema,
+      goldenSample,
+    });
+
+    expect(result?.brand).toBeUndefined();
+    expect(result?.model).toBe('Macina Scarp');
+  });
+
+  it('passes a plain-undefined LLM releaseYear through untouched', async () => {
+    aiChat.createChat.mockResolvedValueOnce({
+      content: JSON.stringify({ model: 'Macina Scarp' }),
+      parsed: { model: 'Macina Scarp' },
+    });
+
+    const result = await service.process({
+      data: { brand: 'KTM', model: 'raw title', specs: {}, releaseYear: 2024 },
+      schema,
+      goldenSample,
+    });
+
+    expect(result?.releaseYear).toBeUndefined();
+    expect(result?.model).toBe('Macina Scarp');
+  });
+
+  it('cleans the raw model via the LLM, stripping brand/boilerplate', async () => {
     const cleanedModel = 'MACINA SCARP SX PRESTIGE Di2';
     aiChat.createChat.mockResolvedValueOnce({
       content: JSON.stringify({ specs: {}, model: cleanedModel }),
@@ -202,21 +301,23 @@ describe('ProductSourcePostProcessService', () => {
     });
 
     const result = await service.process({
-      extractedSpecs: {},
-      rawModel:
-        'KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben',
-      brand: 'KTM',
+      data: {
+        brand: 'KTM',
+        model:
+          'KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben',
+        specs: {},
+      },
       schema,
       goldenSample,
     });
 
-    expect(result.model).toBe(cleanedModel);
+    expect(result?.model).toBe(cleanedModel);
     expect(aiChat.createChat).toHaveBeenCalledWith(
       expect.objectContaining({
         messages: [
           expect.objectContaining({
             role: 'system',
-            content: expect.stringContaining('rawModel'),
+            content: expect.stringContaining('"model"'),
           }),
           expect.objectContaining({
             role: 'user',
@@ -227,21 +328,18 @@ describe('ProductSourcePostProcessService', () => {
     );
   });
 
-  it('keeps the raw model unchanged when rawModel is not provided (no model cleanup requested)', async () => {
-    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+  it('returns a corrected brand when the LLM confidently provides one', async () => {
+    aiChat.createChat.mockResolvedValueOnce({
+      content: JSON.stringify({ brand: 'KTM' }),
+      parsed: { brand: 'KTM' },
+    });
 
-    const result = await service.process({ extractedSpecs: {}, schema, goldenSample });
+    const result = await service.process({
+      data: { brand: 'ktm', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+    });
 
-    expect(result.model).toBeUndefined();
-    expect(aiChat.createChat).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: [
-          expect.objectContaining({
-            content: expect.not.stringContaining('rawModel'),
-          }),
-          expect.anything(),
-        ],
-      }),
-    );
+    expect(result?.brand).toBe('KTM');
   });
 });

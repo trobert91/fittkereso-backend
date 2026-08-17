@@ -10,10 +10,27 @@ import { ProductSpecNormalizationService } from './product-spec-normalization.se
 
 const DEFAULT_MODEL = 'deepseek-v4-flash';
 
-export interface ProductSourcePostProcessResult {
+/** Deterministic, pre-LLM view of a scraped product. */
+export interface DeterministicProductData {
+  brand: string;
+  model: string;
   specs: ProductSpecs;
-  model?: string;
+  releaseYear?: number;
 }
+
+/**
+ * What the LLM may confidently contribute — same shape as
+ * DeterministicProductData, every field optional. Fields the LLM isn't
+ * confident about are omitted rather than guessed.
+ */
+export interface LlmProductContribution {
+  brand?: string;
+  model?: string;
+  specs?: ProductSpecs;
+  releaseYear?: number;
+}
+
+export type ProductSourcePostProcessResult = LlmProductContribution;
 
 /**
  * Post-processes a source's deterministically-extracted data via a single
@@ -24,18 +41,22 @@ export interface ProductSourcePostProcessResult {
  *    stripping brand/marketing/color/gender/category boilerplate that some
  *    sources (e.g. speedbike.hu, whose ShopRenter.product.name is the full
  *    listing title) bake into the same field
+ *  - optionally corrects brand/releaseYear when confidently derivable from
+ *    the input
  *
  * Runs AFTER SpecExtractionService, not instead of it — the deterministic
  * pass already did unit stripping/number extraction/value remapping; this
  * pass only re-keys/re-shapes into the canonical field set for sources whose
- * raw labels don't line up with the category's SourceSpecMapping[] entries,
- * and only cleans the model name for sources whose raw title field isn't
- * already a clean model name.
+ * raw labels don't line up with the category's SourceSpecMapping[] entries.
  *
- * Mirrors TranslationService's degrade-on-failure contract: any internal
- * error (LLM call failure, schema validation failure) is caught and the
- * caller gets `extractedSpecs`/`rawModel` back unchanged, never a thrown
- * error — a failed post-process pass should not fail the whole scrape.
+ * Returns only what the LLM confidently contributed (or `undefined` on any
+ * failure) — never a value pre-merged with deterministic data. Merging is
+ * ProductSourcePostProcessMergeService's job, so "no LLM contribution" has
+ * exactly one shape (`undefined`) regardless of why: disabled, no golden
+ * sample, thrown error, or an empty parsed response. Mirrors
+ * TranslationService's degrade-on-failure contract: any internal error (LLM
+ * call failure, schema validation failure) is caught and never thrown — a
+ * failed post-process pass should not fail the whole scrape.
  */
 @Injectable()
 export class ProductSourcePostProcessService {
@@ -49,20 +70,13 @@ export class ProductSourcePostProcessService {
   ) {}
 
   async process(params: {
-    extractedSpecs: ProductSpecs;
+    data: DeterministicProductData;
     rawSpecs?: ScrapedProductSpec[];
-    rawModel?: string;
-    brand?: string;
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     model?: string;
-  }): Promise<ProductSourcePostProcessResult> {
-    const { extractedSpecs, rawSpecs, rawModel, brand, schema, goldenSample, model } =
-      params;
-    const fallback: ProductSourcePostProcessResult = {
-      specs: extractedSpecs,
-      model: rawModel,
-    };
+  }): Promise<ProductSourcePostProcessResult | undefined> {
+    const { data, rawSpecs, schema, goldenSample, model } = params;
 
     try {
       const response = await this.aiChat.createChat({
@@ -73,44 +87,60 @@ export class ProductSourcePostProcessService {
         messages: [
           {
             role: 'system',
-            content: this.buildSystemPrompt(schema, goldenSample, !!rawModel),
+            content: this.buildSystemPrompt(schema, goldenSample),
           },
           {
             role: 'user',
-            content: this.buildUserMessage(extractedSpecs, rawSpecs, rawModel, brand),
+            content: this.buildUserMessage(data, rawSpecs),
           },
         ],
         temperature: 1,
       });
 
-      const parsed = response.parsed as
-        | { specs?: ProductSpecs; model?: string }
-        | undefined;
+      const parsed = response.parsed as LlmProductContribution | undefined;
       if (!parsed) {
-        this.logger.warn('Post-process returned no parsed output, falling back', {
-          preview: response.content?.slice(0, 200),
-        });
-        return fallback;
+        this.logger.warn(
+          'Post-process returned no usable output, degrading to deterministic-only',
+          { preview: response.content?.slice(0, 200) },
+        );
+        return undefined;
       }
 
-      return {
+      const sanitized: LlmProductContribution = {
+        brand: parsed.brand?.trim() || undefined,
+        model: parsed.model?.trim() || undefined,
         specs: parsed.specs
           ? this.specNormalizer.normalize(parsed.specs, schema)
-          : extractedSpecs,
-        model: parsed.model?.trim() || rawModel,
+          : undefined,
+        releaseYear: parsed.releaseYear,
       };
+
+      if (
+        sanitized.brand === undefined &&
+        sanitized.model === undefined &&
+        sanitized.specs === undefined &&
+        sanitized.releaseYear === undefined
+      ) {
+        this.logger.warn(
+          'Post-process contributed nothing usable after sanitization, degrading to deterministic-only',
+          { preview: response.content?.slice(0, 200) },
+        );
+        return undefined;
+      }
+
+      return sanitized;
     } catch (error: unknown) {
-      this.logger.warn('Post-process LLM call failed, falling back to deterministic data', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return fallback;
+      this.logger.warn(
+        'Post-process LLM call failed, degrading to deterministic-only',
+        { error: error instanceof Error ? error.message : String(error) },
+      );
+      return undefined;
     }
   }
 
   private buildSystemPrompt(
     schema: SpecDefinitionJsonSchema,
     goldenSample: ProductSpecs,
-    includeModelCleanup: boolean,
   ): string {
     const fieldDescriptions = Object.entries(schema.properties)
       .map(([key, prop]) => {
@@ -126,14 +156,16 @@ export class ProductSourcePostProcessService {
       })
       .join('\n');
 
-    const modelInstructions = includeModelCleanup
-      ? `\n\nThe user message also has a "rawModel" string (the source's raw, uncleaned model/title field) and a "brand" string (the product's already-known, correct brand name). Return a "model" field: the clean model name only — strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), color names, gender/target-audience words, and year, but KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If rawModel is already a clean model name with nothing to strip, return it unchanged. Never invent a model name that isn't derivable from rawModel.`
-      : '';
-
     return (
-      `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below, but all string spec VALUES must be in Hungarian (translate if the source data is in another language, e.g. English or German). The "model" field (if requested) should stay in whatever language the source uses for model names — do not translate it.\n\n` +
+      `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below, but all string spec VALUES must be in Hungarian (translate if the source data is in another language, e.g. English or German). The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
       `Canonical spec fields:\n${fieldDescriptions}\n\n` +
-      `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSample, null, 2)}${modelInstructions}\n\n` +
+      `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSample, null, 2)}\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text), "specs" (already deterministically mapped), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
+      `Field-specific guidance:\n` +
+      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), color names, gender/target-audience words, and year, but KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
+      `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
+      `- "releaseYear": only return this if a release/model year is explicitly stated somewhere in the input (deterministicSpecs or rawSpecs) — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context (e.g. don't infer it from a model name).\n` +
+      `- "specs": see the rules below.\n\n` +
       `Rules:\n` +
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass) and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
       `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs gives a more precise value for the same field.\n` +
@@ -142,18 +174,19 @@ export class ProductSourcePostProcessService {
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
-      `- Return a single JSON object with a "specs" key (canonical field names only) ${includeModelCleanup ? 'and a "model" key' : ''}.`
+      `- Return a single JSON object with a "specs" key (canonical field names, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model"/"releaseYear" keys per the field-specific guidance above.`
     );
   }
 
   private buildUserMessage(
-    extractedSpecs: ProductSpecs,
+    data: DeterministicProductData,
     rawSpecs: ScrapedProductSpec[] | undefined,
-    rawModel: string | undefined,
-    brand: string | undefined,
   ): string {
     const payload: Record<string, unknown> = {
-      deterministicSpecs: extractedSpecs,
+      deterministicSpecs: data.specs,
+      rawModel: data.model,
+      brand: data.brand,
+      releaseYear: data.releaseYear,
     };
 
     if (rawSpecs?.length) {
@@ -165,20 +198,15 @@ export class ProductSourcePostProcessService {
       }));
     }
 
-    if (rawModel) {
-      payload['rawModel'] = rawModel;
-      payload['brand'] = brand;
-    }
-
     return JSON.stringify(payload);
   }
 
   /**
    * Builds a strict-mode-valid JSON Schema for the response — a "specs"
-   * object (derived from the category's SpecDefinitionJsonSchema properties,
-   * additionalProperties: false, no required keys — every field is optional
-   * since a source may not expose all of them) plus an optional "model"
-   * string.
+   * object (derived from the category's SpecDefinitionJsonSchema properties)
+   * plus optional "brand"/"model"/"releaseYear" fields. No `required` array
+   * anywhere (top level or inside "specs") — the LLM should only populate
+   * fields it's confident about; every field is optional.
    *
    * Cannot pass `schema.properties` straight through: SpecDefinitionProperty
    * carries a `meta` key (unit/examples/options/order — our own convention,
@@ -203,12 +231,14 @@ export class ProductSourcePostProcessService {
       type: 'object',
       additionalProperties: false,
       properties: {
+        brand: { type: 'string' },
+        model: { type: 'string' },
+        releaseYear: { type: 'number' },
         specs: {
           type: 'object',
           additionalProperties: false,
           properties,
         },
-        model: { type: 'string' },
       },
     };
   }

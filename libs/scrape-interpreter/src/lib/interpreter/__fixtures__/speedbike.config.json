@@ -120,8 +120,8 @@
     ],
 
     "images": [
-      { "op": "selectAll", "selector": ".fancybox img, .product-images img" },
-      { "op": "extractAttrList", "attr": "src", "trim": true }
+      { "op": "selectAll", "selector": "meta[property=\"og:image\"]" },
+      { "op": "extractAttrList", "attr": "content", "trim": true }
     ],
 
     "specMapping": {
@@ -188,7 +188,7 @@
       "contextTemplate": "Technical specification values from a speedbike.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."
     },
 
-    "specUnification": {
+    "postProcess": {
       "enabled": true
     }
   }

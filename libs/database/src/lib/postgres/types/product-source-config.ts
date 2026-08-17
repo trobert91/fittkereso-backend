@@ -44,13 +44,13 @@ export interface ProductSourceTranslationConfig {
 
 /**
  * Per-source switch for the LLM post-processing pass
- * (ProductSourcePostProcessService) — spec unification plus model-name
- * cleanup — which runs after the deterministic SourceSpecMapping[]
- * extraction. The category-level pieces the LLM call needs (canonical
- * schema, golden sample) live in category config, not here — every source
- * in a category shares them.
+ * (ProductSourcePostProcessService) — brand/model/specs/releaseYear
+ * post-processing — which runs after the deterministic
+ * SourceSpecMapping[]/scrape-op extraction. The category-level pieces the
+ * LLM call needs (canonical schema, golden sample) live in category config,
+ * not here — every source in a category shares them.
  */
-export interface ProductSourceSpecUnificationConfig {
+export interface ProductSourcePostProcessConfig {
   enabled: boolean;
   model?: string;
 }
@@ -77,7 +77,7 @@ export interface ProductSourceDetailPageConfig {
   specMapping: Record<string, SourceSpecConfig>;
   offers?: ProductSourceOffersConfig;
   translation?: ProductSourceTranslationConfig;
-  specUnification?: ProductSourceSpecUnificationConfig;
+  postProcess?: ProductSourcePostProcessConfig;
 }
 
 export interface ProductSourceConfig {

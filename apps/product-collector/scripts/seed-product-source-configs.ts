@@ -106,9 +106,9 @@ const SOURCES: SeedSourceSpec[] = [
       slug: 'speedbike',
       domains: ['speedbike.hu'],
     },
-    // First-time source, also the first to use detailPage.specUnification —
+    // First-time source, also the first to use detailPage.postProcess —
     // keep scheduling off until a manual dry run confirms both the scrape
-    // config and the LLM unification pass behave as expected end to end.
+    // config and the LLM post-process pass behave as expected end to end.
     schedulingEnabled: false,
   },
 ];

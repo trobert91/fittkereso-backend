@@ -108,9 +108,9 @@ describe('hand-authored source configs', () => {
     ]);
   });
 
-  it('speedbike config enables LLM spec unification', () => {
+  it('speedbike config enables LLM post-processing', () => {
     const config = speedbikeConfig as unknown as ProductSourceConfig;
-    expect(config.detailPage.specUnification?.enabled).toBe(true);
+    expect(config.detailPage.postProcess?.enabled).toBe(true);
   });
 
   it('DisplaySpecs config resolves TV vs monitor via specSectionTitleIn with a monitor fallback', () => {

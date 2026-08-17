@@ -7,3 +7,4 @@ export * from './product-spec-context.service';
 export * from './spec-extraction.service';
 export * from './spec-translation-selector.service';
 export * from './product-source-post-process.service';
+export * from './product-source-post-process-merge.service';
