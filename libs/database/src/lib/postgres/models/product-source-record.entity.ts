@@ -1,10 +1,11 @@
-import { Column, Entity, Index, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
 import { ProductSpecs, ScrapedProductSpec } from '../../models/product-spec';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
+import { Offer } from './offer.entity';
 
 @Entity()
 @Index(['model', 'source'])
@@ -81,4 +82,8 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   normalizedSourceName?: string;
+
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @OneToMany(() => Offer, (offer) => offer.sourceRecord)
+  offers?: Offer[];
 }

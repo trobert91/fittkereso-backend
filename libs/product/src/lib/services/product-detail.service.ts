@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Offer,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
@@ -28,6 +29,8 @@ export class ProductDetailService {
         nameOf<ProductModel>('mainImage'),
         nameOf<ProductModel>('sources'),
         `sources.${nameOf<ProductSourceRecord>('source')}`,
+        `sources.${nameOf<ProductSourceRecord>('offers')}`,
+        `sources.${nameOf<ProductSourceRecord>('offers')}.${nameOf<Offer>('seller')}`,
         nameOf<ProductModel>('scrapeTasks'),
         `scrapeTasks.${nameOf<ScrapeTask>('source')}`,
       ],
