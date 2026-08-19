@@ -11,6 +11,7 @@ import {
 } from '@fittkereso-backend/database';
 import type { ProductMetricsService } from '@fittkereso-backend/metrics';
 import type { ResolutionService } from '@fittkereso-backend/resolution';
+import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   BrandResolutionService,
   ProductEmbeddingService,
@@ -114,6 +115,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
   let mockSellerResolution: jest.Mocked<SellerResolutionService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
+  let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
 
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
@@ -182,6 +184,10 @@ describe('ProductScrapeUpdaterService', () => {
       upsertFromScrape: jest.fn(),
     } as unknown as jest.Mocked<OfferRepository>;
 
+    mockCategoryConfigService = {
+      getConfig: jest.fn().mockReturnValue(undefined),
+    } as unknown as jest.Mocked<CategoryConfigService>;
+
     service = new ProductScrapeUpdaterService(
       mockProductSearch,
       mockBrandResolution,
@@ -196,6 +202,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockProductNormalizer,
       mockSellerResolution,
       mockOfferRepo,
+      mockCategoryConfigService,
     );
   });
 

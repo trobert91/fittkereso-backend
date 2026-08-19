@@ -20,6 +20,7 @@ import {
 } from '@fittkereso-backend/resolution';
 import { generateSlug, nameOf, normalize } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BrandResolutionService,
   ProductEmbeddingService,
@@ -29,7 +30,7 @@ import {
   SellerResolutionService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
-import { isEmpty, minBy } from 'lodash';
+import { isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 interface ResolvedIdentity {
@@ -64,6 +65,7 @@ export class ProductScrapeUpdaterService {
     private readonly productNormalizer: ProductNormalizerService,
     private readonly sellerResolution: SellerResolutionService,
     private readonly offerRepo: OfferRepository,
+    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -119,10 +121,14 @@ export class ProductScrapeUpdaterService {
   // One canonical name for this scrape, used for Path 1 lookup, for the new
   // ProductSourceRecord row, and for ProductModel.normalizedName on new products.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
+    const strategy =
+      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
+        ?.normalizationStrategy ?? 'digit-heuristic';
     return this.productNormalizer.normalizeProduct({
       brand: scrapedProduct.brand,
       model: scrapedProduct.model,
       displayName: scrapedProduct.displayName,
+      strategy,
     });
   }
 
@@ -327,6 +333,16 @@ export class ProductScrapeUpdaterService {
       return;
     }
 
+    // Page-level offer-level specs (e.g. frameSize, color), derived from this
+    // listing's own spec set. Applied to every offer on the page by default;
+    // an individual ScrapedOffer.specs overrides this for sources that report
+    // multiple size/color variants on a single product page. Always optional
+    // — a listing with no extractable offer-level values simply yields {}.
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
+        ?.offerLevelSpecs ?? [];
+    const pageOfferLevelSpecs = pick(sourceRecord.specs, offerLevelKeys);
+
     for (const scraped of offers!) {
       try {
         const seller = await this.sellerResolution.resolveOrCreate(
@@ -341,6 +357,7 @@ export class ProductScrapeUpdaterService {
           availability: scraped.availability,
           url: scraped.url,
           sourceListingId: scraped.sourceListingId,
+          specs: scraped.specs ?? pageOfferLevelSpecs,
         });
       } catch (error) {
         // Do not fail the whole product scrape if one offer fails — mirrors

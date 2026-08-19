@@ -330,12 +330,16 @@ export class ProductDetailsPageScraperService {
       return this.postProcessMerge.merge(data, undefined);
     }
 
+    const offerLevelSpecs =
+      this.categoryConfigService.getConfig(categorySlug)?.offerLevelSpecs;
+
     const llmContribution = await this.postProcess.process({
       data,
       rawSpecs,
       schema: jsonSchema,
       goldenSample,
       model: postProcessConfig.model,
+      offerLevelSpecs,
     });
 
     return this.postProcessMerge.merge(data, llmContribution);

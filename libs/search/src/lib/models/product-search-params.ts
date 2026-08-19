@@ -60,4 +60,15 @@ export class ProductSearchParams {
   @IsBoolean()
   @Type(() => Boolean)
   includeImages?: boolean;
+
+  /**
+   * Spec filters, keyed by canonical spec field name (e.g. "frameSize",
+   * "wheelSize"). Value is either an exact match (string/number) or a
+   * [min, max] range. Keys flagged as offer-level in the relevant
+   * category's ProductCategoryConfig.offerLevelSpecs are matched against
+   * Offer.specs (any active offer on the product may satisfy the filter);
+   * all other keys are matched against ProductModel.specs directly.
+   */
+  @IsOptional()
+  specFilters?: Record<string, string | number | [number, number]>;
 }

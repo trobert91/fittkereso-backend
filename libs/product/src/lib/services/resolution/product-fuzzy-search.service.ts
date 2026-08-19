@@ -59,6 +59,11 @@ export class ProductFuzzySearchService {
     const input = searchInput.input;
     if (!input.displayName && !input.model) return [];
 
+    // CategoryConfigService is keyed by category slug, but this search only
+    // has category id/name (via input.category) or a categoryIds list — no
+    // slug, and resolving one would mean a DB round-trip in a fuzzy-recall
+    // hot path. Falls back to 'digit-heuristic' (today's behavior) rather
+    // than guessing a strategy for a search that may span multiple categories.
     const normalizedName = this.productNormalizerService.normalizeProduct({
       brand: searchInput.brand?.name ?? input.brand!,
       model: input.model,

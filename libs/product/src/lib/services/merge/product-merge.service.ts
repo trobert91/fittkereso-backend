@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  Offer,
   ProductAlias,
   ProductAliasSource,
   ProductImage,
@@ -68,6 +69,7 @@ export class ProductMergeService {
 
         await this.moveProductSourceRecords(manager, source, target);
         await this.moveProductImages(manager, source, target);
+        await this.moveOffers(manager, sourceId, targetId);
         await this.createAliasesFromSource(manager, source, target);
         await this.moveProductAliases(manager, sourceId, targetId);
         await this.moveScrapeTasks(manager, sourceId, targetId);
@@ -145,6 +147,76 @@ export class ProductMergeService {
     }
 
     this.logger.debug('Moved product model sources', {
+      moved: toMove.length,
+      skipped: toDelete.length,
+    });
+  }
+
+  // Offer.model has onDelete: 'CASCADE' — any Offer still pointing at the
+  // source product when deleteSourceProduct runs would be silently destroyed
+  // by Postgres's FK cascade (no error, no log line). Must run before that
+  // delete. Mirrors moveProductSourceRecords's move-vs-delete-duplicate
+  // pattern, using Offer's own unique constraint (seller, sourceListingId)
+  // to decide which source-side offers collide with an existing target-side
+  // offer (same seller already selling this exact listing) versus which are
+  // safe to reassign outright.
+  private async moveOffers(
+    manager: EntityManager,
+    sourceId: string,
+    targetId: string,
+  ): Promise<void> {
+    const sourceOffers = await manager.find(Offer, {
+      where: { model: { id: sourceId } },
+      relations: [nameOf<Offer>('seller')],
+    });
+
+    if (isEmpty(sourceOffers)) {
+      return;
+    }
+
+    const targetOffers = await manager.find(Offer, {
+      where: { model: { id: targetId } },
+      relations: [nameOf<Offer>('seller')],
+    });
+    const targetOfferKeys = new Set(
+      targetOffers
+        .filter((o) => o.sourceListingId)
+        .map((o) => `${o.seller.id}:${o.sourceListingId}`),
+    );
+
+    const toMove: string[] = [];
+    const toDelete: string[] = [];
+
+    for (const offer of sourceOffers) {
+      const key = offer.sourceListingId
+        ? `${offer.seller.id}:${offer.sourceListingId}`
+        : undefined;
+      if (key && targetOfferKeys.has(key)) {
+        toDelete.push(offer.id);
+      } else {
+        toMove.push(offer.id);
+      }
+    }
+
+    if (!isEmpty(toMove)) {
+      await manager
+        .createQueryBuilder()
+        .update(Offer)
+        .set({ model: { id: targetId } })
+        .where('id IN (:...ids)', { ids: toMove })
+        .execute();
+    }
+
+    if (!isEmpty(toDelete)) {
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(Offer)
+        .where('id IN (:...ids)', { ids: toDelete })
+        .execute();
+    }
+
+    this.logger.debug('Moved product offers', {
       moved: toMove.length,
       skipped: toDelete.length,
     });

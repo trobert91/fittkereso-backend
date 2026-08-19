@@ -153,4 +153,25 @@ export interface ProductCategoryConfig {
   categoryDescription?: string;
   /** Ordered list of filterable specs with their UI type. */
   filterSpecs?: FilterSpecConfig[];
+  /** Strategy for computing normalizedName/normalizedSourceName.
+   *  'digit-heuristic' (default): keep only whitespace-delimited words containing
+   *  a digit — correct when the model code is the one alphanumeric token
+   *  (monitors: "PG32UCDP").
+   *  'full': keep the whole brand-stripped string, lowercased and whitespace-
+   *  collapsed only — no word-level discarding. Use when there's no reliable
+   *  digit/alpha split between "identity" and "noise" (ebikes: "MACINA SCARP SX
+   *  PRESTIGE Di2" has no digits at all). Relies on the LLM post-process step
+   *  (ProductSourcePostProcessService) already having stripped offer-level
+   *  attributes like size/color from `model` upstream. */
+  normalizationStrategy?: 'digit-heuristic' | 'full';
+  /** Spec keys (must exist in the category's jsonSchema.json) that describe a
+   *  purchasable variant/listing attribute rather than the product model's
+   *  identity — e.g. frameSize, color. Values for these keys are never merged
+   *  into ProductModel.specs; they're captured per-Offer instead, so two
+   *  listings of the same model in different sizes/colors match to one
+   *  ProductModel with multiple Offer rows instead of each variant tripping
+   *  the model-level spec-mismatch gate in the resolution pipeline's filter
+   *  stage. Always optional per-listing — absence of a value is normal, not
+   *  an error. */
+  offerLevelSpecs?: string[];
 }

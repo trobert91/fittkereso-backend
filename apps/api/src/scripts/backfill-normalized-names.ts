@@ -7,6 +7,7 @@ import {
   ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
 
 const BATCH_SIZE = 100;
@@ -17,11 +18,15 @@ async function bootstrap() {
   const productRepo = app.get(ProductModelRepository);
   const sourceRepo = app.get(ProductSourceRecordRepository);
   const normalizer = app.get(ProductNormalizerService);
+  const categoryConfigService = app.get(CategoryConfigService);
 
   // 1. Backfill ProductModel.normalizedName
   console.log('Backfilling ProductModel.normalizedName...');
   const models = await productRepo.find({
-    relations: [nameOf<ProductModel>('brand')],
+    relations: [
+      nameOf<ProductModel>('brand'),
+      nameOf<ProductModel>('productCategory'),
+    ],
   });
 
   let modelsUpdated = 0;
@@ -32,11 +37,15 @@ async function bootstrap() {
     const toSave: ProductModel[] = [];
     for (const model of batch) {
       const brandName = model.brand?.name ?? '';
+      const strategy =
+        categoryConfigService.getConfig(model.productCategory?.slug)
+          ?.normalizationStrategy ?? 'digit-heuristic';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
           model: model.model,
           displayName: model.displayName,
+          strategy,
         });
         if (!next || next === model.normalizedName) {
           modelsSkipped++;
@@ -77,6 +86,7 @@ async function bootstrap() {
     relations: [
       nameOf<ProductSourceRecord>('model'),
       `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('brand')}`,
+      `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('productCategory')}`,
     ],
   });
 
@@ -93,11 +103,15 @@ async function bootstrap() {
         sourcesSkipped++;
         continue;
       }
+      const strategy =
+        categoryConfigService.getConfig(source.model?.productCategory?.slug)
+          ?.normalizationStrategy ?? 'digit-heuristic';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
           model: undefined,
           displayName,
+          strategy,
         });
         if (!next || next === source.normalizedSourceName) {
           sourcesSkipped++;

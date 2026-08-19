@@ -8,6 +8,7 @@ import { Seller } from '../models/seller.entity';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { OfferCondition } from '../types/offer-condition';
 import { OfferAvailability } from '../types/offer-availability';
+import { ProductSpecs } from '../../models/product-spec';
 
 export interface UpsertOfferFromScrapeParams {
   model: ProductModel;
@@ -18,6 +19,9 @@ export interface UpsertOfferFromScrapeParams {
   availability?: OfferAvailability;
   url?: string;
   sourceListingId?: string;
+  /** Offer-level spec values (e.g. frameSize, color) — always optional,
+   *  absence is normal and must never block the upsert. */
+  specs?: ProductSpecs;
 }
 
 @Injectable()
@@ -36,8 +40,17 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   async upsertFromScrape(
     params: UpsertOfferFromScrapeParams,
   ): Promise<Offer> {
-    const { model, seller, sourceRecord, price, currency, availability, url, sourceListingId } =
-      params;
+    const {
+      model,
+      seller,
+      sourceRecord,
+      price,
+      currency,
+      availability,
+      url,
+      sourceListingId,
+      specs,
+    } = params;
 
     const existing = sourceListingId
       ? await this.repo.findOne({
@@ -57,6 +70,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     offer.sourceListingId = sourceListingId;
     offer.lastSeenAt = new Date();
     offer.active = true;
+    offer.specs = specs;
 
     try {
       return await this.repo.save(offer);
@@ -74,6 +88,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
           raceWinner.url = url;
           raceWinner.lastSeenAt = new Date();
           raceWinner.active = true;
+          raceWinner.specs = specs;
           return this.repo.save(raceWinner);
         }
       }

@@ -34,6 +34,14 @@ export interface ScrapedOffer {
   availability?: OfferAvailability;
   url?: string;
   sourceListingId?: string;
+  /**
+   * Offer-level spec values (e.g. frameSize, color) for this specific
+   * listing — overrides the page-level offer-level specs derived from
+   * ProductSourceRecord.specs when a source reports multiple size/color
+   * variants on a single product page, each with its own price. Optional:
+   * most sources have nothing to put here and rely on the page-level default.
+   */
+  specs?: ProductSpecs;
 }
 
 export interface ProcessedProductSpec {

@@ -12,7 +12,7 @@ describe('ProductSpecUpdaterService.updateSpecsOnProduct', () => {
     productSourceSpecValidationFailed: jest.Mock;
     productSpecValidationFailed: jest.Mock;
   };
-  let categoryConfigService: { getJsonSchema: jest.Mock };
+  let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
 
   const source = { id: 'source-1', name: 'speedbike' } as any;
   const category = { slug: 'ebikes' } as any;
@@ -35,7 +35,10 @@ describe('ProductSpecUpdaterService.updateSpecsOnProduct', () => {
       productSourceSpecValidationFailed: jest.fn(),
       productSpecValidationFailed: jest.fn(),
     };
-    categoryConfigService = { getJsonSchema: jest.fn().mockReturnValue(undefined) };
+    categoryConfigService = {
+      getJsonSchema: jest.fn().mockReturnValue(undefined),
+      getConfig: jest.fn().mockReturnValue(undefined),
+    };
 
     service = new ProductSpecUpdaterService(
       productRepo as any,
@@ -141,5 +144,43 @@ describe('ProductSpecUpdaterService.updateSpecsOnProduct', () => {
     // Falls through to normal processing with empty specs — this is the
     // manual-edit / first-scrape path, not the "unchanged" skip path.
     expect(specMergeService.mergeSpecs).toHaveBeenCalledTimes(1);
+  });
+
+  it('excludes offer-level spec keys from the merged model.specs', async () => {
+    specMergeService.mergeSpecs.mockResolvedValue({
+      weight: 22,
+      frameSize: 48,
+      color: 'Fekete',
+    });
+    categoryConfigService.getConfig.mockReturnValue({
+      offerLevelSpecs: ['frameSize', 'color'],
+    });
+    const model = makeModel();
+
+    await service.updateSpecsOnProduct({
+      model,
+      source,
+      specs: { weight: 22, frameSize: 48, color: 'Fekete' },
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(model.specs).toEqual({ weight: 22 });
+    expect(model.specs).not.toHaveProperty('frameSize');
+    expect(model.specs).not.toHaveProperty('color');
+  });
+
+  it('leaves model.specs untouched when the category has no offerLevelSpecs configured', async () => {
+    specMergeService.mergeSpecs.mockResolvedValue({ weight: 22, frameSize: 48 });
+    categoryConfigService.getConfig.mockReturnValue(undefined);
+    const model = makeModel();
+
+    await service.updateSpecsOnProduct({
+      model,
+      source,
+      specs: { weight: 22, frameSize: 48 },
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(model.specs).toEqual({ weight: 22, frameSize: 48 });
   });
 });

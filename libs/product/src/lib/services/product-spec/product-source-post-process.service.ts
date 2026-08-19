@@ -75,8 +75,10 @@ export class ProductSourcePostProcessService {
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     model?: string;
+    offerLevelSpecs?: string[];
   }): Promise<ProductSourcePostProcessResult | undefined> {
-    const { data, rawSpecs, schema, goldenSample, model } = params;
+    const { data, rawSpecs, schema, goldenSample, model, offerLevelSpecs } =
+      params;
 
     try {
       const response = await this.aiChat.createChat({
@@ -87,7 +89,11 @@ export class ProductSourcePostProcessService {
         messages: [
           {
             role: 'system',
-            content: this.buildSystemPrompt(schema, goldenSample),
+            content: this.buildSystemPrompt(
+              schema,
+              goldenSample,
+              offerLevelSpecs ?? [],
+            ),
           },
           {
             role: 'user',
@@ -141,6 +147,7 @@ export class ProductSourcePostProcessService {
   private buildSystemPrompt(
     schema: SpecDefinitionJsonSchema,
     goldenSample: ProductSpecs,
+    offerLevelSpecs: string[],
   ): string {
     const fieldDescriptions = Object.entries(schema.properties)
       .map(([key, prop]) => {
@@ -156,20 +163,27 @@ export class ProductSourcePostProcessService {
       })
       .join('\n');
 
+    const offerLevelTitles = offerLevelSpecs
+      .map((key) => schema.properties[key]?.title)
+      .filter((title): title is string => Boolean(title));
+    const offerLevelHint = offerLevelTitles.length
+      ? ` Pay particular attention to ${offerLevelTitles.join(', ')} — these are frequently embedded only in the raw title/model text (e.g. a size code like "M/43" or a color name) rather than the structured spec table, and must be extracted from there if present.`
+      : '';
+
     return (
       `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below, but all string spec VALUES must be in Hungarian (translate if the source data is in another language, e.g. English or German). The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
       `Canonical spec fields:\n${fieldDescriptions}\n\n` +
       `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSample, null, 2)}\n\n` +
-      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text), "specs" (already deterministically mapped), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
-      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), color names, gender/target-audience words, and year, but KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
+      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), color names, size/dimension tokens, gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name. KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
       `- "releaseYear": only return this if a release/model year is explicitly stated somewhere in the input (deterministicSpecs or rawSpecs) — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context (e.g. don't infer it from a model name).\n` +
       `- "specs": see the rules below.\n\n` +
       `Rules:\n` +
-      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass) and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
-      `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs gives a more precise value for the same field.\n` +
-      `- Then look through rawSpecs for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract it from there when it's clearly and unambiguously present.\n` +
+      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string (the same raw title referenced above), and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
+      `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs or rawModel gives a more precise value for the same field.\n` +
+      `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension) or inside the raw title itself (e.g. a size code or color word mixed into the product name).${offerLevelHint} Extract from either source when the value is clearly and unambiguously present.\n` +
       `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +

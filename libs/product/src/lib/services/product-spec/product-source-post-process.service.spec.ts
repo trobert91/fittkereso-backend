@@ -342,4 +342,83 @@ describe('ProductSourcePostProcessService', () => {
 
     expect(result?.brand).toBe('KTM');
   });
+
+  describe('offerLevelSpecs extraction guidance', () => {
+    const schemaWithFrameSize: SpecDefinitionJsonSchema = {
+      type: 'object',
+      title: 'E-bike',
+      properties: {
+        weight: { type: 'number', title: 'Weight', meta: { unit: 'kg' } },
+        frameSize: { type: 'number', title: 'Frame size', meta: { unit: 'cm' } },
+        color: { type: 'string', title: 'Color' },
+      },
+    };
+
+    it('tells the LLM to extract offer-level fields from the raw title before stripping them', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.process({
+        data: { brand: 'KTM', model: 'raw title', specs: {} },
+        schema: schemaWithFrameSize,
+        goldenSample,
+        offerLevelSpecs: ['frameSize', 'color'],
+      });
+
+      expect(aiChat.createChat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              role: 'system',
+              content: expect.stringContaining('Frame size, Color'),
+            }),
+            expect.anything(),
+          ],
+        }),
+      );
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain('rawModel');
+      expect(systemPrompt).toMatch(
+        /add them to "specs".*BEFORE removing them from "model"/,
+      );
+    });
+
+    it('omits the offer-level hint entirely when no offerLevelSpecs are configured for the category', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.process({
+        data: { brand: 'KTM', model: 'raw title', specs: {} },
+        schema: schemaWithFrameSize,
+        goldenSample,
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).not.toContain('Pay particular attention to');
+    });
+
+    it('extracts a frame size embedded only in the raw title into specs, per the KTM example', async () => {
+      const cleanedModel = 'MACINA SCARP SX PRESTIGE Di2';
+      aiChat.createChat.mockResolvedValueOnce({
+        content: JSON.stringify({
+          model: cleanedModel,
+          specs: { frameSize: 43 },
+        }),
+        parsed: { model: cleanedModel, specs: { frameSize: 43 } },
+      });
+
+      const result = await service.process({
+        data: {
+          brand: 'KTM',
+          model:
+            'KTM MACINA SCARP SX PRESTIGE Di2 M/43 Összteleszkópos elektromos MTB kerékpár OLIVE PEARL színben',
+          specs: {},
+        },
+        schema: schemaWithFrameSize,
+        goldenSample,
+        offerLevelSpecs: ['frameSize', 'color'],
+      });
+
+      expect(result?.model).toBe(cleanedModel);
+      expect(result?.specs).toEqual({ frameSize: 43 });
+    });
+  });
 });

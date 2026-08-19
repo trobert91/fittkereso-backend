@@ -112,6 +112,10 @@
       "filterType": "range"
     },
     {
+      "key": "color",
+      "filterType": "multiselect"
+    },
+    {
       "key": "gender",
       "filterType": "multiselect"
     },
@@ -174,6 +178,8 @@
     "topSpeed"
   ],
   "maxMatcherSpecMismatches": 1,
+  "normalizationStrategy": "full",
+  "offerLevelSpecs": ["frameSize", "color"],
   "promptConfig": {
     "validSpecs": [
       {

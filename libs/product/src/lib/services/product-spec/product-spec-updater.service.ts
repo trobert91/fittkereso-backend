@@ -11,7 +11,16 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductSpecMergeService } from './product-spec-merge.service';
 import { ProductSpecSortService } from './product-spec-sort.service';
-import { chain, groupBy, isBoolean, isEmpty, isNumber, maxBy } from 'lodash';
+import {
+  chain,
+  groupBy,
+  isBoolean,
+  isEmpty,
+  isNumber,
+  maxBy,
+  omit,
+  pick,
+} from 'lodash';
 import { hashRawSpecs, nameOf } from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
@@ -34,14 +43,16 @@ export class ProductSpecUpdaterService {
       return;
     }
 
+    const categorySlug = model.productCategory?.slug;
+
     const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
     model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
+    model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,
       model.specs,
     );
 
-    const categorySlug = model.productCategory?.slug;
     const jsonSchema = categorySlug
       ? this.categoryConfigService.getJsonSchema(categorySlug)
       : undefined;
@@ -180,6 +191,7 @@ export class ProductSpecUpdaterService {
     // For spec merging, use only the most recent entry per source
     const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
     model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
+    model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,
       model.specs,
@@ -204,6 +216,40 @@ export class ProductSpecUpdaterService {
     );
 
     return source;
+  }
+
+  // Offer-level spec keys (e.g. frameSize, color) describe a purchasable
+  // variant/listing attribute, not the product model's identity — they're
+  // captured on Offer.specs instead (see ProductScrapeUpdaterService), so
+  // they must never land in the merged ProductModel.specs, or two listings
+  // of the same model in different sizes/colors would trip the model-level
+  // spec-mismatch gate in the resolution pipeline's filter stage.
+  private getProductLevelSpecs(
+    specs: ProductSpecs,
+    categorySlug: string | undefined,
+  ): ProductSpecs {
+    const offerLevelKeys = this.getOfferLevelKeys(categorySlug);
+    return isEmpty(offerLevelKeys) ? specs : omit(specs, offerLevelKeys);
+  }
+
+  // The complement of getProductLevelSpecs — the subset of a merged spec
+  // object that belongs on Offer.specs instead. Not currently called from
+  // this service (offer-level values are sourced from ProductSourceRecord.specs
+  // directly in ProductScrapeUpdaterService), but kept symmetric with
+  // getProductLevelSpecs for callers that only have the merged object.
+  private getOfferLevelSpecs(
+    specs: ProductSpecs,
+    categorySlug: string | undefined,
+  ): ProductSpecs {
+    const offerLevelKeys = this.getOfferLevelKeys(categorySlug);
+    return isEmpty(offerLevelKeys) ? {} : pick(specs, offerLevelKeys);
+  }
+
+  private getOfferLevelKeys(categorySlug: string | undefined): string[] {
+    return (
+      this.categoryConfigService.getConfig(categorySlug)?.offerLevelSpecs ??
+      []
+    );
   }
 
   private processSpecs(specs: ProductSpecs): ProductSpecs {

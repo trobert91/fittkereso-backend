@@ -4,7 +4,7 @@ import type { ScrapeTask, SpecDefinitionJsonSchema } from '@fittkereso-backend/d
 
 describe('ProductDetailsPageScraperService', () => {
   let service: ProductDetailsPageScraperService;
-  let categoryConfigService: { getGoldenSample: jest.Mock };
+  let categoryConfigService: { getGoldenSample: jest.Mock; getConfig: jest.Mock };
   let postProcess: { process: jest.Mock };
   let postProcessMerge: { merge: jest.Mock };
 
@@ -37,7 +37,10 @@ describe('ProductDetailsPageScraperService', () => {
   }
 
   beforeEach(() => {
-    categoryConfigService = { getGoldenSample: jest.fn() };
+    categoryConfigService = {
+      getGoldenSample: jest.fn(),
+      getConfig: jest.fn().mockReturnValue(undefined),
+    };
     postProcess = { process: jest.fn() };
     postProcessMerge = { merge: jest.fn() };
 
@@ -109,8 +112,25 @@ describe('ProductDetailsPageScraperService', () => {
       schema: jsonSchema,
       goldenSample,
       model: 'custom-model',
+      offerLevelSpecs: undefined,
     });
     expect(postProcessMerge.merge).toHaveBeenCalledWith(data, llmContribution);
     expect(result).toBe(merged);
+  });
+
+  it('passes the category offerLevelSpecs config through to postProcess.process', async () => {
+    const task = buildTask({ enabled: true });
+    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
+    categoryConfigService.getConfig.mockReturnValueOnce({
+      offerLevelSpecs: ['frameSize', 'color'],
+    });
+    postProcess.process.mockResolvedValueOnce(undefined);
+    postProcessMerge.merge.mockReturnValueOnce(data);
+
+    await callMaybePostProcess(task);
+
+    expect(postProcess.process).toHaveBeenCalledWith(
+      expect.objectContaining({ offerLevelSpecs: ['frameSize', 'color'] }),
+    );
   });
 });

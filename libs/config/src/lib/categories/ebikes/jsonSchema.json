@@ -230,6 +230,13 @@
       "meta": {},
       "type": "boolean",
       "title": "App/GPS connectivity"
+    },
+    "color": {
+      "meta": {
+        "examples": ["Fekete", "Fehér", "Piros", "Kék", "Zöld"]
+      },
+      "type": "string",
+      "title": "Color"
     }
   }
 }
