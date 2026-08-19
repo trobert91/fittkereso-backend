@@ -1,5 +1,6 @@
 export * from './product-category-config';
-export * from './product-source';
+export * from './product-source-config';
+export * from './scrape-operation';
 export * from './queues';
 export * from './product-source-sync-mode';
 export * from './product-duplicate-decision';

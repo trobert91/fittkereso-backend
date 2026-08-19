@@ -46,6 +46,9 @@
       "@fittkereso-backend/resolution": [
         "libs/resolution/src/index.ts"
       ],
+      "@fittkereso-backend/scrape-interpreter": [
+        "libs/scrape-interpreter/src/index.ts"
+      ],
       "@fittkereso-backend/scraper": ["libs/scraper/src/index.ts"],
       "@fittkereso-backend/search": ["libs/search/src/index.ts"],
       "@fittkereso-backend/storage": ["libs/storage/src/index.ts"],

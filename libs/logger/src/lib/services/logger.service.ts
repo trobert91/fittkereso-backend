@@ -9,7 +9,7 @@ export class LoggerService implements NestLoggerService {
 
   constructor(private readonly config: LoggerConfigService) {
     this.logger = winston.createLogger({
-      level: 'debug',
+      level: config.level,
       format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.json(),

@@ -1,11 +1,17 @@
 import { Column, Entity, Index, ManyToOne, Unique } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
-import { Expose } from 'class-transformer';
-import { SerializeGroup, nameOf } from '@fittkereso-backend/utils';
+import { Expose, Transform } from 'class-transformer';
+import {
+  SerializeGroup,
+  nameOf,
+  transfromExposeAll,
+} from '@fittkereso-backend/utils';
 import { ProductModel } from './product-model.entity';
 import { Seller } from './seller.entity';
+import { ProductSourceRecord } from './product-source-record.entity';
 import { OfferCondition } from '../types/offer-condition';
 import { OfferAvailability } from '../types/offer-availability';
+import { ProductSpecs } from '../../models/product-spec';
 
 @Entity()
 @Index([nameOf<Offer>('model'), nameOf<Offer>('condition')])
@@ -23,6 +29,19 @@ export class Offer extends BasePostgresEntity {
   @ManyToOne(() => Seller, (seller) => seller.offers, { nullable: false })
   @Index()
   seller: Seller;
+
+  /**
+   * The specific listing this offer belongs to — carries both the source
+   * site (via sourceRecord.source) and that listing's URL/specs, so callers
+   * don't need a second join to get from an offer to its source.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @ManyToOne(() => ProductSourceRecord, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @Index()
+  sourceRecord?: ProductSourceRecord | null;
 
   @Expose({ groups: [SerializeGroup.list] })
   @Index()
@@ -82,4 +101,16 @@ export class Offer extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.details] })
   @Column({ type: 'text', nullable: true })
   usedConditionNotes?: string;
+
+  /**
+   * Offer-scoped spec values (e.g. frameSize, color) — the subset of the
+   * category's spec keys flagged via ProductCategoryConfig.offerLevelSpecs.
+   * Always optional: a listing may not surface any, or only some, of these
+   * values (e.g. frameSize known but color not extractable from this source)
+   * — absence must never block creating/matching the Offer itself.
+   */
+  @Expose({ groups: [SerializeGroup.details] })
+  @Column({ type: 'jsonb', nullable: true })
+  @Transform(transfromExposeAll())
+  specs?: ProductSpecs;
 }

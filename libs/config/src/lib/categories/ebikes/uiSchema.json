@@ -31,6 +31,9 @@
   "gearType": {
     "ui:widget": "select"
   },
+  "gearCount": {
+    "ui:widget": "updown"
+  },
   "batteryCapacity": {
     "ui:widget": "updown"
   },
@@ -84,6 +87,7 @@
     "suspension",
     "drivetrain",
     "gearType",
+    "gearCount",
     "brakeType",
     "weight",
     "maxLoad",

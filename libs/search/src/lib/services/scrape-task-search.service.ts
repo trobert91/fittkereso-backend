@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
-  ProductSource,
   ScrapeTask,
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
@@ -58,11 +57,10 @@ export class ScrapeTaskSearchService {
       );
     }
 
-    if (!isEmpty(params.sourceTypes)) {
-      query = query.andWhere(
-        `source.${nameOf<ProductSource>('type')} IN (:...sourceTypes)`,
-        { sourceTypes: params.sourceTypes },
-      );
+    if (!isEmpty(params.sourceIds)) {
+      query = query.andWhere('source.id IN (:...sourceIds)', {
+        sourceIds: params.sourceIds,
+      });
     }
 
     query = query.orderBy(
@@ -97,7 +95,7 @@ export class ScrapeTaskSearchService {
     searchResult.order = params.order;
     searchResult.statuses = params.statuses;
     searchResult.queues = params.queues;
-    searchResult.sourceTypes = params.sourceTypes;
+    searchResult.sourceIds = params.sourceIds;
 
     return searchResult;
   }

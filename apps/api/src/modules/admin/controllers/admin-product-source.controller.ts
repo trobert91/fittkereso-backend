@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -17,6 +16,7 @@ import {
   ProductSourceSyncMode,
   UserRole,
 } from '@fittkereso-backend/database';
+import { ProductSourceUpdateService } from '@fittkereso-backend/product';
 import {
   ProductSourceSearchParams,
   ProductSourceSearchResult,
@@ -24,7 +24,6 @@ import {
 } from '@fittkereso-backend/search';
 import { QueuePublisherService } from '@fittkereso-backend/task';
 import { SerializeGroup } from '@fittkereso-backend/utils';
-import ms from 'ms';
 import { UpdateProductSourceDto } from '../dtos/update-product-source.dto';
 import {
   QueueStatusDto,
@@ -39,6 +38,7 @@ export class AdminProductSourceController {
     private readonly searchService: ProductSourceSearchService,
     private readonly productSourceRepo: ProductSourceRepository,
     private readonly queuePublisher: QueuePublisherService,
+    private readonly updateService: ProductSourceUpdateService,
   ) {}
 
   @Post('search')
@@ -94,80 +94,7 @@ export class AdminProductSourceController {
     @Param('id') productSourceId: string,
     @Body() updateDto: UpdateProductSourceDto,
   ): Promise<ProductSource> {
-    const source = await this.productSourceRepo.findOne({
-      where: { id: productSourceId },
-    });
-
-    if (!source) {
-      throw new NotFoundException('Product source not found');
-    }
-
-    if (updateDto.name !== undefined) {
-      source.name = updateDto.name.trim();
-    }
-
-    if (updateDto.schedulingEnabled !== undefined) {
-      source.schedulingEnabled = updateDto.schedulingEnabled;
-    }
-
-    if (updateDto.processingEnabled !== undefined) {
-      source.processingEnabled = updateDto.processingEnabled;
-    }
-
-    if (updateDto.priority !== undefined) {
-      source.priority = updateDto.priority;
-    }
-
-    if (updateDto.maxConcurrent !== undefined) {
-      source.maxConcurrent = updateDto.maxConcurrent;
-    }
-
-    if (updateDto.requestsPerHour !== undefined) {
-      source.requestsPerHour = updateDto.requestsPerHour;
-    }
-
-    if (updateDto.fullSyncInterval !== undefined) {
-      if (
-        updateDto.fullSyncInterval !== null &&
-        updateDto.fullSyncInterval.trim() !== ''
-      ) {
-        const parsedInterval = ms(updateDto.fullSyncInterval as ms.StringValue);
-
-        if (parsedInterval === undefined) {
-          throw new BadRequestException('Invalid fullSyncInterval format');
-        }
-
-        source.fullSyncInterval = updateDto.fullSyncInterval as ms.StringValue;
-      } else {
-        source.fullSyncInterval = undefined;
-      }
-    }
-
-    if (updateDto.incrementalSyncInterval !== undefined) {
-      if (
-        updateDto.incrementalSyncInterval !== null &&
-        updateDto.incrementalSyncInterval.trim() !== ''
-      ) {
-        const parsedInterval = ms(
-          updateDto.incrementalSyncInterval as ms.StringValue,
-        );
-
-        if (parsedInterval === undefined) {
-          throw new BadRequestException(
-            'Invalid incrementalSyncInterval format',
-          );
-        }
-
-        source.incrementalSyncInterval =
-          updateDto.incrementalSyncInterval as ms.StringValue;
-      } else {
-        source.incrementalSyncInterval = undefined;
-      }
-    }
-
-    await this.productSourceRepo.save(source);
-
-    return source;
+    return this.updateService.updateProductSource(productSourceId, updateDto);
   }
 
   @Post(':id/full-sync')

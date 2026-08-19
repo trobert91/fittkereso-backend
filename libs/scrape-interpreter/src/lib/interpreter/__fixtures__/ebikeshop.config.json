@@ -1,0 +1,310 @@
+{
+  "baseUrl": "https://ebikeshop.hu",
+  "fullSyncStartUrl": "https://ebikeshop.hu/termekek/elektromos-kerekparok",
+
+  "categories": {
+    "ebikes": { "enabled": true, "sourceTitle": "Elektromos kerékpárok" }
+  },
+
+  "incrementalSync": {
+    "searchKeywords": ["elektromos kerékpár ebikeshop"],
+    "numResults": 40,
+    "urlClassify": {
+      "detailUrlPattern": "ebikeshop\\.hu\\/termek\\/[^/?#]+\\/?$"
+    }
+  },
+
+  "listPage": {
+    "categoryName": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.meta.h1Title"
+      }
+    ],
+
+    "categoryLinks": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.lastPage",
+        "as": "lastPage"
+      },
+      {
+        "op": "buildBaseUrl",
+        "from": "task.url",
+        "stripQuery": true,
+        "trimTrailingSlash": true,
+        "as": "baseUrl"
+      },
+      {
+        "op": "generatePaginationLinks",
+        "totalPages": "lastPage",
+        "startPage": 2,
+        "baseUrl": "baseUrl",
+        "urlTemplate": "{baseUrl}?oldal={page}",
+        "titleTemplate": "Page {page}"
+      }
+    ],
+
+    "productLinks": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.products",
+        "as": "products"
+      },
+      {
+        "op": "filterJsonArray",
+        "on": "products",
+        "path": "isUsed",
+        "equals": false
+      },
+      {
+        "op": "mapJsonArray",
+        "fields": {
+          "url": { "path": "showPageUrl" },
+          "title": { "path": "productName" }
+        }
+      }
+    ]
+  },
+
+  "detailPage": {
+    "rawSpecs": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.properties",
+        "as": "propsArray"
+      },
+      {
+        "op": "mapJsonArray",
+        "on": "propsArray",
+        "fields": {
+          "name": { "path": "categoryTitle" },
+          "values": {
+            "path": "value",
+            "template": "{{value}} {{quantityUnit}}",
+            "asArray": true
+          }
+        }
+      }
+    ],
+
+    "category": {
+      "breadcrumbOrSource": [
+        { "op": "literal", "value": "Elektromos kerékpárok" }
+      ],
+      "slugLookup": [
+        { "when": { "always": true }, "slug": "ebikes" }
+      ]
+    },
+
+    "brand": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.manufacturer.title",
+        "as": "manufacturerTitle"
+      },
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.legalManufacturerName",
+        "as": "legalManufacturerRaw"
+      },
+      {
+        "op": "stripPattern",
+        "value": "legalManufacturerRaw",
+        "pattern": "\\s*(GmbH|AG|Kft\\.?|Inc\\.?|Ltd\\.?|Zrt\\.?|Co\\.,? Ltd\\.?|S\\.p\\.A\\.?|B\\.V\\.?)\\s*$",
+        "flags": "i",
+        "trim": true,
+        "as": "legalManufacturerClean"
+      },
+      { "op": "coalesce", "candidates": ["manufacturerTitle", "legalManufacturerClean"] }
+    ],
+
+    "model": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.name",
+        "as": "fullName"
+      },
+      {
+        "op": "stripPattern",
+        "value": "fullName",
+        "pattern": "\\s*\\([^)]*\\)\\s*$",
+        "as": "nameWithoutExtras"
+      },
+      {
+        "op": "stripPattern",
+        "value": "nameWithoutExtras",
+        "pattern": "\\s*elektromos kerékpár\\s*$",
+        "flags": "i",
+        "trim": true,
+        "as": "nameWithoutSuffix"
+      },
+      {
+        "op": "stripPrefix",
+        "value": "nameWithoutSuffix",
+        "prefix": "{{brand}}",
+        "flags": "i"
+      }
+    ],
+
+    "releaseYear": [
+      { "op": "mapSpecValue", "label": "Modellév", "single": true },
+      { "op": "prependPrefix", "prefix": "20" },
+      { "op": "regexCapture", "pattern": "\\d+", "group": 0, "cast": "number" }
+    ],
+
+    "images": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.images"
+      },
+      {
+        "op": "filterJsonArray",
+        "path": "type",
+        "equals": "gallery"
+      },
+      {
+        "op": "flattenJsonArray",
+        "path": "images"
+      },
+      {
+        "op": "filterJsonArray",
+        "path": "code",
+        "equals": "original"
+      },
+      {
+        "op": "mapJsonArray",
+        "fields": {
+          "url": { "path": "url" }
+        },
+        "flattenField": "url"
+      }
+    ],
+
+    "specMapping": {
+      "ebikes": {
+        "mappings": [
+          { "key": "gender", "labels": ["Nem"] },
+          { "key": "frameType", "labels": ["Váztípus"] },
+          { "key": "frameSize", "labels": ["Vázméret"], "extract": "number" },
+          { "key": "usageType", "labels": ["Felhasználás módja"] },
+          { "key": "batteryPosition", "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"] },
+          { "key": "wheelSize", "labels": ["Kerékméret"], "extract": "number" },
+          { "key": "drivetrain", "labels": ["Erőátvitel"] },
+          { "key": "suspension", "labels": ["Rugózás"] },
+          { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
+          { "key": "gearType", "labels": ["Váltó típusa"] },
+          { "key": "gearCount", "labels": ["Váltó sebességfokozatainak száma"], "extract": "number" },
+          { "key": "batteryCapacity", "labels": ["Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
+          { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
+          { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
+          { "key": "motorPower", "labels": ["Motor teljesítménye"], "extract": "number" },
+          { "key": "topSpeed", "labels": ["Maximális rásegítés", "Maximális sebesség", "Motoros rásegítés sebessége"], "extract": "number" },
+          { "key": "range", "labels": ["Hatótávolság"], "extract": "number" },
+          { "key": "chargingTime", "labels": ["Töltési idő"], "extract": "number" },
+          { "key": "display", "labels": ["Kijelző", "Kijelzővel rendelkezik", "Kijelző típus"] },
+          { "key": "maxLoad", "labels": ["Maximális terhelhetőség", "Emelt teherbírás"], "extract": "number" },
+          { "key": "weight", "labels": ["Tömeg", "Súly"], "extract": "number" },
+          { "key": "waterResistance", "labels": ["Védettségi szint", "Vízállóság"] },
+          { "key": "smartConnectivity", "labels": ["Applikáció", "GPS követés"] }
+        ]
+      }
+    },
+
+    "offers": {
+      "listItems": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.stocks"
+        }
+      ],
+      "sellerName": [
+        { "op": "literal", "value": "ebikeshop.hu" }
+      ],
+      "price": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.prices.sale",
+          "as": "onSale"
+        },
+        {
+          "op": "branch",
+          "condition": { "equals": { "value": "onSale", "to": true } },
+          "ifTrue": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.prices.priceSale"
+            }
+          ],
+          "ifFalse": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.prices.price"
+            }
+          ]
+        }
+      ],
+      "currency": [
+        { "op": "literal", "value": "HUF" }
+      ],
+      "availability": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.stocks.0.preorderTypeTitle"
+        },
+        {
+          "op": "mapValue",
+          "cases": {
+            "Készleten": "in_stock",
+            "Gyártói készlet": "preorder"
+          },
+          "default": "unknown"
+        }
+      ],
+      "url": [
+        { "op": "buildBaseUrl", "from": "task.url" }
+      ],
+      "sourceListingId": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.productCode"
+        }
+      ]
+    },
+
+    "translation": {
+      "enabled": false,
+      "sourceLanguage": "hu",
+      "targetLanguage": "en",
+      "contextTemplate": "Technical specification values from an ebikeshop.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."
+    }
+  }
+}

@@ -14,7 +14,7 @@ export class ProductImage extends BasePostgresEntity {
   model: ProductModel;
 
   @Expose({ groups: [SerializeGroup.adminDetails, SerializeGroup.adminList] })
-  @ManyToOne(() => ProductSource, (source) => source.images, {
+  @ManyToOne(() => ProductSource, {
     nullable: true,
   })
   source?: ProductSource;

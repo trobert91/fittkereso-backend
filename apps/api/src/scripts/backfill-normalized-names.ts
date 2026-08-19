@@ -3,10 +3,11 @@ import { AppModule } from '../app.module';
 import {
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
 
 const BATCH_SIZE = 100;
@@ -15,13 +16,17 @@ async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
 
   const productRepo = app.get(ProductModelRepository);
-  const sourceRepo = app.get(ProductModelSourceRepository);
+  const sourceRepo = app.get(ProductSourceRecordRepository);
   const normalizer = app.get(ProductNormalizerService);
+  const categoryConfigService = app.get(CategoryConfigService);
 
   // 1. Backfill ProductModel.normalizedName
   console.log('Backfilling ProductModel.normalizedName...');
   const models = await productRepo.find({
-    relations: [nameOf<ProductModel>('brand')],
+    relations: [
+      nameOf<ProductModel>('brand'),
+      nameOf<ProductModel>('productCategory'),
+    ],
   });
 
   let modelsUpdated = 0;
@@ -32,11 +37,15 @@ async function bootstrap() {
     const toSave: ProductModel[] = [];
     for (const model of batch) {
       const brandName = model.brand?.name ?? '';
+      const strategy =
+        categoryConfigService.getConfig(model.productCategory?.slug)
+          ?.normalizationStrategy ?? 'digit-heuristic';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
           model: model.model,
           displayName: model.displayName,
+          strategy,
         });
         if (!next || next === model.normalizedName) {
           modelsSkipped++;
@@ -71,12 +80,13 @@ async function bootstrap() {
     `  ProductModel: ${modelsUpdated} updated, ${modelsSkipped} unchanged, ${modelsFailed} failed.`,
   );
 
-  // 2. Backfill ProductModelSource.normalizedSourceName
-  console.log('Backfilling ProductModelSource.normalizedSourceName...');
+  // 2. Backfill ProductSourceRecord.normalizedSourceName
+  console.log('Backfilling ProductSourceRecord.normalizedSourceName...');
   const sources = await sourceRepo.find({
     relations: [
-      nameOf<ProductModelSource>('model'),
-      `${nameOf<ProductModelSource>('model')}.${nameOf<ProductModel>('brand')}`,
+      nameOf<ProductSourceRecord>('model'),
+      `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('brand')}`,
+      `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('productCategory')}`,
     ],
   });
 
@@ -85,7 +95,7 @@ async function bootstrap() {
   let sourcesFailed = 0;
   for (let i = 0; i < sources.length; i += BATCH_SIZE) {
     const batch = sources.slice(i, i + BATCH_SIZE);
-    const toSave: ProductModelSource[] = [];
+    const toSave: ProductSourceRecord[] = [];
     for (const source of batch) {
       const brandName = source.model?.brand?.name ?? '';
       const displayName = source.sourceName ?? source.model?.displayName;
@@ -93,11 +103,15 @@ async function bootstrap() {
         sourcesSkipped++;
         continue;
       }
+      const strategy =
+        categoryConfigService.getConfig(source.model?.productCategory?.slug)
+          ?.normalizationStrategy ?? 'digit-heuristic';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
           model: undefined,
           displayName,
+          strategy,
         });
         if (!next || next === source.normalizedSourceName) {
           sourcesSkipped++;
@@ -129,7 +143,7 @@ async function bootstrap() {
     );
   }
   console.log(
-    `  ProductModelSource: ${sourcesUpdated} updated, ${sourcesSkipped} unchanged, ${sourcesFailed} failed.`,
+    `  ProductSourceRecord: ${sourcesUpdated} updated, ${sourcesSkipped} unchanged, ${sourcesFailed} failed.`,
   );
 
   console.log('Normalized-name backfill complete.');

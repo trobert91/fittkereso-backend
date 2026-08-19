@@ -78,4 +78,8 @@ export class ScrapeTask extends BasePostgresEntity {
   @Column('float', { nullable: true })
   @Expose({ groups: [SerializeGroup.list] })
   executionTimeInSec?: number;
+
+  @Column({ type: 'boolean', default: false })
+  @Expose({ groups: [SerializeGroup.list] })
+  force?: boolean;
 }

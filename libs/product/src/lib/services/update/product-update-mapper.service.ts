@@ -6,13 +6,13 @@ import {
   ProductEmbedding,
   ProductImageRepository,
   ProductModel,
-  ProductModelSource,
-  ProductSourceType,
+  ProductSourceRecord,
   ProductSpecs,
 } from '@fittkereso-backend/database';
 import { isUndefined } from 'lodash';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductNormalizerService } from '../product-normalizer.service';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class ProductUpdateMapperService {
@@ -22,6 +22,7 @@ export class ProductUpdateMapperService {
     private readonly productImageRepo: ProductImageRepository,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly productNormalizer: ProductNormalizerService,
+    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async mapDtoToEntity(
@@ -109,10 +110,14 @@ export class ProductUpdateMapperService {
         displayName: entity.displayName,
         category: entity.productCategory?.name,
       });
+    const strategy =
+      this.categoryConfigService.getConfig(entity.productCategory?.slug)
+        ?.normalizationStrategy ?? 'digit-heuristic';
     entity.normalizedName = this.productNormalizer.normalizeProduct({
       brand: entity.brand.name,
       model: entity.model,
       displayName: entity.displayName,
+      strategy,
     });
   }
 
@@ -143,17 +148,17 @@ export class ProductUpdateMapperService {
   private mapManualSpecs(entity: ProductModel, specs: ProductSpecs) {
     entity.sources = entity.sources ?? [];
 
-    let manualSource = entity.sources.find(
-      (s) => s.type === ProductSourceType.manual,
-    );
+    // Admin-entered specs have no ProductSource behind them (source: null) —
+    // that's what distinguishes them from scraped ProductSourceRecord rows.
+    let manualSource = entity.sources.find((s) => !s.source);
 
     if (manualSource) {
       manualSource.specs = specs;
       manualSource.lastUpdated = new Date();
     } else {
-      const newSource = new ProductModelSource();
+      const newSource = new ProductSourceRecord();
       newSource.model = entity;
-      newSource.type = ProductSourceType.manual;
+      newSource.source = null;
       newSource.specs = specs;
       newSource.lastUpdated = new Date();
       entity.sources.push(newSource);

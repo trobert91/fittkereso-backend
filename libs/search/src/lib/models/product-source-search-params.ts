@@ -1,4 +1,3 @@
-import { ProductSourceType } from '@fittkereso-backend/database';
 import {
   IsBoolean,
   IsEnum,
@@ -14,12 +13,12 @@ export class ProductSourceSearchParams {
   searchTerm?: string;
 
   @IsOptional()
-  @IsBoolean()
-  schedulingEnabled?: boolean;
+  @IsString()
+  sellerId?: string;
 
   @IsOptional()
-  @IsEnum(ProductSourceType, { each: true })
-  types?: ProductSourceType[];
+  @IsBoolean()
+  schedulingEnabled?: boolean;
 
   @IsOptional()
   @IsInt()
@@ -34,7 +33,6 @@ export class ProductSourceSearchParams {
   @IsOptional()
   @IsEnum([
     'name',
-    'type',
     'schedulingEnabled',
     'processingEnabled',
     'priority',
@@ -52,7 +50,6 @@ export class ProductSourceSearchParams {
   ])
   sort?:
     | 'name'
-    | 'type'
     | 'schedulingEnabled'
     | 'processingEnabled'
     | 'priority'

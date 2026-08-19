@@ -6,3 +6,4 @@ export * from './product-source-search.service';
 export * from './scrape-task-search.service';
 export * from './product-duplication-search.service';
 export * from './product-duplicate-search.service';
+export * from './seller-search.service';

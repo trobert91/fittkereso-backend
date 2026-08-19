@@ -1,15 +1,17 @@
 import {
   Brand,
+  OfferRepository,
   ProductAliasRepository,
   ProductCategory,
   ProductModel,
   ProductModelRepository,
-  ProductModelSourceRepository,
+  ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
 import type { ProductMetricsService } from '@fittkereso-backend/metrics';
 import type { ResolutionService } from '@fittkereso-backend/resolution';
+import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   BrandResolutionService,
   ProductEmbeddingService,
@@ -17,6 +19,7 @@ import type {
   ProductNormalizerService,
   ProductSpecUpdaterService,
   ScrapedProduct,
+  SellerResolutionService,
 } from '@fittkereso-backend/product';
 
 jest.mock('@fittkereso-backend/resolution', () => ({
@@ -62,7 +65,8 @@ function makeTask(): ScrapeTask {
     id: 'task-1',
     url: 'https://example.com/product',
     source: {
-      type: 'arukereso',
+      id: 'source-arukereso',
+      name: 'arukereso',
     },
   } as ScrapeTask;
 }
@@ -104,11 +108,14 @@ describe('ProductScrapeUpdaterService', () => {
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
-  let mockProductModelSourceRepo: jest.Mocked<ProductModelSourceRepository>;
+  let mockSourceRecordRepo: jest.Mocked<ProductSourceRecordRepository>;
   let mockSpecUpdaterService: jest.Mocked<ProductSpecUpdaterService>;
   let mockImageCopyService: jest.Mocked<ProductImageCopyService>;
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
   let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
+  let mockSellerResolution: jest.Mocked<SellerResolutionService>;
+  let mockOfferRepo: jest.Mocked<OfferRepository>;
+  let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
 
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
@@ -141,12 +148,14 @@ describe('ProductScrapeUpdaterService', () => {
       },
     } as unknown as jest.Mocked<ProductAliasRepository>;
 
-    mockProductModelSourceRepo = {
+    mockSourceRecordRepo = {
       findAllByNormalizedName: jest.fn().mockResolvedValue([]),
-    } as unknown as jest.Mocked<ProductModelSourceRepository>;
+    } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSpecUpdaterService = {
-      updateSpecsOnProduct: jest.fn().mockResolvedValue(undefined),
+      updateSpecsOnProduct: jest
+        .fn()
+        .mockResolvedValue({ id: 'source-record-1' }),
     } as unknown as jest.Mocked<ProductSpecUpdaterService>;
 
     mockImageCopyService = {
@@ -167,6 +176,18 @@ describe('ProductScrapeUpdaterService', () => {
       normalizeProduct: jest.fn().mockReturnValue('mx keys'),
     } as unknown as jest.Mocked<ProductNormalizerService>;
 
+    mockSellerResolution = {
+      resolveOrCreate: jest.fn(),
+    } as unknown as jest.Mocked<SellerResolutionService>;
+
+    mockOfferRepo = {
+      upsertFromScrape: jest.fn(),
+    } as unknown as jest.Mocked<OfferRepository>;
+
+    mockCategoryConfigService = {
+      getConfig: jest.fn().mockReturnValue(undefined),
+    } as unknown as jest.Mocked<CategoryConfigService>;
+
     service = new ProductScrapeUpdaterService(
       mockProductSearch,
       mockBrandResolution,
@@ -174,11 +195,14 @@ describe('ProductScrapeUpdaterService', () => {
       mockProductRepo,
       mockTaskRepo,
       mockAliasRepo,
-      mockProductModelSourceRepo,
+      mockSourceRecordRepo,
       mockSpecUpdaterService,
       mockImageCopyService,
       mockMetricsService,
       mockProductNormalizer,
+      mockSellerResolution,
+      mockOfferRepo,
+      mockCategoryConfigService,
     );
   });
 
@@ -187,10 +211,10 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
-        type: 'arukereso',
+        source: { id: 'source-arukereso' },
         sourceName: scrapedProduct.displayName,
       } as never,
     ]);
@@ -216,10 +240,10 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: existingModel,
-        type: 'displayspecs',
+        source: { id: 'source-displayspecs' },
         sourceName: 'Logitech MX Keys (different display name)',
       } as never,
     ]);
@@ -244,12 +268,12 @@ describe('ProductScrapeUpdaterService', () => {
     });
     const otherVariant = makeExistingModel();
     otherVariant.id = 'model-variant-b';
-    otherVariant.sources = [{ type: 'arukereso' } as never];
+    otherVariant.sources = [{ source: { id: 'source-arukereso' } } as never];
 
-    mockProductModelSourceRepo.findAllByNormalizedName.mockResolvedValueOnce([
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
       {
         model: otherVariant,
-        type: 'arukereso',
+        source: { id: 'source-arukereso' },
         sourceName: 'LG UltraGear 39GS95QE-B',
       } as never,
     ]);
@@ -363,5 +387,105 @@ describe('ProductScrapeUpdaterService', () => {
       undefined,
       { taskId: task.id },
     );
+  });
+
+  it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is absent', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct(); // no `offers` field
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-no-offers';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
+    expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+  });
+
+  it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is an empty array', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({ offers: [] });
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-empty-offers';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
+    expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+  });
+
+  it('resolves a seller and upserts an offer per entry when ScrapedProduct.offers is populated', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({
+      offers: [
+        {
+          sellerName: 'Alza.hu',
+          price: 199990,
+          currency: 'HUF',
+          url: 'https://alza.hu/product/1',
+          sourceListingId: 'listing-1',
+        },
+      ],
+    });
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-with-offers';
+      return model;
+    });
+    const mockSeller = { id: 'seller-1', name: 'Alza.hu' };
+    mockSellerResolution.resolveOrCreate.mockResolvedValueOnce(
+      mockSeller as never,
+    );
+    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledWith(
+      'Alza.hu',
+    );
+    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledWith(
+      expect.objectContaining({
+        seller: mockSeller,
+        sourceRecord: { id: 'source-record-1' },
+        price: 199990,
+        currency: 'HUF',
+        url: 'https://alza.hu/product/1',
+        sourceListingId: 'listing-1',
+      }),
+    );
+  });
+
+  it('continues processing remaining offers and does not fail the scrape if one offer upsert throws', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({
+      offers: [
+        { sellerName: 'BadSeller', price: 1000 },
+        { sellerName: 'GoodSeller', price: 2000 },
+      ],
+    });
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-partial-offer-failure';
+      return model;
+    });
+    mockSellerResolution.resolveOrCreate
+      .mockRejectedValueOnce(new Error('seller resolution failed'))
+      .mockResolvedValueOnce({ id: 'seller-2', name: 'GoodSeller' } as never);
+    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
+
+    const result = await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(result).toBeDefined();
+    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(2);
+    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(1);
   });
 });

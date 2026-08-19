@@ -25,4 +25,8 @@ export class LoggerConfigService {
   get token(): string | undefined {
     return this.configService.get<string>('logging.token');
   }
+
+  get level(): string {
+    return this.configService.get<string>('logging.level') ?? 'debug';
+  }
 }

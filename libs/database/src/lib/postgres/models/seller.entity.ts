@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne, OneToMany, OneToOne } from 'typeorm';
+import { Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { Expose } from 'class-transformer';
 import { SerializeGroup } from '@fittkereso-backend/utils';
@@ -44,8 +44,8 @@ export class Seller extends BasePostgresEntity {
   location?: string;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
-  productSource?: ProductSource | null;
+  @OneToMany(() => ProductSource, (source) => source.seller)
+  productSources: ProductSource[];
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @OneToOne(() => BillingInfo, (billingInfo) => billingInfo.seller, {

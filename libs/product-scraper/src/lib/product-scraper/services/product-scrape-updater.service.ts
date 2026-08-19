@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import {
+  OfferRepository,
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
   ProductEmbedding,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
@@ -19,15 +20,17 @@ import {
 } from '@fittkereso-backend/resolution';
 import { generateSlug, nameOf, normalize } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BrandResolutionService,
   ProductEmbeddingService,
   ProductImageCopyService,
   ProductNormalizerService,
   ProductSpecUpdaterService,
+  SellerResolutionService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
-import { isEmpty, minBy } from 'lodash';
+import { isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 interface ResolvedIdentity {
@@ -39,6 +42,7 @@ interface ResolvedIdentity {
 interface PersistResult {
   model: ProductModel;
   created: boolean;
+  sourceRecord?: ProductSourceRecord;
 }
 
 @Injectable()
@@ -54,11 +58,14 @@ export class ProductScrapeUpdaterService {
     private readonly productRepo: ProductModelRepository,
     private readonly taskRepo: ScrapeTaskRepository,
     private readonly aliasRepo: ProductAliasRepository,
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
     private readonly productNormalizer: ProductNormalizerService,
+    private readonly sellerResolution: SellerResolutionService,
+    private readonly offerRepo: OfferRepository,
+    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -67,7 +74,7 @@ export class ProductScrapeUpdaterService {
   ): Promise<ProductModel | undefined> {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'skipped_no_category',
       );
       this.logger.warn('Skipping scrape — no category identified', {
@@ -96,13 +103,14 @@ export class ProductScrapeUpdaterService {
         task,
         scrapedProduct,
         model: persisted.model,
+        sourceRecord: persisted.sourceRecord,
       });
       return persisted.model;
     } catch (error) {
       // do not fail the whole scraping if brand resolution fails
       if ((error as Error).message?.includes('Brand could not be identified')) {
         this.productMetricsService.productBrandResolutionFailed(
-          task.source.type,
+          task.source.name,
         );
         return undefined;
       }
@@ -111,12 +119,16 @@ export class ProductScrapeUpdaterService {
   }
 
   // One canonical name for this scrape, used for Path 1 lookup, for the new
-  // ProductModelSource row, and for ProductModel.normalizedName on new products.
+  // ProductSourceRecord row, and for ProductModel.normalizedName on new products.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
+    const strategy =
+      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
+        ?.normalizationStrategy ?? 'digit-heuristic';
     return this.productNormalizer.normalizeProduct({
       brand: scrapedProduct.brand,
       model: scrapedProduct.model,
       displayName: scrapedProduct.displayName,
+      strategy,
     });
   }
 
@@ -141,14 +153,14 @@ export class ProductScrapeUpdaterService {
       return { isExistingMatch: false };
     }
     const sourceRows =
-      await this.productModelSourceRepo.findAllByNormalizedName(
+      await this.sourceRecordRepo.findAllByNormalizedName(
         normalizedSourceName,
         categoryId,
       );
     const path1Match = this.selectPath1Match(sourceRows, task, scrapedProduct);
     if (path1Match) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'path1_hit',
       );
       return { model: path1Match.model, isExistingMatch: true };
@@ -162,11 +174,11 @@ export class ProductScrapeUpdaterService {
     const candidate = resolved.resolvedModel;
     const resolutionContext = resolved.context;
 
-    if (candidate && this.hasSourceOfType(candidate, task.source.type)) {
+    if (candidate && this.hasSourceRow(candidate, task.source.id)) {
       // The same source already has a different name pointing at this product —
       // this scrape is a distinct product by the source catalog's own definition.
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'cross_source_rejected_same_source',
       );
       this.logger.debug(
@@ -175,7 +187,7 @@ export class ProductScrapeUpdaterService {
           taskId: task.id,
           url: task.url,
           candidateId: candidate.id,
-          sourceType: task.source.type,
+          sourceName: task.source.name,
           normalizedSourceName,
         },
       );
@@ -184,10 +196,10 @@ export class ProductScrapeUpdaterService {
 
     if (candidate) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'cross_source_merge',
       );
-      this.productMetricsService.productMatched(task.source.type);
+      this.productMetricsService.productMatched(task.source.name);
       return { model: candidate, isExistingMatch: true, resolutionContext };
     }
 
@@ -210,17 +222,19 @@ export class ProductScrapeUpdaterService {
         normalizedSourceName,
       );
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.type,
+        task.source.name,
         'new_product',
       );
     }
 
     this.applyScrapedProductDetails(model, scrapedProduct);
 
-    await this.specUpdaterService.updateSpecsOnProduct({
+    const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
       model,
       specs: scrapedProduct.specs,
-      sourceType: task.source.type,
+      rawSpecs: scrapedProduct.rawSpecs,
+      externalId: scrapedProduct.externalId,
+      source: task.source,
       sourceUrl: task.url,
       sourceName: scrapedProduct.displayName,
       normalizedSourceName,
@@ -232,11 +246,12 @@ export class ProductScrapeUpdaterService {
       scrapedProduct,
       task,
     });
+    saveOutcome.sourceRecord ??= sourceRecord;
 
     if (saveOutcome.created) {
-      this.productMetricsService.newProductCreated(task.source.type);
+      this.productMetricsService.newProductCreated(task.source.name);
     } else {
-      this.productMetricsService.productUpdated(task.source.type);
+      this.productMetricsService.productUpdated(task.source.name);
     }
 
     task.product = saveOutcome.model;
@@ -252,8 +267,9 @@ export class ProductScrapeUpdaterService {
     task: ScrapeTask;
     scrapedProduct: ScrapedProduct;
     model: ProductModel;
+    sourceRecord?: ProductSourceRecord;
   }): Promise<void> {
-    const { task, scrapedProduct, model } = params;
+    const { task, scrapedProduct, model, sourceRecord } = params;
 
     if (!model.slug) {
       await this.generateProductSlug(model);
@@ -271,7 +287,7 @@ export class ProductScrapeUpdaterService {
     );
     if (insertedCount > 0) {
       this.productMetricsService.productAliasCreated(
-        task.source.type,
+        task.source.name,
         insertedCount,
       );
     }
@@ -290,9 +306,68 @@ export class ProductScrapeUpdaterService {
         await this.productRepo.save(model);
 
         this.productMetricsService.productImagesCreated(
-          task.source.type,
+          task.source.name,
           newImages.length,
         );
+      }
+    }
+
+    await this.createOrUpdateOffers(task, scrapedProduct, model, sourceRecord);
+  }
+
+  // No-op for sources whose config doesn't populate ScrapedProduct.offers.
+  private async createOrUpdateOffers(
+    task: ScrapeTask,
+    scrapedProduct: ScrapedProduct,
+    model: ProductModel,
+    sourceRecord: ProductSourceRecord | undefined,
+  ): Promise<void> {
+    const offers = scrapedProduct.offers;
+    if (isEmpty(offers)) return;
+
+    if (!sourceRecord) {
+      this.logger.warn(
+        'No ProductSourceRecord resolved for this scrape, skipping offer upsert',
+        { taskId: task.id, url: task.url },
+      );
+      return;
+    }
+
+    // Page-level offer-level specs (e.g. frameSize, color), derived from this
+    // listing's own spec set. Applied to every offer on the page by default;
+    // an individual ScrapedOffer.specs overrides this for sources that report
+    // multiple size/color variants on a single product page. Always optional
+    // — a listing with no extractable offer-level values simply yields {}.
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
+        ?.offerLevelSpecs ?? [];
+    const pageOfferLevelSpecs = pick(sourceRecord.specs, offerLevelKeys);
+
+    for (const scraped of offers!) {
+      try {
+        const seller = await this.sellerResolution.resolveOrCreate(
+          scraped.sellerName,
+        );
+        await this.offerRepo.upsertFromScrape({
+          model,
+          seller,
+          sourceRecord,
+          price: scraped.price,
+          currency: scraped.currency,
+          availability: scraped.availability,
+          url: scraped.url,
+          sourceListingId: scraped.sourceListingId,
+          specs: scraped.specs ?? pageOfferLevelSpecs,
+        });
+      } catch (error) {
+        // Do not fail the whole product scrape if one offer fails — mirrors
+        // the existing brand-resolution-failure tolerance in this service.
+        this.logger.warn('Failed to upsert offer, continuing', {
+          taskId: task.id,
+          url: task.url,
+          sellerName: scraped.sellerName,
+          error,
+        });
       }
     }
   }
@@ -331,8 +406,10 @@ export class ProductScrapeUpdaterService {
     return result.generatedMaps.length || result.identifiers.length;
   }
 
-  private hasSourceOfType(model: ProductModel, sourceType: string): boolean {
-    return model.sources?.some((source) => source.type === sourceType) ?? false;
+  private hasSourceRow(model: ProductModel, sourceId: string): boolean {
+    return (
+      model.sources?.some((source) => source.source?.id === sourceId) ?? false
+    );
   }
 
   // Pick the right Path 1 hit when multiple source rows share a normalizedSourceName
@@ -341,21 +418,21 @@ export class ProductScrapeUpdaterService {
   // cross-source row; reject same-source-different-name rows so Path 2's same-source
   // gate can treat the scrape as a distinct product.
   private selectPath1Match(
-    sourceRows: ProductModelSource[],
+    sourceRows: ProductSourceRecord[],
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
-  ): ProductModelSource | undefined {
+  ): ProductSourceRecord | undefined {
     if (isEmpty(sourceRows)) return undefined;
 
     const incomingName = scrapedProduct.displayName?.toLowerCase();
     const exactMatch = sourceRows.find(
       (row) =>
-        row.type === task.source.type &&
+        row.source?.id === task.source.id &&
         row.sourceName?.toLowerCase() === incomingName,
     );
     if (exactMatch) return exactMatch;
 
-    return sourceRows.find((row) => row.type !== task.source.type);
+    return sourceRows.find((row) => row.source?.id !== task.source.id);
   }
 
   private async findExistingProductModel(
@@ -450,10 +527,12 @@ export class ProductScrapeUpdaterService {
       );
 
       this.applyScrapedProductDetails(existingModel, scrapedProduct);
-      await this.specUpdaterService.updateSpecsOnProduct({
+      const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
         model: existingModel,
         specs: scrapedProduct.specs,
-        sourceType: task.source.type,
+        rawSpecs: scrapedProduct.rawSpecs,
+        externalId: scrapedProduct.externalId,
+        source: task.source,
         sourceUrl: task.url,
         sourceName: scrapedProduct.displayName,
         normalizedSourceName,
@@ -462,6 +541,7 @@ export class ProductScrapeUpdaterService {
       return {
         model: await this.productRepo.save(existingModel),
         created: false,
+        sourceRecord,
       };
     }
   }

@@ -32,19 +32,33 @@ export abstract class BaseScrapeTaskManagerService {
       this.dynamicConfigService.scheduling?.staleScrapeTaskTimeoutMinutes ??
       SCHEDULING_DEFAULTS.staleScrapeTaskTimeoutMinutes;
 
-    const task = await this.taskRepo.fetchNextScrapeTask(
+    const { task, noTaskDiagnostics } = await this.taskRepo.fetchNextScrapeTask(
       this.queues,
       staleTimeoutMinutes,
     );
     if (!task) {
+      if (noTaskDiagnostics && noTaskDiagnostics.candidateCount > 0) {
+        this.logger.debug(
+          `Scrape task poll tick found ${noTaskDiagnostics.candidateCount} candidate row(s) but claimed none — see blockedReasons per task`,
+          { queues: this.queues, ...noTaskDiagnostics },
+        );
+      }
       return;
     }
 
     this.logger.debug(
       `Processing scrape task ${task.id} for queue ${task.queue}`,
+      {
+        taskId: task.id,
+        queue: task.queue,
+        url: task.url,
+        sourceId: task.source.id,
+        sourceName: task.source.name,
+        attempts: task.attempts,
+      },
     );
 
-    this.taskMetricsService.taskStarted(task.queue, task.source.type);
+    this.taskMetricsService.taskStarted(task.queue, task.source.name);
 
     const startTime = Date.now();
 
@@ -66,11 +80,27 @@ export abstract class BaseScrapeTaskManagerService {
 
       await this.taskRepo.save(task);
 
-      this.logger.debug(`Finished task ${task.id} for queue ${task.queue}`);
-      this.taskMetricsService.taskFinished(task.queue, task.source.type);
+      this.logger.debug(`Finished task ${task.id} for queue ${task.queue}`, {
+        taskId: task.id,
+        queue: task.queue,
+        url: task.url,
+        sourceId: task.source.id,
+        sourceName: task.source.name,
+        status: task.status,
+        executionTimeInSec: task.executionTimeInSec,
+        attempts: task.attempts,
+      });
+      this.taskMetricsService.taskFinished(task.queue, task.source.name);
     } catch (error: unknown) {
-      this.logger.error(`Task ${task.id} failed: ${task.url}`, error);
-      this.taskMetricsService.taskFailed(task.queue, task.source.type);
+      this.logger.error(`Task ${task.id} failed: ${task.url}`, error, {
+        taskId: task.id,
+        queue: task.queue,
+        url: task.url,
+        sourceId: task.source.id,
+        sourceName: task.source.name,
+        attempts: task.attempts,
+      });
+      this.taskMetricsService.taskFailed(task.queue, task.source.name);
 
       task.executionTimeInSec = (Date.now() - startTime) / 1000;
       task.error = JSON.stringify(
@@ -95,7 +125,7 @@ export abstract class BaseScrapeTaskManagerService {
       if (task.executionTimeInSec) {
         this.taskMetricsService.recordTaskDuration(
           task.queue,
-          task.source.type,
+          task.source.name,
           task.status === TaskStatus.FAILED ? 'failed' : 'finished',
           task.executionTimeInSec,
         );

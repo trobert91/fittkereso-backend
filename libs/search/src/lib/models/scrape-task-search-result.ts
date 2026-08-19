@@ -1,5 +1,4 @@
 import {
-  ProductSourceType,
   ScrapeQueueName,
   ScrapeTask,
   TaskStatus,
@@ -11,5 +10,5 @@ export class ScrapeTaskSearchResult extends BasePageResult<ScrapeTask> {
 
   queues?: ScrapeQueueName[];
 
-  sourceTypes?: ProductSourceType[];
+  sourceIds?: string[];
 }

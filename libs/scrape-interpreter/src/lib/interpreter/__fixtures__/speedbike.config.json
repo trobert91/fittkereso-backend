@@ -1,0 +1,195 @@
+{
+  "baseUrl": "https://speedbike.hu",
+  "fullSyncStartUrl": "https://speedbike.hu/elektromos-kerekpar",
+
+  "categories": {
+    "ebikes": { "enabled": true, "sourceTitle": "E-BIKE" }
+  },
+
+  "incrementalSync": {
+    "searchKeywords": ["elektromos kerékpár speedbike"],
+    "numResults": 40,
+    "urlClassify": {
+      "detailUrlPattern": "speedbike\\.hu\\/[^/?#]+-elektromos-[^/?#]*kerekpar[^/?#]*\\/?$"
+    }
+  },
+
+  "listPage": {
+    "categoryName": [
+      { "op": "selectText", "selector": "h1.category-title", "first": true, "trim": true }
+    ],
+    "categoryLinks": [
+      {
+        "op": "buildBaseUrl",
+        "from": "task.url",
+        "stripQuery": true,
+        "trimTrailingSlash": true,
+        "as": "baseUrl"
+      }
+    ],
+    "productLinks": [
+      { "op": "selectAll", "selector": ".product-box .name a, .list-view .product-box a.name", "as": "boxes" },
+      {
+        "op": "extractLinkFromBox",
+        "on": "boxes",
+        "linkSelector": "a",
+        "first": true,
+        "titleFrom": ["attr:title", "text"]
+      }
+    ]
+  },
+
+  "detailPage": {
+    "rawSpecs": [
+      {
+        "op": "extractSpecTableV1",
+        "rowSelector": "table.parameter_table tr",
+        "sectionHeaderSelector": "h3",
+        "nameSelector": "td:first-child strong",
+        "nameExcludeChildren": false,
+        "valueCellIndex": 1,
+        "listValueSelector": ".prop .name",
+        "descriptionSelector": ".hint",
+        "descriptionAttr": "data-content",
+        "dedupeBy": "name"
+      }
+    ],
+
+    "category": {
+      "breadcrumbOrSource": [
+        { "op": "selectAll", "selector": "[itemprop=\"itemListElement\"]", "as": "breadcrumbItems" },
+        {
+          "op": "selectNestedText",
+          "on": "breadcrumbItems",
+          "index": 2,
+          "childSelector": "[itemprop=\"name\"]",
+          "trim": true,
+          "fallback": "unknown"
+        }
+      ],
+      "slugLookup": [
+        { "when": { "equalsIgnoreCase": "E-BIKE" }, "slug": "ebikes" }
+      ]
+    },
+
+    "brand": [
+      { "op": "selectAll", "selector": "script", "as": "scripts" },
+      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"brand\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true
+      }
+    ],
+
+    "model": [
+      { "op": "selectAll", "selector": "script", "as": "scripts" },
+      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"name\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true,
+        "as": "fullName"
+      },
+      {
+        "op": "stripPrefix",
+        "value": "fullName",
+        "prefix": "{{brand}}",
+        "flags": "i"
+      }
+    ],
+
+    "externalId": [
+      { "op": "selectAll", "selector": "script", "as": "scripts" },
+      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true
+      }
+    ],
+
+    "releaseYear": [
+      { "op": "mapSpecValue", "label": "E-bike évjárat", "single": true, "cast": "number" }
+    ],
+
+    "images": [
+      { "op": "selectAll", "selector": "meta[property=\"og:image\"]" },
+      { "op": "extractAttrList", "attr": "content", "trim": true }
+    ],
+
+    "specMapping": {
+      "ebikes": {
+        "mappings": [
+          { "key": "frameType", "labels": ["Váztípus"] },
+          { "key": "usageType", "labels": ["Felhasználás módja"] },
+          { "key": "batteryPosition", "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"] },
+          { "key": "drivetrain", "labels": ["Erőátvitel"] },
+          { "key": "suspension", "labels": ["Rugózás"] },
+          { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
+          { "key": "gearType", "labels": ["Váltó típusa"] },
+          { "key": "batteryCapacity", "labels": ["wattora", "Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
+          { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
+          { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
+          { "key": "motorPower", "labels": ["Motor teljesítménye"], "extract": "number" },
+          { "key": "topSpeed", "labels": ["Maximális rásegítés", "Maximális sebesség", "Motoros rásegítés sebessége"], "extract": "number" },
+          { "key": "range", "labels": ["Hatótávolság"], "extract": "number" },
+          { "key": "chargingTime", "labels": ["Töltési idő"], "extract": "number" },
+          { "key": "display", "labels": ["Kijelző", "Kijelzővel rendelkezik"] },
+          { "key": "maxLoad", "labels": ["Maximális terhelhetőség"], "extract": "number" },
+          { "key": "weight", "labels": ["Tömeg", "Súly"], "extract": "number" },
+          { "key": "waterResistance", "labels": ["Védettségi szint", "Vízállóság"] },
+          { "key": "smartConnectivity", "labels": ["Applikáció", "GPS követés"] }
+        ]
+      }
+    },
+
+    "offers": {
+      "listItems": [
+        { "op": "selectAll", "selector": ".price_special_color, .price:not(.price_special_color)" }
+      ],
+      "sellerName": [
+        { "op": "literal", "value": "speedbike.hu" }
+      ],
+      "price": [
+        { "op": "selectText", "selector": ".price_special_color, .price:not(.price_special_color)", "first": true, "trim": true },
+        { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithDots" },
+        { "op": "stripPattern", "value": "priceWithDots", "pattern": "\\.", "flags": "g" }
+      ],
+      "currency": [
+        { "op": "literal", "value": "HUF" }
+      ],
+      "url": [
+        { "op": "buildBaseUrl", "from": "task.url" }
+      ],
+      "sourceListingId": [
+        { "op": "selectAll", "selector": "script", "as": "scripts" },
+        { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+        {
+          "op": "regexCapture",
+          "value": "shopRenterJson",
+          "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
+          "group": 1,
+          "trim": true
+        }
+      ]
+    },
+
+    "translation": {
+      "enabled": false,
+      "sourceLanguage": "hu",
+      "targetLanguage": "en",
+      "contextTemplate": "Technical specification values from a speedbike.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."
+    },
+
+    "postProcess": {
+      "enabled": true
+    }
+  }
+}

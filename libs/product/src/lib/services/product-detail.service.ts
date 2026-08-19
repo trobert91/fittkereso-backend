@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
   ProductModelRepository,
+  ProductSourceRecord,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -26,6 +27,7 @@ export class ProductDetailService {
         nameOf<ProductModel>('images'),
         nameOf<ProductModel>('mainImage'),
         nameOf<ProductModel>('sources'),
+        `sources.${nameOf<ProductSourceRecord>('source')}`,
         nameOf<ProductModel>('scrapeTasks'),
         `scrapeTasks.${nameOf<ScrapeTask>('source')}`,
       ],

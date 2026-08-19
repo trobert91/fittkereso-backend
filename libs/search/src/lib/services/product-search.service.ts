@@ -1,21 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import {
   Brand,
+  Offer,
   ProductCategory,
   ProductModel,
   ProductModelRepository,
 } from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductSearchParams } from '../models/product-search-params';
 import { ProductSearchResult } from '../models/product-search-result';
 import { SelectQueryBuilder } from 'typeorm';
 import { nameOf } from '@fittkereso-backend/utils';
-import { isEmpty } from 'lodash';
+import { isEmpty, isArray } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
 
 @Injectable()
 export class ProductSearchService {
-  constructor(private readonly productRepo: ProductModelRepository) {}
+  constructor(
+    private readonly productRepo: ProductModelRepository,
+    private readonly categoryConfigService: CategoryConfigService,
+  ) {}
 
   public async searchProducts(
     params: ProductSearchParams,
@@ -71,6 +76,10 @@ export class ProductSearchService {
       });
     }
 
+    if (!isEmpty(params.specFilters)) {
+      query = this.applySpecFilters(query, params.specFilters!);
+    }
+
     // --- Text search (LIKE + similarity filter + ranking) ---
     if (params.searchTerm && !isEmpty(params.searchTerm.trim())) {
       const rawTerm = params.searchTerm!.trim().toLowerCase();
@@ -122,6 +131,73 @@ export class ProductSearchService {
     const page: number = params.page ?? 1;
     const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
     query = query.skip((page - 1) * pageSize).take(pageSize);
+
+    return query;
+  }
+
+  // A spec key is offer-level if ANY known category flags it as such —
+  // search can span multiple categories, so there's no single category
+  // config to check against at query-build time. Cheap: category configs
+  // are filesystem-cached, not a DB round-trip.
+  private isOfferLevelSpecKey(key: string): boolean {
+    return this.categoryConfigService
+      .getAllSlugs()
+      .some((slug) =>
+        (
+          this.categoryConfigService.getConfig(slug)?.offerLevelSpecs ?? []
+        ).includes(key),
+      );
+  }
+
+  // Offer-level keys (e.g. frameSize, color) live on Offer.specs, not
+  // ProductModel.specs — a product matches if ANY of its active offers
+  // carries the filtered value. Uses leftJoin, not innerJoin: a product
+  // whose offers happen to have no value for a given key must still be
+  // findable by searches that don't filter on that key, and must simply
+  // not match a search that does — never treated as an error either way.
+  private applySpecFilters(
+    query: SelectQueryBuilder<ProductModel>,
+    specFilters: Record<string, string | number | [number, number]>,
+  ): SelectQueryBuilder<ProductModel> {
+    let offerJoined = false;
+
+    Object.entries(specFilters).forEach(([key, value], idx) => {
+      const isOfferLevel = this.isOfferLevelSpecKey(key);
+      const column = isOfferLevel
+        ? `offer.${nameOf<Offer>('specs')}`
+        : `product.${nameOf<ProductModel>('specs')}`;
+
+      if (isOfferLevel && !offerJoined) {
+        // Plain leftJoin (no ON-clause restriction to active offers): an
+        // inactive offer's spec values still shouldn't satisfy the filter,
+        // but that's enforced per-condition below via offer.active, not by
+        // narrowing the join — narrowing the join here would also drop
+        // products whose only offers are inactive from the base result set
+        // entirely, which isn't what an unrelated filter should do.
+        query = query.leftJoin(
+          `product.${nameOf<ProductModel>('offers')}`,
+          'offer',
+        );
+        offerJoined = true;
+      }
+
+      const activeGuard = isOfferLevel
+        ? `offer.${nameOf<Offer>('active')} = true AND `
+        : '';
+      const valueParam = `specFilterValue${idx}`;
+      if (isArray(value)) {
+        const [min, max] = value;
+        query = query.andWhere(
+          `${activeGuard}(${column}->>'${key}')::numeric BETWEEN :${valueParam}Min AND :${valueParam}Max`,
+          { [`${valueParam}Min`]: min, [`${valueParam}Max`]: max },
+        );
+      } else {
+        query = query.andWhere(
+          `${activeGuard}${column}->>'${key}' = :${valueParam}`,
+          { [valueParam]: String(value) },
+        );
+      }
+    });
 
     return query;
   }

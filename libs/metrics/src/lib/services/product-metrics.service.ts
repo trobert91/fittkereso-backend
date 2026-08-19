@@ -20,7 +20,6 @@ export type ScrapeResolutionOutcome =
   | 'cross_source_merge'
   | 'cross_source_rejected_same_source'
   | 'new_product';
-import { ProductSourceType } from '@fittkereso-backend/database';
 
 @Injectable()
 export class ProductMetricsService {
@@ -98,54 +97,48 @@ export class ProductMetricsService {
     });
   }
 
-  newProductCreated(source: ProductSourceType): void {
+  newProductCreated(source: string): void {
     this.newProductCounter.inc({ source });
   }
 
-  productUpdated(source: ProductSourceType): void {
+  productUpdated(source: string): void {
     this.productUpdatedCounter.inc({ source });
   }
 
-  productImagesCreated(
-    source: ProductSourceType,
-    numberOfImages: number,
-  ): void {
+  productImagesCreated(source: string, numberOfImages: number): void {
     this.productImageCreatedCounter.inc({ source }, numberOfImages);
   }
 
-  productSpecValidationFailed(source: ProductSourceType): void {
+  productSpecValidationFailed(source: string): void {
     this.productSpecValidationFailedCounter.inc({ source });
   }
 
-  productMatched(source: ProductSourceType): void {
+  productMatched(source: string): void {
     this.productMatchedCounter.inc({ source });
   }
 
-  productAliasCreated(source: ProductSourceType, count: number): void {
+  productAliasCreated(source: string, count: number): void {
     this.productAliasCreatedCounter.inc({ source }, count);
   }
 
-  productBrandResolutionFailed(source: ProductSourceType): void {
+  productBrandResolutionFailed(source: string): void {
     this.productBrandResolutionFailedCounter.inc({ source });
   }
 
-  productSourceSpecValidationFailed(
-    source: ProductSourceType,
-    category: string,
-  ): void {
+  productSourceSpecValidationFailed(source: string, category: string): void {
     this.productSourceSpecValidationFailedCounter.inc({ source, category });
   }
 
-  productImageCopySuccess(source: ProductSourceType, count: number): void {
+  productImageCopySuccess(source: string, count: number): void {
     this.productImageCopyCounter.inc({ source, status: 'success' }, count);
   }
 
-  productImageCopyFailed(source: ProductSourceType): void {
+  productImageCopyFailed(source: string): void {
     this.productImageCopyCounter.inc({ source, status: 'failed' });
   }
 
   scrapeResolutionOutcome(
-    source: ProductSourceType,
+    source: string,
     result: ScrapeResolutionOutcome,
   ): void {
     this.scrapeResolutionOutcomeCounter.inc({ source, result });

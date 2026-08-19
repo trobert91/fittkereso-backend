@@ -1,6 +1,10 @@
-import { IsUUID } from 'class-validator';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 
 export class ResyncProductSourceDto {
   @IsUUID()
-  productModelSourceId: string;
+  sourceRecordId: string;
+
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean;
 }

@@ -112,6 +112,10 @@
       "filterType": "range"
     },
     {
+      "key": "color",
+      "filterType": "multiselect"
+    },
+    {
       "key": "gender",
       "filterType": "multiselect"
     },
@@ -130,6 +134,10 @@
     {
       "key": "brakeType",
       "filterType": "multiselect"
+    },
+    {
+      "key": "gearCount",
+      "filterType": "range"
     },
     {
       "key": "weight",
@@ -170,6 +178,8 @@
     "topSpeed"
   ],
   "maxMatcherSpecMismatches": 1,
+  "normalizationStrategy": "full",
+  "offerLevelSpecs": ["frameSize", "color"],
   "promptConfig": {
     "validSpecs": [
       {

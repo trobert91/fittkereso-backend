@@ -4,12 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  Offer,
   ProductAlias,
   ProductAliasSource,
   ProductImage,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
+  ProductSourceRecord,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -66,8 +67,9 @@ export class ProductMergeService {
           targetDisplayName: target.displayName,
         });
 
-        await this.moveProductModelSources(manager, source, target);
+        await this.moveProductSourceRecords(manager, source, target);
         await this.moveProductImages(manager, source, target);
+        await this.moveOffers(manager, sourceId, targetId);
         await this.createAliasesFromSource(manager, source, target);
         await this.moveProductAliases(manager, sourceId, targetId);
         await this.moveScrapeTasks(manager, sourceId, targetId);
@@ -101,7 +103,7 @@ export class ProductMergeService {
     });
   }
 
-  private async moveProductModelSources(
+  private async moveProductSourceRecords(
     manager: EntityManager,
     source: ProductModel,
     target: ProductModel,
@@ -111,13 +113,15 @@ export class ProductMergeService {
       return;
     }
 
-    const targetTypes = new Set((target.sources ?? []).map((s) => s.type));
+    const targetSourceIds = new Set(
+      (target.sources ?? []).map((s) => s.source?.id ?? 'manual'),
+    );
 
     const toMove: string[] = [];
     const toDelete: string[] = [];
 
     for (const sourceRecord of sourceSources) {
-      if (targetTypes.has(sourceRecord.type)) {
+      if (targetSourceIds.has(sourceRecord.source?.id ?? 'manual')) {
         toDelete.push(sourceRecord.id);
       } else {
         toMove.push(sourceRecord.id);
@@ -127,7 +131,7 @@ export class ProductMergeService {
     if (!isEmpty(toMove)) {
       await manager
         .createQueryBuilder()
-        .update(ProductModelSource)
+        .update(ProductSourceRecord)
         .set({ model: { id: target.id }, deduplicated: true })
         .where('id IN (:...ids)', { ids: toMove })
         .execute();
@@ -137,12 +141,82 @@ export class ProductMergeService {
       await manager
         .createQueryBuilder()
         .delete()
-        .from(ProductModelSource)
+        .from(ProductSourceRecord)
         .where('id IN (:...ids)', { ids: toDelete })
         .execute();
     }
 
     this.logger.debug('Moved product model sources', {
+      moved: toMove.length,
+      skipped: toDelete.length,
+    });
+  }
+
+  // Offer.model has onDelete: 'CASCADE' — any Offer still pointing at the
+  // source product when deleteSourceProduct runs would be silently destroyed
+  // by Postgres's FK cascade (no error, no log line). Must run before that
+  // delete. Mirrors moveProductSourceRecords's move-vs-delete-duplicate
+  // pattern, using Offer's own unique constraint (seller, sourceListingId)
+  // to decide which source-side offers collide with an existing target-side
+  // offer (same seller already selling this exact listing) versus which are
+  // safe to reassign outright.
+  private async moveOffers(
+    manager: EntityManager,
+    sourceId: string,
+    targetId: string,
+  ): Promise<void> {
+    const sourceOffers = await manager.find(Offer, {
+      where: { model: { id: sourceId } },
+      relations: [nameOf<Offer>('seller')],
+    });
+
+    if (isEmpty(sourceOffers)) {
+      return;
+    }
+
+    const targetOffers = await manager.find(Offer, {
+      where: { model: { id: targetId } },
+      relations: [nameOf<Offer>('seller')],
+    });
+    const targetOfferKeys = new Set(
+      targetOffers
+        .filter((o) => o.sourceListingId)
+        .map((o) => `${o.seller.id}:${o.sourceListingId}`),
+    );
+
+    const toMove: string[] = [];
+    const toDelete: string[] = [];
+
+    for (const offer of sourceOffers) {
+      const key = offer.sourceListingId
+        ? `${offer.seller.id}:${offer.sourceListingId}`
+        : undefined;
+      if (key && targetOfferKeys.has(key)) {
+        toDelete.push(offer.id);
+      } else {
+        toMove.push(offer.id);
+      }
+    }
+
+    if (!isEmpty(toMove)) {
+      await manager
+        .createQueryBuilder()
+        .update(Offer)
+        .set({ model: { id: targetId } })
+        .where('id IN (:...ids)', { ids: toMove })
+        .execute();
+    }
+
+    if (!isEmpty(toDelete)) {
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(Offer)
+        .where('id IN (:...ids)', { ids: toDelete })
+        .execute();
+    }
+
+    this.logger.debug('Moved product offers', {
       moved: toMove.length,
       skipped: toDelete.length,
     });

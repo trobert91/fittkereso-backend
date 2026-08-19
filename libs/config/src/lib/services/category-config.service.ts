@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { ProductCategoryConfig } from '@fittkereso-backend/database';
 import type {
-  ProductCategoryConfig,
-  SourceSpecConfig,
-} from '@fittkereso-backend/database';
-import type {
+  ProductSpecs,
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
 } from '@fittkereso-backend/database';
@@ -14,7 +12,7 @@ interface CategoryConfigFiles {
   config?: ProductCategoryConfig;
   jsonSchema?: SpecDefinitionJsonSchema;
   uiSchema?: SpecDefinitionUiSchema;
-  specMappings?: Record<string, SourceSpecConfig>;
+  goldenSample?: ProductSpecs;
 }
 
 @Injectable()
@@ -54,19 +52,14 @@ export class CategoryConfigService {
     return this.configCache.get(slug)?.uiSchema;
   }
 
-  getSpecMappings(
-    slug: string | null | undefined,
-  ): Record<string, SourceSpecConfig> | undefined {
+  /**
+   * One real, fully-populated ProductSpecs example in the category's target
+   * canonical shape — used to anchor ProductSourcePostProcessService's LLM
+   * output format. Absent for categories that don't use LLM post-processing.
+   */
+  getGoldenSample(slug: string | null | undefined): ProductSpecs | undefined {
     if (!slug) return undefined;
-    return this.configCache.get(slug)?.specMappings;
-  }
-
-  getSpecMappingsForSource(
-    slug: string | null | undefined,
-    source: string,
-  ): SourceSpecConfig | undefined {
-    if (!slug) return undefined;
-    return this.configCache.get(slug)?.specMappings?.[source];
+    return this.configCache.get(slug)?.goldenSample;
   }
 
   // ─── Write Methods ──────────────────────────────────────────────────────────
@@ -92,13 +85,10 @@ export class CategoryConfigService {
     this.reloadCategory(slug);
   }
 
-  writeSpecMappings(
-    slug: string,
-    mappings: Record<string, SourceSpecConfig>,
-  ): void {
+  writeGoldenSample(slug: string, goldenSample: ProductSpecs): void {
     this.ensureCategoryDirectory(slug);
-    const filePath = path.join(this.categoriesPath, slug, 'specMappings.json');
-    fs.writeFileSync(filePath, JSON.stringify(mappings, null, 2) + '\n');
+    const filePath = path.join(this.categoriesPath, slug, 'goldenSample.json');
+    fs.writeFileSync(filePath, JSON.stringify(goldenSample, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -161,8 +151,8 @@ export class CategoryConfigService {
       uiSchema: this.readJsonFile<SpecDefinitionUiSchema>(
         path.join(categoryDirectory, 'uiSchema.json'),
       ),
-      specMappings: this.readJsonFile<Record<string, SourceSpecConfig>>(
-        path.join(categoryDirectory, 'specMappings.json'),
+      goldenSample: this.readJsonFile<ProductSpecs>(
+        path.join(categoryDirectory, 'goldenSample.json'),
       ),
     };
   }

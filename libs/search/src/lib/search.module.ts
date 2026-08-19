@@ -7,6 +7,7 @@ import {
   ProductCategorySearchService,
   ProductSearchService,
   ScrapeTaskSearchService,
+  SellerSearchService,
   TaskSearchService,
 } from './services';
 import { DatabaseModule } from '@fittkereso-backend/database';
@@ -22,6 +23,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
     ProductCategorySearchService,
     ProductSearchService,
     ScrapeTaskSearchService,
+    SellerSearchService,
     TaskSearchService,
   ],
   exports: [
@@ -32,6 +34,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
     ProductCategorySearchService,
     ProductSearchService,
     ScrapeTaskSearchService,
+    SellerSearchService,
     TaskSearchService,
   ],
 })

@@ -95,4 +95,44 @@ describe('ProductNormalizerService', () => {
       }),
     ).toThrow();
   });
+
+  describe("strategy: 'full'", () => {
+    const runFull = (brand: string, model: string, displayName?: string) =>
+      service.normalizeProduct({
+        brand,
+        model,
+        displayName: displayName ?? `${brand} ${model}`,
+        strategy: 'full',
+      });
+
+    it('strips the brand prefix', () => {
+      expect(runFull('KTM', 'MACINA SCARP SX PRESTIGE Di2')).toBe(
+        'macina scarp sx prestige di2',
+      );
+    });
+
+    it('lowercases and collapses internal whitespace', () => {
+      expect(
+        runFull('KTM', 'MACINA  SCARP   SX PRESTIGE Di2'),
+      ).toBe('macina scarp sx prestige di2');
+    });
+
+    it('does not strip punctuation', () => {
+      expect(runFull('LG', '34GN850P-B')).toBe('34gn850p-b');
+    });
+
+    it('produces distinct keys for different trims of the same model line', () => {
+      const prestige = runFull('KTM', 'MACINA SCARP SX PRESTIGE Di2');
+      const master = runFull('KTM', 'MACINA SCARP SX MASTER Di2');
+      expect(prestige).toBe('macina scarp sx prestige di2');
+      expect(master).toBe('macina scarp sx master di2');
+      expect(prestige).not.toBe(master);
+    });
+
+    it('does not fall back to the digit-heuristic word-dropping behavior', () => {
+      // Under 'digit-heuristic' this would collapse to just "di2" (see the
+      // top-level describe block) — 'full' must keep the whole model line.
+      expect(runFull('KTM', 'MACINA SCARP SX PRESTIGE Di2')).not.toBe('di2');
+    });
+  });
 });

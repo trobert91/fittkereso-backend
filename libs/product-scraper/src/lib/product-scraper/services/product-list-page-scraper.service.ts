@@ -5,10 +5,10 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScrapeQueueName, ScrapeTask } from '@fittkereso-backend/database';
 import * as cheerio from 'cheerio';
 import { compact, isEmpty } from 'lodash';
-import { ListPageExtractor } from '../interfaces/list-page-extractor.interface';
 import { Injectable } from '@nestjs/common';
 import { WebLink } from '@fittkereso-backend/product';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 
 @Injectable()
 export class ProductListPageScraperService {
@@ -21,23 +21,35 @@ export class ProductListPageScraperService {
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly scrapeUrlDedup: ScrapeUrlDeduplicationService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
+    private readonly interpreter: ScrapeInterpreterService,
   ) {}
 
-  public async scrapeListPage(
-    task: ScrapeTask,
-    listPageExtractor: ListPageExtractor,
-  ): Promise<void> {
+  public async scrapeListPage(task: ScrapeTask): Promise<void> {
+    this.logger.debug('Scraping list page', {
+      taskId: task.id,
+      url: task.url,
+      sourceName: task.source.name,
+    });
+
     const html = await this.scraperService.getHtml(task.url);
     const $ = cheerio.load(html);
 
-    const categoryName = listPageExtractor.getCategoryName(task, $);
-    const categoryLinks = await listPageExtractor.getCategoryLinks(task, $);
-    const productLinks = await listPageExtractor.getProductLinks(task, $);
+    const { categoryName, categoryLinks, productLinks } =
+      await this.interpreter.runListPage(task, $, task.source.config);
 
-    const sourceType = task.source.type;
+    const sourceName = task.source.name;
+
+    this.logger.debug('List page interpreter result', {
+      taskId: task.id,
+      url: task.url,
+      sourceName,
+      categoryName,
+      categoryLinksFound: categoryLinks.length,
+      productLinksFound: productLinks.length,
+    });
 
     this.productCollectionMetrics.recordProductsFound(
-      sourceType,
+      sourceName,
       productLinks.length,
     );
 
@@ -49,7 +61,7 @@ export class ProductListPageScraperService {
     );
 
     this.productCollectionMetrics.recordDetailTasksCreated(
-      sourceType,
+      sourceName,
       productTasks.length,
     );
 
@@ -57,6 +69,16 @@ export class ProductListPageScraperService {
       ...categoryTasks,
       ...productTasks,
     ]);
+
+    this.logger.debug('List page scrape complete', {
+      taskId: task.id,
+      url: task.url,
+      sourceName,
+      categoryTasksCreated: categoryTasks.length,
+      productTasksCreated: productTasks.length,
+      productLinksSkippedOrDeduped:
+        productLinks.length - productTasks.length,
+    });
   }
 
   private async createCategoryTasks(
@@ -109,7 +131,7 @@ export class ProductListPageScraperService {
 
       if (dedup.isDuplicate) {
         this.productCollectionMetrics.productSkipped(
-          parentTask.source.type,
+          parentTask.source.name,
           dedup.reason!,
         );
         return;
@@ -122,12 +144,11 @@ export class ProductListPageScraperService {
 
       return task;
     } catch (error) {
-      this.logger.error('Error checking dedup for product link', {
+      this.logger.error('Error checking dedup for product link', error, {
         taskId: parentTask.id,
         parentUrl: parentTask.url,
         linkUrl: link.url,
         linkTitle: link.title,
-        error,
       });
       return;
     }

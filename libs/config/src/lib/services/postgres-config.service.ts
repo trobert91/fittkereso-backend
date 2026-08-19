@@ -6,6 +6,7 @@ import { entityList } from '@fittkereso-backend/database';
 import { AddTrigramIndexes1735550000000 } from '../migrations/1756502843829-add-trigram-indexes';
 import { AddEmbeddingVectorToProductModel1736720000000 } from '../migrations/1757861707507-product-embedding';
 import { Brand1758983295970 } from '../migrations/1758983295970-brand';
+import { AddOfferSpecsGinIndex1787153028613 } from '../migrations/1787153028613-add-offer-specs-gin-index';
 
 @Injectable()
 export class PostgresConfigService implements TypeOrmOptionsFactory {
@@ -28,6 +29,7 @@ export class PostgresConfigService implements TypeOrmOptionsFactory {
             AddTrigramIndexes1735550000000,
             AddEmbeddingVectorToProductModel1736720000000,
             Brand1758983295970,
+            AddOfferSpecsGinIndex1787153028613,
           ]
         : [],
     };

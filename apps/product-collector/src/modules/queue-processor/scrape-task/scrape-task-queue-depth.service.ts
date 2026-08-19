@@ -25,11 +25,11 @@ export class ScrapeTaskQueueDepthService {
     try {
       const queueColumn = `task.${nameOf<ScrapeTask>('queue')}`;
       const statusColumn = `task.${nameOf<ScrapeTask>('status')}`;
-      const sourceTypeColumn = `source.${nameOf<ProductSource>('type')}`;
+      const sourceNameColumn = `source.${nameOf<ProductSource>('name')}`;
       const counts = await this.scrapeTaskRepository.repo
         .createQueryBuilder('task')
         .select(queueColumn, 'queue')
-        .addSelect(sourceTypeColumn, 'source_type')
+        .addSelect(sourceNameColumn, 'source_type')
         .addSelect(statusColumn, 'status')
         .addSelect('COUNT(*)::int', 'count')
         .innerJoin(`task.${nameOf<ScrapeTask>('source')}`, 'source')
@@ -41,7 +41,7 @@ export class ScrapeTaskQueueDepthService {
           ],
         })
         .groupBy(queueColumn)
-        .addGroupBy(sourceTypeColumn)
+        .addGroupBy(sourceNameColumn)
         .addGroupBy(statusColumn)
         .getRawMany<{
           queue: ScrapeQueueName;

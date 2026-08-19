@@ -4,11 +4,13 @@ import {
   PostgresConfigService,
   LoggerConfigService,
   CategoryConfigService,
-  SourceConfigService,
   OpenAiConfigService,
   GeminiConfigService,
   ClaudeConfigService,
   DeepSeekConfigService,
+  ZyteConfigService,
+  DataForSeoConfigService,
+  BunnyConfigService,
 } from '@fittkereso-backend/config';
 
 @Global()
@@ -19,22 +21,26 @@ import {
     PostgresConfigService,
     LoggerConfigService,
     CategoryConfigService,
-    SourceConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
     DeepSeekConfigService,
+    ZyteConfigService,
+    DataForSeoConfigService,
+    BunnyConfigService,
   ],
   exports: [
     AppConfigService,
     PostgresConfigService,
     LoggerConfigService,
     CategoryConfigService,
-    SourceConfigService,
     OpenAiConfigService,
     GeminiConfigService,
     ClaudeConfigService,
     DeepSeekConfigService,
+    ZyteConfigService,
+    DataForSeoConfigService,
+    BunnyConfigService,
   ],
 })
 export class AppConfigModule {}

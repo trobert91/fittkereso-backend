@@ -1,0 +1,393 @@
+{
+  "baseUrl": "https://www.arukereso.hu",
+  "fullSyncStartUrl": "https://www.arukereso.hu/MainCategories.php",
+
+  "discovery": {
+    "mode": "categoryTitleMatch",
+    "linkPipeline": [
+      { "op": "selectAll", "selector": ".all-categories .by-letter a" },
+      {
+        "op": "extractLinkTitlePairs",
+        "titleFromOwnTextExcludingChildren": true
+      },
+      {
+        "op": "filterByAllowlist",
+        "against": "sourceTitles",
+        "caseInsensitive": true,
+        "dedupeBy": "title"
+      }
+    ]
+  },
+
+  "categories": {
+    "monitors": { "enabled": true, "sourceTitle": "Monitor" },
+    "tvs": { "enabled": true, "sourceTitle": "LED TV, LCD TV, OLED TV" },
+    "projectors": { "enabled": true, "sourceTitle": "Projektor" },
+    "mice": { "enabled": true, "sourceTitle": "Egér" },
+    "keyboards": { "enabled": true, "sourceTitle": "Billentyűzet" },
+    "headphones": { "enabled": true, "sourceTitle": "Fülhallgató, fejhallgató" },
+    "headsets": { "enabled": true, "sourceTitle": "Fülhallgató, fejhallgató" },
+    "soundbars": { "enabled": true, "sourceTitle": "Hangprojektor" }
+  },
+
+  "incrementalSync": {
+    "searchKeywords": [
+      "monitor",
+      "tv",
+      "projektor",
+      "egér",
+      "billentyűzet",
+      "fejhallgató",
+      "hangprojektor"
+    ],
+    "numResults": 60,
+    "urlClassify": {
+      "detailUrlPattern": "arukereso\\.hu\\/.+-p\\d+\\/?"
+    }
+  },
+
+  "listPage": {
+    "categoryName": [
+      { "op": "selectText", "selector": "h1.category-title", "first": true, "trim": true }
+    ],
+    "categoryLinks": [
+      {
+        "op": "selectText",
+        "selector": ".category-navbar .product-num",
+        "trim": true,
+        "as": "productNumText"
+      },
+      {
+        "op": "assertContains",
+        "value": "productNumText",
+        "substring": ", 1. oldal",
+        "onFail": "returnEmpty"
+      },
+      {
+        "op": "regexCapture",
+        "value": "productNumText",
+        "pattern": "(\\d+)\\s*termék",
+        "group": 1,
+        "cast": "number",
+        "as": "totalProducts"
+      },
+      { "op": "computePages", "totalItems": "totalProducts", "perPage": 25, "as": "totalPages" },
+      {
+        "op": "buildBaseUrl",
+        "from": "task.url",
+        "stripQuery": true,
+        "trimTrailingSlash": true,
+        "as": "baseUrl"
+      },
+      {
+        "op": "generatePaginationLinks",
+        "totalPages": "totalPages",
+        "startPage": 2,
+        "baseUrl": "baseUrl",
+        "urlTemplate": "{baseUrl}/?start={(page-1)*25}",
+        "titleTemplate": "Page {page}"
+      }
+    ],
+    "productLinks": [
+      { "op": "selectAll", "selector": ".list-view .product-box", "as": "boxes" },
+      { "op": "filterByAttrAbsent", "on": "boxes", "attr": "data-akpid", "as": "boxes" },
+      {
+        "op": "filterByAttrSuffix",
+        "on": "boxes",
+        "attr": "data-akpid",
+        "excludeSuffix": "-PADS",
+        "as": "boxes"
+      },
+      {
+        "op": "extractLinkFromBox",
+        "on": "boxes",
+        "linkSelector": "a",
+        "excludeHrefContains": "Jump.php",
+        "first": true,
+        "urlTransform": [
+          { "op": "trimEnd", "chars": "/" },
+          { "op": "appendSuffix", "value": "/#termek-leiras" }
+        ],
+        "titleFrom": ["attr:title", "text"]
+      },
+      {
+        "op": "filterByBrandPrefix",
+        "source": "runtime:brandCache",
+        "field": "title",
+        "caseInsensitive": true
+      }
+    ]
+  },
+
+  "detailPage": {
+    "rawSpecs": [
+      {
+        "op": "branch",
+        "condition": { "selectorExists": "table.product-properties" },
+        "ifTrue": [
+          {
+            "op": "extractSpecTableV1",
+            "rowSelector": "table.product-properties tr",
+            "sectionHeaderSelector": "h3",
+            "nameSelector": "td.prop-name",
+            "nameExcludeChildren": true,
+            "valueCellIndex": 1,
+            "listValueSelector": ".prop .name",
+            "descriptionSelector": ".hint",
+            "descriptionAttr": "data-content",
+            "dedupeBy": "name"
+          }
+        ],
+        "ifFalse": [
+          {
+            "op": "extractSpecTableV2",
+            "rowSelector": "table.property-sheet tr",
+            "sectionHeaderRowClass": "property-title",
+            "nameSelector": ".property-name",
+            "descriptionSelector": ".icon-help-circled",
+            "descriptionAttr": "data-content",
+            "valueContainerSelector": ".property-value div",
+            "valueIconFallback": { "selector": ".icon-ok, .icon-cancel", "attr": "title" },
+            "dedupeBy": "name"
+          }
+        ]
+      },
+      {
+        "op": "appendSyntheticSpec",
+        "name": "description",
+        "value": [
+          {
+            "op": "selectAttr",
+            "selector": "meta[itemprop=\"description\"]",
+            "attr": "content",
+            "first": true,
+            "trim": true
+          }
+        ]
+      }
+    ],
+
+    "category": {
+      "breadcrumbOrSource": [
+        { "op": "selectAll", "selector": ".breadcrumb-field [itemprop=\"itemListElement\"]", "as": "breadcrumbItems" },
+        {
+          "op": "selectNestedText",
+          "on": "breadcrumbItems",
+          "index": 2,
+          "childSelector": "[itemprop=\"name\"]",
+          "trim": true,
+          "fallback": "unknown"
+        }
+      ],
+      "slugLookup": [
+        { "when": { "equalsIgnoreCase": "monitor" }, "slug": "monitors" },
+        { "when": { "equalsIgnoreCase": "sportkamera" }, "slug": "action-cameras" },
+        { "when": { "equalsIgnoreCase": "hordozható hangszóró" }, "slug": "portable-bluetooth-speakers" },
+        { "when": { "equalsIgnoreCase": "ip kamera" }, "slug": "ip-cameras" },
+        {
+          "when": { "equalsIgnoreCase": "fülhallgató, fejhallgató" },
+          "slug": "headphones",
+          "unless": {
+            "specValueIncludes": {
+              "label": "Típus",
+              "anyOf": ["headset", "gamer"]
+            }
+          }
+        },
+        { "when": { "equalsIgnoreCase": "fülhallgató, fejhallgató" }, "slug": "headsets" },
+        { "when": { "equalsIgnoreCase": "billentyűzet" }, "slug": "keyboards" },
+        { "when": { "equalsIgnoreCase": "egér" }, "slug": "mice" },
+        { "when": { "equalsIgnoreCase": "projektor" }, "slug": "projectors" },
+        { "when": { "equalsIgnoreCase": "takarító robot" }, "slug": "robot-vacuums" },
+        { "when": { "equalsIgnoreCase": "okosóra, aktivitásmérő" }, "slug": "smartwatches-fitness-trackers" },
+        { "when": { "equalsIgnoreCase": "hangprojektor" }, "slug": "soundbars" },
+        { "when": { "equalsIgnoreCase": "belső ssd meghajtó" }, "slug": "internal-ssds" },
+        { "when": { "equalsIgnoreCase": "led tv, lcd tv, oled tv" }, "slug": "tvs" },
+        { "when": { "equalsIgnoreCase": "router" }, "slug": "wifi-routers" }
+      ]
+    },
+
+    "brand": [
+      { "op": "selectAll", "selector": "script", "as": "scripts" },
+      { "op": "findScriptContaining", "on": "scripts", "contains": "dataLayerHG", "as": "dataLayerJson" },
+      {
+        "op": "regexCapture",
+        "value": "dataLayerJson",
+        "pattern": "\"item_brand\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true,
+        "as": "dataLayerBrand"
+      },
+      {
+        "op": "selectAll",
+        "selector": ".breadcrumb-field [itemprop=\"itemListElement\"]",
+        "as": "breadcrumbItemsForBrand"
+      },
+      {
+        "op": "selectNestedText",
+        "on": "breadcrumbItemsForBrand",
+        "index": 3,
+        "childSelector": "[itemprop=\"name\"]",
+        "trim": true,
+        "as": "breadcrumbBrandRaw"
+      },
+      {
+        "op": "stripPattern",
+        "value": "breadcrumbBrandRaw",
+        "pattern": "\\s*{{categoryName}}\\s*",
+        "flags": "i",
+        "trim": true,
+        "as": "breadcrumbBrand"
+      },
+      { "op": "coalesce", "candidates": ["dataLayerBrand", "breadcrumbBrand"] }
+    ],
+
+    "model": [
+      {
+        "op": "regexCapture",
+        "value": "dataLayerJson",
+        "pattern": "\"item_name\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true,
+        "as": "dataLayerModel"
+      },
+      {
+        "op": "selectText",
+        "selector": ".product-page-top h1.hidden-xs",
+        "first": true,
+        "trim": true,
+        "as": "h1Text"
+      },
+      { "op": "coalesce", "candidates": ["dataLayerModel", "h1Text"], "as": "fullModelText" },
+      { "op": "stripPrefix", "value": "fullModelText", "prefix": "{{brand}}", "as": "rawModel" },
+      {
+        "op": "stripPattern",
+        "value": "rawModel",
+        "pattern": "\\s*\\([A-Za-z0-9][A-Za-z0-9\\-/]*(?:-[A-Za-z0-9]+|[0-9])[A-Za-z0-9\\-/]*\\)",
+        "flags": "g",
+        "trim": true,
+        "as": "modelWithoutPartNumbers"
+      },
+      {
+        "op": "stripPattern",
+        "value": "modelWithoutPartNumbers",
+        "pattern": "\\s+\\b(AF|AR|BE|BR|CA|CH|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IL|IT|JP|KR|LA|LT|LV|ME|MK|NL|NO|PL|PT|RO|RS|RU|SE|SI|SK|SL|TR|UA|UK|US|YU)\\b\\s*$",
+        "flags": "i",
+        "trim": true
+      }
+    ],
+
+    "images": [
+      { "op": "selectAll", "selector": ".carousel-inner img", "as": "v1Imgs" },
+      { "op": "extractAttrList", "on": "v1Imgs", "attr": "data-lazy-delayed-src", "trim": true, "as": "v1Urls" },
+      {
+        "op": "branch",
+        "condition": { "isEmpty": "v1Urls" },
+        "ifTrue": [
+          { "op": "selectAll", "selector": ".product-image", "as": "v2Boxes" },
+          {
+            "op": "extractImageWithFallback",
+            "on": "v2Boxes",
+            "primary": {
+              "selector": "a.product-image-wrapper",
+              "attr": "href",
+              "mustContain": "akcdn.net"
+            },
+            "fallback": {
+              "selector": "img",
+              "attr": "src",
+              "mustContain": "akcdn.net",
+              "replacePatterns": [{ "from": "/mid/", "to": "/full/" }]
+            }
+          }
+        ],
+        "ifFalse": [{ "op": "identity", "value": "v1Urls" }]
+      },
+      { "op": "dedupe" },
+      { "op": "takeFirst", "count": 1 }
+    ],
+
+    "specMapping": {
+      "monitors": {
+        "mappings": [
+          { "key": "screenSize", "labels": ["Képátló", "Képátló (inch)"] },
+          { "key": "resolution", "labels": ["Felbontás"], "extract": "removeWhitespace" },
+          { "key": "hdResolution", "labels": ["HD felbontás"] },
+          { "key": "aspectRatio", "labels": ["Képarány"] },
+          { "key": "refreshRate", "labels": ["Képfrissítési frekvencia"] },
+          { "key": "responseTime", "labels": ["Válaszidő"], "extract": "number" },
+          { "key": "peakBrightness", "labels": ["Fényerő"], "extract": "number" },
+          { "key": "contrastRatio", "labels": ["Statikus kontraszt"], "extract": "removeWhitespace" },
+          { "key": "viewingAngle", "labels": ["Betekintési szög"] },
+          { "key": "curvature", "labels": ["Görbület"] },
+          { "key": "isCurved", "labels": ["Ívelt kijelző"] },
+          {
+            "key": "touchScreen",
+            "labels": ["Érintőképernyő", "Típus", "TV típusa"],
+            "trimSuffixes": ["panel", "monitor"]
+          },
+          {
+            "key": "panelType",
+            "labels": ["Panel típusa", "Típus", "TV típusa"],
+            "trimSuffixes": ["panel", "monitor"]
+          },
+          { "key": "connections", "labels": ["Csatlakozók"], "extract": "list" },
+          { "key": "hdmiCount", "labels": ["HDMI bemenetek száma"], "extract": "number" },
+          { "key": "usbCount", "labels": ["USB portok száma"], "extract": "number" },
+          { "key": "vesaMount", "labels": ["VESA szabvány"], "extract": "list" },
+          { "key": "speakers", "labels": ["Hangszóró"] },
+          { "key": "heightAdjustment", "labels": ["Állítható magasság"] },
+          { "key": "freesync", "labels": ["AMD FreeSync támogatás"] },
+          { "key": "gsync", "labels": ["Nvidia G-Sync támogatás"] },
+          { "key": "powerConsumption", "labels": ["Fogyasztás"] },
+          { "key": "weightWithStand", "labels": ["Tömeg (talppal)"] },
+          { "key": "3d", "labels": ["3D monitor"] },
+          {
+            "key": "energyClass",
+            "labels": ["Energiaosztály - SDR (A-G)"],
+            "skipValues": ["Termékinformációs adatlap"]
+          },
+          { "key": "swivel", "labels": ["Forgatható"] },
+          { "key": "tiltable", "labels": ["Dönthető"] },
+          { "key": "widthWithStand", "labels": ["Szélesség (talppal)"], "extract": "cmToInchList" },
+          { "key": "heightWithStand", "labels": ["Magasság (talppal)"], "extract": "cmToInchList" },
+          { "key": "depthWithStand", "labels": ["Mélység (talppal)"], "extract": "cmToInchList" },
+          { "key": "widthWithoutStand", "labels": ["Szélesség (talp nélkül)"], "extract": "cmToInchList" },
+          { "key": "heightWithoutStand", "labels": ["Magasság (talp nélkül)"], "extract": "cmToInchList" },
+          { "key": "depthWithoutStand", "labels": ["Mélység (talp nélkül)"], "extract": "cmToInchList" }
+        ],
+        "calculated": [
+          {
+            "key": "hdr",
+            "rule": "presentLabels",
+            "source": [
+              "HDR10",
+              "HDR10+",
+              "HDR10+ Gaming",
+              "Dolby Vision",
+              "DisplayHDR 400",
+              "DisplayHDR 600",
+              "DisplayHDR 1000",
+              "DisplayHDR 400 True Black",
+              "DisplayHDR 500 True Black",
+              "HLG"
+            ]
+          }
+        ]
+      }
+    },
+
+    "offers": {
+      "listItems": [],
+      "sellerName": [],
+      "price": []
+    },
+
+    "translation": {
+      "enabled": true,
+      "sourceLanguage": "hu",
+      "targetLanguage": "en",
+      "contextTemplate": "Technical specification values from an arukereso.hu product listing in the \"{{categoryName}}\" category. Preserve units, model numbers, and technical jargon."
+    }
+  }
+}

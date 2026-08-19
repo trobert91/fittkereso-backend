@@ -24,6 +24,7 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       username: Joi.string().optional(),
       password: Joi.string().optional(),
       token: Joi.string().optional(),
+      level: Joi.string().optional(),
     }).required(),
 
     openai: Joi.object({
@@ -49,6 +50,28 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
     deepseek: Joi.object({
       api_key: Joi.string().allow('').required(),
       debug: Joi.boolean().default(false),
+    }).required(),
+
+    zyte: Joi.object({
+      api_url: Joi.string().required(),
+      api_key: Joi.string().required(),
+    }).required(),
+
+    dataforseo: Joi.object({
+      api_url: Joi.string().required(),
+      email: Joi.string().required(),
+      password: Joi.string().required(),
+    }).required(),
+
+    bunny: Joi.object({
+      url: Joi.string().required(),
+      api_key: Joi.string().required(),
+      cdn_url: Joi.string().required(),
+    }).required(),
+
+    exa: Joi.object({
+      api_key: Joi.string().required(),
+      api_url: Joi.string().optional(),
     }).required(),
   }).required();
 

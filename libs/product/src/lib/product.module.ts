@@ -26,6 +26,9 @@ import {
   ProductSpecUpdaterService,
   ProductSpecValidatorService,
   SpecExtractionService,
+  SpecTranslationSelectorService,
+  ProductSourcePostProcessService,
+  ProductSourcePostProcessMergeService,
 } from './services';
 import { ProductDetailService } from './services/product-detail.service';
 import { ProductUpdateService } from './services/update/product-update.service';
@@ -49,6 +52,12 @@ import { ProductAliasAutoCreateService } from './services/resolution/product-ali
 import { ProductEmbeddingMatchService } from './services/resolution/product-embedding-match.service';
 import { ProductFuzzySearchService } from './services/resolution/product-fuzzy-search.service';
 import { ProductWebSearchService } from './services/resolution/product-web-search.service';
+import { SellerResolutionService } from './services/resolution/seller-resolution.service';
+import { SellerCreateService } from './services/seller/seller-create.service';
+import { SellerDetailService } from './services/seller/seller-detail.service';
+import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
+import { SellerUpdateService } from './services/seller/seller-update.service';
+import { ProductSourceUpdateService } from './services/product-source/product-source-update.service';
 
 @Module({
   imports: [
@@ -81,6 +90,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductImageDeleteService,
     ProductSpecValidatorService,
     ProductSpecNormalizationService,
+    SpecTranslationSelectorService,
     ProductCategoryDetailService,
     CategoryUpdateMapperService,
     BrandCacheService,
@@ -93,6 +103,8 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingService,
     ProductMergeService,
     SpecExtractionService,
+    ProductSourcePostProcessService,
+    ProductSourcePostProcessMergeService,
     SpecComparisonService,
     ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,
@@ -103,6 +115,12 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingMatchService,
     ProductFuzzySearchService,
     ProductWebSearchService,
+    SellerResolutionService,
+    SellerCreateService,
+    SellerDetailService,
+    SellerProductSourceCreateService,
+    SellerUpdateService,
+    ProductSourceUpdateService,
   ],
   exports: [
     ProductImageDtoService,
@@ -118,6 +136,7 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductSpecUpdaterService,
     ProductSpecValidatorService,
     ProductSpecNormalizationService,
+    SpecTranslationSelectorService,
     ProductCategoryDetailService,
     BrandCacheService,
     BrandCreateService,
@@ -129,6 +148,8 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingService,
     ProductMergeService,
     SpecExtractionService,
+    ProductSourcePostProcessService,
+    ProductSourcePostProcessMergeService,
     SpecComparisonService,
     ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,
@@ -139,6 +160,12 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
     ProductEmbeddingMatchService,
     ProductFuzzySearchService,
     ProductWebSearchService,
+    SellerResolutionService,
+    SellerCreateService,
+    SellerDetailService,
+    SellerProductSourceCreateService,
+    SellerUpdateService,
+    ProductSourceUpdateService,
   ],
 })
 export class ProductModule {}

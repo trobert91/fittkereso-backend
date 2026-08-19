@@ -21,10 +21,8 @@ import {
   ProductImage,
   ProductModel,
   ProductModelRepository,
-  ProductModelSource,
-  ProductModelSourceRepository,
-  ProductSourceRepository,
-  ProductSourceType,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
   ScrapeQueueName,
   ScrapeTask,
   UserRole,
@@ -72,8 +70,7 @@ export class AdminProductController {
     private readonly imageDeleteService: ProductImageDeleteService,
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly productRepo: ProductModelRepository,
-    private readonly productModelSourceRepo: ProductModelSourceRepository,
-    private readonly productSourceRepo: ProductSourceRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly mergeService: ProductMergeService,
     private readonly duplicationSearchService: ProductDuplicationSearchService,
@@ -342,9 +339,9 @@ export class AdminProductController {
     @Param('id') id: string,
     @Param('sourceId') sourceId: string,
   ): Promise<ProductModel> {
-    const source = await this.productModelSourceRepo.findOne({
+    const source = await this.sourceRecordRepo.findOne({
       where: { id: sourceId },
-      relations: [nameOf<ProductModelSource>('model')],
+      relations: [nameOf<ProductSourceRecord>('model')],
     });
 
     if (!source || source.model.id !== id) {
@@ -353,7 +350,7 @@ export class AdminProductController {
       );
     }
 
-    await this.productModelSourceRepo.deleteById(sourceId);
+    await this.sourceRecordRepo.deleteById(sourceId);
     return this.detailService.getProductById(id);
   }
 
@@ -362,16 +359,19 @@ export class AdminProductController {
     @Param('id') productId: string,
     @Body() body: ResyncProductSourceDto,
   ): Promise<QueueStatusDto> {
-    const modelSource = await this.productModelSourceRepo.findOne({
-      where: { id: body.productModelSourceId },
-      relations: [nameOf<ProductModelSource>('model')],
+    const modelSource = await this.sourceRecordRepo.findOne({
+      where: { id: body.sourceRecordId },
+      relations: [
+        nameOf<ProductSourceRecord>('model'),
+        nameOf<ProductSourceRecord>('source'),
+      ],
     });
 
     if (!modelSource || modelSource.model.id !== productId) {
       throw new NotFoundException('Product source not found for product');
     }
 
-    if (modelSource.type === ProductSourceType.manual) {
+    if (!modelSource.source) {
       throw new BadRequestException('Manual source cannot be resynced');
     }
 
@@ -379,21 +379,12 @@ export class AdminProductController {
       throw new BadRequestException('Product source url is missing');
     }
 
-    const productSource = await this.productSourceRepo.findOne({
-      where: { type: modelSource.type },
-    });
-
-    if (!productSource) {
-      throw new NotFoundException(
-        `Product source config for type ${modelSource.type} not found`,
-      );
-    }
-
     const task = new ScrapeTask();
     task.queue = ScrapeQueueName.ScrapeProductDetails;
-    task.source = productSource;
+    task.source = modelSource.source;
     task.url = modelSource.url;
     task.product = { id: productId } as ProductModel;
+    task.force = body.force ?? false;
 
     await this.scrapeTaskPublisher.addTask(task);
 

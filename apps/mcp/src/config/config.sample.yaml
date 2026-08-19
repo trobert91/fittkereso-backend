@@ -36,3 +36,21 @@ openrouter:
 deepseek:
   api_key: your-deepseek-api-key
   debug: true
+
+zyte:
+  api_url: https://api.zyte.com/v1
+  api_key: your-zyte-api-key
+
+dataforseo:
+  api_url: https://api.dataforseo.com/v3
+  email: your-dataforseo-email
+  password: your-dataforseo-password
+
+bunny:
+  url: https://storage.bunnycdn.com/your-storage-zone
+  api_key: your-bunny-api-key
+  cdn_url: https://your-zone.b-cdn.net
+
+exa:
+  api_key: your-exa-api-key
+  api_url: https://api.exa.ai

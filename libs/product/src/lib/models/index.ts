@@ -13,3 +13,7 @@ export * from './category-update.dto';
 export * from './category-with-config.dto';
 export * from './brand-update.dto';
 export * from './brand-create.dto';
+export * from './seller-update.dto';
+export * from './seller-create.dto';
+export * from './seller-product-source-create.dto';
+export * from './product-source-update-params';

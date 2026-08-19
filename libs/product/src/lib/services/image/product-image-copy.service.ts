@@ -58,12 +58,12 @@ export class ProductImageCopyService {
           productId: model.id,
           error,
         });
-        this.productMetrics.productImageCopyFailed(source.type);
+        this.productMetrics.productImageCopyFailed(source.name);
       }
     }
 
     if (images.length > 0) {
-      this.productMetrics.productImageCopySuccess(source.type, images.length);
+      this.productMetrics.productImageCopySuccess(source.name, images.length);
     }
 
     return this.imageRepo.saveAll(images);
