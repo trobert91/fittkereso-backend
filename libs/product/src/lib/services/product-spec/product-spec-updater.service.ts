@@ -46,7 +46,7 @@ export class ProductSpecUpdaterService {
     const categorySlug = model.productCategory?.slug;
 
     const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
+    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource, categorySlug);
     model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,
@@ -190,7 +190,7 @@ export class ProductSpecUpdaterService {
 
     // For spec merging, use only the most recent entry per source
     const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource);
+    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource, categorySlug);
     model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
     model.orderedSpecs = await this.specSortService.sortSpecs(
       model.productCategory!,

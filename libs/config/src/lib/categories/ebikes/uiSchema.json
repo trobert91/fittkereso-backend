@@ -1,44 +1,33 @@
 {
-  "gender": {
-    "ui:widget": "select"
+  "brand": {
+    "ui:widget": "text"
+  },
+  "modelYear": {
+    "ui:widget": "updown"
   },
   "frameType": {
     "ui:widget": "select"
   },
-  "frameSize": {
-    "ui:widget": "updown",
-    "ui:placeholder": "e.g. 51"
-  },
   "usageType": {
     "ui:widget": "select"
   },
-  "batteryPosition": {
+  "gender": {
     "ui:widget": "select"
   },
-  "wheelSize": {
-    "ui:widget": "updown",
-    "ui:placeholder": "e.g. 28"
+  "color": {
+    "ui:widget": "text"
   },
-  "drivetrain": {
+  "condition": {
     "ui:widget": "select"
   },
-  "suspension": {
-    "ui:widget": "select"
-  },
-  "brakeType": {
-    "ui:widget": "select"
-  },
-  "gearType": {
-    "ui:widget": "select"
-  },
-  "gearCount": {
+  "mileage": {
     "ui:widget": "updown"
   },
-  "batteryCapacity": {
-    "ui:widget": "updown"
+  "motorModel": {
+    "ui:widget": "text"
   },
-  "torque": {
-    "ui:widget": "updown"
+  "motorBrand": {
+    "ui:widget": "text"
   },
   "motorPosition": {
     "ui:widget": "select"
@@ -46,7 +35,52 @@
   "motorPower": {
     "ui:widget": "updown"
   },
+  "motorPeakPower": {
+    "ui:widget": "updown"
+  },
+  "torque": {
+    "ui:widget": "updown"
+  },
   "topSpeed": {
+    "ui:widget": "updown"
+  },
+  "maxAssistLevel": {
+    "ui:widget": "updown"
+  },
+  "sensorType": {
+    "ui:widget": "select"
+  },
+  "ebikeSystem": {
+    "ui:widget": "text"
+  },
+  "pedelecClass": {
+    "ui:widget": "select"
+  },
+  "batteryCapacity": {
+    "ui:widget": "updown"
+  },
+  "batteryModel": {
+    "ui:widget": "text"
+  },
+  "batteryPosition": {
+    "ui:widget": "select"
+  },
+  "batteryChemistry": {
+    "ui:widget": "select"
+  },
+  "batteryVoltage": {
+    "ui:widget": "updown"
+  },
+  "batteryRemovable": {
+    "ui:widget": "checkbox"
+  },
+  "batteryLock": {
+    "ui:widget": "text"
+  },
+  "chargerModel": {
+    "ui:widget": "text"
+  },
+  "chargerCurrent": {
     "ui:widget": "updown"
   },
   "range": {
@@ -55,44 +89,353 @@
   "chargingTime": {
     "ui:widget": "updown"
   },
+  "displayModel": {
+    "ui:widget": "text"
+  },
   "display": {
     "ui:widget": "checkbox"
   },
-  "maxLoad": {
+  "controlUnit": {
+    "ui:widget": "text"
+  },
+  "smartConnectivity": {
+    "ui:widget": "checkbox"
+  },
+  "gpsModule": {
+    "ui:widget": "checkbox"
+  },
+  "abs": {
+    "ui:widget": "checkbox"
+  },
+  "frameModel": {
+    "ui:widget": "text"
+  },
+  "frameMaterial": {
+    "ui:widget": "select"
+  },
+  "frameSize": {
+    "ui:widget": "updown",
+    "ui:placeholder": "e.g. 48"
+  },
+  "frameSizeLabel": {
+    "ui:widget": "select"
+  },
+  "standoverHeight": {
+    "ui:widget": "text"
+  },
+  "recommendedRiderHeight": {
+    "ui:widget": "text"
+  },
+  "seatTubeLength": {
+    "ui:widget": "updown"
+  },
+  "topTubeLength": {
     "ui:widget": "updown"
   },
   "weight": {
     "ui:widget": "updown"
   },
+  "maxTotalWeight": {
+    "ui:widget": "updown"
+  },
+  "maxLoad": {
+    "ui:widget": "updown"
+  },
   "waterResistance": {
+    "ui:widget": "text"
+  },
+  "suspension": {
     "ui:widget": "select"
   },
-  "smartConnectivity": {
+  "forkModel": {
+    "ui:widget": "text"
+  },
+  "forkTravel": {
+    "ui:widget": "updown"
+  },
+  "forkType": {
+    "ui:widget": "select"
+  },
+  "rearShockModel": {
+    "ui:widget": "text"
+  },
+  "rearTravel": {
+    "ui:widget": "updown"
+  },
+  "drivetrain": {
+    "ui:widget": "select"
+  },
+  "gearType": {
+    "ui:widget": "select"
+  },
+  "gearCount": {
+    "ui:widget": "updown"
+  },
+  "shiftingActuation": {
+    "ui:widget": "select"
+  },
+  "autoShift": {
+    "ui:widget": "checkbox"
+  },
+  "rearDerailleur": {
+    "ui:widget": "text"
+  },
+  "rearDerailleurTier": {
+    "ui:widget": "text"
+  },
+  "frontDerailleur": {
+    "ui:widget": "text"
+  },
+  "shifter": {
+    "ui:widget": "text"
+  },
+  "crankset": {
+    "ui:widget": "text"
+  },
+  "crankLength": {
+    "ui:widget": "updown"
+  },
+  "chainring": {
+    "ui:widget": "text"
+  },
+  "chainringTeeth": {
+    "ui:widget": "updown"
+  },
+  "chainringCount": {
+    "ui:widget": "updown"
+  },
+  "cassette": {
+    "ui:widget": "text"
+  },
+  "cassetteRange": {
+    "ui:widget": "text"
+  },
+  "chain": {
+    "ui:widget": "text"
+  },
+  "bottomBracket": {
+    "ui:widget": "text"
+  },
+  "pedals": {
+    "ui:widget": "text"
+  },
+  "brakeType": {
+    "ui:widget": "select"
+  },
+  "brakeModel": {
+    "ui:widget": "text"
+  },
+  "brakeLever": {
+    "ui:widget": "text"
+  },
+  "rotorModel": {
+    "ui:widget": "text"
+  },
+  "rotorSizeFront": {
+    "ui:widget": "updown"
+  },
+  "rotorSizeRear": {
+    "ui:widget": "updown"
+  },
+  "brakePistons": {
+    "ui:widget": "updown"
+  },
+  "wheelSize": {
+    "ui:widget": "updown"
+  },
+  "wheelset": {
+    "ui:widget": "text"
+  },
+  "rimModel": {
+    "ui:widget": "text"
+  },
+  "hubModel": {
+    "ui:widget": "text"
+  },
+  "hubSpacingFront": {
+    "ui:widget": "text"
+  },
+  "hubSpacingRear": {
+    "ui:widget": "text"
+  },
+  "hubType": {
+    "ui:widget": "select"
+  },
+  "spokes": {
+    "ui:widget": "text"
+  },
+  "tireModel": {
+    "ui:widget": "text"
+  },
+  "tireSize": {
+    "ui:widget": "text"
+  },
+  "tireType": {
+    "ui:widget": "text"
+  },
+  "tubeless": {
+    "ui:widget": "checkbox"
+  },
+  "handlebar": {
+    "ui:widget": "text"
+  },
+  "handlebarMaterial": {
+    "ui:widget": "select"
+  },
+  "handlebarWidth": {
+    "ui:widget": "updown"
+  },
+  "stem": {
+    "ui:widget": "text"
+  },
+  "adjustableStem": {
+    "ui:widget": "checkbox"
+  },
+  "headset": {
+    "ui:widget": "text"
+  },
+  "grips": {
+    "ui:widget": "text"
+  },
+  "saddle": {
+    "ui:widget": "text"
+  },
+  "seatpost": {
+    "ui:widget": "text"
+  },
+  "seatpostType": {
+    "ui:widget": "select"
+  },
+  "seatpostDiameter": {
+    "ui:widget": "updown"
+  },
+  "seatClamp": {
+    "ui:widget": "text"
+  },
+  "lighting": {
+    "ui:widget": "select"
+  },
+  "rack": {
+    "ui:widget": "select"
+  },
+  "fenders": {
+    "ui:widget": "select"
+  },
+  "kickstand": {
+    "ui:widget": "checkbox"
+  },
+  "chainGuard": {
     "ui:widget": "checkbox"
   },
   "ui:order": [
     "frameType",
+    "batteryCapacity",
+    "motorModel",
+    "wheelSize",
+    "torque",
+    "modelYear",
     "usageType",
+    "gender",
+    "frameMaterial",
+    "weight",
+    "suspension",
+    "gearCount",
+    "brand",
+    "color",
+    "condition",
+    "mileage",
+    "motorBrand",
     "motorPosition",
     "motorPower",
-    "torque",
+    "motorPeakPower",
     "topSpeed",
-    "batteryCapacity",
+    "maxAssistLevel",
+    "sensorType",
+    "ebikeSystem",
+    "pedelecClass",
+    "batteryModel",
     "batteryPosition",
+    "batteryChemistry",
+    "batteryVoltage",
+    "batteryRemovable",
+    "batteryLock",
+    "chargerModel",
+    "chargerCurrent",
     "range",
     "chargingTime",
-    "wheelSize",
+    "displayModel",
+    "display",
+    "controlUnit",
+    "smartConnectivity",
+    "gpsModule",
+    "abs",
+    "frameModel",
     "frameSize",
-    "gender",
-    "suspension",
+    "frameSizeLabel",
+    "standoverHeight",
+    "recommendedRiderHeight",
+    "seatTubeLength",
+    "topTubeLength",
+    "maxTotalWeight",
+    "maxLoad",
+    "waterResistance",
+    "forkModel",
+    "forkTravel",
+    "forkType",
+    "rearShockModel",
+    "rearTravel",
     "drivetrain",
     "gearType",
-    "gearCount",
+    "shiftingActuation",
+    "autoShift",
+    "rearDerailleur",
+    "rearDerailleurTier",
+    "frontDerailleur",
+    "shifter",
+    "crankset",
+    "crankLength",
+    "chainring",
+    "chainringTeeth",
+    "chainringCount",
+    "cassette",
+    "cassetteRange",
+    "chain",
+    "bottomBracket",
+    "pedals",
     "brakeType",
-    "weight",
-    "maxLoad",
-    "display",
-    "smartConnectivity",
-    "waterResistance"
+    "brakeModel",
+    "brakeLever",
+    "rotorModel",
+    "rotorSizeFront",
+    "rotorSizeRear",
+    "brakePistons",
+    "wheelset",
+    "rimModel",
+    "hubModel",
+    "hubSpacingFront",
+    "hubSpacingRear",
+    "hubType",
+    "spokes",
+    "tireModel",
+    "tireSize",
+    "tireType",
+    "tubeless",
+    "handlebar",
+    "handlebarMaterial",
+    "handlebarWidth",
+    "stem",
+    "adjustableStem",
+    "headset",
+    "grips",
+    "saddle",
+    "seatpost",
+    "seatpostType",
+    "seatpostDiameter",
+    "seatClamp",
+    "lighting",
+    "rack",
+    "fenders",
+    "kickstand",
+    "chainGuard"
   ]
 }

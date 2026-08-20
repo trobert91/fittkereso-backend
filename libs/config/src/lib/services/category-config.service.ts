@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ProductCategoryConfig } from '@fittkereso-backend/database';
 import type {
+  DerivedSpecConfig,
   ProductSpecs,
   SpecDefinitionJsonSchema,
   SpecDefinitionUiSchema,
@@ -13,6 +14,7 @@ interface CategoryConfigFiles {
   jsonSchema?: SpecDefinitionJsonSchema;
   uiSchema?: SpecDefinitionUiSchema;
   goldenSample?: ProductSpecs;
+  derivedSpecs?: DerivedSpecConfig[];
 }
 
 @Injectable()
@@ -62,6 +64,18 @@ export class CategoryConfigService {
     return this.configCache.get(slug)?.goldenSample;
   }
 
+  /**
+   * ProductSpecMergeService's Tier-0 derivation rules (e.g. motor model code
+   * -> torque/power/position). Absent for categories that don't define any —
+   * merge simply skips Tier 0 in that case.
+   */
+  getDerivedSpecs(
+    slug: string | null | undefined,
+  ): DerivedSpecConfig[] | undefined {
+    if (!slug) return undefined;
+    return this.configCache.get(slug)?.derivedSpecs;
+  }
+
   // ─── Write Methods ──────────────────────────────────────────────────────────
 
   writeConfig(slug: string, config: ProductCategoryConfig): void {
@@ -89,6 +103,13 @@ export class CategoryConfigService {
     this.ensureCategoryDirectory(slug);
     const filePath = path.join(this.categoriesPath, slug, 'goldenSample.json');
     fs.writeFileSync(filePath, JSON.stringify(goldenSample, null, 2) + '\n');
+    this.reloadCategory(slug);
+  }
+
+  writeDerivedSpecs(slug: string, derivedSpecs: DerivedSpecConfig[]): void {
+    this.ensureCategoryDirectory(slug);
+    const filePath = path.join(this.categoriesPath, slug, 'derivedSpecs.json');
+    fs.writeFileSync(filePath, JSON.stringify(derivedSpecs, null, 2) + '\n');
     this.reloadCategory(slug);
   }
 
@@ -153,6 +174,9 @@ export class CategoryConfigService {
       ),
       goldenSample: this.readJsonFile<ProductSpecs>(
         path.join(categoryDirectory, 'goldenSample.json'),
+      ),
+      derivedSpecs: this.readJsonFile<DerivedSpecConfig[]>(
+        path.join(categoryDirectory, 'derivedSpecs.json'),
       ),
     };
   }

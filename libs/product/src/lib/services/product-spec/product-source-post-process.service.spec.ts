@@ -122,7 +122,7 @@ describe('ProductSourcePostProcessService', () => {
     );
   });
 
-  it('constrains enum-like fields (meta.options) to an exact JSON Schema enum and lists them in the system prompt', async () => {
+  it('constrains fields with a schema enum to an exact JSON Schema enum and lists them in the system prompt', async () => {
     aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
     const enumSchema: SpecDefinitionJsonSchema = {
       type: 'object',
@@ -131,7 +131,8 @@ describe('ProductSourcePostProcessService', () => {
         drivetrain: {
           type: 'string',
           title: 'Drivetrain',
-          meta: { options: ['Lánc', 'Szíj'] },
+          meta: {},
+          enum: ['Lánc', 'Szíj'],
         },
       },
     };
@@ -202,6 +203,70 @@ describe('ProductSourcePostProcessService', () => {
     expect(aiChat.createChat).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'deepseek-v4-flash' }),
     );
+  });
+
+  it('caps reasoning at low effort and applies a token ceiling by default', async () => {
+    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+    await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+    });
+
+    expect(aiChat.createChat).toHaveBeenCalledWith(
+      expect.objectContaining({ effort: 'low', maxTokens: 8000 }),
+    );
+  });
+
+  it('forwards per-source reasoning overrides', async () => {
+    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+    await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+      effort: 'high',
+      maxTokens: 2000,
+    });
+
+    expect(aiChat.createChat).toHaveBeenCalledWith(
+      expect.objectContaining({ effort: 'high', maxTokens: 2000 }),
+    );
+  });
+
+  // Supplying `effort` implies reasoning is enabled on DeepSeek, so the
+  // default must not sneak back in and re-enable what the source turned off.
+  it('omits effort entirely when a source disables reasoning', async () => {
+    aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+    await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+      schema,
+      goldenSample,
+      thinking: false,
+    });
+
+    const callArgs = aiChat.createChat.mock.calls[0][0];
+    expect(callArgs.thinking).toBe(false);
+    expect(callArgs.effort).toBeUndefined();
+  });
+
+  it('degrades to deterministic-only when the response is truncated by the token ceiling', async () => {
+    aiChat.createChat.mockResolvedValueOnce({
+      content: '{"specs":{"weight":17',
+      parsed: undefined,
+      finishReason: 'length',
+      usage: { completionTokens: 8000 },
+    });
+
+    const result = await service.process({
+      data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
+      schema,
+      goldenSample,
+    });
+
+    expect(result).toBeUndefined();
   });
 
   it('returns undefined when the LLM call throws', async () => {

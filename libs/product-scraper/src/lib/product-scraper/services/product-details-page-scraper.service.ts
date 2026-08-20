@@ -339,6 +339,9 @@ export class ProductDetailsPageScraperService {
       schema: jsonSchema,
       goldenSample,
       model: postProcessConfig.model,
+      thinking: postProcessConfig.thinking,
+      effort: postProcessConfig.effort,
+      maxTokens: postProcessConfig.maxTokens,
       offerLevelSpecs,
     });
 

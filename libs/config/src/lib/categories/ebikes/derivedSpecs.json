@@ -1,0 +1,31 @@
+[
+  {
+    "sourceKey": "motorModel",
+    "rules": [
+      {
+        "match": ["BDU3144"],
+        "label": "Bosch Performance Line SX",
+        "specs": {
+          "motorBrand": "Bosch",
+          "motorPosition": "Középmotor",
+          "torque": 55,
+          "motorPower": 250,
+          "motorPeakPower": 600,
+          "topSpeed": 25
+        }
+      },
+      {
+        "match": ["BDU374Y", "BDU375Y"],
+        "label": "Bosch Performance Line CX (Gen.4, Smart System)",
+        "specs": {
+          "motorBrand": "Bosch",
+          "motorPosition": "Középmotor",
+          "torque": 85,
+          "motorPower": 250,
+          "motorPeakPower": 600,
+          "topSpeed": 25
+        }
+      }
+    ]
+  }
+]

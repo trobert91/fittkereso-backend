@@ -5,73 +5,8 @@
       "filterType": "multiselect"
     },
     {
-      "key": "usageType",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "motorPosition",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "motorPower",
-      "buckets": [
-        {
-          "max": 250,
-          "min": 0,
-          "label": "Up to 250 W"
-        },
-        {
-          "max": 500,
-          "min": 251,
-          "label": "251–500 W"
-        },
-        {
-          "max": 750,
-          "min": 501,
-          "label": "501–750 W"
-        },
-        {
-          "min": 751,
-          "label": "750+ W"
-        }
-      ],
-      "filterType": "multiselect"
-    },
-    {
-      "key": "torque",
-      "filterType": "range"
-    },
-    {
       "key": "batteryCapacity",
       "filterType": "range"
-    },
-    {
-      "key": "batteryPosition",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "range",
-      "filterType": "range"
-    },
-    {
-      "key": "topSpeed",
-      "buckets": [
-        {
-          "max": 25,
-          "min": 0,
-          "label": "Up to 25 km/h"
-        },
-        {
-          "min": 26,
-          "max": 45,
-          "label": "26–45 km/h"
-        },
-        {
-          "min": 46,
-          "label": "Unrestricted"
-        }
-      ],
-      "filterType": "multiselect"
     },
     {
       "key": "wheelSize",
@@ -108,11 +43,15 @@
       "filterType": "multiselect"
     },
     {
-      "key": "frameSize",
+      "key": "torque",
       "filterType": "range"
     },
     {
-      "key": "color",
+      "key": "modelYear",
+      "filterType": "range"
+    },
+    {
+      "key": "usageType",
       "filterType": "multiselect"
     },
     {
@@ -120,19 +59,15 @@
       "filterType": "multiselect"
     },
     {
+      "key": "frameMaterial",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "weight",
+      "filterType": "range"
+    },
+    {
       "key": "suspension",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "drivetrain",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "gearType",
-      "filterType": "multiselect"
-    },
-    {
-      "key": "brakeType",
       "filterType": "multiselect"
     },
     {
@@ -140,16 +75,81 @@
       "filterType": "range"
     },
     {
-      "key": "weight",
-      "filterType": "range"
+      "key": "color",
+      "filterType": "multiselect"
     },
     {
-      "key": "maxLoad",
-      "filterType": "range"
+      "key": "condition",
+      "filterType": "multiselect"
     },
     {
-      "key": "chargingTime",
-      "filterType": "range"
+      "key": "motorBrand",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "motorPosition",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "motorPower",
+      "buckets": [
+        {
+          "max": 250,
+          "min": 0,
+          "label": "Up to 250 W"
+        },
+        {
+          "max": 500,
+          "min": 251,
+          "label": "251–500 W"
+        },
+        {
+          "max": 750,
+          "min": 501,
+          "label": "501–750 W"
+        },
+        {
+          "min": 751,
+          "label": "750+ W"
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "topSpeed",
+      "buckets": [
+        {
+          "max": 25,
+          "min": 0,
+          "label": "Up to 25 km/h"
+        },
+        {
+          "min": 26,
+          "max": 45,
+          "label": "26–45 km/h"
+        },
+        {
+          "min": 46,
+          "label": "Unrestricted"
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "sensorType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "pedelecClass",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "batteryPosition",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "batteryRemovable",
+      "filterType": "boolean"
     },
     {
       "key": "display",
@@ -160,40 +160,114 @@
       "filterType": "boolean"
     },
     {
-      "key": "waterResistance",
+      "key": "gpsModule",
+      "filterType": "boolean"
+    },
+    {
+      "key": "abs",
+      "filterType": "boolean"
+    },
+    {
+      "key": "frameSize",
+      "filterType": "range"
+    },
+    {
+      "key": "frameSizeLabel",
       "filterType": "multiselect"
+    },
+    {
+      "key": "maxTotalWeight",
+      "filterType": "range"
+    },
+    {
+      "key": "forkTravel",
+      "filterType": "range"
+    },
+    {
+      "key": "forkType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rearTravel",
+      "filterType": "range"
+    },
+    {
+      "key": "drivetrain",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "gearType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "shiftingActuation",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "brakeType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rotorSizeFront",
+      "filterType": "range"
+    },
+    {
+      "key": "brakePistons",
+      "filterType": "range"
+    },
+    {
+      "key": "tubeless",
+      "filterType": "boolean"
+    },
+    {
+      "key": "seatpostType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "lighting",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rack",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "fenders",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "kickstand",
+      "filterType": "boolean"
     }
   ],
   "primarySpecs": [
     "frameType",
-    "motorPosition",
     "batteryCapacity",
+    "motorModel",
     "wheelSize",
-    "torque"
+    "torque",
+    "modelYear",
+    "usageType",
+    "frameMaterial"
   ],
   "matcherSpecs": [
     "motorPower",
-    "range",
-    "weight"
+    "modelYear",
+    "weight",
+    "forkTravel",
+    "frameMaterial",
+    "gearCount",
+    "topSpeed"
   ],
   "matchingConfig": {
-    "maxMatcherSpecMismatches": 1
+    "maxMatcherSpecMismatches": 2
   },
   "normalizationStrategy": "full",
   "offerLevelSpecs": [
     "frameSize",
-    "color"
-  ],
-  "keywordIdentifiers": [
-    "motor power",
-    "torque",
-    "battery capacity",
-    "range",
-    "top speed",
-    "mid-drive",
-    "hub motor",
-    "pedelec",
-    "throttle",
-    "regenerative braking"
+    "frameSizeLabel",
+    "color",
+    "condition",
+    "mileage"
   ]
 }

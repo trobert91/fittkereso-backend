@@ -10,6 +10,28 @@ import { ProductSpecNormalizationService } from './product-spec-normalization.se
 
 const DEFAULT_MODEL = 'deepseek-v4-flash';
 
+/**
+ * Reasoning is left ON by default because the pass genuinely depends on it:
+ * most sources publish a free-text OEM component list, and canonical fields
+ * (motorPosition from a Bosch `BDU*` code, seatpostType from "FOX Transfer",
+ * tubeless from a `TLE`/`TLR` token, equipment booleans from blank rows) exist
+ * only as inferences over that text. It is capped at 'low' rather than left at
+ * the provider default: a measured call spent 3052 output tokens on a response
+ * whose JSON payload was ~200, nearly all of it internal reasoning
+ * (docs/SpecUnificationAnalysis.md §5). Sources with an already-normalized
+ * spec table should set `thinking: false` per-source instead.
+ */
+const DEFAULT_EFFORT = 'low';
+
+/**
+ * Safety ceiling, not a tuning knob — sized to clear a fully-populated specs
+ * object with room to spare (the ebikes golden sample is 92 fields, ~1.2k
+ * output tokens) plus a bounded reasoning trace. Truncation fails JSON parsing
+ * and degrades the whole pass to deterministic-only, so this must never bind
+ * on a well-behaved call.
+ */
+const DEFAULT_MAX_TOKENS = 8000;
+
 /** Deterministic, pre-LLM view of a scraped product. */
 export interface DeterministicProductData {
   brand: string;
@@ -75,10 +97,27 @@ export class ProductSourcePostProcessService {
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     model?: string;
+    thinking?: boolean;
+    effort?: string;
+    maxTokens?: number;
     offerLevelSpecs?: string[];
   }): Promise<ProductSourcePostProcessResult | undefined> {
-    const { data, rawSpecs, schema, goldenSample, model, offerLevelSpecs } =
-      params;
+    const {
+      data,
+      rawSpecs,
+      schema,
+      goldenSample,
+      model,
+      thinking,
+      effort,
+      maxTokens,
+      offerLevelSpecs,
+    } = params;
+
+    // `effort` implies reasoning is enabled, so only default it in when the
+    // caller hasn't explicitly turned reasoning off.
+    const resolvedEffort =
+      thinking === false ? undefined : (effort ?? DEFAULT_EFFORT);
 
     try {
       const response = await this.aiChat.createChat({
@@ -86,6 +125,9 @@ export class ProductSourcePostProcessService {
         schema: this.buildResponseSchema(schema),
         schemaName: 'post_processed_product',
         model: model ?? DEFAULT_MODEL,
+        ...(thinking !== undefined && { thinking }),
+        ...(resolvedEffort !== undefined && { effort: resolvedEffort }),
+        maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
         messages: [
           {
             role: 'system',
@@ -102,6 +144,20 @@ export class ProductSourcePostProcessService {
         ],
         temperature: 1,
       });
+
+      // A response cut off by the token ceiling fails JSON parsing and would
+      // otherwise be indistinguishable from a model that simply answered
+      // badly — call it out so the cap is diagnosable rather than mysterious.
+      if (response.finishReason === 'length') {
+        this.logger.warn(
+          'Post-process response hit the token ceiling and was truncated, degrading to deterministic-only — consider raising maxTokens or lowering effort for this source',
+          {
+            maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
+            completionTokens: response.usage.completionTokens,
+          },
+        );
+        return undefined;
+      }
 
       const parsed = response.parsed as LlmProductContribution | undefined;
       if (!parsed) {
@@ -152,8 +208,8 @@ export class ProductSourcePostProcessService {
     const fieldDescriptions = Object.entries(schema.properties)
       .map(([key, prop]) => {
         const unit = prop.meta?.unit ? `, unit: ${prop.meta.unit}` : '';
-        const options = prop.meta?.options?.length
-          ? `, allowed values (pick exactly one of these, verbatim): ${prop.meta.options.join(' | ')}`
+        const options = prop.enum?.length
+          ? `, allowed values (pick exactly one of these, verbatim): ${prop.enum.join(' | ')}`
           : '';
         const examples =
           !options && prop.meta?.examples?.length
@@ -223,19 +279,20 @@ export class ProductSourcePostProcessService {
    * fields it's confident about; every field is optional.
    *
    * Cannot pass `schema.properties` straight through: SpecDefinitionProperty
-   * carries a `meta` key (unit/examples/options/order — our own convention,
-   * read by buildSystemPrompt) and a `title`, neither of which are schema
-   * keywords. Ajv's `strict: true` mode (used by AiSchemaValidatorService)
-   * rejects unknown keywords outright, so passing them through fails
-   * `ajv.compile(schema)` before the LLM call is even validated.
+   * carries a `meta` key (unit/examples/order — our own convention, read by
+   * buildSystemPrompt) and a `title`, neither of which are schema keywords.
+   * Ajv's `strict: true` mode (used by AiSchemaValidatorService) rejects
+   * unknown keywords outright, so passing them through fails
+   * `ajv.compile(schema)` before the LLM call is even validated. `enum` is a
+   * real schema keyword, so it passes through as-is.
    */
   private buildResponseSchema(schema: SpecDefinitionJsonSchema): unknown {
     const properties: Record<string, unknown> = {};
     for (const [key, prop] of Object.entries(schema.properties)) {
       if (prop.type === 'array') {
         properties[key] = { type: 'array', items: { type: 'string' } };
-      } else if (prop.type === 'string' && prop.meta?.options?.length) {
-        properties[key] = { type: 'string', enum: prop.meta.options };
+      } else if (prop.type === 'string' && prop.enum?.length) {
+        properties[key] = { type: 'string', enum: prop.enum };
       } else {
         properties[key] = { type: prop.type };
       }

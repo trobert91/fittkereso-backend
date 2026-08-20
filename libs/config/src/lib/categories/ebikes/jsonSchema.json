@@ -2,37 +2,42 @@
   "type": "object",
   "title": "E-bike",
   "properties": {
-    "gender": {
+    "brand": {
       "meta": {
-        "order": 4,
-        "options": ["Férfi", "Női", "Unisex"],
-        "examples": ["Férfi", "Női", "Unisex"]
+        "examples": [
+          "KTM",
+          "Bosch",
+          "Giant",
+          "Bergamont"
+        ]
       },
       "type": "string",
-      "title": "Gender"
+      "title": "Brand"
+    },
+    "modelYear": {
+      "meta": {
+        "order": 6,
+        "examples": [
+          "2024",
+          "2025",
+          "2026"
+        ],
+        "min": 2015,
+        "max": 2030
+      },
+      "type": "number",
+      "title": "Model year"
     },
     "frameType": {
       "meta": {
         "order": 1,
-        "options": [
-          "All Mountain",
-          "Merev MTB",
-          "Országúti",
-          "Magas vázú",
-          "Trapéz",
-          "Alacsony vázú (női)",
-          "Összteleszkópos",
-          "Cross",
-          "Összecsukható",
-          "Kompakt"
-        ],
         "examples": [
           "All Mountain",
           "Merev MTB",
           "Országúti",
           "Magas vázú",
           "Trapéz",
-          "Alacsony vázú (női)",
+          "Alacsony vázú",
           "Összteleszkópos",
           "Cross",
           "Összecsukható",
@@ -42,27 +47,9 @@
       "type": "string",
       "title": "Frame type"
     },
-    "frameSize": {
-      "meta": {
-        "unit": "cm",
-        "examples": ["46", "51", "56"],
-        "unitFormat": "none"
-      },
-      "type": "number",
-      "title": "Frame size"
-    },
     "usageType": {
       "meta": {
-        "order": 5,
-        "options": [
-          "Trekking",
-          "MTB",
-          "Cross",
-          "Cross-Trekking",
-          "Városi",
-          "Kompakt városi",
-          "Országúti"
-        ],
+        "order": 7,
         "examples": [
           "Trekking",
           "MTB",
@@ -76,116 +63,296 @@
       "type": "string",
       "title": "Usage type"
     },
-    "batteryPosition": {
+    "gender": {
       "meta": {
-        "options": ["Vázba integrált", "Külső", "Csomagtartóra szerelt"],
-        "examples": ["Vázba integrált", "Külső", "Csomagtartóra szerelt"]
+        "order": 8
       },
+      "enum": [
+        "Férfi",
+        "Női",
+        "Unisex"
+      ],
       "type": "string",
-      "title": "Battery position"
+      "title": "Gender"
     },
-    "wheelSize": {
+    "color": {
       "meta": {
-        "order": 3,
-        "unit": "\"",
-        "examples": ["26", "27.5", "28", "29"],
-        "unitFormat": "none"
-      },
-      "type": "number",
-      "title": "Wheel size"
-    },
-    "drivetrain": {
-      "meta": {
-        "options": ["Lánc", "Szíj"],
-        "examples": ["Lánc", "Szíj"]
-      },
-      "type": "string",
-      "title": "Drivetrain"
-    },
-    "suspension": {
-      "meta": {
-        "options": [
-          "Első teleszkóp",
-          "Első teleszkóp, hátsó rugóstag",
-          "Rugózatlan"
-        ],
         "examples": [
-          "Első teleszkóp",
-          "Első teleszkóp, hátsó rugóstag",
-          "Rugózatlan"
+          "Olive Pearl",
+          "Fekete",
+          "Fehér",
+          "Piros",
+          "Kék",
+          "Zöld"
         ]
       },
       "type": "string",
-      "title": "Suspension"
+      "title": "Color"
     },
-    "brakeType": {
+    "condition": {
+      "meta": {},
+      "enum": [
+        "Új",
+        "Újszerű",
+        "Használt",
+        "Felújított"
+      ],
+      "type": "string",
+      "title": "Condition"
+    },
+    "mileage": {
       "meta": {
-        "options": ["Tárcsa", "Racker (Felni)", "Tárcsa + kontrafék"],
-        "examples": ["Tárcsa", "Racker (Felni)", "Tárcsa + kontrafék"]
+        "unit": "km",
+        "examples": [
+          "1065"
+        ],
+        "min": 0,
+        "max": 200000
+      },
+      "type": "number",
+      "title": "Mileage"
+    },
+    "motorModel": {
+      "meta": {
+        "order": 3,
+        "examples": [
+          "Bosch Performance SX BDU3144",
+          "Bosch Performance Line CX Gen.4 (BDU374Y)",
+          "Shimano EP8",
+          "Yamaha PW-X3"
+        ]
       },
       "type": "string",
-      "title": "Brake type"
+      "title": "Motor model"
     },
-    "gearType": {
+    "motorBrand": {
       "meta": {
-        "options": ["Láncváltó", "Motorba integrált váltó", "Agyváltó"],
-        "examples": ["Láncváltó", "Motorba integrált váltó", "Agyváltó"]
+        "examples": [
+          "Bosch",
+          "Shimano",
+          "Yamaha",
+          "Brose",
+          "Bafang",
+          "Fazua",
+          "TQ"
+        ]
       },
       "type": "string",
-      "title": "Gear type"
-    },
-    "gearCount": {
-      "meta": {
-        "examples": ["1", "9", "11", "12"]
-      },
-      "type": "number",
-      "title": "Number of gears"
-    },
-    "batteryCapacity": {
-      "meta": {
-        "order": 2,
-        "unit": "Wh",
-        "examples": ["375", "500", "625", "750"]
-      },
-      "type": "number",
-      "title": "Battery capacity"
-    },
-    "torque": {
-      "meta": {
-        "unit": "Nm",
-        "examples": ["50", "65", "85"]
-      },
-      "type": "number",
-      "title": "Torque"
+      "title": "Motor brand"
     },
     "motorPosition": {
-      "meta": {
-        "options": ["Középmotor", "Hátsó kerékagy motor", "Első kerékagy motor"],
-        "examples": ["Középmotor", "Hátsó kerékagy motor", "Első kerékagy motor"]
-      },
+      "meta": {},
+      "enum": [
+        "Középmotor",
+        "Hátsó kerékagy motor",
+        "Első kerékagy motor"
+      ],
       "type": "string",
       "title": "Motor position"
     },
     "motorPower": {
       "meta": {
         "unit": "W",
-        "examples": ["250", "350", "500", "750"]
+        "examples": [
+          "250",
+          "350",
+          "500",
+          "750"
+        ],
+        "min": 100,
+        "max": 1500
       },
       "type": "number",
-      "title": "Motor power"
+      "title": "Motor power (rated)"
+    },
+    "motorPeakPower": {
+      "meta": {
+        "unit": "W",
+        "examples": [
+          "600",
+          "750"
+        ],
+        "min": 100,
+        "max": 2000
+      },
+      "type": "number",
+      "title": "Motor peak power"
+    },
+    "torque": {
+      "meta": {
+        "order": 5,
+        "unit": "Nm",
+        "examples": [
+          "55",
+          "60",
+          "85"
+        ],
+        "min": 20,
+        "max": 160
+      },
+      "type": "number",
+      "title": "Torque"
     },
     "topSpeed": {
       "meta": {
         "unit": "km/h",
-        "examples": ["25", "45"]
+        "examples": [
+          "25",
+          "45"
+        ],
+        "min": 15,
+        "max": 80
       },
       "type": "number",
       "title": "Assisted top speed"
     },
+    "maxAssistLevel": {
+      "meta": {
+        "unit": "%",
+        "examples": [
+          "340",
+          "400"
+        ],
+        "min": 50,
+        "max": 600
+      },
+      "type": "number",
+      "title": "Max assist level"
+    },
+    "sensorType": {
+      "meta": {},
+      "enum": [
+        "Nyomatékszenzor",
+        "Fordulatszám-szenzor",
+        "Nyomaték- és fordulatszám-szenzor"
+      ],
+      "type": "string",
+      "title": "Pedal assist sensor"
+    },
+    "ebikeSystem": {
+      "meta": {
+        "examples": [
+          "Bosch CPT-SX4R4",
+          "Bosch Smart System"
+        ]
+      },
+      "type": "string",
+      "title": "E-bike system"
+    },
+    "pedelecClass": {
+      "meta": {},
+      "enum": [
+        "Pedelec",
+        "S-Pedelec"
+      ],
+      "type": "string",
+      "title": "Pedelec class"
+    },
+    "batteryCapacity": {
+      "meta": {
+        "order": 2,
+        "unit": "Wh",
+        "examples": [
+          "400",
+          "625",
+          "750"
+        ],
+        "min": 100,
+        "max": 1500
+      },
+      "type": "number",
+      "title": "Battery capacity"
+    },
+    "batteryModel": {
+      "meta": {
+        "examples": [
+          "Bosch CompactTube 400Wh",
+          "Bosch PowerTube 750Wh 'Smart System'"
+        ]
+      },
+      "type": "string",
+      "title": "Battery model"
+    },
+    "batteryPosition": {
+      "meta": {},
+      "enum": [
+        "Vázba integrált",
+        "Külső",
+        "Csomagtartóra szerelt"
+      ],
+      "type": "string",
+      "title": "Battery position"
+    },
+    "batteryChemistry": {
+      "meta": {},
+      "enum": [
+        "Li-ion",
+        "Li-polimer"
+      ],
+      "type": "string",
+      "title": "Battery chemistry"
+    },
+    "batteryVoltage": {
+      "meta": {
+        "unit": "V",
+        "examples": [
+          "36",
+          "48"
+        ],
+        "min": 24,
+        "max": 72
+      },
+      "type": "number",
+      "title": "Battery voltage"
+    },
+    "batteryRemovable": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Removable battery"
+    },
+    "batteryLock": {
+      "meta": {
+        "examples": [
+          "ABUS integrated btry lock IT2 (T82 key)"
+        ]
+      },
+      "type": "string",
+      "title": "Battery lock"
+    },
+    "chargerModel": {
+      "meta": {
+        "examples": [
+          "Bosch Standard Charger 4A",
+          "Bosch töltő 'Smart System' (4A)"
+        ]
+      },
+      "type": "string",
+      "title": "Charger model"
+    },
+    "chargerCurrent": {
+      "meta": {
+        "unit": "A",
+        "examples": [
+          "2",
+          "4",
+          "6"
+        ],
+        "min": 1,
+        "max": 10
+      },
+      "type": "number",
+      "title": "Charger current"
+    },
     "range": {
       "meta": {
         "unit": "km",
-        "examples": ["60", "100", "150"]
+        "examples": [
+          "60",
+          "100",
+          "150"
+        ],
+        "min": 10,
+        "max": 400
       },
       "type": "number",
       "title": "Range"
@@ -193,50 +360,835 @@
     "chargingTime": {
       "meta": {
         "unit": "h",
-        "examples": ["3.5", "6"]
+        "examples": [
+          "3.5",
+          "6"
+        ],
+        "min": 0.5,
+        "max": 20
       },
       "type": "number",
       "title": "Charging time"
+    },
+    "displayModel": {
+      "meta": {
+        "examples": [
+          "Bosch Mini Remote",
+          "Bosch Kiox 300",
+          "Bosch Purion 400",
+          "Bosch Intuvia 100"
+        ]
+      },
+      "type": "string",
+      "title": "Display model"
     },
     "display": {
       "meta": {},
       "type": "boolean",
       "title": "Display/controller"
     },
-    "maxLoad": {
+    "controlUnit": {
       "meta": {
-        "unit": "kg",
-        "examples": ["120", "150"]
-      },
-      "type": "number",
-      "title": "Max load capacity"
-    },
-    "weight": {
-      "meta": {
-        "unit": "kg",
-        "examples": ["22", "25"]
-      },
-      "type": "number",
-      "title": "Weight"
-    },
-    "waterResistance": {
-      "meta": {
-        "examples": ["IPX4", "IPX5", "IPX6"]
+        "examples": [
+          "Bosch Led Remote",
+          "Bosch Mini Remote Flatbar"
+        ]
       },
       "type": "string",
-      "title": "Water resistance"
+      "title": "Control unit"
     },
     "smartConnectivity": {
       "meta": {},
       "type": "boolean",
       "title": "App/GPS connectivity"
     },
-    "color": {
+    "gpsModule": {
+      "meta": {},
+      "type": "boolean",
+      "title": "GPS module"
+    },
+    "abs": {
+      "meta": {},
+      "type": "boolean",
+      "title": "ABS"
+    },
+    "frameModel": {
       "meta": {
-        "examples": ["Fekete", "Fehér", "Piros", "Kék", "Zöld"]
+        "examples": [
+          "Macina Scarp Prem CB 140 UDH|CPT400 Bosch BDU31/M4830",
+          "Macina Scarp Premium Carbon 140 UDH"
+        ]
       },
       "type": "string",
-      "title": "Color"
+      "title": "Frame model"
+    },
+    "frameMaterial": {
+      "meta": {
+        "order": 9
+      },
+      "enum": [
+        "Alumínium",
+        "Karbon",
+        "Acél",
+        "Titán"
+      ],
+      "type": "string",
+      "title": "Frame material"
+    },
+    "frameSize": {
+      "meta": {
+        "unit": "cm",
+        "unitFormat": "none",
+        "examples": [
+          "43",
+          "48",
+          "53"
+        ],
+        "min": 30,
+        "max": 70
+      },
+      "type": "number",
+      "title": "Frame size"
+    },
+    "frameSizeLabel": {
+      "meta": {},
+      "enum": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL",
+        "XXL"
+      ],
+      "type": "string",
+      "title": "Frame size label"
+    },
+    "standoverHeight": {
+      "meta": {
+        "unit": "cm",
+        "examples": [
+          "kb. 80-84 cm"
+        ]
+      },
+      "type": "string",
+      "title": "Standover height"
+    },
+    "recommendedRiderHeight": {
+      "meta": {
+        "unit": "cm",
+        "examples": [
+          "kb. 175-188 cm"
+        ]
+      },
+      "type": "string",
+      "title": "Recommended rider height"
+    },
+    "seatTubeLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "430",
+          "480"
+        ],
+        "min": 300,
+        "max": 700
+      },
+      "type": "number",
+      "title": "Seat tube length"
+    },
+    "topTubeLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "601",
+          "625"
+        ],
+        "min": 400,
+        "max": 800
+      },
+      "type": "number",
+      "title": "Top tube length"
+    },
+    "weight": {
+      "meta": {
+        "order": 10,
+        "unit": "kg",
+        "examples": [
+          "17.9",
+          "22",
+          "25"
+        ],
+        "min": 8,
+        "max": 45
+      },
+      "type": "number",
+      "title": "Weight"
+    },
+    "maxTotalWeight": {
+      "meta": {
+        "unit": "kg",
+        "examples": [
+          "118",
+          "128"
+        ],
+        "min": 80,
+        "max": 250
+      },
+      "type": "number",
+      "title": "Max permissible total weight"
+    },
+    "maxLoad": {
+      "meta": {
+        "unit": "kg",
+        "examples": [
+          "120",
+          "150"
+        ],
+        "min": 50,
+        "max": 200
+      },
+      "type": "number",
+      "title": "Max payload"
+    },
+    "waterResistance": {
+      "meta": {
+        "examples": [
+          "IPX4",
+          "IPX5",
+          "IPX6"
+        ]
+      },
+      "type": "string",
+      "title": "Water resistance"
+    },
+    "suspension": {
+      "meta": {
+        "order": 11
+      },
+      "enum": [
+        "Első teleszkóp",
+        "Első teleszkóp, hátsó rugóstag",
+        "Rugózatlan"
+      ],
+      "type": "string",
+      "title": "Suspension"
+    },
+    "forkModel": {
+      "meta": {
+        "examples": [
+          "FOX 36SL Float 29\" Factory 140mm",
+          "SR Suntour XCR 34",
+          "RockShox Recon Silver RL"
+        ]
+      },
+      "type": "string",
+      "title": "Fork model"
+    },
+    "forkTravel": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "63",
+          "120",
+          "140"
+        ],
+        "min": 20,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Fork travel"
+    },
+    "forkType": {
+      "meta": {},
+      "enum": [
+        "Levegős",
+        "Acélrugós",
+        "Merev"
+      ],
+      "type": "string",
+      "title": "Fork type"
+    },
+    "rearShockModel": {
+      "meta": {
+        "examples": [
+          "FOX Float Factory 2-Pos 230x60"
+        ]
+      },
+      "type": "string",
+      "title": "Rear shock model"
+    },
+    "rearTravel": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "140",
+          "150"
+        ],
+        "min": 20,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Rear travel"
+    },
+    "drivetrain": {
+      "meta": {},
+      "enum": [
+        "Lánc",
+        "Szíj"
+      ],
+      "type": "string",
+      "title": "Drivetrain"
+    },
+    "gearType": {
+      "meta": {},
+      "enum": [
+        "Láncváltó",
+        "Motorba integrált váltó",
+        "Agyváltó"
+      ],
+      "type": "string",
+      "title": "Gear type"
+    },
+    "gearCount": {
+      "meta": {
+        "order": 12,
+        "examples": [
+          "1",
+          "10",
+          "11",
+          "12"
+        ],
+        "min": 1,
+        "max": 14
+      },
+      "type": "number",
+      "title": "Number of gears"
+    },
+    "shiftingActuation": {
+      "meta": {},
+      "enum": [
+        "Mechanikus",
+        "Elektromos"
+      ],
+      "type": "string",
+      "title": "Shifting actuation"
+    },
+    "autoShift": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Automatic shifting"
+    },
+    "rearDerailleur": {
+      "meta": {
+        "examples": [
+          "Shimano Deore XT Di2 M8260-11 LG SGS",
+          "SRAM GX Eagle T-Type 12speed"
+        ]
+      },
+      "type": "string",
+      "title": "Rear derailleur"
+    },
+    "rearDerailleurTier": {
+      "meta": {
+        "examples": [
+          "Shimano XT Di2",
+          "SRAM GX Eagle"
+        ]
+      },
+      "type": "string",
+      "title": "Rear derailleur tier"
+    },
+    "frontDerailleur": {
+      "meta": {
+        "examples": [
+          "Nincs",
+          "Shimano Deore FD-M5100"
+        ]
+      },
+      "type": "string",
+      "title": "Front derailleur"
+    },
+    "shifter": {
+      "meta": {
+        "examples": [
+          "Shimano Deore XT Di2 M8250",
+          "SRAM POD Rocker AXS Controller"
+        ]
+      },
+      "type": "string",
+      "title": "Shifter"
+    },
+    "crankset": {
+      "meta": {
+        "examples": [
+          "Race Face Aeffect-R170",
+          "KTM E-TEAM2 ISIS 170mm Q8"
+        ]
+      },
+      "type": "string",
+      "title": "Crankset"
+    },
+    "crankLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "165",
+          "170",
+          "175"
+        ],
+        "min": 130,
+        "max": 200
+      },
+      "type": "number",
+      "title": "Crank length"
+    },
+    "chainring": {
+      "meta": {
+        "examples": [
+          "KTM aluminium 34T Direct Mount"
+        ]
+      },
+      "type": "string",
+      "title": "Chainring"
+    },
+    "chainringTeeth": {
+      "meta": {
+        "unit": "T",
+        "unitFormat": "none",
+        "examples": [
+          "34",
+          "38"
+        ],
+        "min": 20,
+        "max": 50
+      },
+      "type": "number",
+      "title": "Chainring teeth"
+    },
+    "chainringCount": {
+      "meta": {
+        "examples": [
+          "1",
+          "2",
+          "3"
+        ],
+        "min": 1,
+        "max": 3
+      },
+      "type": "number",
+      "title": "Chainring count"
+    },
+    "cassette": {
+      "meta": {
+        "examples": [
+          "Shimano LG700-11 / 11-50",
+          "SRAM GX T-Type XS-1275 / 10-52"
+        ]
+      },
+      "type": "string",
+      "title": "Cassette"
+    },
+    "cassetteRange": {
+      "meta": {
+        "unit": "T",
+        "unitFormat": "none",
+        "examples": [
+          "11-50T",
+          "10-52T",
+          "11-43T"
+        ]
+      },
+      "type": "string",
+      "title": "Cassette range"
+    },
+    "chain": {
+      "meta": {
+        "examples": [
+          "KMC e11 Sport EPT e-bike",
+          "SRAM GX T-Type 12s"
+        ]
+      },
+      "type": "string",
+      "title": "Chain"
+    },
+    "bottomBracket": {
+      "meta": {
+        "examples": [
+          "Shimano BB-MT500"
+        ]
+      },
+      "type": "string",
+      "title": "Bottom bracket"
+    },
+    "pedals": {
+      "meta": {
+        "examples": [
+          "MTB-Pedal flat VP-539 nylon",
+          "fém platform"
+        ]
+      },
+      "type": "string",
+      "title": "Pedals"
+    },
+    "brakeType": {
+      "meta": {},
+      "enum": [
+        "Tárcsa",
+        "Racker (Felni)",
+        "Tárcsa + kontrafék"
+      ],
+      "type": "string",
+      "title": "Brake type"
+    },
+    "brakeModel": {
+      "meta": {
+        "examples": [
+          "Shimano XT M8200/BR-M8220",
+          "Shimano MT200 / MT200 2-Piston",
+          "Tektro Gemini SL"
+        ]
+      },
+      "type": "string",
+      "title": "Brake model"
+    },
+    "brakeLever": {
+      "meta": {
+        "examples": [
+          "Tektro Gemini SL hidr. fékkar szett"
+        ]
+      },
+      "type": "string",
+      "title": "Brake lever"
+    },
+    "rotorModel": {
+      "meta": {
+        "examples": [
+          "Shimano CL800 CL 203 freeza",
+          "Shimano MT800 / CL900"
+        ]
+      },
+      "type": "string",
+      "title": "Brake rotor model"
+    },
+    "rotorSizeFront": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "180",
+          "203"
+        ],
+        "min": 140,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Front rotor size"
+    },
+    "rotorSizeRear": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "160",
+          "180"
+        ],
+        "min": 140,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Rear rotor size"
+    },
+    "brakePistons": {
+      "meta": {
+        "examples": [
+          "2",
+          "4"
+        ],
+        "min": 1,
+        "max": 6
+      },
+      "type": "number",
+      "title": "Brake pistons"
+    },
+    "wheelSize": {
+      "meta": {
+        "order": 4,
+        "unit": "\"",
+        "unitFormat": "none",
+        "examples": [
+          "26",
+          "27.5",
+          "28",
+          "29"
+        ],
+        "min": 12,
+        "max": 29
+      },
+      "type": "number",
+      "title": "Wheel size"
+    },
+    "wheelset": {
+      "meta": {
+        "examples": [
+          "DT HXC 1501 Spline LS 29 Carbon",
+          "KTM E-PRIME Trail 29 by DT"
+        ]
+      },
+      "type": "string",
+      "title": "Wheelset"
+    },
+    "rimModel": {
+      "meta": {
+        "examples": [
+          "DT Swiss HXC 1501 Spline LS 29 Carbon",
+          "Ryde Rival 30"
+        ]
+      },
+      "type": "string",
+      "title": "Rim model"
+    },
+    "hubModel": {
+      "meta": {
+        "examples": [
+          "Shimano MT410/400 Boost"
+        ]
+      },
+      "type": "string",
+      "title": "Hub model"
+    },
+    "hubSpacingFront": {
+      "meta": {
+        "unit": "mm",
+        "unitFormat": "none",
+        "examples": [
+          "110x15"
+        ]
+      },
+      "type": "string",
+      "title": "Front hub spacing"
+    },
+    "hubSpacingRear": {
+      "meta": {
+        "unit": "mm",
+        "unitFormat": "none",
+        "examples": [
+          "148x12"
+        ]
+      },
+      "type": "string",
+      "title": "Rear hub spacing"
+    },
+    "hubType": {
+      "meta": {},
+      "enum": [
+        "CenterLock",
+        "6-lyukas (IS)"
+      ],
+      "type": "string",
+      "title": "Hub rotor mount"
+    },
+    "spokes": {
+      "meta": {
+        "examples": [
+          "DT Swiss Competition"
+        ]
+      },
+      "type": "string",
+      "title": "Spokes"
+    },
+    "tireModel": {
+      "meta": {
+        "examples": [
+          "Schwalbe Wicked Will Evo SuperGround TLE",
+          "Schwalbe Smart Sam",
+          "Schwalbe Johnny Watts"
+        ]
+      },
+      "type": "string",
+      "title": "Tire model"
+    },
+    "tireSize": {
+      "meta": {
+        "examples": [
+          "62-622",
+          "47-622",
+          "29x2.35"
+        ]
+      },
+      "type": "string",
+      "title": "Tire size"
+    },
+    "tireType": {
+      "meta": {
+        "examples": [
+          "SuperGround TLE",
+          "Performance"
+        ]
+      },
+      "type": "string",
+      "title": "Tire casing"
+    },
+    "tubeless": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Tubeless ready"
+    },
+    "handlebar": {
+      "meta": {
+        "examples": [
+          "FSA NS SIC cockpit ICR carbon",
+          "KTM PRIME II flat Carbon 780mm"
+        ]
+      },
+      "type": "string",
+      "title": "Handlebar"
+    },
+    "handlebarMaterial": {
+      "meta": {},
+      "enum": [
+        "Alumínium",
+        "Karbon"
+      ],
+      "type": "string",
+      "title": "Handlebar material"
+    },
+    "handlebarWidth": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "720",
+          "780"
+        ],
+        "min": 500,
+        "max": 900
+      },
+      "type": "number",
+      "title": "Handlebar width"
+    },
+    "stem": {
+      "meta": {
+        "examples": [
+          "FSA NS MTB -10° ICR",
+          "KTM alu állítható dőlésszögű"
+        ]
+      },
+      "type": "string",
+      "title": "Stem"
+    },
+    "adjustableStem": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Adjustable stem"
+    },
+    "headset": {
+      "meta": {
+        "examples": [
+          "FSA SRS drop/in 1.5\" internal",
+          "FSA ACR drop/in 1.5\" internal"
+        ]
+      },
+      "type": "string",
+      "title": "Headset"
+    },
+    "grips": {
+      "meta": {
+        "examples": [
+          "ESI Chunky silicone",
+          "KTM Comp Ergo Lock"
+        ]
+      },
+      "type": "string",
+      "title": "Grips"
+    },
+    "saddle": {
+      "meta": {
+        "examples": [
+          "Fizik Terra Aidon X5 SAlloy",
+          "Selle Royal Essenza"
+        ]
+      },
+      "type": "string",
+      "title": "Saddle"
+    },
+    "seatpost": {
+      "meta": {
+        "examples": [
+          "FOX Transfer Factory 30.9 internal",
+          "KTM COMP II 30.9/350"
+        ]
+      },
+      "type": "string",
+      "title": "Seatpost"
+    },
+    "seatpostType": {
+      "meta": {},
+      "enum": [
+        "Merev",
+        "Teleszkópos (dropper)"
+      ],
+      "type": "string",
+      "title": "Seatpost type"
+    },
+    "seatpostDiameter": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "27.2",
+          "30.9",
+          "31.6"
+        ],
+        "min": 25,
+        "max": 35
+      },
+      "type": "number",
+      "title": "Seatpost diameter"
+    },
+    "seatClamp": {
+      "meta": {
+        "examples": [
+          "KTM TEAM Light CL-FJ21 - 34,9mm"
+        ]
+      },
+      "type": "string",
+      "title": "Seat clamp"
+    },
+    "lighting": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Lighting"
+    },
+    "rack": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Rack"
+    },
+    "fenders": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Fenders"
+    },
+    "kickstand": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Kickstand"
+    },
+    "chainGuard": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Chain guard"
     }
   }
 }

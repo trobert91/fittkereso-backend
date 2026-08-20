@@ -53,6 +53,28 @@ export interface ProductSourceTranslationConfig {
 export interface ProductSourcePostProcessConfig {
   enabled: boolean;
   model?: string;
+  /**
+   * Reasoning toggle. Leave unset to use the service default (reasoning on at
+   * `effort`). Set false for sources whose spec table is already normalized to
+   * near-canonical labels (e.g. ebikeshop.hu, ambringa.hu) — those need
+   * re-keying, not inference, so the reasoning tokens are pure waste. Sources
+   * that publish only a free-text OEM component list (speedbike.hu,
+   * tuttobici.hu, berguson.hu) do need it: fields like motorPosition,
+   * seatpostType and the equipment booleans are only derivable by inference.
+   */
+  thinking?: boolean;
+  /**
+   * Provider-native reasoning effort, forwarded as-is (DeepSeek:
+   * `reasoning_effort`). Note that supplying this implies thinking is enabled.
+   */
+  effort?: string;
+  /**
+   * Ceiling on generated tokens, guarding against a runaway reasoning trace.
+   * Must stay well above the size of a fully-populated specs object for the
+   * category, since a truncated response fails JSON parsing and silently
+   * degrades the whole pass to deterministic-only.
+   */
+  maxTokens?: number;
 }
 
 export interface ProductSourceDetailPageConfig {
