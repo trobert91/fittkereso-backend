@@ -5,6 +5,7 @@ import { ScraperModule } from '@fittkereso-backend/scraper';
 import { ProductScrapeUpdaterService } from './services/product-scrape-updater.service';
 import { ScrapeUrlDeduplicationService } from './services/scrape-url-deduplication.service';
 import { GenericProductSourceSyncService } from './services/generic-product-source-sync.service';
+import { ProductSourceSimulationService } from './services/product-source-simulation.service';
 import { TaskModule } from '@fittkereso-backend/task';
 import { ResolutionModule } from '@fittkereso-backend/resolution';
 import { AiModule } from '@fittkereso-backend/ai';
@@ -36,12 +37,14 @@ import { TranslationModule } from '@fittkereso-backend/translation';
     ProductScrapeUpdaterService,
     ScrapeUrlDeduplicationService,
     GenericProductSourceSyncService,
+    ProductSourceSimulationService,
   ],
   exports: [
     ProductDetailsPageScraperService,
     ProductListPageScraperService,
     ScrapeUrlDeduplicationService,
     GenericProductSourceSyncService,
+    ProductSourceSimulationService,
   ],
 })
 export class ProductScraperModule {}
