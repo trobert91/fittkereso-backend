@@ -153,13 +153,13 @@ export class ProductUpdateMapperService {
     let manualSource = entity.sources.find((s) => !s.source);
 
     if (manualSource) {
-      manualSource.specs = specs;
+      manualSource.scrapedProduct = { ...manualSource.scrapedProduct, specs };
       manualSource.lastUpdated = new Date();
     } else {
       const newSource = new ProductSourceRecord();
       newSource.model = entity;
       newSource.source = null;
-      newSource.specs = specs;
+      newSource.scrapedProduct = { specs };
       newSource.lastUpdated = new Date();
       entity.sources.push(newSource);
     }

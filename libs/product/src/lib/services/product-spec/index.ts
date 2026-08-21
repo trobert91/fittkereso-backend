@@ -8,3 +8,6 @@ export * from './spec-extraction.service';
 export * from './spec-translation-selector.service';
 export * from './product-source-post-process.service';
 export * from './product-source-post-process-merge.service';
+export * from './product-source-record-updater.service';
+export * from './get-latest-source-per-source';
+export * from './product-level-specs';

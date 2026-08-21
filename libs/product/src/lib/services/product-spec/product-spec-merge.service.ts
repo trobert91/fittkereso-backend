@@ -93,7 +93,9 @@ export class ProductSpecMergeService {
       const sourceLabel =
         record.source?.name ?? record.sourceName ?? record.id;
 
-      for (const [key, value] of Object.entries(record.specs ?? {})) {
+      for (const [key, value] of Object.entries(
+        record.scrapedProduct?.specs ?? {},
+      )) {
         if (!this.isValueDefined(value)) continue;
 
         const list = byKey.get(key) ?? [];

@@ -6,4 +6,5 @@ export {
   type ProductResolutionInput,
 } from './resolution-context';
 export * from './product-spec';
+export * from './scraped-product';
 export * from './user-roles';

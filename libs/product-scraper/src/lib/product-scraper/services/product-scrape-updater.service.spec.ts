@@ -16,8 +16,9 @@ import type {
   BrandResolutionService,
   ProductEmbeddingService,
   ProductImageCopyService,
+  ProductMergeService,
   ProductNormalizerService,
-  ProductSpecUpdaterService,
+  ProductSourceRecordUpdaterService,
   ScrapedProduct,
   SellerResolutionService,
 } from '@fittkereso-backend/product';
@@ -109,7 +110,8 @@ describe('ProductScrapeUpdaterService', () => {
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
   let mockSourceRecordRepo: jest.Mocked<ProductSourceRecordRepository>;
-  let mockSpecUpdaterService: jest.Mocked<ProductSpecUpdaterService>;
+  let mockSourceRecordUpdater: jest.Mocked<ProductSourceRecordUpdaterService>;
+  let mockMergeService: jest.Mocked<ProductMergeService>;
   let mockImageCopyService: jest.Mocked<ProductImageCopyService>;
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
   let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
@@ -152,11 +154,15 @@ describe('ProductScrapeUpdaterService', () => {
       findAllByNormalizedName: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
-    mockSpecUpdaterService = {
-      updateSpecsOnProduct: jest
+    mockSourceRecordUpdater = {
+      upsertSourceRecord: jest
         .fn()
         .mockResolvedValue({ id: 'source-record-1' }),
-    } as unknown as jest.Mocked<ProductSpecUpdaterService>;
+    } as unknown as jest.Mocked<ProductSourceRecordUpdaterService>;
+
+    mockMergeService = {
+      mergeSources: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<ProductMergeService>;
 
     mockImageCopyService = {
       copyImagesFromSource: jest.fn().mockResolvedValue([]),
@@ -196,7 +202,8 @@ describe('ProductScrapeUpdaterService', () => {
       mockTaskRepo,
       mockAliasRepo,
       mockSourceRecordRepo,
-      mockSpecUpdaterService,
+      mockSourceRecordUpdater,
+      mockMergeService,
       mockImageCopyService,
       mockMetricsService,
       mockProductNormalizer,
@@ -319,7 +326,7 @@ describe('ProductScrapeUpdaterService', () => {
 
     expect(result).toBe(existingModel);
     expect(mockBrandResolution.resolve).toHaveBeenCalledTimes(1);
-    expect(mockSpecUpdaterService.updateSpecsOnProduct).toHaveBeenCalledTimes(
+    expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledTimes(
       2,
     );
     expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();

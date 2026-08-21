@@ -1,71 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ProductModel,
-  ProductModelRepository,
-  ProductSourceRecord,
-  ProductSource,
-  ProductSpecs,
-  ScrapedProductSpec,
-} from '@fittkereso-backend/database';
-import { CategoryConfigService } from '@fittkereso-backend/config';
-import { CustomLogger } from '@fittkereso-backend/logger';
-import { ProductSpecMergeService } from './product-spec-merge.service';
-import { ProductSpecSortService } from './product-spec-sort.service';
-import {
-  chain,
-  groupBy,
-  isBoolean,
-  isEmpty,
-  isNumber,
-  maxBy,
-  omit,
-  pick,
-} from 'lodash';
-import { hashRawSpecs, nameOf } from '@fittkereso-backend/utils';
-import { ProductSpecValidatorService } from './product-spec-validator.service';
-import { ProductMetricsService } from '@fittkereso-backend/metrics';
+import { ProductModel, ProductModelRepository, ProductSpecs } from '@fittkereso-backend/database';
+import { nameOf } from '@fittkereso-backend/utils';
+import { ProductSourceRecordUpdaterService } from './product-source-record-updater.service';
+import { ProductMergeService } from '../merge/product-merge.service';
 
+/**
+ * Manual-spec-override entry point (admin "update manual specs" endpoint):
+ * upserts a source: null ProductSourceRecord carrying the given specs, then
+ * runs the same idempotent ProductMergeService.mergeSources recompute every
+ * other update path uses — a manual edit participates in the merge as a
+ * real candidate (see ProductSpecMergeService's Tier 4 recency/priority
+ * tiebreak) rather than bypassing it.
+ */
 @Injectable()
 export class ProductSpecUpdaterService {
-  private readonly logger = new CustomLogger(ProductSpecUpdaterService.name);
-
   constructor(
     private readonly productRepo: ProductModelRepository,
-    private readonly specMergeService: ProductSpecMergeService,
-    private readonly specSortService: ProductSpecSortService,
-    private readonly validatorService: ProductSpecValidatorService,
-    private readonly productMetrics: ProductMetricsService,
-    private readonly categoryConfigService: CategoryConfigService,
+    private readonly sourceRecordUpdater: ProductSourceRecordUpdaterService,
+    private readonly mergeService: ProductMergeService,
   ) {}
-
-  public async remergeSpecsFromSources(model: ProductModel): Promise<void> {
-    if (isEmpty(model.sources)) {
-      return;
-    }
-
-    const categorySlug = model.productCategory?.slug;
-
-    const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource, categorySlug);
-    model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
-    model.orderedSpecs = await this.specSortService.sortSpecs(
-      model.productCategory!,
-      model.specs,
-    );
-
-    const jsonSchema = categorySlug
-      ? this.categoryConfigService.getJsonSchema(categorySlug)
-      : undefined;
-
-    const finalValidation = this.validatorService.validateSpecs(
-      jsonSchema,
-      model.specs,
-    );
-    model.specValid = finalValidation.isValid;
-    model.specErrors = !isEmpty(finalValidation.errors)
-      ? finalValidation.errors
-      : undefined;
-  }
 
   public async updateManualSpecs(
     id: string,
@@ -74,203 +27,21 @@ export class ProductSpecUpdaterService {
     const product = await this.productRepo.findOneOrFail({
       where: { id },
       relations: [
+        nameOf<ProductModel>('brand'),
         nameOf<ProductModel>('productCategory'),
         nameOf<ProductModel>('sources'),
       ],
     });
 
-    await this.updateSpecsOnProduct({
+    await this.sourceRecordUpdater.upsertSourceRecord({
       model: product,
       source: null,
-      specs,
+      scrapedProduct: { specs },
     });
 
+    await this.mergeService.mergeSources(product);
     await this.productRepo.save(product);
 
     return product;
-  }
-
-  public async updateSpecsOnProduct(params: {
-    model: ProductModel;
-    source: ProductSource | null;
-    specs?: ProductSpecs;
-    rawSpecs?: ScrapedProductSpec[];
-    externalId?: string;
-    sourceUrl?: string;
-    sourceName?: string;
-    normalizedSourceName?: string;
-  }): Promise<ProductSourceRecord | undefined> {
-    const {
-      model,
-      source: newSource,
-      specs,
-      rawSpecs,
-      externalId,
-      sourceUrl,
-      sourceName,
-      normalizedSourceName,
-    } = params;
-    // Label used only for metrics/logging — admin-entered specs have no
-    // ProductSource (source: null), everything else is scraped.
-    const sourceLabel = newSource?.name ?? 'manual';
-
-    // Ensure sources loaded
-    model.sources = model.sources ?? [];
-
-    // Find existing source entry by URL, or create a new one
-    let source = sourceUrl
-      ? model.sources.find((s) => s.url === sourceUrl)
-      : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
-
-    // `specs` is absent when the caller already determined (via rawSpecsHash
-    // comparison) that this listing's raw spec table is unchanged since the
-    // last scrape — see ProductDetailsPageScraperService.extractProduct.
-    // Nothing to re-extract/re-merge; just report the existing row as-is.
-    if (specs === undefined && source) {
-      return source;
-    }
-
-    const categorySlug = model.productCategory?.slug;
-    const jsonSchema = categorySlug
-      ? this.categoryConfigService.getJsonSchema(categorySlug)
-      : undefined;
-
-    const processedSpecs = specs ? this.processSpecs(specs) : {};
-
-    const validation = this.validatorService.validateSpecs(
-      jsonSchema,
-      processedSpecs,
-    );
-
-    if (!validation.isValid && categorySlug) {
-      this.productMetrics.productSourceSpecValidationFailed(
-        sourceLabel,
-        categorySlug,
-      );
-    }
-
-    // Revalidate existing sources other than the one being updated against current schema
-    for (const existingSource of model.sources) {
-      if (existingSource.source?.id === newSource?.id) continue;
-      existingSource.specs = this.processSpecs(existingSource.specs);
-      const sourceValidation = this.validatorService.validateSpecs(
-        jsonSchema,
-        existingSource.specs,
-      );
-      existingSource.specValid = sourceValidation.isValid;
-      existingSource.specErrors = sourceValidation.isValid
-        ? {}
-        : sourceValidation.errors;
-      if (!sourceValidation.isValid && categorySlug) {
-        this.productMetrics.productSourceSpecValidationFailed(
-          existingSource.source?.name ?? 'manual',
-          categorySlug,
-        );
-      }
-    }
-
-    if (!source) {
-      source = new ProductSourceRecord();
-      source.model = model;
-      source.source = newSource;
-      model.sources.push(source);
-    }
-
-    source.url = sourceUrl;
-    source.specs = processedSpecs;
-    source.rawSpecs = rawSpecs;
-    source.rawSpecsHash = rawSpecs ? hashRawSpecs(rawSpecs) : undefined;
-    source.externalId = externalId;
-    source.specValid = validation.isValid;
-    source.specErrors = validation.isValid ? {} : validation.errors;
-    source.lastUpdated = new Date();
-    if (sourceName !== undefined) source.sourceName = sourceName;
-    if (normalizedSourceName !== undefined)
-      source.normalizedSourceName = normalizedSourceName;
-
-    // For spec merging, use only the most recent entry per source
-    const latestSourcePerSource = this.getLatestSourcePerSource(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(latestSourcePerSource, categorySlug);
-    model.specs = this.getProductLevelSpecs(model.specs, categorySlug);
-    model.orderedSpecs = await this.specSortService.sortSpecs(
-      model.productCategory!,
-      model.specs,
-    );
-
-    const finalValidation = this.validatorService.validateSpecs(
-      jsonSchema,
-      model.specs,
-    );
-
-    if (!finalValidation.isValid) {
-      this.productMetrics.productSpecValidationFailed(sourceLabel);
-    }
-
-    model.specValid = finalValidation.isValid;
-    model.specErrors = !isEmpty(finalValidation.errors)
-      ? finalValidation.errors
-      : undefined;
-
-    this.logger.debug(
-      `Updated specs for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
-    );
-
-    return source;
-  }
-
-  // Offer-level spec keys (e.g. frameSize, color) describe a purchasable
-  // variant/listing attribute, not the product model's identity — they're
-  // captured on Offer.specs instead (see ProductScrapeUpdaterService), so
-  // they must never land in the merged ProductModel.specs, or two listings
-  // of the same model in different sizes/colors would trip the model-level
-  // spec-mismatch gate in the resolution pipeline's filter stage.
-  private getProductLevelSpecs(
-    specs: ProductSpecs,
-    categorySlug: string | undefined,
-  ): ProductSpecs {
-    const offerLevelKeys = this.getOfferLevelKeys(categorySlug);
-    return isEmpty(offerLevelKeys) ? specs : omit(specs, offerLevelKeys);
-  }
-
-  // The complement of getProductLevelSpecs — the subset of a merged spec
-  // object that belongs on Offer.specs instead. Not currently called from
-  // this service (offer-level values are sourced from ProductSourceRecord.specs
-  // directly in ProductScrapeUpdaterService), but kept symmetric with
-  // getProductLevelSpecs for callers that only have the merged object.
-  private getOfferLevelSpecs(
-    specs: ProductSpecs,
-    categorySlug: string | undefined,
-  ): ProductSpecs {
-    const offerLevelKeys = this.getOfferLevelKeys(categorySlug);
-    return isEmpty(offerLevelKeys) ? {} : pick(specs, offerLevelKeys);
-  }
-
-  private getOfferLevelKeys(categorySlug: string | undefined): string[] {
-    return (
-      this.categoryConfigService.getConfig(categorySlug)?.offerLevelSpecs ??
-      []
-    );
-  }
-
-  private processSpecs(specs: ProductSpecs): ProductSpecs {
-    return chain(specs)
-      .toPairs()
-      .filter(([_, value]) => this.isValueDefined(value))
-      .sortBy(0)
-      .fromPairs()
-      .value();
-  }
-
-  private getLatestSourcePerSource(
-    sources: ProductSourceRecord[],
-  ): ProductSourceRecord[] {
-    const bySource = groupBy(sources, (s) => s.source?.id ?? 'manual');
-    return Object.values(bySource).map(
-      (entries) => maxBy(entries, (e) => e.lastUpdated)!,
-    );
-  }
-
-  private isValueDefined(value: any): boolean {
-    return isBoolean(value) || isNumber(value) || !isEmpty(value);
   }
 }

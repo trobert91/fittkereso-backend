@@ -240,6 +240,37 @@ export class AdminProductController {
     });
   }
 
+  // Recomputes this product's specs and identity fields (brand/model/
+  // displayName/releaseYear/aliases) from its current ProductSourceRecords —
+  // the same idempotent recompute every scrape/manual-edit/product-merge
+  // already triggers, exposed as a standalone on-demand action.
+  @Post(':id/merge-sources')
+  @Roles([UserRole.admin])
+  @SerializeOptions({
+    groups: [
+      SerializeGroup.adminList,
+      SerializeGroup.list,
+      SerializeGroup.adminDetails,
+      SerializeGroup.details,
+    ],
+  })
+  async mergeProductSources(@Param('id') id: string): Promise<ProductModel> {
+    const model = await this.productRepo.findOneOrFail({
+      where: { id },
+      relations: [
+        nameOf<ProductModel>('brand'),
+        nameOf<ProductModel>('productCategory'),
+        nameOf<ProductModel>('sources'),
+        `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
+      ],
+    });
+
+    await this.mergeService.mergeSources(model);
+    await this.productRepo.save(model);
+
+    return this.detailService.getProductById(id);
+  }
+
   // ---------------------------------------------------
   // 🏷️ Alias management
   // ---------------------------------------------------

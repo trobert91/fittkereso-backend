@@ -2,7 +2,7 @@ import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
-import { ProductSpecs, ScrapedProductSpec } from '../../models/product-spec';
+import { ScrapedProduct } from '../../models/scraped-product';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Offer } from './offer.entity';
@@ -26,22 +26,33 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   url?: string;
 
-  @Column({ type: 'jsonb', nullable: false, default: '{}' })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Transform(transfromExposeAll())
-  specs: ProductSpecs;
-
   /**
-   * Raw label/value pairs as scraped, before SpecExtractionService/
-   * ProductSourcePostProcessService map them into canonical `specs` keys.
-   * Hashed via `rawSpecsHash` so re-scrapes can skip re-extraction when
-   * unchanged.
+   * The complete ScrapedProduct this source record was built from — full
+   * provenance/replay copy, including this source's specs/rawSpecs (read
+   * via scrapedProduct.specs/scrapedProduct.rawSpecs — there are no
+   * separate top-level columns for those, to avoid two divergent copies of
+   * "what did this source actually say"), brand/model/displayName/aliases/
+   * releaseYear/imageUrls/offers. ProductModel/ProductImage/Offer hold the
+   * resolved, deduped, cross-source-merged results (brand FK lookup,
+   * CDN-uploaded images, offers keyed by (seller, sourceListingId)); this
+   * column is the pre-resolution source claim those were built from, kept
+   * so ProductMergeService.mergeSources can recompute ProductModel's specs
+   * and identity fields from sources without a re-scrape.
+   *
+   * Partial for manual/admin-entered rows (source: null): those only ever
+   * carry `specs`, never brand/category/etc.
    */
   @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Transform(transfromExposeAll())
-  rawSpecs?: ScrapedProductSpec[];
+  scrapedProduct?: Partial<ScrapedProduct>;
 
+  /**
+   * Digest of scrapedProduct.rawSpecs, computed via hashRawSpecs. Kept as
+   * its own column (not read out of scrapedProduct) so a re-scrape can
+   * cheaply detect an unchanged spec table and skip re-extraction —
+   * see ProductDetailsPageScraperService.
+   */
   @Index()
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })

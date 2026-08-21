@@ -4,6 +4,7 @@ import {
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
+  ProductCategory,
   ProductEmbedding,
   ProductModel,
   ProductModelRepository,
@@ -25,8 +26,9 @@ import {
   BrandResolutionService,
   ProductEmbeddingService,
   ProductImageCopyService,
+  ProductMergeService,
   ProductNormalizerService,
-  ProductSpecUpdaterService,
+  ProductSourceRecordUpdaterService,
   SellerResolutionService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
@@ -59,7 +61,8 @@ export class ProductScrapeUpdaterService {
     private readonly taskRepo: ScrapeTaskRepository,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
-    private readonly specUpdaterService: ProductSpecUpdaterService,
+    private readonly sourceRecordUpdater: ProductSourceRecordUpdaterService,
+    private readonly mergeService: ProductMergeService,
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
     private readonly productNormalizer: ProductNormalizerService,
@@ -229,16 +232,16 @@ export class ProductScrapeUpdaterService {
 
     this.applyScrapedProductDetails(model, scrapedProduct);
 
-    const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
+    const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
       model,
-      specs: scrapedProduct.specs,
-      rawSpecs: scrapedProduct.rawSpecs,
+      scrapedProduct,
       externalId: scrapedProduct.externalId,
       source: task.source,
       sourceUrl: task.url,
       sourceName: scrapedProduct.displayName,
       normalizedSourceName,
     });
+    await this.mergeService.mergeSources(model);
 
     const saveOutcome = await this.saveProductModel({
       model,
@@ -341,7 +344,10 @@ export class ProductScrapeUpdaterService {
     const offerLevelKeys =
       this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
         ?.offerLevelSpecs ?? [];
-    const pageOfferLevelSpecs = pick(sourceRecord.specs, offerLevelKeys);
+    const pageOfferLevelSpecs = pick(
+      sourceRecord.scrapedProduct?.specs,
+      offerLevelKeys,
+    );
 
     for (const scraped of offers!) {
       try {
@@ -527,16 +533,16 @@ export class ProductScrapeUpdaterService {
       );
 
       this.applyScrapedProductDetails(existingModel, scrapedProduct);
-      const sourceRecord = await this.specUpdaterService.updateSpecsOnProduct({
+      const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
         model: existingModel,
-        specs: scrapedProduct.specs,
-        rawSpecs: scrapedProduct.rawSpecs,
+        scrapedProduct,
         externalId: scrapedProduct.externalId,
         source: task.source,
         sourceUrl: task.url,
         sourceName: scrapedProduct.displayName,
         normalizedSourceName,
       });
+      await this.mergeService.mergeSources(existingModel);
 
       return {
         model: await this.productRepo.save(existingModel),
@@ -561,7 +567,7 @@ export class ProductScrapeUpdaterService {
       model.model = scrapedProduct.model;
     }
 
-    model.productCategory = scrapedProduct.category;
+    model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
   }
 
   private getProductRelations(): string[] {
@@ -571,6 +577,7 @@ export class ProductScrapeUpdaterService {
       nameOf<ProductModel>('images'),
       nameOf<ProductModel>('embedding'),
       nameOf<ProductModel>('sources'),
+      `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
     ];
   }
 
@@ -623,7 +630,7 @@ export class ProductScrapeUpdaterService {
     }
 
     const model = new ProductModel();
-    model.productCategory = scrapedProduct.category;
+    model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
 
     model.brand = brand.entity;
     model.displayName = scrapedProduct.displayName;
@@ -637,7 +644,7 @@ export class ProductScrapeUpdaterService {
         brand: model.brand.name,
         model: model.model,
         displayName: model.displayName,
-        category: model.productCategory?.name,
+        category: scrapedProduct.category.name,
       });
 
     return model;

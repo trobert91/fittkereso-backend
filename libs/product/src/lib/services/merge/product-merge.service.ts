@@ -17,7 +17,13 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
 import { EntityManager } from 'typeorm';
 import { isEmpty } from 'lodash';
-import { ProductSpecUpdaterService } from '../product-spec/product-spec-updater.service';
+import { ProductSpecMergeService } from '../product-spec/product-spec-merge.service';
+import { ProductSpecSortService } from '../product-spec/product-spec-sort.service';
+import { ProductSpecValidatorService } from '../product-spec/product-spec-validator.service';
+import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
+import { getProductLevelSpecs } from '../product-spec/product-level-specs';
+import { ProductIdentityMergeService } from '../product-identity/product-identity-merge.service';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductDetailService } from '../product-detail.service';
 
@@ -26,16 +32,73 @@ interface MergeProductsParams {
   targetId: string;
 }
 
+const SOURCES_RELATION = nameOf<ProductModel>('sources');
+const SOURCES_SOURCE_RELATION = `${SOURCES_RELATION}.${nameOf<ProductSourceRecord>('source')}`;
+
 @Injectable()
 export class ProductMergeService {
   private readonly logger = new CustomLogger(ProductMergeService.name);
 
   constructor(
     private readonly productRepo: ProductModelRepository,
-    private readonly specUpdater: ProductSpecUpdaterService,
+    private readonly specMergeService: ProductSpecMergeService,
+    private readonly specSortService: ProductSpecSortService,
+    private readonly validatorService: ProductSpecValidatorService,
+    private readonly identityMergeService: ProductIdentityMergeService,
+    private readonly categoryConfigService: CategoryConfigService,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly detailService: ProductDetailService,
   ) {}
+
+  /**
+   * The single idempotent "recompute ProductModel from its
+   * ProductSourceRecords" operation — specs (via ProductSpecMergeService)
+   * and identity fields (via ProductIdentityMergeService) alike. Purely a
+   * function of model.sources (already-persisted ProductSourceRecords), so
+   * it's safe to call repeatedly, from any trigger (a fresh scrape's
+   * source-record upsert, a manual admin retry, or post-model-merge
+   * cleanup) with identical results given the same source data — there is
+   * no separate "first scrape" vs. "remerge" code path. Mutates `model` in
+   * place; the caller decides whether/when to save.
+   */
+  public async mergeSources(model: ProductModel): Promise<ProductModel> {
+    if (isEmpty(model.sources)) {
+      return model;
+    }
+
+    const categorySlug = model.productCategory?.slug;
+    const latestPerSource = getLatestSourcePerSource(model.sources);
+
+    model.specs = await this.specMergeService.mergeSpecs(
+      latestPerSource,
+      categorySlug,
+    );
+    model.specs = getProductLevelSpecs(
+      this.categoryConfigService,
+      model.specs,
+      categorySlug,
+    );
+    model.orderedSpecs = await this.specSortService.sortSpecs(
+      model.productCategory!,
+      model.specs,
+    );
+
+    const jsonSchema = categorySlug
+      ? this.categoryConfigService.getJsonSchema(categorySlug)
+      : undefined;
+    const finalValidation = this.validatorService.validateSpecs(
+      jsonSchema,
+      model.specs,
+    );
+    model.specValid = finalValidation.isValid;
+    model.specErrors = !isEmpty(finalValidation.errors)
+      ? finalValidation.errors
+      : undefined;
+
+    await this.identityMergeService.mergeIdentity(model, latestPerSource);
+
+    return model;
+  }
 
   public async mergeProducts(
     params: MergeProductsParams,
@@ -402,13 +465,15 @@ export class ProductMergeService {
         relations: [
           nameOf<ProductModel>('brand'),
           nameOf<ProductModel>('productCategory'),
-          nameOf<ProductModel>('sources'),
+          SOURCES_RELATION,
+          SOURCES_SOURCE_RELATION,
         ],
       });
 
-      // Re-merge specs from all sources now that sources have been consolidated
+      // Recompute specs and identity fields from all sources now that
+      // sources have been consolidated
       if (!isEmpty(target.sources)) {
-        await this.specUpdater.remergeSpecsFromSources(target);
+        await this.mergeSources(target);
         await this.productRepo.save(target);
       }
 

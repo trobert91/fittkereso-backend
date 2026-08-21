@@ -37,7 +37,11 @@ describe('ProductMergeService.moveOffers', () => {
 
     service = new ProductMergeService(
       {} as any, // productRepo
-      {} as any, // specUpdater
+      {} as any, // specMergeService
+      {} as any, // specSortService
+      {} as any, // validatorService
+      {} as any, // identityMergeService
+      {} as any, // categoryConfigService
       {} as any, // embeddingService
       {} as any, // detailService
     );
@@ -147,5 +151,119 @@ describe('ProductMergeService.moveOffers', () => {
     );
     expect(updateWhereCall).toBeDefined();
     expect(deleteWhereCall).toBeDefined();
+  });
+});
+
+describe('ProductMergeService.mergeSources', () => {
+  let service: ProductMergeService;
+  let specMergeService: { mergeSpecs: jest.Mock };
+  let specSortService: { sortSpecs: jest.Mock };
+  let validatorService: { validateSpecs: jest.Mock };
+  let identityMergeService: { mergeIdentity: jest.Mock };
+  let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
+
+  const category = { slug: 'ebikes' } as any;
+
+  beforeEach(() => {
+    specMergeService = {
+      mergeSpecs: jest.fn().mockResolvedValue({ weight: 22, frameSize: 48 }),
+    };
+    specSortService = { sortSpecs: jest.fn().mockResolvedValue([]) };
+    validatorService = {
+      validateSpecs: jest.fn().mockReturnValue({ isValid: true, errors: {} }),
+    };
+    identityMergeService = { mergeIdentity: jest.fn().mockResolvedValue(undefined) };
+    categoryConfigService = {
+      getJsonSchema: jest.fn().mockReturnValue(undefined),
+      getConfig: jest.fn().mockReturnValue(undefined),
+    };
+
+    service = new ProductMergeService(
+      {} as any,
+      specMergeService as any,
+      specSortService as any,
+      validatorService as any,
+      identityMergeService as any,
+      categoryConfigService as any,
+      {} as any,
+      {} as any,
+    );
+  });
+
+  it('is a no-op when the model has no sources', async () => {
+    const model = { sources: [], productCategory: category } as any;
+
+    await service.mergeSources(model);
+
+    expect(specMergeService.mergeSpecs).not.toHaveBeenCalled();
+    expect(identityMergeService.mergeIdentity).not.toHaveBeenCalled();
+  });
+
+  it('merges specs, strips offer-level keys, and calls identity merge with the same latest-per-source set', async () => {
+    categoryConfigService.getConfig.mockReturnValue({
+      offerLevelSpecs: ['frameSize'],
+    });
+    const sourceA = {
+      id: 'src-a',
+      source: { id: 'source-1' },
+      lastUpdated: new Date('2026-01-01'),
+    } as any;
+    const model = {
+      sources: [sourceA],
+      productCategory: category,
+    } as any;
+
+    await service.mergeSources(model);
+
+    expect(specMergeService.mergeSpecs).toHaveBeenCalledWith(
+      [sourceA],
+      'ebikes',
+    );
+    // frameSize is offer-level for this category — stripped from model.specs
+    expect(model.specs).toEqual({ weight: 22 });
+    expect(identityMergeService.mergeIdentity).toHaveBeenCalledWith(
+      model,
+      [sourceA],
+    );
+  });
+
+  it('dedupes to the latest row per source before merging', async () => {
+    const stale = {
+      id: 'src-a-stale',
+      source: { id: 'source-1' },
+      lastUpdated: new Date('2020-01-01'),
+    } as any;
+    const fresh = {
+      id: 'src-a-fresh',
+      source: { id: 'source-1' },
+      lastUpdated: new Date('2026-01-01'),
+    } as any;
+    const model = {
+      sources: [stale, fresh],
+      productCategory: category,
+    } as any;
+
+    await service.mergeSources(model);
+
+    expect(specMergeService.mergeSpecs).toHaveBeenCalledWith(
+      [fresh],
+      'ebikes',
+    );
+  });
+
+  it('sets specValid/specErrors from the final validation of the merged specs', async () => {
+    validatorService.validateSpecs.mockReturnValue({
+      isValid: false,
+      errors: { weight: 'out of range' },
+    });
+    const model = {
+      sources: [{ id: 'src-a', source: { id: 'source-1' }, lastUpdated: new Date() }],
+      productCategory: category,
+    } as any;
+
+    await service.mergeSources(model);
+
+    expect(model.specValid).toBe(false);
+    expect(model.specErrors).toEqual({ weight: 'out of range' });
   });
 });
