@@ -55,10 +55,15 @@ export class ProductSpecValidatorService {
 
     for (const err of errors) {
       const key =
-        err.instancePath.replace(/^\//, '') || err.params['missingProperty'];
+        err.instancePath.replace(/^\//, '') ||
+        err.params['missingProperty'] ||
+        err.params['additionalProperty'];
       if (!key) continue;
 
-      const message = err.message || 'Invalid value';
+      const message =
+        err.keyword === 'additionalProperties'
+          ? `unknown field "${err.params['additionalProperty']}"`
+          : err.message || 'Invalid value';
       if (!output[key]) output[key] = [];
 
       output[key].push(message);

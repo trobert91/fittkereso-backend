@@ -36,7 +36,6 @@ export class ProductSourceRecordUpdaterService {
     scrapedProduct?: Partial<ScrapedProduct>;
     externalId?: string;
     sourceUrl?: string;
-    sourceName?: string;
     normalizedSourceName?: string;
   }): Promise<ProductSourceRecord | undefined> {
     const {
@@ -45,7 +44,6 @@ export class ProductSourceRecordUpdaterService {
       scrapedProduct,
       externalId,
       sourceUrl,
-      sourceName,
       normalizedSourceName,
     } = params;
     // Label used only for metrics/logging — admin-entered specs have no
@@ -60,12 +58,13 @@ export class ProductSourceRecordUpdaterService {
       ? model.sources.find((s) => s.url === sourceUrl)
       : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
 
-    // `scrapedProduct` is absent when the caller already determined (via
-    // rawSpecsHash comparison) that this listing's raw spec table is
-    // unchanged since the last scrape — see
-    // ProductDetailsPageScraperService.extractProduct. Nothing to
-    // re-extract; just report the existing row as-is.
-    if (scrapedProduct === undefined && source) {
+    // `scrapedProduct.specs` is absent (whether `scrapedProduct` itself is
+    // undefined, e.g. a manual edit with no re-scrape, or defined without
+    // `specs`, e.g. ProductDetailsPageScraperService.extractProduct's
+    // rawSpecsHash-unchanged branch) when the caller determined there is
+    // nothing new to re-extract. Report the existing row as-is rather than
+    // overwriting its specs with `{}`.
+    if (scrapedProduct?.specs === undefined && source) {
       return source;
     }
 
@@ -140,7 +139,6 @@ export class ProductSourceRecordUpdaterService {
     source.specValid = validation.isValid;
     source.specErrors = validation.isValid ? {} : validation.errors;
     source.lastUpdated = new Date();
-    if (sourceName !== undefined) source.sourceName = sourceName;
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
 

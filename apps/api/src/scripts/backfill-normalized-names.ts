@@ -98,7 +98,8 @@ async function bootstrap() {
     const toSave: ProductSourceRecord[] = [];
     for (const source of batch) {
       const brandName = source.model?.brand?.name ?? '';
-      const displayName = source.sourceName ?? source.model?.displayName;
+      const displayName =
+        source.scrapedProduct?.displayName ?? source.model?.displayName;
       if (!displayName) {
         sourcesSkipped++;
         continue;

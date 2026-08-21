@@ -85,10 +85,13 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   deduplicated: boolean;
 
-  @Column({ type: 'varchar', nullable: true })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  sourceName?: string;
-
+  /**
+   * Normalized identity key derived from scrapedProduct.{brand,model,
+   * displayName} at scrape time (see ProductScrapeUpdaterService.
+   * buildNormalizedSourceName), kept as its own indexed column so Path-1
+   * identity lookup (findAllByNormalizedName) can query it directly instead
+   * of recomputing normalization for every row on every scrape.
+   */
   @Index()
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })

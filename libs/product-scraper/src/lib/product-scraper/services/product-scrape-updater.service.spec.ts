@@ -223,7 +223,7 @@ describe('ProductScrapeUpdaterService', () => {
       {
         model: existingModel,
         source: { id: 'source-arukereso' },
-        sourceName: scrapedProduct.displayName,
+        scrapedProduct: { displayName: scrapedProduct.displayName },
       } as never,
     ]);
     mockProductRepo.save.mockResolvedValue(existingModel);
@@ -252,7 +252,7 @@ describe('ProductScrapeUpdaterService', () => {
       {
         model: existingModel,
         source: { id: 'source-displayspecs' },
-        sourceName: 'Logitech MX Keys (different display name)',
+        scrapedProduct: { displayName: 'Logitech MX Keys (different display name)' },
       } as never,
     ]);
     mockProductRepo.save.mockResolvedValue(existingModel);
@@ -282,7 +282,7 @@ describe('ProductScrapeUpdaterService', () => {
       {
         model: otherVariant,
         source: { id: 'source-arukereso' },
-        sourceName: 'LG UltraGear 39GS95QE-B',
+        scrapedProduct: { displayName: 'LG UltraGear 39GS95QE-B' },
       } as never,
     ]);
     mockProductSearch.search.mockResolvedValueOnce({

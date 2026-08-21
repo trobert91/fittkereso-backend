@@ -72,7 +72,6 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       } as any,
       externalId: 'sku-123',
       sourceUrl: 'https://speedbike.hu/product-1',
-      sourceName: 'KTM Macina Scarp',
       normalizedSourceName: 'ktm macina scarp',
     });
 
@@ -131,5 +130,35 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     // is the manual-edit / first-scrape path, not the "unchanged" skip path.
     expect(result).toBeDefined();
     expect(model.sources).toHaveLength(1);
+  });
+
+  it('skips extraction when scrapedProduct is defined but specs is undefined (rawSpecsHash-unchanged rescrape) and a matching source row already exists', async () => {
+    // Mirrors ProductDetailsPageScraperService.extractProduct's
+    // rawSpecsHash-unchanged branch: it returns a full ScrapedProduct
+    // (brand/model/displayName/offers/...) but omits specs/rawSpecs — it must
+    // not be treated as "new data to write", or it wipes the existing row's
+    // specs with {}.
+    const existingSource: Partial<ProductSourceRecord> = {
+      url: 'https://speedbike.hu/product-1',
+      scrapedProduct: { specs: { weight: 22 } },
+      rawSpecsHash: 'abc123',
+      lastUpdated: new Date('2026-01-01'),
+    };
+    const model = makeModel(existingSource);
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: {
+        brand: 'KTM',
+        model: 'Macina Scarp',
+        displayName: 'KTM Macina Scarp',
+      } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(result).toBe(existingSource);
+    expect(existingSource.scrapedProduct?.specs).toEqual({ weight: 22 });
+    expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
   });
 });

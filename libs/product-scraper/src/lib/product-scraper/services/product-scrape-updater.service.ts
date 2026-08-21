@@ -238,7 +238,6 @@ export class ProductScrapeUpdaterService {
       externalId: scrapedProduct.externalId,
       source: task.source,
       sourceUrl: task.url,
-      sourceName: scrapedProduct.displayName,
       normalizedSourceName,
     });
     await this.mergeService.mergeSources(model);
@@ -442,7 +441,7 @@ export class ProductScrapeUpdaterService {
     const exactMatch = sourceRows.find(
       (row) =>
         row.source?.id === task.source.id &&
-        row.sourceName?.toLowerCase() === incomingName,
+        row.scrapedProduct?.displayName?.toLowerCase() === incomingName,
     );
     if (exactMatch) return exactMatch;
 
@@ -547,7 +546,6 @@ export class ProductScrapeUpdaterService {
         externalId: scrapedProduct.externalId,
         source: task.source,
         sourceUrl: task.url,
-        sourceName: scrapedProduct.displayName,
         normalizedSourceName,
       });
       await this.mergeService.mergeSources(existingModel);

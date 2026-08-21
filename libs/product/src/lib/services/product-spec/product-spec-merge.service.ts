@@ -91,7 +91,7 @@ export class ProductSpecMergeService {
         this.sources.find((source) => source.id === record.source?.id)
           ?.priority ?? 0;
       const sourceLabel =
-        record.source?.name ?? record.sourceName ?? record.id;
+        record.source?.name ?? record.scrapedProduct?.displayName ?? record.id;
 
       for (const [key, value] of Object.entries(
         record.scrapedProduct?.specs ?? {},
