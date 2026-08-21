@@ -30,7 +30,7 @@ const DEFAULT_EFFORT = 'low';
  * and degrades the whole pass to deterministic-only, so this must never bind
  * on a well-behaved call.
  */
-const DEFAULT_MAX_TOKENS = 8000;
+const DEFAULT_MAX_TOKENS = 20000;
 
 /** Deterministic, pre-LLM view of a scraped product. */
 export interface DeterministicProductData {
@@ -222,8 +222,12 @@ export class ProductSourcePostProcessService {
     const offerLevelTitles = offerLevelSpecs
       .map((key) => schema.properties[key]?.title)
       .filter((title): title is string => Boolean(title));
+    const offerLevelList = offerLevelTitles.join(', ');
     const offerLevelHint = offerLevelTitles.length
-      ? ` Pay particular attention to ${offerLevelTitles.join(', ')} — these are frequently embedded only in the raw title/model text (e.g. a size code like "M/43" or a color name) rather than the structured spec table, and must be extracted from there if present.`
+      ? ` Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title/model text (e.g. a size code like "M/43" or a color name) rather than the structured spec table, and must be extracted from there if present.`
+      : '';
+    const offerLevelModelHint = offerLevelTitles.length
+      ? ` ${offerLevelList} are offer-level fields — they describe a specific purchasable variant/listing (this exact size, this exact color), not the product model's identity — so they must never remain in "model" once extracted.`
       : '';
 
     return (
@@ -232,7 +236,7 @@ export class ProductSourcePostProcessService {
       `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSample, null, 2)}\n\n` +
       `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
-      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), color names, size/dimension tokens, gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name. KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
+      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
       `- "releaseYear": only return this if a release/model year is explicitly stated somewhere in the input (deterministicSpecs or rawSpecs) — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context (e.g. don't infer it from a model name).\n` +
       `- "specs": see the rules below.\n\n` +

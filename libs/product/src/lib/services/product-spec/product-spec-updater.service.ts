@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { ProductModel, ProductModelRepository, ProductSpecs } from '@fittkereso-backend/database';
+import {
+  ProductModel,
+  ProductModelRepository,
+  ProductSourceRecord,
+  ProductSpecs,
+} from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 import { ProductSourceRecordUpdaterService } from './product-source-record-updater.service';
 import { ProductMergeService } from '../merge/product-merge.service';
@@ -30,6 +35,7 @@ export class ProductSpecUpdaterService {
         nameOf<ProductModel>('brand'),
         nameOf<ProductModel>('productCategory'),
         nameOf<ProductModel>('sources'),
+        `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
       ],
     });
 

@@ -32,17 +32,11 @@ export abstract class BaseScrapeTaskManagerService {
       this.dynamicConfigService.scheduling?.staleScrapeTaskTimeoutMinutes ??
       SCHEDULING_DEFAULTS.staleScrapeTaskTimeoutMinutes;
 
-    const { task, noTaskDiagnostics } = await this.taskRepo.fetchNextScrapeTask(
+    const { task } = await this.taskRepo.fetchNextScrapeTask(
       this.queues,
       staleTimeoutMinutes,
     );
     if (!task) {
-      if (noTaskDiagnostics && noTaskDiagnostics.candidateCount > 0) {
-        this.logger.debug(
-          `Scrape task poll tick found ${noTaskDiagnostics.candidateCount} candidate row(s) but claimed none — see blockedReasons per task`,
-          { queues: this.queues, ...noTaskDiagnostics },
-        );
-      }
       return;
     }
 

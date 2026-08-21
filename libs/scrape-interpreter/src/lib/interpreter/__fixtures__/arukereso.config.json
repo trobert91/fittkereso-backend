@@ -216,6 +216,7 @@
         "pattern": "\"item_brand\"\\s*:\\s*\"([^\"]+)\"",
         "group": 1,
         "trim": true,
+        "cast": "jsonString",
         "as": "dataLayerBrand"
       },
       {
@@ -249,6 +250,7 @@
         "pattern": "\"item_name\"\\s*:\\s*\"([^\"]+)\"",
         "group": 1,
         "trim": true,
+        "cast": "jsonString",
         "as": "dataLayerModel"
       },
       {

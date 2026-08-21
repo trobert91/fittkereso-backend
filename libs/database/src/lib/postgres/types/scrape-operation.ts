@@ -179,7 +179,11 @@ export interface RegexCaptureOp extends OpBase {
   value?: string;
   pattern: string;
   group: number;
-  cast?: 'number' | 'string';
+  // 'jsonString' decodes JSON string escapes (\uXXXX, \/, \", \\, etc.) in
+  // the captured group — use it when capturing a value from inside a JSON
+  // or JS string literal (e.g. a findScriptContaining blob), where the raw
+  // substring still carries its source escaping instead of the real chars.
+  cast?: 'number' | 'string' | 'jsonString';
   trim?: boolean;
 }
 
