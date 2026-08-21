@@ -44,6 +44,7 @@ describe('ProductMergeService.moveOffers', () => {
       {} as any, // categoryConfigService
       {} as any, // embeddingService
       {} as any, // detailService
+      {} as any, // offerRepo
     );
   });
 
@@ -185,6 +186,7 @@ describe('ProductMergeService.mergeSources', () => {
       validatorService as any,
       identityMergeService as any,
       categoryConfigService as any,
+      {} as any,
       {} as any,
       {} as any,
     );

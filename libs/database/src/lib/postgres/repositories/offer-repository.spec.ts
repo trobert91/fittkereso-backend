@@ -42,6 +42,20 @@ describe('OfferRepository.upsertFromScrape', () => {
     expect(result.lastSeenAt).toBeInstanceOf(Date);
   });
 
+  it('persists priceWithoutDiscount when the scrape reports a discount, and leaves it undefined otherwise', async () => {
+    mockRepo.findOne.mockResolvedValueOnce(null);
+    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
+
+    const discounted = await repository.upsertFromScrape(
+      makeParams({ priceWithoutDiscount: 249990 }),
+    );
+    expect(discounted.priceWithoutDiscount).toBe(249990);
+
+    mockRepo.findOne.mockResolvedValueOnce(null);
+    const notDiscounted = await repository.upsertFromScrape(makeParams());
+    expect(notDiscounted.priceWithoutDiscount).toBeUndefined();
+  });
+
   it('updates an existing offer in place without clobbering a non-default condition', async () => {
     const existing = new Offer();
     existing.id = 'offer-1';

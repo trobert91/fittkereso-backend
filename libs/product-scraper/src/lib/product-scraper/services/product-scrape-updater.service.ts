@@ -349,6 +349,7 @@ export class ProductScrapeUpdaterService {
       offerLevelKeys,
     );
 
+    let upsertedAny = false;
     for (const scraped of offers!) {
       try {
         const seller = await this.sellerResolution.resolveOrCreate(
@@ -359,12 +360,14 @@ export class ProductScrapeUpdaterService {
           seller,
           sourceRecord,
           price: scraped.price,
+          priceWithoutDiscount: scraped.priceWithoutDiscount,
           currency: scraped.currency,
           availability: scraped.availability,
           url: scraped.url,
           sourceListingId: scraped.sourceListingId,
           specs: scraped.specs ?? pageOfferLevelSpecs,
         });
+        upsertedAny = true;
       } catch (error) {
         // Do not fail the whole product scrape if one offer fails — mirrors
         // the existing brand-resolution-failure tolerance in this service.
@@ -375,6 +378,11 @@ export class ProductScrapeUpdaterService {
           error,
         });
       }
+    }
+
+    if (upsertedAny) {
+      await this.mergeService.recomputePrice(model);
+      await this.productRepo.save(model);
     }
   }
 

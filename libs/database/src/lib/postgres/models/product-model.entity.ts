@@ -139,6 +139,21 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.details] })
   offers?: Offer[];
 
+  /**
+   * Denormalized from the cheapest active Offer whenever offers are
+   * (re)computed for this model, so callers can filter/sort by price
+   * without joining Offers.
+   */
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  @Index()
+  @Expose({ groups: [SerializeGroup.list] })
+  price?: number;
+
+  /** Mirrors that same cheapest active Offer's priceWithoutDiscount. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  @Expose({ groups: [SerializeGroup.list] })
+  priceWithoutDiscount?: number;
+
   @OneToMany(() => PriceHistory, (priceHistory) => priceHistory.model)
   @Expose({ groups: [SerializeGroup.details] })
   priceHistory?: PriceHistory[];

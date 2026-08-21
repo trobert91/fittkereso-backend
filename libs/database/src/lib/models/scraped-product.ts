@@ -35,6 +35,12 @@ export interface ScrapedProduct {
 export interface ScrapedOffer {
   sellerName: string;
   price: number;
+  /**
+   * The pre-discount price, only set when the source shows this offer as
+   * currently discounted (e.g. a struck-through original price alongside
+   * the current one). Absent when the offer isn't on discount.
+   */
+  priceWithoutDiscount?: number;
   currency?: string;
   availability?: OfferAvailability;
   url?: string;

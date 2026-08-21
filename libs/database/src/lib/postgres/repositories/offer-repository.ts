@@ -15,6 +15,8 @@ export interface UpsertOfferFromScrapeParams {
   seller: Seller;
   sourceRecord: ProductSourceRecord;
   price: number;
+  /** Pre-discount price — only set when this offer is currently discounted. */
+  priceWithoutDiscount?: number;
   currency?: string;
   availability?: OfferAvailability;
   url?: string;
@@ -45,6 +47,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       seller,
       sourceRecord,
       price,
+      priceWithoutDiscount,
       currency,
       availability,
       url,
@@ -64,6 +67,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     offer.sourceRecord = sourceRecord;
     offer.condition = offer.condition ?? OfferCondition.new;
     offer.price = price;
+    offer.priceWithoutDiscount = priceWithoutDiscount;
     offer.currency = currency ?? 'HUF';
     offer.availability = availability ?? OfferAvailability.unknown;
     offer.url = url;
@@ -83,6 +87,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
         });
         if (raceWinner) {
           raceWinner.price = price;
+          raceWinner.priceWithoutDiscount = priceWithoutDiscount;
           raceWinner.currency = currency ?? 'HUF';
           raceWinner.availability = availability ?? OfferAvailability.unknown;
           raceWinner.url = url;
@@ -94,6 +99,16 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       }
       throw error;
     }
+  }
+
+  // Drives ProductModel.price/priceWithoutDiscount denormalization — the
+  // cheapest active offer is what a price-sorted/filtered product listing
+  // should reflect.
+  async findCheapestActiveOffer(modelId: string): Promise<Offer | null> {
+    return this.repo.findOne({
+      where: { model: { id: modelId }, active: true },
+      order: { price: 'ASC' },
+    });
   }
 
   private isConflict(error: unknown): boolean {

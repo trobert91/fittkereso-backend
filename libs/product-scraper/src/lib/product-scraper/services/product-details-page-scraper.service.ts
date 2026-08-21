@@ -360,6 +360,7 @@ export class ProductDetailsPageScraperService {
       .map((offer) => ({
         sellerName: offer.sellerName,
         price: offer.price,
+        priceWithoutDiscount: offer.priceWithoutDiscount,
         currency: offer.currency,
         availability: this.parseAvailability(offer.availability),
         url: offer.url,

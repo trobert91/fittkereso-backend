@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   Offer,
+  OfferRepository,
   ProductAlias,
   ProductAliasSource,
   ProductImage,
@@ -48,7 +49,22 @@ export class ProductMergeService {
     private readonly categoryConfigService: CategoryConfigService,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly detailService: ProductDetailService,
+    private readonly offerRepo: OfferRepository,
   ) {}
+
+  /**
+   * Denormalizes price/priceWithoutDiscount onto the model from its cheapest
+   * active Offer, so product listings can filter/sort by price without
+   * joining Offers. Mutates `model` in place; the caller decides
+   * whether/when to save. Safe to call whenever a model's offers may have
+   * changed (fresh scrape, admin product merge reassigning Offer rows).
+   */
+  public async recomputePrice(model: ProductModel): Promise<ProductModel> {
+    const cheapest = await this.offerRepo.findCheapestActiveOffer(model.id);
+    model.price = cheapest?.price;
+    model.priceWithoutDiscount = cheapest?.priceWithoutDiscount;
+    return model;
+  }
 
   /**
    * The single idempotent "recompute ProductModel from its
@@ -476,6 +492,11 @@ export class ProductMergeService {
         await this.mergeSources(target);
         await this.productRepo.save(target);
       }
+
+      // Recompute price/priceWithoutDiscount now that moveOffers has
+      // reassigned the source product's Offer rows onto this target
+      await this.recomputePrice(target);
+      await this.productRepo.save(target);
 
       // Regenerate embedding
       const embedding = await this.embeddingService.createProductEmbedding({

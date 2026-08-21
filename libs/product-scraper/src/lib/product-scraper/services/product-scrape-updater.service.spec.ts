@@ -162,6 +162,7 @@ describe('ProductScrapeUpdaterService', () => {
 
     mockMergeService = {
       mergeSources: jest.fn().mockResolvedValue(undefined),
+      recomputePrice: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<ProductMergeService>;
 
     mockImageCopyService = {
@@ -410,6 +411,7 @@ describe('ProductScrapeUpdaterService', () => {
 
     expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+    expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
   it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is an empty array', async () => {
@@ -426,15 +428,17 @@ describe('ProductScrapeUpdaterService', () => {
 
     expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+    expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
-  it('resolves a seller and upserts an offer per entry when ScrapedProduct.offers is populated', async () => {
+  it('resolves a seller and upserts an offer per entry when ScrapedProduct.offers is populated, then recomputes model price', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
           sellerName: 'Alza.hu',
           price: 199990,
+          priceWithoutDiscount: 249990,
           currency: 'HUF',
           url: 'https://alza.hu/product/1',
           sourceListingId: 'listing-1',
@@ -463,10 +467,14 @@ describe('ProductScrapeUpdaterService', () => {
         seller: mockSeller,
         sourceRecord: { id: 'source-record-1' },
         price: 199990,
+        priceWithoutDiscount: 249990,
         currency: 'HUF',
         url: 'https://alza.hu/product/1',
         sourceListingId: 'listing-1',
       }),
+    );
+    expect(mockMergeService.recomputePrice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'model-with-offers' }),
     );
   });
 
@@ -494,5 +502,6 @@ describe('ProductScrapeUpdaterService', () => {
     expect(result).toBeDefined();
     expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(2);
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(1);
+    expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
   });
 });

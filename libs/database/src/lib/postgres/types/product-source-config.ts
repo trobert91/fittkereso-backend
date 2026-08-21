@@ -29,6 +29,14 @@ export interface ProductSourceOffersConfig {
   listItems: ScrapeOperation[];
   sellerName: ScrapeOperation[];
   price: ScrapeOperation[];
+  /**
+   * The pre-discount price pipeline. Optional: most sources don't surface a
+   * separate "original price" element. Should resolve to undefined (e.g. an
+   * empty selector match) on listings that aren't currently discounted,
+   * rather than being run conditionally — see speedbike.hu's config for the
+   * pattern.
+   */
+  priceWithoutDiscount?: ScrapeOperation[];
   currency?: ScrapeOperation[];
   availability?: ScrapeOperation[];
   url?: ScrapeOperation[];

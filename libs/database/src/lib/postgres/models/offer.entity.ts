@@ -52,6 +52,15 @@ export class Offer extends BasePostgresEntity {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: false })
   price: number;
 
+  /**
+   * The pre-discount price, only set when the source lists this offer at a
+   * discount (i.e. a strikethrough/original price alongside the current
+   * one). Absent whenever the offer isn't currently discounted.
+   */
+  @Expose({ groups: [SerializeGroup.list] })
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  priceWithoutDiscount?: number;
+
   @Expose({ groups: [SerializeGroup.list] })
   @Column({ default: 'HUF' })
   currency: string;

@@ -80,7 +80,8 @@
         "value": "shopRenterJson",
         "pattern": "\"brand\"\\s*:\\s*\"([^\"]+)\"",
         "group": 1,
-        "trim": true
+        "trim": true,
+        "cast": "jsonString"
       }
     ],
 
@@ -93,6 +94,7 @@
         "pattern": "\"name\"\\s*:\\s*\"([^\"]+)\"",
         "group": 1,
         "trim": true,
+        "cast": "jsonString",
         "as": "fullName"
       },
       {
@@ -202,12 +204,34 @@
         { "op": "literal", "value": "speedbike.hu" }
       ],
       "price": [
-        { "op": "selectText", "selector": ".price_special_color, .price:not(.price_special_color)", "first": true, "trim": true },
+        { "op": "selectText", "selector": ".price_special_color", "first": true, "trim": true, "as": "specialPriceText" },
+        { "op": "selectText", "selector": ".price:not(.price_special_color):not(.price_original_color)", "first": true, "trim": true, "as": "regularPriceText" },
+        { "op": "coalesce", "candidates": ["specialPriceText", "regularPriceText"] },
         { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithDots" },
         { "op": "stripPattern", "value": "priceWithDots", "pattern": "\\.", "flags": "g" }
       ],
+      "priceWithoutDiscount": [
+        { "op": "selectText", "selector": ".price_original_color", "first": true, "trim": true },
+        { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithoutDiscountWithDots" },
+        { "op": "stripPattern", "value": "priceWithoutDiscountWithDots", "pattern": "\\.", "flags": "g" }
+      ],
       "currency": [
         { "op": "literal", "value": "HUF" }
+      ],
+      "availability": [
+        { "op": "selectText", "selector": ".productstock-param.param-value", "first": true, "trim": true },
+        {
+          "op": "mapValue",
+          "cases": {
+            "Raktáron": "in_stock",
+            "Készleten": "in_stock",
+            "Beszerezhető": "preorder",
+            "Gyártói készlet": "preorder",
+            "Nincs készleten": "out_of_stock",
+            "Elfogyott": "out_of_stock"
+          },
+          "default": "unknown"
+        }
       ],
       "url": [
         { "op": "buildBaseUrl", "from": "task.url" }

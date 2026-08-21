@@ -20,6 +20,7 @@ export interface ListPageResult {
 export interface RawOfferRecord {
   sellerName?: string;
   price?: number;
+  priceWithoutDiscount?: number;
   currency?: string;
   availability?: string;
   url?: string;
@@ -234,13 +235,14 @@ export class ScrapeInterpreterService {
     )) as string | undefined;
 
     const rawPrice = await this.runner.run(offersConfig.price, ctx);
-    const price =
-      typeof rawPrice === 'number'
-        ? rawPrice
-        : typeof rawPrice === 'string'
-          ? Number(rawPrice)
-          : undefined;
+    const price = this.toFiniteNumber(rawPrice);
     if (!sellerName || !Number.isFinite(price)) return [];
+
+    const priceWithoutDiscount = offersConfig.priceWithoutDiscount
+      ? this.toFiniteNumber(
+          await this.runner.run(offersConfig.priceWithoutDiscount, ctx),
+        )
+      : undefined;
 
     const currency = offersConfig.currency
       ? ((await this.runner.run(offersConfig.currency, ctx)) as
@@ -261,7 +263,27 @@ export class ScrapeInterpreterService {
           | undefined)
       : undefined;
 
-    return [{ sellerName, price, currency, availability, url, sourceListingId }];
+    return [
+      {
+        sellerName,
+        price,
+        priceWithoutDiscount,
+        currency,
+        availability,
+        url,
+        sourceListingId,
+      },
+    ];
+  }
+
+  private toFiniteNumber(value: unknown): number | undefined {
+    const num =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? Number(value)
+          : undefined;
+    return Number.isFinite(num) ? num : undefined;
   }
 
   private resolveCategorySlug(

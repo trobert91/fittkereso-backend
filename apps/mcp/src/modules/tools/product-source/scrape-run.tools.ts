@@ -120,8 +120,11 @@ export class ScrapeRunTools {
         L.push('');
         L.push('## Offers');
         for (const offer of offers) {
+          const discountSuffix = offer.priceWithoutDiscount
+            ? ` (was ${offer.priceWithoutDiscount} ${offer.currency})`
+            : '';
           L.push(
-            `- ${offer.price} ${offer.currency} · availability: ${offer.availability} · condition: ${offer.condition} · sourceListingId: ${offer.sourceListingId ?? '_none_'} · lastSeenAt: ${offer.lastSeenAt?.toISOString?.() ?? ''}`,
+            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability} · condition: ${offer.condition} · sourceListingId: ${offer.sourceListingId ?? '_none_'} · lastSeenAt: ${offer.lastSeenAt?.toISOString?.() ?? ''}`,
           );
         }
       } else if (task.queue === ScrapeQueueName.ScrapeProductDetails) {

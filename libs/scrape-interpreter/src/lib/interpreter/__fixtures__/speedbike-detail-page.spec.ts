@@ -40,7 +40,7 @@ function buildHtml(): string {
         <meta property="og:image" content="https://speedbike2.cdn.shoprenter.hu/custom/speedbike2/image/cache/w1955h1024q100/KTM-2026/1260044108.webp?lastmod=1761570968.1772457778" />
         <script>
           var BASEURL = 'https://speedbike.hu';
-          var ShopRenter = ShopRenter || {}; ShopRenter.product = {"id":92513,"sku":"1260044103","currency":"HUF","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben","brand":"KTM","currentVariant":[],"parent":{"id":92513,"sku":"1260044103","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben"}};
+          var ShopRenter = ShopRenter || {}; ShopRenter.product = {"id":92513,"sku":"1260044103","currency":"HUF","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M\\/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben","brand":"KTM","currentVariant":[],"parent":{"id":92513,"sku":"1260044103","unitName":"db","price":3045957,"name":"KTM MACINA SCARP SX PRESTIGE Di2  M\\/43 Összteleszkópos elektromos  MTB kerékpár OLIVE PEARL színben"}};
         </script>
       </head>
       <body>
@@ -63,7 +63,14 @@ function buildHtml(): string {
             </span>
           </div>
         </section>
+        <span class="price price_original_color product_table_original">3.359.000 Ft</span>
         <span class="price price_special_color product_table_special">3.045.957 Ft</span>
+        <table class="product_parameters">
+          <tr class="product-parameter-row productstock-param-row stock_status_id-9">
+            <td class="param-label productstock-param">Elérhetőség:</td>
+            <td class="param-value productstock-param"><span style="color:#739623;">Raktáron</span></td>
+          </tr>
+        </table>
         <table class="parameter_table">
           <tbody>
             <tr class="odd row-param-ebike_akkuteljesitmeny"><td><strong>wattora</strong></td><td>400 Wh</td></tr>
@@ -241,11 +248,57 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
       {
         sellerName: 'speedbike.hu',
         price: 3045957,
+        priceWithoutDiscount: 3359000,
         currency: 'HUF',
+        availability: 'in_stock',
         url: 'https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben',
         sourceListingId: '1260044103',
       },
     ]);
+  });
+
+  it('omits priceWithoutDiscount for a listing with no discount (only .price, no special/original variants)', async () => {
+    const html = buildHtml().replace(
+      '<span class="price price_original_color product_table_original">3.359.000 Ft</span>\n        <span class="price price_special_color product_table_special">3.045.957 Ft</span>',
+      '<span class="price">3.045.957 Ft</span>',
+    );
+    const $ = cheerio.load(html);
+    const config = speedbikeConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers).toEqual([
+      {
+        sellerName: 'speedbike.hu',
+        price: 3045957,
+        priceWithoutDiscount: undefined,
+        currency: 'HUF',
+        availability: 'in_stock',
+        url: 'https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben',
+        sourceListingId: '1260044103',
+      },
+    ]);
+  });
+
+  it('maps stock status to an out_of_stock/preorder/unknown OfferAvailability from Elérhetőség row text', async () => {
+    async function runWithStockText(stockText: string) {
+      const html = buildHtml().replace(
+        '<span style="color:#739623;">Raktáron</span>',
+        stockText,
+      );
+      const $ = cheerio.load(html);
+      const config = speedbikeConfig as unknown as ProductSourceConfig;
+      const result = await interpreter.runDetailPage(makeTask(), $, config);
+      return result.rawOffers[0]?.availability;
+    }
+
+    await expect(runWithStockText('Nincs készleten')).resolves.toBe(
+      'out_of_stock',
+    );
+    await expect(runWithStockText('Beszerezhető')).resolves.toBe('preorder');
+    await expect(runWithStockText('Valami ismeretlen státusz')).resolves.toBe(
+      'unknown',
+    );
   });
 
   it('deterministically maps the real page rawSpecs onto the current ebikes jsonSchema via specMapping', async () => {
