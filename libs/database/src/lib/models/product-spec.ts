@@ -45,35 +45,6 @@ export interface SpecDefinitionMeta {
   max?: number;
 }
 
-/**
- * One rule in a category's derived-spec table — ProductSpecMergeService's
- * Tier 0, which runs after normal per-key resolution (Tiers 1-4) and
- * overrides specific keys wholesale when a component identifier resolves
- * unambiguously to a known part. A manufacturer's own datasheet for e.g. a
- * motor model code is a more reliable source of that motor's torque/power
- * than any individual shop's own (frequently mistranscribed) listing — see
- * docs/SpecUnificationAnalysis.md and docs/EbikeSpecExtensionAnalysis.md §4.2
- * for the discrepancies this is meant to correct.
- */
-export interface DerivedSpecRule {
-  /** Case-insensitive substrings matched against the resolved sourceKey value. First match wins. */
-  match: string[];
-  /** Human-readable label for the matched component, log-only. */
-  label?: string;
-  /** Canonical spec key/value pairs forced onto the merge result when this rule matches. */
-  specs: ProductSpecs;
-}
-
-/**
- * A derivation source for one category: `sourceKey` names an already-resolved
- * canonical spec (e.g. "motorModel"); each rule's `match` substrings are
- * tested against that resolved value to force in the mapped `specs`.
- */
-export interface DerivedSpecConfig {
-  sourceKey: string;
-  rules: DerivedSpecRule[];
-}
-
 export interface SpecDefinitionProperty {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   title: string;

@@ -9,7 +9,6 @@ describe('ProductSpecMergeService', () => {
   let sourceRepo: { getAll: jest.Mock };
   let categoryConfigService: {
     getJsonSchema: jest.Mock;
-    getDerivedSpecs: jest.Mock;
   };
 
   const schema: SpecDefinitionJsonSchema = {
@@ -55,7 +54,6 @@ describe('ProductSpecMergeService', () => {
     sourceRepo = { getAll: jest.fn().mockResolvedValue([]) };
     categoryConfigService = {
       getJsonSchema: jest.fn().mockReturnValue(schema),
-      getDerivedSpecs: jest.fn().mockReturnValue(undefined),
     };
     service = new ProductSpecMergeService(
       sourceRepo as any,
@@ -193,63 +191,6 @@ describe('ProductSpecMergeService', () => {
         'ebikes',
       );
       expect(result['weight']).toBe(21);
-    });
-  });
-
-  describe('Tier 0 — derived overrides', () => {
-    it('overrides tier 1-4 winners for keys a matched derived rule defines', async () => {
-      categoryConfigService.getDerivedSpecs.mockReturnValue([
-        {
-          sourceKey: 'motorModel',
-          rules: [
-            {
-              match: ['BDU3144'],
-              label: 'Bosch Performance Line SX',
-              specs: { torque: 55, motorPower: 250 },
-            },
-          ],
-        },
-      ]);
-      setSourcePriorities({ a: 0, b: 0 });
-      const result = await service.mergeSpecs(
-        [
-          // Two sources both claim 60 Nm (majority per Tier 2) — but the
-          // motor's real datasheet torque is 55 Nm, which the derived rule
-          // must win with regardless.
-          makeSource('a', {
-            motorModel: 'Bosch PERFORMANCE SX BDU3144',
-            torque: 60,
-          }),
-          makeSource('b', { torque: 60 }),
-        ],
-        'ebikes',
-      );
-      expect(result['torque']).toBe(55);
-      expect(result['motorPower']).toBe(250);
-    });
-
-    it('does nothing when no derived config is present for the category', async () => {
-      setSourcePriorities({ a: 0 });
-      const result = await service.mergeSpecs(
-        [makeSource('a', { motorModel: 'Bosch PERFORMANCE SX BDU3144', torque: 60 })],
-        'ebikes',
-      );
-      expect(result['torque']).toBe(60);
-    });
-
-    it('does nothing when the resolved sourceKey value matches no rule', async () => {
-      categoryConfigService.getDerivedSpecs.mockReturnValue([
-        {
-          sourceKey: 'motorModel',
-          rules: [{ match: ['BDU3144'], specs: { torque: 55 } }],
-        },
-      ]);
-      setSourcePriorities({ a: 0 });
-      const result = await service.mergeSpecs(
-        [makeSource('a', { motorModel: 'Shimano EP8', torque: 85 })],
-        'ebikes',
-      );
-      expect(result['torque']).toBe(85);
     });
   });
 

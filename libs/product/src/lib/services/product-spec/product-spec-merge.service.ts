@@ -48,18 +48,6 @@ interface ValueGroup {
  *           operator can still set when they know better — see the entity
  *           doc comment — but it only decides ties tiers 1-3 couldn't).
  *
- * Then, separately and unconditionally after all keys resolve:
- *
- *  Tier 0 — derived overrides (CategoryConfigService.getDerivedSpecs):
- *           once a component identifier (e.g. `motorModel`) is resolved, a
- *           category's derived-spec rules can force a fixed set of other
- *           keys (torque, motorPower, ...) to their manufacturer-datasheet
- *           values, overriding whatever tiers 1-4 picked for those keys —
- *           shops routinely mistranscribe a known motor's own spec sheet, so
- *           a confident component match beats corroboration entirely. Named
- *           "Tier 0" for its priority, but applied last because it depends on
- *           a normal key (`motorModel`) already being resolved.
- *
  * A key with only one source's value skips straight through with nothing to
  * arbitrate — most of a 100+-key category schema is this case, since
  * per-source coverage of any individual field is typically sparse.
@@ -87,8 +75,6 @@ export class ProductSpecMergeService {
     for (const [key, candidates] of candidatesByKey) {
       merged[key] = this.resolveKey(key, candidates, jsonSchema?.properties[key]);
     }
-
-    this.applyDerivedSpecs(merged, categorySlug);
 
     return chain(merged).toPairs().sortBy(0).fromPairs().value() as ProductSpecs;
   }
@@ -279,32 +265,6 @@ export class ProductSpecMergeService {
 
   private pickRepresentative(group: ValueGroup): SpecCandidate {
     return orderBy(group.candidates, ['lastUpdated', 'priority'], ['desc', 'desc'])[0];
-  }
-
-  // ─── Tier 0: derived overrides ──────────────────────────────────────────
-
-  private applyDerivedSpecs(
-    specs: ProductSpecs,
-    categorySlug: string | null | undefined,
-  ): void {
-    const derivedConfigs = this.categoryConfigService.getDerivedSpecs(categorySlug);
-    if (!derivedConfigs?.length) return;
-
-    for (const config of derivedConfigs) {
-      const sourceValue = specs[config.sourceKey];
-      if (typeof sourceValue !== 'string') continue;
-
-      const normalized = sourceValue.toLowerCase();
-      const rule = config.rules.find((r) =>
-        r.match.some((m) => normalized.includes(m.toLowerCase())),
-      );
-      if (!rule) continue;
-
-      this.logger.debug(
-        `Tier 0: "${config.sourceKey}"="${sourceValue}" matched derived rule${rule.label ? ` (${rule.label})` : ''}, overriding ${Object.keys(rule.specs).join(', ')}`,
-      );
-      Object.assign(specs, rule.specs);
-    }
   }
 
   // ─── Source priority cache ──────────────────────────────────────────────
