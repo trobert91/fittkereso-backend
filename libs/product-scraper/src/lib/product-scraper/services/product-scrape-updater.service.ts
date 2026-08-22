@@ -573,7 +573,15 @@ export class ProductScrapeUpdaterService {
       model.model = scrapedProduct.model;
     }
 
-    model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
+    // Only replace productCategory when it's actually changing — model.productCategory
+    // is normally the fully-loaded entity (slug, jsonSchema, etc.) fetched via
+    // getProductRelations(); overwriting it with a bare { id } stub here drops
+    // `slug`, which ProductMergeService.mergeSources → sortSpecs needs to build
+    // orderedSpecs (its `!category?.slug` guard short-circuits to [] otherwise),
+    // silently emptying the "Specifications" admin tab after every scrape.
+    if (model.productCategory?.id !== scrapedProduct.category.id) {
+      model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
+    }
   }
 
   private getProductRelations(): string[] {

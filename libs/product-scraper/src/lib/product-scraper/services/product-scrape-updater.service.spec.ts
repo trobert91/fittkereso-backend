@@ -243,6 +243,34 @@ describe('ProductScrapeUpdaterService', () => {
     expect(task.product).toBe(existingModel);
   });
 
+  it('preserves the existing model\'s fully-loaded productCategory (slug included) on a rescrape of the same category', async () => {
+    // Regression: applyScrapedProductDetails used to unconditionally replace
+    // model.productCategory with a bare { id } stub, dropping `slug` even
+    // when the model already had the fully-loaded category entity. That
+    // stub then reached ProductMergeService.mergeSources → sortSpecs, whose
+    // `!category?.slug` guard short-circuits to an empty array — silently
+    // emptying ProductModel.orderedSpecs (the "Specifications" admin tab)
+    // after every single scrape.
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct();
+    const existingModel = makeExistingModel();
+    const originalCategory = existingModel.productCategory;
+
+    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
+      {
+        model: existingModel,
+        source: { id: 'source-arukereso' },
+        scrapedProduct: { displayName: scrapedProduct.displayName },
+      } as never,
+    ]);
+    mockProductRepo.save.mockResolvedValue(existingModel);
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(existingModel.productCategory).toBe(originalCategory);
+    expect(existingModel.productCategory?.slug).toBe('keyboards');
+  });
+
   it('takes a cross-source row when no same-source exact match exists', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();
