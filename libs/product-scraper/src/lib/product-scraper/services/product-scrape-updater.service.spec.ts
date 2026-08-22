@@ -337,6 +337,33 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
+  it('passes ScrapedProduct.category.slug explicitly to mergeSources for a brand-new product', async () => {
+    // Regression: a brand-new ProductModel's productCategory is set to a
+    // bare { id } stub (newProductModel has no fully-loaded category to
+    // preserve), so mergeSources can't derive categorySlug from
+    // model.productCategory?.slug the way it does for an existing model —
+    // it must be passed explicitly, or orderedSpecs silently comes back [].
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct();
+
+    mockProductRepo.findOne.mockResolvedValue(null);
+    mockProductSearch.search.mockResolvedValueOnce({
+      resolvedModel: undefined,
+      context: undefined,
+    } as never);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-new';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockMergeService.mergeSources).toHaveBeenCalledWith(
+      expect.anything(),
+      scrapedProduct.category.slug,
+    );
+  });
+
   it('recovers from a normalizedName insert race by loading the existing product', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct();

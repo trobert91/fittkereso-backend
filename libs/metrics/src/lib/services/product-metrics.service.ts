@@ -16,6 +16,7 @@ import {
 
 export type ScrapeResolutionOutcome =
   | 'skipped_no_category'
+  | 'external_id_hit'
   | 'path1_hit'
   | 'cross_source_merge'
   | 'cross_source_rejected_same_source'

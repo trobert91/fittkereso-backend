@@ -21,6 +21,8 @@ export interface ScrapedProductSpec {
 export interface OrderedSpec {
   key: string;
   label: string;
+  /** Localized display label (e.g. Hungarian), shown to end users in place of `label` when present. */
+  translation?: string;
   value: string | number | boolean | string[] | undefined;
 }
 
@@ -48,6 +50,8 @@ export interface SpecDefinitionMeta {
 export interface SpecDefinitionProperty {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   title: string;
+  /** Localized display title (e.g. Hungarian) shown to end users in place of `title`. */
+  translation?: string;
   meta?: SpecDefinitionMeta;
   /** Closed set of allowed values for a categorical string field — a
    *  standard JSON Schema enum, enforced by ProductSpecValidatorService

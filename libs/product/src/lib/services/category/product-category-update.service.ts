@@ -102,7 +102,7 @@ export class ProductCategoryUpdateService {
     }
 
     product.orderedSpecs = await this.productSpecSortService.sortSpecs(
-      category,
+      category.slug,
       product.specs,
     );
   }

@@ -1,6 +1,11 @@
 import { ProductDetailsPageScraperService } from './product-details-page-scraper.service';
 import type { DeterministicProductData } from '@fittkereso-backend/product';
-import type { ScrapeTask, SpecDefinitionJsonSchema } from '@fittkereso-backend/database';
+import type {
+  ProductCategory,
+  ScrapeTask,
+  SpecDefinitionJsonSchema,
+} from '@fittkereso-backend/database';
+import { hashRawSpecs } from '@fittkereso-backend/utils';
 
 describe('ProductDetailsPageScraperService', () => {
   let service: ProductDetailsPageScraperService;
@@ -132,5 +137,114 @@ describe('ProductDetailsPageScraperService', () => {
     expect(postProcess.process).toHaveBeenCalledWith(
       expect.objectContaining({ offerLevelSpecs: ['frameSize', 'color'] }),
     );
+  });
+});
+
+describe('ProductDetailsPageScraperService.extractProduct', () => {
+  let service: ProductDetailsPageScraperService;
+  let interpreter: { runDetailPage: jest.Mock };
+  let runtime: { getCategoryBySlug: jest.Mock };
+  let categoryConfigService: {
+    getJsonSchema: jest.Mock;
+    getConfig: jest.Mock;
+    getGoldenSample: jest.Mock;
+  };
+  let sourceRecordRepo: {
+    findBySourceAndExternalId: jest.Mock;
+    findByUrl: jest.Mock;
+  };
+  let postProcessMerge: { merge: jest.Mock };
+
+  const category = { id: 'cat-1', slug: 'ebikes', name: 'Ebikes' } as ProductCategory;
+  const jsonSchema: SpecDefinitionJsonSchema = {
+    type: 'object',
+    title: 'E-bike',
+    properties: {},
+  };
+
+  function buildTask(force = false): ScrapeTask {
+    return {
+      id: 'task-1',
+      url: 'https://speedbike.hu/product/1',
+      force,
+      source: {
+        name: 'speedbike',
+        config: {
+          categories: { ebikes: { enabled: true } },
+          detailPage: { specMapping: {}, postProcess: undefined },
+        },
+      },
+    } as unknown as ScrapeTask;
+  }
+
+  // "raw title" is speedbike.hu's uncleaned marketing title — the exact
+  // scenario originalName exists to preserve.
+  const detail = {
+    categorySlug: 'ebikes',
+    brand: 'KTM',
+    model: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
+    rawSpecs: [],
+    rawOffers: [],
+    imageUrls: [],
+    aliases: [],
+    externalId: 'sku-1',
+  };
+
+  beforeEach(() => {
+    interpreter = { runDetailPage: jest.fn().mockResolvedValue(detail) };
+    runtime = { getCategoryBySlug: jest.fn().mockResolvedValue(category) };
+    categoryConfigService = {
+      getJsonSchema: jest.fn().mockReturnValue(jsonSchema),
+      getConfig: jest.fn().mockReturnValue(undefined),
+      getGoldenSample: jest.fn().mockReturnValue(undefined),
+    };
+    sourceRecordRepo = {
+      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+      findByUrl: jest.fn().mockResolvedValue(null),
+    };
+    postProcessMerge = {
+      merge: jest.fn().mockImplementation((data) => data),
+    };
+
+    service = new ProductDetailsPageScraperService(
+      {} as any, // scraperService
+      {} as any, // productUpdaterService
+      { recordExtractionSkipReason: jest.fn() } as any, // scrapingMetrics
+      interpreter as any,
+      runtime as any,
+      categoryConfigService as any,
+      { extractSpecs: jest.fn().mockReturnValue({}) } as any, // specExtraction
+      {} as any, // postProcess
+      postProcessMerge as any,
+      {} as any, // translationSelector
+      {} as any, // translationService
+      sourceRecordRepo as any,
+    );
+  });
+
+  function callExtractProduct(task: ScrapeTask) {
+    return (service as any).extractProduct(task, {} as any);
+  }
+
+  it('carries the raw scraped title through as originalName alongside the cleaned model', async () => {
+    const task = buildTask();
+
+    const result = await callExtractProduct(task);
+
+    expect(result.model).toBe(detail.model);
+    expect(result.originalName).toBe(detail.model);
+  });
+
+  it('sets originalName on the raw-specs-unchanged fast path too', async () => {
+    const task = buildTask();
+    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
+      rawSpecsHash: hashRawSpecs(detail.rawSpecs),
+      model: { model: 'Reused Model Name' },
+    });
+
+    const result = await callExtractProduct(task);
+
+    expect(result.model).toBe('Reused Model Name');
+    expect(result.originalName).toBe(detail.model);
   });
 });

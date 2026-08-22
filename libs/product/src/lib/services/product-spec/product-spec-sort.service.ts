@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   OrderedSpec,
-  ProductCategory,
   ProductSpecs,
   UnitFormat,
 } from '@fittkereso-backend/database';
@@ -13,14 +12,18 @@ export class ProductSpecSortService {
   constructor(private readonly categoryConfigService: CategoryConfigService) {}
 
   /**
-   * Sort specs using category JSON schema with parent fallback.
+   * Sort specs using the category's JSON schema, with unrecognized keys
+   * falling back after the schema-ordered ones. Takes categorySlug directly
+   * (not a ProductCategory entity) so callers can't accidentally break
+   * ordering by passing a partially-loaded/stubbed entity that's missing
+   * `slug` — see ProductMergeService.mergeSources.
    */
   public sortSpecs(
-    category: ProductCategory,
+    categorySlug: string | undefined,
     specs: ProductSpecs,
   ): OrderedSpec[] {
-    if (!category?.slug) return [];
-    const schema = this.categoryConfigService.getJsonSchema(category.slug);
+    if (!categorySlug) return [];
+    const schema = this.categoryConfigService.getJsonSchema(categorySlug);
     const properties = schema?.properties ?? {};
     const specKeys = Object.keys(specs ?? {});
     if (!specKeys.length) return [];
@@ -31,6 +34,7 @@ export class ProductSpecSortService {
     const defined = _.map(properties, (def, key) => ({
       key,
       title: def.title ?? key,
+      translation: def.translation,
       order: def.meta?.order,
       unit: def.meta?.unit,
       unitFormat: def.meta?.unitFormat,
@@ -51,7 +55,8 @@ export class ProductSpecSortService {
       .filter((d) => specs[d.key] !== undefined)
       .map((d) => ({
         key: d.key,
-        label: d.title,
+        label: d.translation ?? d.title,
+        translation: d.translation,
         value: this.formatSpecValue(specs[d.key], d.unit, d.unitFormat),
       }));
 

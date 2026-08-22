@@ -76,13 +76,21 @@ export class ProductMergeService {
    * cleanup) with identical results given the same source data — there is
    * no separate "first scrape" vs. "remerge" code path. Mutates `model` in
    * place; the caller decides whether/when to save.
+   *
+   * `categorySlug` defaults to `model.productCategory?.slug` — pass it
+   * explicitly when the caller only has a partially-loaded/stubbed
+   * productCategory (e.g. a freshly scraped ProductModel whose
+   * productCategory is set to `{ id }` for the FK save) but already knows
+   * the real slug from elsewhere (e.g. ScrapedProduct.category.slug).
    */
-  public async mergeSources(model: ProductModel): Promise<ProductModel> {
+  public async mergeSources(
+    model: ProductModel,
+    categorySlug: string | undefined = model.productCategory?.slug,
+  ): Promise<ProductModel> {
     if (isEmpty(model.sources)) {
       return model;
     }
 
-    const categorySlug = model.productCategory?.slug;
     const latestPerSource = getLatestSourcePerSource(model.sources);
 
     model.specs = await this.specMergeService.mergeSpecs(
@@ -95,7 +103,7 @@ export class ProductMergeService {
       categorySlug,
     );
     model.orderedSpecs = await this.specSortService.sortSpecs(
-      model.productCategory!,
+      categorySlug,
       model.specs,
     );
 

@@ -6,7 +6,7 @@ import {
   ProductSourceRepository,
   ProductModelRepository,
 } from '@fittkereso-backend/database';
-import { nameOf } from '@fittkereso-backend/utils';
+import { domainFromUrl, nameOf } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScrapeTaskCreateDto } from '../models/scrape-task-create.dto';
 import { ScrapeTaskPublisherService } from './scrape-task-publisher.service';
@@ -24,14 +24,15 @@ export class ScrapeTaskCreatorService {
   ) {}
 
   public async create(dto: ScrapeTaskCreateDto): Promise<ScrapeTask> {
-    const source = await this.productSourceRepository.findById(dto.sourceId);
+    const domain = domainFromUrl(dto.url);
+    const source = await this.productSourceRepository.findByDomain(domain);
     if (isNil(source)) {
-      this.logger.warn('Cannot create scrape task — product source not found', {
-        sourceId: dto.sourceId,
+      this.logger.warn('Cannot create scrape task — no product source matches URL domain', {
+        domain,
         queue: dto.queue,
         url: dto.url,
       });
-      throw new NotFoundException(`Product source not found: ${dto.sourceId}`);
+      throw new NotFoundException(`No product source found for domain: ${domain}`);
     }
 
     let product: ProductModel | undefined;
@@ -40,7 +41,7 @@ export class ScrapeTaskCreatorService {
       if (isNil(found)) {
         this.logger.warn('Cannot create scrape task — product not found', {
           productId: dto.productId,
-          sourceId: dto.sourceId,
+          sourceId: source.id,
         });
         throw new NotFoundException(`Product not found: ${dto.productId}`);
       }

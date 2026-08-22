@@ -13,10 +13,6 @@ export class ScrapeTaskCreateDto {
   @IsEnum(ScrapeQueueName)
   queue: ScrapeQueueName;
 
-  @IsDefined()
-  @IsUUID()
-  sourceId: string;
-
   @IsOptional()
   @IsUUID()
   productId?: string;

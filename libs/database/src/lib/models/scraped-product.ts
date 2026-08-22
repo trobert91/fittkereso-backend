@@ -21,6 +21,14 @@ export interface ScrapedProduct {
   brand: string;
   model: string;
   displayName: string;
+  /**
+   * The raw, unfiltered title/model text exactly as scraped, before
+   * ProductSourcePostProcessService (or the post-process-disabled path)
+   * strips brand/marketing/size/color boilerplate into the clean `model`
+   * above. Some sources (e.g. speedbike.hu) only expose the full marketing
+   * title, so this is the only place the original listing name survives.
+   */
+  originalName?: string;
   aliases?: string[];
   releaseYear?: number;
   specs?: ProductSpecs;

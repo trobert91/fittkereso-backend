@@ -48,6 +48,14 @@ export class SellerUpdateService {
       seller.active = dto.active;
     }
 
+    if (!isUndefined(dto.maxConcurrent)) {
+      seller.maxConcurrent = dto.maxConcurrent;
+    }
+
+    if (!isUndefined(dto.requestsPerHour)) {
+      seller.requestsPerHour = dto.requestsPerHour;
+    }
+
     if (nameChanged || !seller.slug) {
       await this.regenerateSlug(seller);
     }

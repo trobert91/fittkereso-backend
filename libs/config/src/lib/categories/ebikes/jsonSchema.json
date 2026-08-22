@@ -12,7 +12,8 @@
         ]
       },
       "type": "string",
-      "title": "Brand"
+      "title": "Brand",
+      "translation": "Márka"
     },
     "modelYear": {
       "meta": {
@@ -26,7 +27,8 @@
         "max": 2030
       },
       "type": "number",
-      "title": "Model year"
+      "title": "Model year",
+      "translation": "Modellév"
     },
     "frameType": {
       "meta": {
@@ -45,7 +47,8 @@
         ]
       },
       "type": "string",
-      "title": "Frame type"
+      "title": "Frame type",
+      "translation": "Váztípus"
     },
     "usageType": {
       "meta": {
@@ -61,7 +64,8 @@
         ]
       },
       "type": "string",
-      "title": "Usage type"
+      "title": "Usage type",
+      "translation": "Felhasználás módja"
     },
     "gender": {
       "meta": {
@@ -73,7 +77,8 @@
         "Unisex"
       ],
       "type": "string",
-      "title": "Gender"
+      "title": "Gender",
+      "translation": "Nem"
     },
     "color": {
       "meta": {
@@ -87,7 +92,8 @@
         ]
       },
       "type": "string",
-      "title": "Color"
+      "title": "Color",
+      "translation": "Szín"
     },
     "condition": {
       "meta": {},
@@ -98,7 +104,8 @@
         "Felújított"
       ],
       "type": "string",
-      "title": "Condition"
+      "title": "Condition",
+      "translation": "Állapot"
     },
     "mileage": {
       "meta": {
@@ -110,7 +117,8 @@
         "max": 200000
       },
       "type": "number",
-      "title": "Mileage"
+      "title": "Mileage",
+      "translation": "Futásteljesítmény"
     },
     "motorModel": {
       "meta": {
@@ -123,7 +131,8 @@
         ]
       },
       "type": "string",
-      "title": "Motor model"
+      "title": "Motor model",
+      "translation": "Motor típusa"
     },
     "motorBrand": {
       "meta": {
@@ -138,7 +147,8 @@
         ]
       },
       "type": "string",
-      "title": "Motor brand"
+      "title": "Motor brand",
+      "translation": "Motor márkája"
     },
     "motorPosition": {
       "meta": {},
@@ -148,7 +158,8 @@
         "Első kerékagy motor"
       ],
       "type": "string",
-      "title": "Motor position"
+      "title": "Motor position",
+      "translation": "Motor elhelyezkedése"
     },
     "motorPower": {
       "meta": {
@@ -163,7 +174,8 @@
         "max": 1500
       },
       "type": "number",
-      "title": "Motor power (rated)"
+      "title": "Motor power (rated)",
+      "translation": "Motor teljesítménye"
     },
     "motorPeakPower": {
       "meta": {
@@ -176,7 +188,8 @@
         "max": 2000
       },
       "type": "number",
-      "title": "Motor peak power"
+      "title": "Motor peak power",
+      "translation": "Motor csúcsteljesítménye"
     },
     "torque": {
       "meta": {
@@ -191,7 +204,8 @@
         "max": 160
       },
       "type": "number",
-      "title": "Torque"
+      "title": "Torque",
+      "translation": "Nyomaték"
     },
     "topSpeed": {
       "meta": {
@@ -204,7 +218,8 @@
         "max": 80
       },
       "type": "number",
-      "title": "Assisted top speed"
+      "title": "Assisted top speed",
+      "translation": "Maximális rásegített sebesség"
     },
     "maxAssistLevel": {
       "meta": {
@@ -217,7 +232,8 @@
         "max": 600
       },
       "type": "number",
-      "title": "Max assist level"
+      "title": "Max assist level",
+      "translation": "Maximális rásegítés mértéke"
     },
     "sensorType": {
       "meta": {},
@@ -227,7 +243,8 @@
         "Nyomaték- és fordulatszám-szenzor"
       ],
       "type": "string",
-      "title": "Pedal assist sensor"
+      "title": "Pedal assist sensor",
+      "translation": "Pedálérzékelő típusa"
     },
     "ebikeSystem": {
       "meta": {
@@ -237,7 +254,8 @@
         ]
       },
       "type": "string",
-      "title": "E-bike system"
+      "title": "E-bike system",
+      "translation": "E-bike rendszer"
     },
     "pedelecClass": {
       "meta": {},
@@ -246,7 +264,8 @@
         "S-Pedelec"
       ],
       "type": "string",
-      "title": "Pedelec class"
+      "title": "Pedelec class",
+      "translation": "Pedelec osztály"
     },
     "batteryCapacity": {
       "meta": {
@@ -261,7 +280,8 @@
         "max": 1500
       },
       "type": "number",
-      "title": "Battery capacity"
+      "title": "Battery capacity",
+      "translation": "Akkumulátor kapacitása"
     },
     "batteryModel": {
       "meta": {
@@ -271,7 +291,8 @@
         ]
       },
       "type": "string",
-      "title": "Battery model"
+      "title": "Battery model",
+      "translation": "Akkumulátor típusa"
     },
     "batteryPosition": {
       "meta": {},
@@ -281,7 +302,8 @@
         "Csomagtartóra szerelt"
       ],
       "type": "string",
-      "title": "Battery position"
+      "title": "Battery position",
+      "translation": "Akkumulátor elhelyezkedése"
     },
     "batteryChemistry": {
       "meta": {},
@@ -290,7 +312,8 @@
         "Li-polimer"
       ],
       "type": "string",
-      "title": "Battery chemistry"
+      "title": "Battery chemistry",
+      "translation": "Akkumulátor kémiája"
     },
     "batteryVoltage": {
       "meta": {
@@ -303,12 +326,14 @@
         "max": 72
       },
       "type": "number",
-      "title": "Battery voltage"
+      "title": "Battery voltage",
+      "translation": "Akkumulátor feszültsége"
     },
     "batteryRemovable": {
       "meta": {},
       "type": "boolean",
-      "title": "Removable battery"
+      "title": "Removable battery",
+      "translation": "Kivehető akkumulátor"
     },
     "batteryLock": {
       "meta": {
@@ -317,7 +342,8 @@
         ]
       },
       "type": "string",
-      "title": "Battery lock"
+      "title": "Battery lock",
+      "translation": "Akkumulátor zár"
     },
     "chargerModel": {
       "meta": {
@@ -327,7 +353,8 @@
         ]
       },
       "type": "string",
-      "title": "Charger model"
+      "title": "Charger model",
+      "translation": "Töltő típusa"
     },
     "chargerCurrent": {
       "meta": {
@@ -341,7 +368,8 @@
         "max": 10
       },
       "type": "number",
-      "title": "Charger current"
+      "title": "Charger current",
+      "translation": "Töltőáram"
     },
     "range": {
       "meta": {
@@ -355,7 +383,8 @@
         "max": 400
       },
       "type": "number",
-      "title": "Range"
+      "title": "Range",
+      "translation": "Hatótávolság"
     },
     "chargingTime": {
       "meta": {
@@ -368,7 +397,8 @@
         "max": 20
       },
       "type": "number",
-      "title": "Charging time"
+      "title": "Charging time",
+      "translation": "Töltési idő"
     },
     "displayModel": {
       "meta": {
@@ -380,12 +410,14 @@
         ]
       },
       "type": "string",
-      "title": "Display model"
+      "title": "Display model",
+      "translation": "Kijelző típusa"
     },
     "display": {
       "meta": {},
       "type": "boolean",
-      "title": "Display/controller"
+      "title": "Display/controller",
+      "translation": "Kijelző/vezérlő"
     },
     "controlUnit": {
       "meta": {
@@ -395,22 +427,26 @@
         ]
       },
       "type": "string",
-      "title": "Control unit"
+      "title": "Control unit",
+      "translation": "Kezelőegység"
     },
     "smartConnectivity": {
       "meta": {},
       "type": "boolean",
-      "title": "App/GPS connectivity"
+      "title": "App/GPS connectivity",
+      "translation": "Applikáció/GPS kapcsolat"
     },
     "gpsModule": {
       "meta": {},
       "type": "boolean",
-      "title": "GPS module"
+      "title": "GPS module",
+      "translation": "GPS modul"
     },
     "abs": {
       "meta": {},
       "type": "boolean",
-      "title": "ABS"
+      "title": "ABS",
+      "translation": "ABS"
     },
     "frameModel": {
       "meta": {
@@ -420,7 +456,8 @@
         ]
       },
       "type": "string",
-      "title": "Frame model"
+      "title": "Frame model",
+      "translation": "Váz típusa"
     },
     "frameMaterial": {
       "meta": {
@@ -433,7 +470,8 @@
         "Titán"
       ],
       "type": "string",
-      "title": "Frame material"
+      "title": "Frame material",
+      "translation": "Váz anyaga"
     },
     "frameSize": {
       "meta": {
@@ -448,7 +486,8 @@
         "max": 70
       },
       "type": "number",
-      "title": "Frame size"
+      "title": "Frame size",
+      "translation": "Vázméret"
     },
     "frameSizeLabel": {
       "meta": {},
@@ -461,7 +500,8 @@
         "XXL"
       ],
       "type": "string",
-      "title": "Frame size label"
+      "title": "Frame size label",
+      "translation": "Vázméret jelölés"
     },
     "standoverHeight": {
       "meta": {
@@ -471,7 +511,8 @@
         ]
       },
       "type": "string",
-      "title": "Standover height"
+      "title": "Standover height",
+      "translation": "Állómagasság"
     },
     "recommendedRiderHeight": {
       "meta": {
@@ -481,7 +522,8 @@
         ]
       },
       "type": "string",
-      "title": "Recommended rider height"
+      "title": "Recommended rider height",
+      "translation": "Ajánlott testmagasság"
     },
     "seatTubeLength": {
       "meta": {
@@ -494,7 +536,8 @@
         "max": 700
       },
       "type": "number",
-      "title": "Seat tube length"
+      "title": "Seat tube length",
+      "translation": "Nyeregcső hossza"
     },
     "topTubeLength": {
       "meta": {
@@ -507,7 +550,8 @@
         "max": 800
       },
       "type": "number",
-      "title": "Top tube length"
+      "title": "Top tube length",
+      "translation": "Felső cső hossza"
     },
     "weight": {
       "meta": {
@@ -522,7 +566,8 @@
         "max": 45
       },
       "type": "number",
-      "title": "Weight"
+      "title": "Weight",
+      "translation": "Tömeg"
     },
     "maxTotalWeight": {
       "meta": {
@@ -535,7 +580,8 @@
         "max": 250
       },
       "type": "number",
-      "title": "Max permissible total weight"
+      "title": "Max permissible total weight",
+      "translation": "Megengedett össztömeg"
     },
     "maxLoad": {
       "meta": {
@@ -548,7 +594,8 @@
         "max": 200
       },
       "type": "number",
-      "title": "Max payload"
+      "title": "Max payload",
+      "translation": "Maximális terhelhetőség"
     },
     "waterResistance": {
       "meta": {
@@ -559,7 +606,8 @@
         ]
       },
       "type": "string",
-      "title": "Water resistance"
+      "title": "Water resistance",
+      "translation": "Vízállóság"
     },
     "suspension": {
       "meta": {
@@ -571,7 +619,8 @@
         "Rugózatlan"
       ],
       "type": "string",
-      "title": "Suspension"
+      "title": "Suspension",
+      "translation": "Rugózás"
     },
     "forkModel": {
       "meta": {
@@ -582,7 +631,8 @@
         ]
       },
       "type": "string",
-      "title": "Fork model"
+      "title": "Fork model",
+      "translation": "Villa típusa"
     },
     "forkTravel": {
       "meta": {
@@ -596,7 +646,8 @@
         "max": 220
       },
       "type": "number",
-      "title": "Fork travel"
+      "title": "Fork travel",
+      "translation": "Villa rugóútja"
     },
     "forkType": {
       "meta": {},
@@ -606,7 +657,8 @@
         "Merev"
       ],
       "type": "string",
-      "title": "Fork type"
+      "title": "Fork type",
+      "translation": "Villa típusa (levegős/rugós)"
     },
     "rearShockModel": {
       "meta": {
@@ -615,7 +667,8 @@
         ]
       },
       "type": "string",
-      "title": "Rear shock model"
+      "title": "Rear shock model",
+      "translation": "Lengéscsillapító típusa"
     },
     "rearTravel": {
       "meta": {
@@ -628,7 +681,8 @@
         "max": 220
       },
       "type": "number",
-      "title": "Rear travel"
+      "title": "Rear travel",
+      "translation": "Hátsó rugóút"
     },
     "drivetrain": {
       "meta": {},
@@ -637,7 +691,8 @@
         "Szíj"
       ],
       "type": "string",
-      "title": "Drivetrain"
+      "title": "Drivetrain",
+      "translation": "Erőátvitel"
     },
     "gearType": {
       "meta": {},
@@ -647,7 +702,8 @@
         "Agyváltó"
       ],
       "type": "string",
-      "title": "Gear type"
+      "title": "Gear type",
+      "translation": "Váltó típusa"
     },
     "gearCount": {
       "meta": {
@@ -662,7 +718,8 @@
         "max": 14
       },
       "type": "number",
-      "title": "Number of gears"
+      "title": "Number of gears",
+      "translation": "Sebességek száma"
     },
     "shiftingActuation": {
       "meta": {},
@@ -671,12 +728,14 @@
         "Elektromos"
       ],
       "type": "string",
-      "title": "Shifting actuation"
+      "title": "Shifting actuation",
+      "translation": "Váltás módja"
     },
     "autoShift": {
       "meta": {},
       "type": "boolean",
-      "title": "Automatic shifting"
+      "title": "Automatic shifting",
+      "translation": "Automatikus váltás"
     },
     "rearDerailleur": {
       "meta": {
@@ -686,7 +745,8 @@
         ]
       },
       "type": "string",
-      "title": "Rear derailleur"
+      "title": "Rear derailleur",
+      "translation": "Hátsó váltó"
     },
     "rearDerailleurTier": {
       "meta": {
@@ -696,7 +756,8 @@
         ]
       },
       "type": "string",
-      "title": "Rear derailleur tier"
+      "title": "Rear derailleur tier",
+      "translation": "Hátsó váltó szériája"
     },
     "frontDerailleur": {
       "meta": {
@@ -706,7 +767,8 @@
         ]
       },
       "type": "string",
-      "title": "Front derailleur"
+      "title": "Front derailleur",
+      "translation": "Első váltó"
     },
     "shifter": {
       "meta": {
@@ -716,7 +778,8 @@
         ]
       },
       "type": "string",
-      "title": "Shifter"
+      "title": "Shifter",
+      "translation": "Váltókar"
     },
     "crankset": {
       "meta": {
@@ -726,7 +789,8 @@
         ]
       },
       "type": "string",
-      "title": "Crankset"
+      "title": "Crankset",
+      "translation": "Hajtókar"
     },
     "crankLength": {
       "meta": {
@@ -740,7 +804,8 @@
         "max": 200
       },
       "type": "number",
-      "title": "Crank length"
+      "title": "Crank length",
+      "translation": "Hajtókar hossza"
     },
     "chainring": {
       "meta": {
@@ -749,7 +814,8 @@
         ]
       },
       "type": "string",
-      "title": "Chainring"
+      "title": "Chainring",
+      "translation": "Lánckerék"
     },
     "chainringTeeth": {
       "meta": {
@@ -763,7 +829,8 @@
         "max": 50
       },
       "type": "number",
-      "title": "Chainring teeth"
+      "title": "Chainring teeth",
+      "translation": "Lánckerék fogszáma"
     },
     "chainringCount": {
       "meta": {
@@ -776,7 +843,8 @@
         "max": 3
       },
       "type": "number",
-      "title": "Chainring count"
+      "title": "Chainring count",
+      "translation": "Lánckerekek száma"
     },
     "cassette": {
       "meta": {
@@ -786,7 +854,8 @@
         ]
       },
       "type": "string",
-      "title": "Cassette"
+      "title": "Cassette",
+      "translation": "Fogaskoszorú"
     },
     "cassetteRange": {
       "meta": {
@@ -799,7 +868,8 @@
         ]
       },
       "type": "string",
-      "title": "Cassette range"
+      "title": "Cassette range",
+      "translation": "Fogaskoszorú fogszám-tartománya"
     },
     "chain": {
       "meta": {
@@ -809,7 +879,8 @@
         ]
       },
       "type": "string",
-      "title": "Chain"
+      "title": "Chain",
+      "translation": "Lánc"
     },
     "bottomBracket": {
       "meta": {
@@ -818,7 +889,8 @@
         ]
       },
       "type": "string",
-      "title": "Bottom bracket"
+      "title": "Bottom bracket",
+      "translation": "Középcsapágy"
     },
     "pedals": {
       "meta": {
@@ -828,7 +900,8 @@
         ]
       },
       "type": "string",
-      "title": "Pedals"
+      "title": "Pedals",
+      "translation": "Pedál"
     },
     "brakeType": {
       "meta": {},
@@ -838,7 +911,8 @@
         "Tárcsa + kontrafék"
       ],
       "type": "string",
-      "title": "Brake type"
+      "title": "Brake type",
+      "translation": "Fékfajta"
     },
     "brakeModel": {
       "meta": {
@@ -849,7 +923,8 @@
         ]
       },
       "type": "string",
-      "title": "Brake model"
+      "title": "Brake model",
+      "translation": "Fék típusa"
     },
     "brakeLever": {
       "meta": {
@@ -858,7 +933,8 @@
         ]
       },
       "type": "string",
-      "title": "Brake lever"
+      "title": "Brake lever",
+      "translation": "Fékkar"
     },
     "rotorModel": {
       "meta": {
@@ -868,7 +944,8 @@
         ]
       },
       "type": "string",
-      "title": "Brake rotor model"
+      "title": "Brake rotor model",
+      "translation": "Féktárcsa típusa"
     },
     "rotorSizeFront": {
       "meta": {
@@ -881,7 +958,8 @@
         "max": 220
       },
       "type": "number",
-      "title": "Front rotor size"
+      "title": "Front rotor size",
+      "translation": "Első féktárcsa mérete"
     },
     "rotorSizeRear": {
       "meta": {
@@ -894,7 +972,8 @@
         "max": 220
       },
       "type": "number",
-      "title": "Rear rotor size"
+      "title": "Rear rotor size",
+      "translation": "Hátsó féktárcsa mérete"
     },
     "brakePistons": {
       "meta": {
@@ -906,7 +985,8 @@
         "max": 6
       },
       "type": "number",
-      "title": "Brake pistons"
+      "title": "Brake pistons",
+      "translation": "Fékdugattyúk száma"
     },
     "wheelSize": {
       "meta": {
@@ -923,7 +1003,8 @@
         "max": 29
       },
       "type": "number",
-      "title": "Wheel size"
+      "title": "Wheel size",
+      "translation": "Kerékméret"
     },
     "wheelset": {
       "meta": {
@@ -933,7 +1014,8 @@
         ]
       },
       "type": "string",
-      "title": "Wheelset"
+      "title": "Wheelset",
+      "translation": "Kerékszett"
     },
     "rimModel": {
       "meta": {
@@ -943,7 +1025,8 @@
         ]
       },
       "type": "string",
-      "title": "Rim model"
+      "title": "Rim model",
+      "translation": "Felni típusa"
     },
     "hubModel": {
       "meta": {
@@ -952,7 +1035,8 @@
         ]
       },
       "type": "string",
-      "title": "Hub model"
+      "title": "Hub model",
+      "translation": "Agy típusa"
     },
     "hubSpacingFront": {
       "meta": {
@@ -963,7 +1047,8 @@
         ]
       },
       "type": "string",
-      "title": "Front hub spacing"
+      "title": "Front hub spacing",
+      "translation": "Első agy szélessége"
     },
     "hubSpacingRear": {
       "meta": {
@@ -974,7 +1059,8 @@
         ]
       },
       "type": "string",
-      "title": "Rear hub spacing"
+      "title": "Rear hub spacing",
+      "translation": "Hátsó agy szélessége"
     },
     "hubType": {
       "meta": {},
@@ -983,7 +1069,8 @@
         "6-lyukas (IS)"
       ],
       "type": "string",
-      "title": "Hub rotor mount"
+      "title": "Hub rotor mount",
+      "translation": "Agy rögzítési típusa"
     },
     "spokes": {
       "meta": {
@@ -992,7 +1079,8 @@
         ]
       },
       "type": "string",
-      "title": "Spokes"
+      "title": "Spokes",
+      "translation": "Küllők"
     },
     "tireModel": {
       "meta": {
@@ -1003,7 +1091,8 @@
         ]
       },
       "type": "string",
-      "title": "Tire model"
+      "title": "Tire model",
+      "translation": "Gumiabroncs típusa"
     },
     "tireSize": {
       "meta": {
@@ -1014,7 +1103,8 @@
         ]
       },
       "type": "string",
-      "title": "Tire size"
+      "title": "Tire size",
+      "translation": "Gumiabroncs mérete"
     },
     "tireType": {
       "meta": {
@@ -1024,12 +1114,14 @@
         ]
       },
       "type": "string",
-      "title": "Tire casing"
+      "title": "Tire casing",
+      "translation": "Gumiabroncs típusa (köpeny)"
     },
     "tubeless": {
       "meta": {},
       "type": "boolean",
-      "title": "Tubeless ready"
+      "title": "Tubeless ready",
+      "translation": "Tömlő nélküli (tubeless)"
     },
     "handlebar": {
       "meta": {
@@ -1039,7 +1131,8 @@
         ]
       },
       "type": "string",
-      "title": "Handlebar"
+      "title": "Handlebar",
+      "translation": "Kormány"
     },
     "handlebarMaterial": {
       "meta": {},
@@ -1048,7 +1141,8 @@
         "Karbon"
       ],
       "type": "string",
-      "title": "Handlebar material"
+      "title": "Handlebar material",
+      "translation": "Kormány anyaga"
     },
     "handlebarWidth": {
       "meta": {
@@ -1061,7 +1155,8 @@
         "max": 900
       },
       "type": "number",
-      "title": "Handlebar width"
+      "title": "Handlebar width",
+      "translation": "Kormány szélessége"
     },
     "stem": {
       "meta": {
@@ -1071,12 +1166,14 @@
         ]
       },
       "type": "string",
-      "title": "Stem"
+      "title": "Stem",
+      "translation": "Kormányszár"
     },
     "adjustableStem": {
       "meta": {},
       "type": "boolean",
-      "title": "Adjustable stem"
+      "title": "Adjustable stem",
+      "translation": "Állítható kormányszár"
     },
     "headset": {
       "meta": {
@@ -1086,7 +1183,8 @@
         ]
       },
       "type": "string",
-      "title": "Headset"
+      "title": "Headset",
+      "translation": "Kormánycsapágy"
     },
     "grips": {
       "meta": {
@@ -1096,7 +1194,8 @@
         ]
       },
       "type": "string",
-      "title": "Grips"
+      "title": "Grips",
+      "translation": "Markolat"
     },
     "saddle": {
       "meta": {
@@ -1106,7 +1205,8 @@
         ]
       },
       "type": "string",
-      "title": "Saddle"
+      "title": "Saddle",
+      "translation": "Nyereg"
     },
     "seatpost": {
       "meta": {
@@ -1116,7 +1216,8 @@
         ]
       },
       "type": "string",
-      "title": "Seatpost"
+      "title": "Seatpost",
+      "translation": "Nyeregcső"
     },
     "seatpostType": {
       "meta": {},
@@ -1125,7 +1226,8 @@
         "Teleszkópos (dropper)"
       ],
       "type": "string",
-      "title": "Seatpost type"
+      "title": "Seatpost type",
+      "translation": "Nyeregcső típusa"
     },
     "seatpostDiameter": {
       "meta": {
@@ -1139,7 +1241,8 @@
         "max": 35
       },
       "type": "number",
-      "title": "Seatpost diameter"
+      "title": "Seatpost diameter",
+      "translation": "Nyeregcső átmérője"
     },
     "seatClamp": {
       "meta": {
@@ -1148,7 +1251,8 @@
         ]
       },
       "type": "string",
-      "title": "Seat clamp"
+      "title": "Seat clamp",
+      "translation": "Nyeregbilincs"
     },
     "lighting": {
       "meta": {},
@@ -1158,7 +1262,8 @@
         "Nincs"
       ],
       "type": "string",
-      "title": "Lighting"
+      "title": "Lighting",
+      "translation": "Világítás"
     },
     "rack": {
       "meta": {},
@@ -1168,7 +1273,8 @@
         "Nincs"
       ],
       "type": "string",
-      "title": "Rack"
+      "title": "Rack",
+      "translation": "Csomagtartó"
     },
     "fenders": {
       "meta": {},
@@ -1178,17 +1284,20 @@
         "Nincs"
       ],
       "type": "string",
-      "title": "Fenders"
+      "title": "Fenders",
+      "translation": "Sárvédő"
     },
     "kickstand": {
       "meta": {},
       "type": "boolean",
-      "title": "Kickstand"
+      "title": "Kickstand",
+      "translation": "Kitámasztó"
     },
     "chainGuard": {
       "meta": {},
       "type": "boolean",
-      "title": "Chain guard"
+      "title": "Chain guard",
+      "translation": "Láncvédő"
     }
   }
 }

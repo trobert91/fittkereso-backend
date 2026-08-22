@@ -42,6 +42,31 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     });
   }
 
+  /**
+   * Same (source, externalId) identity lookup as findBySourceAndExternalId,
+   * but with `model` loaded via the given relations so the result can be used
+   * directly as a resolved ProductModel (see ProductScrapeUpdaterService
+   * Path 0.5) instead of only as a cheap existence check.
+   */
+  async findBySourceAndExternalIdWithModelRelations(
+    sourceId: string,
+    externalId: string,
+    modelRelations: string[],
+  ): Promise<ProductSourceRecord | null> {
+    return this.repo.findOne({
+      where: {
+        source: { id: sourceId },
+        externalId,
+      },
+      relations: [
+        nameOf<ProductSourceRecord>('model'),
+        ...modelRelations.map(
+          (relation) => `${nameOf<ProductSourceRecord>('model')}.${relation}`,
+        ),
+      ],
+    });
+  }
+
   async findExistingUrls(urls: string[]): Promise<Set<string>> {
     if (isEmpty(urls)) return new Set();
 

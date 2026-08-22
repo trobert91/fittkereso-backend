@@ -107,7 +107,7 @@ export class SellerTools {
   @Tool({
     name: 'update_seller',
     description:
-      'Update an existing Seller — name, type, domains, logoUrl, contactEmail, contactPhone, location, verified, active. name and type are always required by the underlying update (pass the current values from get_seller if you only want to change one other field); all other fields are only changed when provided.',
+      'Update an existing Seller — name, type, domains, logoUrl, contactEmail, contactPhone, location, verified, active, maxConcurrent, requestsPerHour. name and type are always required by the underlying update (pass the current values from get_seller if you only want to change one other field); all other fields are only changed when provided. maxConcurrent/requestsPerHour cap the COMBINED usage across all of this seller\'s ProductSources (in addition to each ProductSource\'s own limit) — pass null to clear and rely only on per-source limits.',
     parameters: z.object({
       sellerId: z.string().describe('Seller UUID to update'),
       name: z.string().min(1).describe('Seller name (required by the update — pass the existing name to leave unchanged)'),
@@ -119,6 +119,8 @@ export class SellerTools {
       location: z.string().optional(),
       verified: z.boolean().optional(),
       active: z.boolean().optional(),
+      maxConcurrent: z.number().int().min(1).nullable().optional().describe('Combined max concurrent scrapes across all of this seller\'s ProductSources; null clears it'),
+      requestsPerHour: z.number().int().min(1).nullable().optional().describe('Combined requests/hour across all of this seller\'s ProductSources; null clears it'),
     }),
     annotations: { destructiveHint: false, idempotentHint: true },
   })
@@ -133,6 +135,8 @@ export class SellerTools {
     location?: string;
     verified?: boolean;
     active?: boolean;
+    maxConcurrent?: number | null;
+    requestsPerHour?: number | null;
   }): Promise<string> {
     try {
       const { sellerId, ...dto } = args;
@@ -158,6 +162,8 @@ export class SellerTools {
     L.push(`- **Contact email**: ${seller.contactEmail ?? '_not set_'}`);
     L.push(`- **Contact phone**: ${seller.contactPhone ?? '_not set_'}`);
     L.push(`- **Location**: ${seller.location ?? '_not set_'}`);
+    L.push(`- **Max concurrent (combined)**: ${seller.maxConcurrent ?? '_not set — only per-source limits apply_'}`);
+    L.push(`- **Requests per hour (combined)**: ${seller.requestsPerHour ?? '_not set — only per-source limits apply_'}`);
 
     if (seller.productSources?.length) {
       L.push('');

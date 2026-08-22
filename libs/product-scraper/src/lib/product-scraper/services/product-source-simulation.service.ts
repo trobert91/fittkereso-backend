@@ -37,6 +37,7 @@ export interface SimulatedProductPreview {
   brand: string;
   model: string;
   displayName: string;
+  originalName?: string;
   categorySlug: string;
   categoryName: string;
   aliases?: string[];
@@ -265,6 +266,7 @@ export class ProductSourceSimulationService {
       brand: merged.brand,
       model: merged.model,
       displayName: `${merged.brand} ${merged.model}`.trim(),
+      originalName: detail.model,
       categorySlug: category.slug,
       categoryName: category.name,
       aliases: detail.aliases,

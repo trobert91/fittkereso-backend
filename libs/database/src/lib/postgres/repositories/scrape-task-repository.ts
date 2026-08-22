@@ -6,7 +6,7 @@ import { TaskStatus } from '../models/task.entity';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { ScrapeQueueName } from '../types';
 import { nameOf } from '@fittkereso-backend/utils';
-import { ProductSource } from '../models';
+import { ProductSource, Seller } from '../models';
 import { isEmpty } from 'lodash';
 
 const DEFAULT_REQUEST_PER_HOUR = 50;
@@ -22,6 +22,9 @@ export interface ScrapeTaskClaimBlockedInfo {
   sourceName: string;
   maxConcurrent: number;
   requestsPerHour: number;
+  sellerId?: string;
+  sellerMaxConcurrent?: number | null;
+  sellerRequestsPerHour?: number | null;
   blockedReasons: string[];
 }
 
@@ -47,7 +50,10 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
 
   /**
    * Fetches the next available scrape task across all product sources,
-   * respecting each source's `maxConcurrent` limit.
+   * respecting each source's `maxConcurrent`/`requestsPerHour` limits, and,
+   * when the source belongs to a Seller with its own limits set, the
+   * Seller-level combined `maxConcurrent`/`requestsPerHour` across all of
+   * that seller's ProductSources.
    */
   async fetchNextScrapeTask(
     queues: ScrapeQueueName[],
@@ -58,13 +64,16 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
     await queryRunner.startTransaction();
 
     try {
-      // Lock only the task row — FOR UPDATE cannot be used with outer joins,
-      // so we select just the ID here and load relations in a separate query.
+      // Lock only the task row. Postgres refuses a bare FOR UPDATE here
+      // because seller is on the nullable side of a LEFT JOIN, so we
+      // restrict the lock to task via "FOR UPDATE OF task". We also select
+      // just the ID and load relations in a separate query.
       const lockedTask = await queryRunner.manager
         .createQueryBuilder(ScrapeTask, 'task')
-        .setLock('pessimistic_write')
+        .setLock('pessimistic_write', undefined, ['task'])
         .select(`task.${nameOf<ScrapeTask>('id')}`)
         .innerJoin(`task.${nameOf<ScrapeTask>('source')}`, 'source')
+        .leftJoin(`source.${nameOf<ProductSource>('seller')}`, 'seller')
         .where(
           `(task.${nameOf<ScrapeTask>('status')} = :pendingStatus OR
            (task.${nameOf<ScrapeTask>('status')} = :failedStatus AND task.${nameOf<ScrapeTask>('attempts')} < :maxAttempts) OR
@@ -119,6 +128,56 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
               NOW() - (${subQuery})
                 >= INTERVAL '1 second'
                   * (3600 / COALESCE(source.${nameOf<ProductSource>('requestsPerHour')}, ${DEFAULT_REQUEST_PER_HOUR}))
+            )
+          `;
+        })
+        .andWhere((qb) => {
+          // Combined maxConcurrent across all of the source's seller's
+          // ProductSources — only enforced when seller.maxConcurrent is set.
+          const subQuery = qb
+            .subQuery()
+            .select('COUNT(*)')
+            .from(ScrapeTask, 't4')
+            .leftJoin(`t4.${nameOf<ScrapeTask>('source')}`, 's4')
+            .where(
+              `s4.${nameOf<ProductSource>('seller')} = seller.${nameOf<Seller>('id')}`,
+            )
+            .andWhere(`t4.${nameOf<ScrapeTask>('status')} = :activeProcessing`)
+            .andWhere(
+              `t4."${nameOf<ScrapeTask>('lockedAt')}" >= NOW() - MAKE_INTERVAL(mins => :staleTimeoutMinutes)`,
+            )
+            .getQuery();
+
+          return `
+            (
+              seller.${nameOf<Seller>('maxConcurrent')} IS NULL
+              OR
+              ${subQuery} < seller.${nameOf<Seller>('maxConcurrent')} )
+          `;
+        })
+        .andWhere((qb) => {
+          // Combined requestsPerHour throttle across all of the source's
+          // seller's ProductSources — only enforced when
+          // seller.requestsPerHour is set.
+          const subQuery = qb
+            .subQuery()
+            .select(`MAX(t5.${nameOf<ScrapeTask>('lockedAt')})`)
+            .from(ScrapeTask, 't5')
+            .leftJoin(`t5.${nameOf<ScrapeTask>('source')}`, 's5')
+            .where(
+              `s5.${nameOf<ProductSource>('seller')} = seller.${nameOf<Seller>('id')}`,
+            )
+            .getQuery();
+
+          return `
+            (
+              seller.${nameOf<Seller>('requestsPerHour')} IS NULL
+              OR
+              ${subQuery} IS NULL
+              OR
+              NOW() - (${subQuery})
+                >= INTERVAL '1 second'
+                  * (3600 / seller.${nameOf<Seller>('requestsPerHour')})
             )
           `;
         })
@@ -177,6 +236,7 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
     const candidates = await this.repo
       .createQueryBuilder('task')
       .innerJoinAndSelect(`task.${nameOf<ScrapeTask>('source')}`, 'source')
+      .leftJoinAndSelect(`source.${nameOf<ProductSource>('seller')}`, 'seller')
       .where(`task.${nameOf<ScrapeTask>('status')} IN (:...statuses)`, {
         statuses: candidateStatuses,
       })
@@ -217,10 +277,15 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
         sourceName: task.source.name,
         maxConcurrent: task.source.maxConcurrent,
         requestsPerHour: task.source.requestsPerHour,
+        sellerId: task.source.seller?.id,
+        sellerMaxConcurrent: task.source.seller?.maxConcurrent,
+        sellerRequestsPerHour: task.source.seller?.requestsPerHour,
         blockedReasons:
           blockedReasons.length > 0
             ? blockedReasons
-            : ['none of the simple gates — likely maxConcurrent cap or requestsPerHour throttle window'],
+            : [
+                'none of the simple gates — likely maxConcurrent/requestsPerHour cap on the source, or the combined seller-level cap',
+              ],
       };
     });
 

@@ -28,12 +28,24 @@ export class ProductImageStorageService {
     productId: string,
     imageUrl: string,
   ): Promise<UploadedFile> {
-    const ext = extname(imageUrl) || '.jpg';
+    const ext = this.extnameFromUrl(imageUrl) || '.jpg';
     const fileName = `${uuidv4()}${ext}`;
     const path = this.buildPath(productId);
 
     const buffer = await this.download(imageUrl);
     return this.storage.uploadFile(path, fileName, buffer);
+  }
+
+  // extname() on the raw URL string picks up the query string/fragment
+  // (e.g. "...1260044108.webp?lastmod=1761570968.1772457778" -> ".1772457778"
+  // instead of ".webp") — parse the pathname first so only the real file
+  // extension is used.
+  private extnameFromUrl(imageUrl: string): string {
+    try {
+      return extname(new URL(imageUrl).pathname);
+    } catch {
+      return extname(imageUrl);
+    }
   }
 
   private async download(url: string): Promise<Buffer> {

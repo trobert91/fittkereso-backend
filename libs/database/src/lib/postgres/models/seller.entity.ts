@@ -47,6 +47,17 @@ export class Seller extends BasePostgresEntity {
   @OneToMany(() => ProductSource, (source) => source.seller)
   productSources: ProductSource[];
 
+  // Nullable: unset means no seller-level cap — only each ProductSource's own
+  // maxConcurrent/requestsPerHour applies. When set, this caps the combined
+  // usage across all of the seller's ProductSources.
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ type: 'int', nullable: true })
+  maxConcurrent?: number | null;
+
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ type: 'int', nullable: true })
+  requestsPerHour?: number | null;
+
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @OneToOne(() => BillingInfo, (billingInfo) => billingInfo.seller, {
     nullable: true,

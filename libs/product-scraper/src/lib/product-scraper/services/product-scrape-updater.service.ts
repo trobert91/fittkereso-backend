@@ -149,6 +149,28 @@ export class ProductScrapeUpdaterService {
       return { model, isExistingMatch: true };
     }
 
+    // Path 0.5: this exact (source, externalId) listing was already scraped
+    // and linked to a product — reuse that link directly rather than
+    // re-deriving identity from the name or falling through to the
+    // matcher/embedding/LLM pipeline in Path 2. externalId is the
+    // source-native SKU/model code/slug and is stable across URL and
+    // display-name changes, unlike Path 1's normalizedSourceName.
+    if (scrapedProduct.externalId) {
+      const existingSource =
+        await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
+          task.source.id,
+          scrapedProduct.externalId,
+          this.getProductRelations(),
+        );
+      if (existingSource?.model) {
+        this.productMetricsService.scrapeResolutionOutcome(
+          task.source.name,
+          'external_id_hit',
+        );
+        return { model: existingSource.model, isExistingMatch: true };
+      }
+    }
+
     // Path 1: name-anchored identity lookup (any source, same category).
     // Category presence is guaranteed by the caller's pre-check.
     const categoryId = scrapedProduct.category?.id;
@@ -240,7 +262,10 @@ export class ProductScrapeUpdaterService {
       sourceUrl: task.url,
       normalizedSourceName,
     });
-    await this.mergeService.mergeSources(model);
+    // model.productCategory may only be the { id } stub set by
+    // newProductModel/applyScrapedProductDetails — pass the slug explicitly
+    // from ScrapedProduct.category, which is always fully populated.
+    await this.mergeService.mergeSources(model, scrapedProduct.category.slug);
 
     const saveOutcome = await this.saveProductModel({
       model,
@@ -548,7 +573,7 @@ export class ProductScrapeUpdaterService {
         sourceUrl: task.url,
         normalizedSourceName,
       });
-      await this.mergeService.mergeSources(existingModel);
+      await this.mergeService.mergeSources(existingModel, scrapedProduct.category.slug);
 
       return {
         model: await this.productRepo.save(existingModel),
@@ -573,12 +598,11 @@ export class ProductScrapeUpdaterService {
       model.model = scrapedProduct.model;
     }
 
-    // Only replace productCategory when it's actually changing — model.productCategory
-    // is normally the fully-loaded entity (slug, jsonSchema, etc.) fetched via
-    // getProductRelations(); overwriting it with a bare { id } stub here drops
-    // `slug`, which ProductMergeService.mergeSources → sortSpecs needs to build
-    // orderedSpecs (its `!category?.slug` guard short-circuits to [] otherwise),
-    // silently emptying the "Specifications" admin tab after every scrape.
+    // Only replace productCategory when it's actually changing — it's normally
+    // the fully-loaded entity fetched via getProductRelations(), and a bare
+    // { id } stub here (TypeORM only needs the id for the FK save) is fine
+    // since mergeSources takes categorySlug as an explicit parameter rather
+    // than reading it off this relation.
     if (model.productCategory?.id !== scrapedProduct.category.id) {
       model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
     }
