@@ -130,7 +130,13 @@ export class ProductSourceRecordUpdaterService {
 
     source.url = sourceUrl;
     source.scrapedProduct = scrapedProduct
-      ? { ...scrapedProduct, specs: processedSpecs }
+      ? {
+          ...scrapedProduct,
+          specs: processedSpecs,
+          extractedSpecs: scrapedProduct.extractedSpecs
+            ? this.processSpecs(scrapedProduct.extractedSpecs)
+            : scrapedProduct.extractedSpecs,
+        }
       : source.scrapedProduct;
     source.rawSpecsHash = scrapedProduct?.rawSpecs
       ? hashRawSpecs(scrapedProduct.rawSpecs)

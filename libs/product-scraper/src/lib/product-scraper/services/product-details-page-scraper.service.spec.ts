@@ -247,4 +247,34 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     expect(result.model).toBe('Reused Model Name');
     expect(result.originalName).toBe(detail.model);
   });
+
+  it('carries the pre-LLM deterministic specs through alongside the post-process-merged specs', async () => {
+    const task = buildTask();
+    task.source.config.detailPage.specMapping = { ebikes: { mappings: [] } };
+    const deterministicSpecs = { weight: 17 };
+    const specExtraction = { extractSpecs: jest.fn().mockReturnValue(deterministicSpecs) };
+    (service as any).specExtraction = specExtraction;
+    postProcessMerge.merge.mockImplementation((data) => ({
+      ...data,
+      specs: { ...data.specs, motorPosition: 'Középmotor' },
+    }));
+
+    const result = await callExtractProduct(task);
+
+    expect(result.extractedSpecs).toBe(deterministicSpecs);
+    expect(result.specs).toEqual({ weight: 17, motorPosition: 'Középmotor' });
+  });
+
+  it('leaves extractedSpecs undefined on the raw-specs-unchanged fast path', async () => {
+    const task = buildTask();
+    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
+      rawSpecsHash: hashRawSpecs(detail.rawSpecs),
+      model: { model: 'Reused Model Name' },
+    });
+
+    const result = await callExtractProduct(task);
+
+    expect(result.extractedSpecs).toBeUndefined();
+    expect(result.specs).toBeUndefined();
+  });
 });

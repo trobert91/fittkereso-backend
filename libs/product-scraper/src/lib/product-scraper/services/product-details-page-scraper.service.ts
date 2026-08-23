@@ -279,6 +279,7 @@ export class ProductDetailsPageScraperService {
       originalName: detail.model,
       category,
       specs,
+      extractedSpecs: deterministicSpecs,
       rawSpecs: detail.rawSpecs,
       externalId: detail.externalId,
       aliases: detail.aliases,

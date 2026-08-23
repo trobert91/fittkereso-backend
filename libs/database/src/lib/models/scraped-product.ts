@@ -32,6 +32,18 @@ export interface ScrapedProduct {
   aliases?: string[];
   releaseYear?: number;
   specs?: ProductSpecs;
+  /**
+   * Output of SpecExtractionService.extractSpecs — the deterministic,
+   * label-matching spec mapping before ProductSourcePostProcessService's LLM
+   * pass merges its own contribution on top to produce `specs` above. This is
+   * also exactly the `deterministicSpecs` payload sent to the LLM (see
+   * ProductSourcePostProcessService.buildUserMessage), kept here so a source
+   * record shows both what was deterministically extracted and what the LLM
+   * changed, without needing a re-scrape to compare. Undefined whenever
+   * `specs` is undefined (rawSpecsHash-unchanged skip, or no specMapping
+   * configured for the category).
+   */
+  extractedSpecs?: ProductSpecs;
   rawSpecs?: ScrapedProductSpec[];
   externalId?: string;
   imageUrls?: string[];
