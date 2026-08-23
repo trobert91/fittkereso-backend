@@ -55,9 +55,9 @@ export class ProductDuplicationSearchService {
       WHERE similarity(a."normalizedName", b."normalizedName") >= $1
         AND NOT EXISTS (
           SELECT 1
-          FROM product_model_source sa
-          JOIN product_model_source sb
-            ON sa.type = sb.type
+          FROM product_source_record sa
+          JOIN product_source_record sb
+            ON sa."sourceId" = sb."sourceId"
             AND sa."normalizedSourceName" IS NOT NULL
             AND sb."normalizedSourceName" IS NOT NULL
             AND sa."normalizedSourceName" <> sb."normalizedSourceName"

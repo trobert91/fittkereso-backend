@@ -213,7 +213,7 @@ export class ProductSourceSimulationService {
     let llmContribution: Record<string, unknown> | undefined;
     let merged = deterministicData;
 
-    if (postProcessConfig?.enabled) {
+    if (postProcessConfig?.enabled !== false) {
       const goldenSample = this.categoryConfigService.getGoldenSample(category.slug);
       if (!goldenSample) {
         warnings.push(
@@ -227,10 +227,10 @@ export class ProductSourceSimulationService {
           rawSpecs: detail.rawSpecs,
           schema: jsonSchema,
           goldenSample,
-          model: postProcessConfig.model,
-          thinking: postProcessConfig.thinking,
-          effort: postProcessConfig.effort,
-          maxTokens: postProcessConfig.maxTokens,
+          model: postProcessConfig?.model,
+          thinking: postProcessConfig?.thinking,
+          effort: postProcessConfig?.effort,
+          maxTokens: postProcessConfig?.maxTokens,
           offerLevelSpecs,
         });
         if (!llmResult) {

@@ -12,11 +12,11 @@ This guide is a reading order. Each section names the file(s) to open, what they
 
 **File:** `libs/database/src/lib/postgres/models/product-source.entity.ts`
 
-This is the root of everything. Each row is one scrapable source (today: Arukereso, DisplaySpecs). Key fields:
+This is the root of everything. Each row is one scrapable source (today: ebikeshop, speedbike — both single-seller storefronts). Key fields:
 
 - `name` — the source's identity. There is **no more `type` enum** — `name` is now the only discriminator, used everywhere for logging/metrics/lookups.
 - `config: ProductSourceConfig` (jsonb) — the entire declarative definition of how to scrape this source: where to fetch from, how to discover products, how to parse list/detail pages, how to map specs. This is the payload the rest of the system interprets.
-- `seller?: Seller` — optional link if this source *is* a single seller's own storefront (nullable — aggregator/reference sites like Arukereso/DisplaySpecs aren't any one seller).
+- `seller?: Seller` — optional link if this source *is* a single seller's own storefront (nullable — an aggregator/reference source with no single owning seller would leave this unset; no such source is configured today).
 - `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs, unchanged from before.
 - `fullSyncInterval` / `nextFullSyncAt` / `incrementalSyncInterval` / `nextIncrementalSyncAt` — two independent cron-like schedules per source (full catalog crawl vs. incremental "what's new" search).
 
@@ -55,7 +55,7 @@ interface ProductSourceConfig {
 
 Everything under `listPage`/`detailPage`/`discovery` is a **pipeline** — an ordered array of operations (`ScrapeOperation[]`) that gets executed against the fetched HTML. That op vocabulary is the next thing to understand.
 
-**See the real thing:** `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/arukereso.config.json` and `displayspecs.config.json` — the two actual production configs, hand-authored to reproduce everything the old per-source code did.
+**See the real thing:** `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/ebikeshop.config.json` and `speedbike.config.json` — the two actual production configs, each showing a different markup style (`ebikeshop.hu` is JSON-hydration/Inertia `data-page`, `speedbike.hu` is classic `<table>` spec extraction).
 
 ---
 
@@ -97,8 +97,8 @@ This is the new library that turns config + HTML into structured data. Read it i
 
 Before touching the live pipeline, look at the tests here — they're the best way to see the interpreter in action against realistic (hand-written, not live-fetched) HTML:
 
-- `arukereso-detail-page.spec.ts` / `displayspecs-detail-page.spec.ts` — feed synthetic HTML through `runDetailPage` with the *real* production config, assert the exact `brand`/`model`/`categorySlug`/`rawSpecs`/`imageUrls` output.
-- `arukereso-list-page.spec.ts` / `displayspecs-discovery.spec.ts` — same idea for list-page parsing and source discovery.
+- `ebikeshop-detail-page.spec.ts` / `speedbike-detail-page.spec.ts` — feed synthetic HTML through `runDetailPage` with the *real* production config, assert the exact `brand`/`model`/`categorySlug`/`rawSpecs`/`imageUrls` output.
+- `ebikeshop-list-page.spec.ts` — same idea for list-page parsing.
 - `config-validation.spec.ts` — structural check: every `op` name referenced anywhere in both real configs actually exists in the op registry, and both configs' `category.slugLookup` rules resolve to the expected slugs.
 
 These are the closest thing to living documentation for "what does this config actually produce."
@@ -133,11 +133,11 @@ These are the two services that actually get invoked per `ScrapeTask`. Both:
 ## 7. What replaced the per-source dispatch switches
 
 **Files:**
-- `apps/product-collector/src/modules/queue-processor/scrape-task/scrape-task-processor.service.ts` — replaces the old `ArukeresoQueueProcessorService`/`DisplayspecsQueueProcessorService`. Routes purely by `task.queue` (list vs. detail), no source branching at all.
-- `libs/product-scraper/src/lib/product-scraper/services/generic-product-source-sync.service.ts` — replaces `ArukeresoSyncService`+`ArukeresoIndexPageService`+`DisplayspecsSyncService`+`DisplaySpecsIndexPageService` (four classes → one). Fetches the discovery page (`config.fullSyncStartUrl ?? config.baseUrl`), calls `interpreter.runDiscovery(...)`, creates one `ScrapeProductList` task per discovered link.
+- `apps/product-collector/src/modules/queue-processor/scrape-task/scrape-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
+- `libs/product-scraper/src/lib/product-scraper/services/generic-product-source-sync.service.ts` — replaces what used to be one sync class pair per source (fetch-discovery-page + index-page). Fetches the discovery page (`config.fullSyncStartUrl ?? config.baseUrl`), calls `interpreter.runDiscovery(...)`, creates one `ScrapeProductList` task per discovered link.
 - `libs/product-scraper/src/lib/incremental-sync/incremental-sync.service.ts` — searches Exa for each of `config.incrementalSync.searchKeywords`, then classifies each result URL via `interpreter.classifyIncrementalUrl(url, config)` (regex from `config.incrementalSync.urlClassify.detailUrlPattern`) instead of a per-source `UrlClassifier` class.
 
-All three read `source.config`/`source.name` — none of them know or care whether they're looking at Arukereso or DisplaySpecs or a future third source.
+All three read `source.config`/`source.name` — none of them know or care which source they're looking at.
 
 ---
 
@@ -153,7 +153,7 @@ This service was already the persistence core before this change and is mostly u
 
 **`createOrUpdateOffers`** (new): if `scrapedProduct.offers` is populated, for each entry it resolves/creates a `Seller` via `SellerResolutionService` (`libs/product/src/lib/services/resolution/seller-resolution.service.ts` — exact-name lookup, create if missing) and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, sourceListingId]`, preserves `condition` on update, always bumps `lastSeenAt`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
 
-**Today this is a no-op for both real sources** — neither `arukereso.config.json` nor `displayspecs.config.json` populates `detailPage.offers`, so `scrapedProduct.offers` is always empty. The plumbing exists so that wiring up real price-table scraping later (most plausible for Arukereso, since it's a price-comparison site) doesn't require another schema change — just populating `offers.listItems`/`sellerName`/`price` in the config.
+Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`sellerName`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup.
 
 ---
 
@@ -200,16 +200,16 @@ ScrapeTaskManagerService (5s poll, separate loop)
                                 → ProductScrapeUpdaterService.createOrUpdateProduct(task, scrapedProduct)
                                     → resolve/create ProductModel, write ProductModelSource, merge specs
                                     → slug, aliases, images
-                                    → createOrUpdateOffers (no-op today for both real sources)
+                                    → createOrUpdateOffers
 ```
 
-Every arrow in that diagram is source-agnostic — the only thing that varies between Arukereso and DisplaySpecs is the JSON sitting in `ProductSource.config`.
+Every arrow in that diagram is source-agnostic — the only thing that varies between ebikeshop and speedbike is the JSON sitting in `ProductSource.config`.
 
 ---
 
-## If you want to add a third source
+## If you want to add a new source
 
-1. Author a new `ProductSourceConfig` JSON (copy the shape from `arukereso.config.json` or `displayspecs.config.json` depending on whether the new source is more "aggregator-with-price-table" or "spec-reference-site" shaped).
+1. Author a new `ProductSourceConfig` JSON (copy the shape from `ebikeshop.config.json` or `speedbike.config.json` depending on whether the new source's markup is JSON-hydration/Inertia-style or classic server-rendered `<table>` spec markup).
 2. Write golden-fixture tests for it under `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/`, following the pattern in step 5.
 3. If (and only if) the source needs a genuinely new kind of DOM pattern the current ~35 ops can't express, add a new op: type in `scrape-operation.ts`, handler in the matching `ops/*.ts` file, registration in `ops/register-ops.ts`.
 4. Insert a `ProductSource` row with the new config (see `apps/product-collector/scripts/seed-product-source-configs.ts` for the pattern).

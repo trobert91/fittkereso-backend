@@ -319,7 +319,7 @@ export class ProductDetailsPageScraperService {
     const { task, data, rawSpecs, jsonSchema, categorySlug } = params;
     const postProcessConfig = task.source.config.detailPage.postProcess;
 
-    if (!postProcessConfig?.enabled) {
+    if (postProcessConfig?.enabled === false) {
       return this.postProcessMerge.merge(data, undefined);
     }
 
@@ -340,10 +340,10 @@ export class ProductDetailsPageScraperService {
       rawSpecs,
       schema: jsonSchema,
       goldenSample,
-      model: postProcessConfig.model,
-      thinking: postProcessConfig.thinking,
-      effort: postProcessConfig.effort,
-      maxTokens: postProcessConfig.maxTokens,
+      model: postProcessConfig?.model,
+      thinking: postProcessConfig?.thinking,
+      effort: postProcessConfig?.effort,
+      maxTokens: postProcessConfig?.maxTokens,
       offerLevelSpecs,
     });
 

@@ -57,15 +57,20 @@ export interface ProductSourceTranslationConfig {
  * SourceSpecMapping[]/scrape-op extraction. The category-level pieces the
  * LLM call needs (canonical schema, golden sample) live in category config,
  * not here — every source in a category shares them.
+ *
+ * Post-processing defaults to ON: a source with no `postProcess` block at all
+ * (or `enabled` left unset) still runs it. Set `enabled: false` explicitly to
+ * opt a source out — e.g. a source that turns out not to benefit from LLM
+ * inference at all, where the extra cost is pure waste.
  */
 export interface ProductSourcePostProcessConfig {
-  enabled: boolean;
+  enabled?: boolean;
   model?: string;
   /**
    * Reasoning toggle. Leave unset to use the service default (reasoning on at
    * `effort`). Set false for sources whose spec table is already normalized to
    * near-canonical labels (e.g. ebikeshop.hu, ambringa.hu) — those need
-   * re-keying, not inference, so the reasoning tokens are pure waste. Sources
+   * re-keying, not inference, so the reasoning tokens are likely waste. Sources
    * that publish only a free-text OEM component list (speedbike.hu,
    * tuttobici.hu, berguson.hu) do need it: fields like motorPosition,
    * seatpostType and the equipment booleans are only derivable by inference.

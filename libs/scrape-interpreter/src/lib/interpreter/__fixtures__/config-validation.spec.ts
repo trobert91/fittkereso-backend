@@ -3,8 +3,6 @@ import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service'
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { ProductValueMapperService } from '../services/product-value-mapper.service';
 import { registerOps } from '../ops/register-ops';
-import arukeresoConfig from './arukereso.config.json';
-import displayspecsConfig from './displayspecs.config.json';
 import ebikeshopConfig from './ebikeshop.config.json';
 import speedbikeConfig from './speedbike.config.json';
 
@@ -53,45 +51,12 @@ describe('hand-authored source configs', () => {
     }
   }
 
-  it('validates the Arukereso config against the op registry', () => {
-    assertConfigValid(arukeresoConfig as unknown as ProductSourceConfig, 'arukereso');
-  });
-
-  it('validates the DisplaySpecs config against the op registry', () => {
-    assertConfigValid(
-      displayspecsConfig as unknown as ProductSourceConfig,
-      'displayspecs',
-    );
-  });
-
   it('validates the ebikeshop config against the op registry', () => {
     assertConfigValid(ebikeshopConfig as unknown as ProductSourceConfig, 'ebikeshop');
   });
 
   it('validates the speedbike config against the op registry', () => {
     assertConfigValid(speedbikeConfig as unknown as ProductSourceConfig, 'speedbike');
-  });
-
-  it('Arukereso config resolves all 15 category slugLookup rules to distinct slugs (headphones covered twice by design)', () => {
-    const config = arukeresoConfig as unknown as ProductSourceConfig;
-    const slugs = config.detailPage.category.slugLookup.map((r) => r.slug);
-    expect(slugs).toEqual([
-      'monitors',
-      'action-cameras',
-      'portable-bluetooth-speakers',
-      'ip-cameras',
-      'headphones',
-      'headsets',
-      'keyboards',
-      'mice',
-      'projectors',
-      'robot-vacuums',
-      'smartwatches-fitness-trackers',
-      'soundbars',
-      'internal-ssds',
-      'tvs',
-      'wifi-routers',
-    ]);
   });
 
   it('ebikeshop config resolves every product to the single ebikes category', () => {
@@ -113,20 +78,9 @@ describe('hand-authored source configs', () => {
     expect(config.detailPage.postProcess?.enabled).toBe(true);
   });
 
-  it('DisplaySpecs config resolves TV vs monitor via specSectionTitleIn with a monitor fallback', () => {
-    const config = displayspecsConfig as unknown as ProductSourceConfig;
-    expect(config.detailPage.category.slugLookup).toEqual([
-      {
-        when: {
-          specSectionTitleIn: [
-            'Video file formats',
-            'Audio file formats',
-            'TV tuner',
-          ],
-        },
-        slug: 'tvs',
-      },
-      { when: { always: true }, slug: 'monitors' },
-    ]);
+  it('ebikeshop config has no postProcess override, so it picks up the on-by-default behavior', () => {
+    expect(
+      (ebikeshopConfig as unknown as ProductSourceConfig).detailPage.postProcess,
+    ).toBeUndefined();
   });
 });

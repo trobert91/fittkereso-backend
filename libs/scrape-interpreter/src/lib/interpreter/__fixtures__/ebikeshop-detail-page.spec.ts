@@ -75,6 +75,26 @@ const EBIKESHOP_DETAIL_PAGE_DATA = {
           categoryTitle: 'Váltó sebességfokozatainak száma',
           quantityUnit: '',
         },
+        {
+          value: 'Bosch',
+          categoryTitle: 'Motor gyártója',
+          quantityUnit: '',
+        },
+        {
+          value: 'Bosch Performance Line CX',
+          categoryTitle: 'Motor típusa',
+          quantityUnit: '',
+        },
+        {
+          value: 'Shimano XT',
+          categoryTitle: 'Váltó',
+          quantityUnit: '',
+        },
+        {
+          value: 'Elektromos',
+          categoryTitle: 'Váltó működése',
+          quantityUnit: '',
+        },
       ],
     },
   },
@@ -126,9 +146,15 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
       { name: 'Vázméret', values: ['48 cm'] },
       { name: 'Modellév', values: ['26'] },
       { name: 'Váltó sebességfokozatainak száma', values: ['11'] },
+      { name: 'Motor gyártója', values: ['Bosch'] },
+      { name: 'Motor típusa', values: ['Bosch Performance Line CX'] },
+      { name: 'Váltó', values: ['Shimano XT'] },
+      { name: 'Váltó működése', values: ['Elektromos'] },
     ]);
 
     expect(result.releaseYear).toBe(2026);
+
+    expect(result.externalId).toBe('1260040108');
 
     expect(result.imageUrls).toEqual(['https://ebikeshop.hu/img/a.webp']);
 
@@ -157,7 +183,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     expect(result.brand).toBe('Riese & Müller');
   });
 
-  it('prefers the sale price when prices.sale is true', async () => {
+  it('prefers the sale price when prices.sale is true, and reports priceWithoutDiscount', async () => {
     const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
     data.props.product.prices = { price: 4099000, priceSale: 3699000, sale: true };
     const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -167,6 +193,17 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.rawOffers[0].price).toBe(3699000);
+    expect(result.rawOffers[0].priceWithoutDiscount).toBe(4099000);
+  });
+
+  it('omits priceWithoutDiscount when prices.sale is false', async () => {
+    const $ = cheerio.load(buildHtml());
+    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers[0].price).toBe(3879000.0017);
+    expect(result.rawOffers[0].priceWithoutDiscount).toBeUndefined();
   });
 
   it('maps "Készleten" stock status to in_stock availability', async () => {

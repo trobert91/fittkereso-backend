@@ -131,6 +131,15 @@
       { "op": "coalesce", "candidates": ["manufacturerTitle", "legalManufacturerClean"] }
     ],
 
+    "externalId": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.productCode"
+      }
+    ],
+
     "model": [
       {
         "op": "parseJsonAttr",
@@ -204,6 +213,7 @@
           { "key": "frameType", "labels": ["Váztípus"] },
           { "key": "frameSize", "labels": ["Vázméret"], "extract": "number" },
           { "key": "usageType", "labels": ["Felhasználás módja"] },
+          { "key": "condition", "labels": ["Állapot"] },
           { "key": "batteryPosition", "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"] },
           { "key": "wheelSize", "labels": ["Kerékméret"], "extract": "number" },
           { "key": "drivetrain", "labels": ["Erőátvitel"] },
@@ -211,9 +221,13 @@
           { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
           { "key": "gearType", "labels": ["Váltó típusa"] },
           { "key": "gearCount", "labels": ["Váltó sebességfokozatainak száma"], "extract": "number" },
+          { "key": "shiftingActuation", "labels": ["Váltó működése"] },
+          { "key": "rearDerailleur", "labels": ["Váltó"] },
           { "key": "batteryCapacity", "labels": ["Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
           { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
           { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
+          { "key": "motorBrand", "labels": ["Motor gyártója"] },
+          { "key": "motorModel", "labels": ["Motor típusa"] },
           { "key": "motorPower", "labels": ["Motor teljesítménye"], "extract": "number" },
           { "key": "topSpeed", "labels": ["Maximális rásegítés", "Maximális sebesség", "Motoros rásegítés sebessége"], "extract": "number" },
           { "key": "range", "labels": ["Hatótávolság"], "extract": "number" },
@@ -264,6 +278,35 @@
               "selector": "#app",
               "attr": "data-page",
               "path": "props.product.prices.price"
+            }
+          ]
+        }
+      ],
+      "priceWithoutDiscount": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.prices.sale",
+          "as": "onSaleForOriginalPrice"
+        },
+        {
+          "op": "branch",
+          "condition": { "equals": { "value": "onSaleForOriginalPrice", "to": true } },
+          "ifTrue": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.prices.price"
+            }
+          ],
+          "ifFalse": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.prices.__notPresent"
             }
           ]
         }

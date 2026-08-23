@@ -1,16 +1,15 @@
 /**
  * One-time idempotent seed for the ProductSource.config JSONB rows
- * (Arukereso, DisplaySpecs, ebikeshop, speedbike), reading the hand-authored
- * config JSON from libs/scrape-interpreter's fixtures directory (same files
- * validated by that library's test suite).
+ * (ebikeshop, speedbike), reading the hand-authored config JSON from
+ * libs/scrape-interpreter's fixtures directory (same files validated by
+ * that library's test suite).
  *
  * Upserts by name, so it's safe to re-run. Sources with a `seller` spec
- * (single-storefront sources like ebikeshop, as opposed to aggregators like
- * Arukereso/DisplaySpecs which have none) also resolve-or-create the
- * matching Seller row by exact name and link it via ProductSource.seller —
- * the name here must match byte-for-byte what the config's
- * detailPage.offers.sellerName pipeline emits, since SellerResolutionService
- * (used at scrape time) does exact-name lookup, not fuzzy matching.
+ * resolve-or-create the matching Seller row by exact name and link it via
+ * ProductSource.seller — the name here must match byte-for-byte what the
+ * config's detailPage.offers.sellerName pipeline emits, since
+ * SellerResolutionService (used at scrape time) does exact-name lookup, not
+ * fuzzy matching.
  *
  * Usage:
  *   npx ts-node -r tsconfig-paths/register apps/product-collector/scripts/seed-product-source-configs.ts
@@ -57,24 +56,6 @@ interface SeedSourceSpec {
 }
 
 const SOURCES: SeedSourceSpec[] = [
-  {
-    name: 'arukereso',
-    configFile: 'arukereso.config.json',
-    maxConcurrent: 1,
-    requestsPerHour: 60,
-    priority: 10,
-    fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
-  },
-  {
-    name: 'displayspecs',
-    configFile: 'displayspecs.config.json',
-    maxConcurrent: 1,
-    requestsPerHour: 60,
-    priority: 5,
-    fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
-  },
   {
     name: 'ebikeshop',
     configFile: 'ebikeshop.config.json',
