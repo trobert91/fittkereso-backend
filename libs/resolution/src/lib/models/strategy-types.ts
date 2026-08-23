@@ -49,5 +49,17 @@ export interface DecisionStrategy {
   ): Promise<FinalDecision>;
 }
 
-/** DI token for the decision strategy (single-impl by default). */
+/** DI token for the decision strategy (single-impl by default). Used for the
+ *  comment/mention-resolution use case (`LlmDecisionStrategy`). */
 export const DECISION_STRATEGY = Symbol('DECISION_STRATEGY');
+
+/** DI token for the scrape-time merge decision strategy
+ *  (`ScrapeMergeDecisionStrategy`) — a separate binary "same product?"
+ *  strategy `DecisionService` dispatches to when
+ *  `ResolutionOptions.decisionStrategy === 'scrape-merge'`. Kept as a
+ *  distinct token/implementation rather than reusing `DECISION_STRATEGY`
+ *  because the two ask fundamentally different questions (see
+ *  ScrapeMergeDecisionStrategy's doc comment). */
+export const SCRAPE_MERGE_DECISION_STRATEGY = Symbol(
+  'SCRAPE_MERGE_DECISION_STRATEGY',
+);

@@ -5,6 +5,9 @@ import {
   ProductAliasRepository,
   ProductAliasSource,
   ProductCategory,
+  ProductDuplicateDecision,
+  ProductDuplicateOrigin,
+  ProductDuplicateRepository,
   ProductEmbedding,
   ProductModel,
   ProductModelRepository,
@@ -30,15 +33,27 @@ import {
   ProductNormalizerService,
   ProductSourceRecordUpdaterService,
   SellerResolutionService,
+  SpecComparisonService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
 import { isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
+interface PendingScrapeDuplicate {
+  candidateProductId: string;
+  confidence: number;
+  reason?: string;
+}
+
 interface ResolvedIdentity {
   model?: ProductModel;
   isExistingMatch: boolean;
   resolutionContext?: ResolutionContext;
+  /** Set when Path 2's LLM merge decision considered a candidate close enough
+   *  to adjudicate but did not confidently accept it. The scraper proceeds to
+   *  create a new product (the safe default), but also flags this candidate
+   *  pair for human review — see `writeScrapeAmbiguousDuplicate`. */
+  pendingDuplicate?: PendingScrapeDuplicate;
 }
 
 interface PersistResult {
@@ -69,6 +84,8 @@ export class ProductScrapeUpdaterService {
     private readonly sellerResolution: SellerResolutionService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly duplicateRepo: ProductDuplicateRepository,
+    private readonly specComparison: SpecComparisonService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -182,7 +199,9 @@ export class ProductScrapeUpdaterService {
         normalizedSourceName,
         categoryId,
       );
-    const path1Match = this.selectPath1Match(sourceRows, task, scrapedProduct);
+    const path1Match = this.hasCollidedKey(sourceRows)
+      ? undefined
+      : this.selectPath1Match(sourceRows, task, scrapedProduct);
     if (path1Match) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
@@ -220,12 +239,28 @@ export class ProductScrapeUpdaterService {
     }
 
     if (candidate) {
+      const isLlmMerge = resolutionContext?.decision?.kind === 'llm_resolved';
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
-        'cross_source_merge',
+        isLlmMerge ? 'llm_merge_accept' : 'cross_source_merge',
       );
       this.productMetricsService.productMatched(task.source.name);
       return { model: candidate, isExistingMatch: true, resolutionContext };
+    }
+
+    // No accepted match. If the scrape-merge LLM decision actually ran and
+    // considered a near-miss candidate without confidently accepting it
+    // (llm_unresolved — distinct from matcher_reject, where the LLM was never
+    // invoked at all because nothing was close enough to be worth asking),
+    // flag that candidate for human review rather than silently creating a
+    // duplicate with no trace. See writeScrapeAmbiguousDuplicate.
+    const pendingDuplicate = this.extractPendingDuplicate(resolutionContext);
+    if (pendingDuplicate) {
+      this.productMetricsService.scrapeResolutionOutcome(
+        task.source.name,
+        'llm_merge_reject',
+      );
+      return { isExistingMatch: false, resolutionContext, pendingDuplicate };
     }
 
     return { isExistingMatch: false, resolutionContext };
@@ -279,6 +314,15 @@ export class ProductScrapeUpdaterService {
       this.productMetricsService.newProductCreated(task.source.name);
     } else {
       this.productMetricsService.productUpdated(task.source.name);
+    }
+
+    if (saveOutcome.created && identity.pendingDuplicate) {
+      await this.writeScrapeAmbiguousDuplicate(
+        task,
+        scrapedProduct,
+        saveOutcome.model,
+        identity.pendingDuplicate,
+      );
     }
 
     task.product = saveOutcome.model;
@@ -450,6 +494,113 @@ export class ProductScrapeUpdaterService {
     );
   }
 
+  // Extract the near-miss candidate from an `llm_unresolved` decision, so it
+  // can be flagged for human review. Deliberately does NOT fire on
+  // `matcher_reject` (the LLM was never invoked — nothing was close enough to
+  // be worth asking) or on `llm_resolved` (already handled as a merge above) —
+  // only a genuine "the scrape-merge LLM looked at this and wasn't
+  // confident" outcome should create a review row, to avoid flooding the
+  // queue with every plain "no match found at all" scrape.
+  private extractPendingDuplicate(
+    resolutionContext: ResolutionContext | undefined,
+  ): PendingScrapeDuplicate | undefined {
+    if (resolutionContext?.decision?.kind !== 'llm_unresolved') return undefined;
+    const bestCandidate = resolutionContext.scoring?.bestCandidate;
+    if (!bestCandidate) return undefined;
+    return {
+      candidateProductId: bestCandidate.candidateId,
+      confidence: resolutionContext.decision.confidence,
+      reason: resolutionContext.decision.evidenceSummary,
+    };
+  }
+
+  // Scrape-time safety net for step 6 of the matching upgrade: when the
+  // scrape-merge LLM decision considered a near-miss candidate but wasn't
+  // confident enough to merge, the scraper still creates a new product (the
+  // safe default — see extractPendingDuplicate) but also writes a
+  // ProductDuplicate row so a human can later confirm or reject a merge.
+  // Reuses the exact entity/repo/admin-UI the nightly dedup job already uses
+  // (ProductDuplicate has no scrape-specific shape) — the only addition is
+  // the `origin` tag distinguishing this from the nightly job's own pairs.
+  private async writeScrapeAmbiguousDuplicate(
+    task: ScrapeTask,
+    scrapedProduct: ScrapedProduct,
+    newModel: ProductModel,
+    pendingDuplicate: PendingScrapeDuplicate,
+  ): Promise<void> {
+    try {
+      const candidateModel = await this.productRepo.findOne({
+        where: { id: pendingDuplicate.candidateProductId },
+        select: ['id', 'specs'],
+      });
+      if (!candidateModel) {
+        this.logger.warn(
+          'Scrape-merge candidate no longer exists, skipping duplicate-record fallback',
+          { taskId: task.id, candidateId: pendingDuplicate.candidateProductId },
+        );
+        return;
+      }
+
+      const categoryConfig = this.categoryConfigService.getConfig(
+        scrapedProduct.category?.slug,
+      );
+      const specMatchDetails = this.specComparison.compareSpecs({
+        specsA: newModel.specs,
+        specsB: candidateModel.specs,
+        primarySpecs: categoryConfig?.primarySpecs,
+        matcherSpecs: categoryConfig?.matcherSpecs,
+        matcherSpecHierarchies: categoryConfig?.matcherSpecHierarchies,
+      });
+
+      const reasons = [
+        'scrape-time ambiguous match',
+        `LLM confidence ${pendingDuplicate.confidence}`,
+        ...(pendingDuplicate.reason ? [pendingDuplicate.reason] : []),
+      ];
+
+      await this.duplicateRepo.upsertPair({
+        productAId: newModel.id,
+        productBId: candidateModel.id,
+        decision: ProductDuplicateDecision.pending_review,
+        similarityScore: pendingDuplicate.confidence,
+        specMatchDetails,
+        pendingReasons: reasons,
+        origin: ProductDuplicateOrigin.scrape_time,
+      });
+
+      this.productMetricsService.scrapeResolutionOutcome(
+        task.source.name,
+        'scrape_ambiguous_pending_review',
+      );
+    } catch (error: unknown) {
+      // Never fail the scrape over the review-queue write — the new product
+      // is already created and saved by this point; losing the review row
+      // is a diagnosability gap, not a data-correctness one.
+      this.logger.warn(
+        'Failed to write scrape-time duplicate-record fallback, continuing',
+        {
+          taskId: task.id,
+          newModelId: newModel.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
+  }
+
+  // A normalizedSourceName key is expected to identify one product. Under the
+  // 'full-sorted' normalization strategy the key is lossy (words are sorted,
+  // so two genuinely different models can coincidentally sort to the same
+  // key) — if the rows sharing this key actually point at more than one
+  // distinct ProductModel, the key match can't be trusted as identity.
+  // Skip Path 1 entirely rather than guess; Path 2's full scoring pipeline
+  // (name/spec similarity, not just the trigram key) is the fallback.
+  private hasCollidedKey(sourceRows: ProductSourceRecord[]): boolean {
+    const distinctModelIds = new Set(
+      sourceRows.map((row) => row.model?.id).filter(Boolean),
+    );
+    return distinctModelIds.size > 1;
+  }
+
   // Pick the right Path 1 hit when multiple source rows share a normalizedSourceName
   // (e.g. color/variant siblings like "39GS95QE-B" and "39GS95QE-W" both normalize
   // to "39gs95qe"). Prefer an exact name match from the same source; accept any
@@ -495,6 +646,15 @@ export class ProductScrapeUpdaterService {
         useEmbedding: true,
         webSearchEnabled: false,
         mode: 'strict',
+        // Let DecisionService fall back to the scrape-merge LLM decision when
+        // quality gates reject every candidate but the best one is still
+        // close to threshold (see MatchingConfig.llmDecisionFloor) — without
+        // this, an ambiguous Path 2 result silently became a new product with
+        // no adjudication or review trail. Explicitly NOT webSearchEnabled:
+        // true — that would also turn on SERP web search, a different cost/
+        // evidence profile this change isn't meant to introduce.
+        llmDecisionEnabled: true,
+        decisionStrategy: 'scrape-merge',
       },
       undefined,
       logContext,

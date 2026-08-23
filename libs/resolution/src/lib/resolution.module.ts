@@ -20,11 +20,13 @@ import { EmbeddingRecallStrategy } from './strategies/recall/embedding.recall';
 import { ModelCatalogSearchService } from './strategies/recall/model-catalog-search.service';
 import { WebResearchRecallStrategy } from './strategies/recall/web-research.recall';
 import { LlmDecisionStrategy } from './strategies/decision/llm-decision.strategy';
+import { ScrapeMergeDecisionStrategy } from './strategies/decision/scrape-merge-decision.strategy';
 import { CatalogResolver } from './web-search/catalog-resolver';
 import { SerpSkusExtractor } from './web-search/serp-skus.extractor';
 import { WebSearchKeywordBuilder } from './web-search/web-search-keyword.builder';
 import {
   DECISION_STRATEGY,
+  SCRAPE_MERGE_DECISION_STRATEGY,
   RECALL_STRATEGIES,
   type RecallStrategy,
 } from './models/strategy-types';
@@ -65,6 +67,7 @@ import { ResolutionService } from './resolution.service';
     CatalogResolver,
     WebResearchRecallStrategy,
     LlmDecisionStrategy,
+    ScrapeMergeDecisionStrategy,
     {
       provide: RECALL_STRATEGIES,
       inject: [
@@ -81,6 +84,10 @@ import { ResolutionService } from './resolution.service';
     {
       provide: DECISION_STRATEGY,
       useExisting: LlmDecisionStrategy,
+    },
+    {
+      provide: SCRAPE_MERGE_DECISION_STRATEGY,
+      useExisting: ScrapeMergeDecisionStrategy,
     },
     RecallService,
     DecisionService,
@@ -105,6 +112,7 @@ import { ResolutionService } from './resolution.service';
     FinalizeService,
     RECALL_STRATEGIES,
     DECISION_STRATEGY,
+    SCRAPE_MERGE_DECISION_STRATEGY,
     ResolutionService,
   ],
 })

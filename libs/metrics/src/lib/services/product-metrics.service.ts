@@ -20,7 +20,17 @@ export type ScrapeResolutionOutcome =
   | 'path1_hit'
   | 'cross_source_merge'
   | 'cross_source_rejected_same_source'
-  | 'new_product';
+  | 'new_product'
+  /** Path 2's scrape-merge LLM decision confidently accepted a candidate that
+   *  the deterministic quality gates had rejected. */
+  | 'llm_merge_accept'
+  /** The scrape-merge LLM decision considered a near-miss candidate but was
+   *  not confident enough to merge — falls through to `new_product`, and also
+   *  produces a `scrape_ambiguous_pending_review` duplicate-record write. */
+  | 'llm_merge_reject'
+  /** A `ProductDuplicate` row was written for human review after an
+   *  `llm_merge_reject` outcome. */
+  | 'scrape_ambiguous_pending_review';
 
 @Injectable()
 export class ProductMetricsService {

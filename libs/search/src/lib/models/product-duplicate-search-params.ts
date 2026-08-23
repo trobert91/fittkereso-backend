@@ -1,6 +1,9 @@
 import { IsOptional, IsString, IsNumber, IsEnum, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ProductDuplicateDecision } from '@fittkereso-backend/database';
+import {
+  ProductDuplicateDecision,
+  ProductDuplicateOrigin,
+} from '@fittkereso-backend/database';
 
 export class ProductDuplicateSearchParams {
   @IsOptional()
@@ -10,6 +13,10 @@ export class ProductDuplicateSearchParams {
   @IsOptional()
   @IsString()
   categoryId?: string;
+
+  @IsOptional()
+  @IsEnum(ProductDuplicateOrigin)
+  origin?: ProductDuplicateOrigin;
 
   @IsOptional()
   @IsNumber()

@@ -3,6 +3,7 @@ import {
   OfferRepository,
   ProductAliasRepository,
   ProductCategory,
+  ProductDuplicateRepository,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecordRepository,
@@ -21,6 +22,7 @@ import type {
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
   SellerResolutionService,
+  SpecComparisonService,
 } from '@fittkereso-backend/product';
 
 jest.mock('@fittkereso-backend/resolution', () => ({
@@ -118,6 +120,8 @@ describe('ProductScrapeUpdaterService', () => {
   let mockSellerResolution: jest.Mocked<SellerResolutionService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
+  let mockDuplicateRepo: jest.Mocked<ProductDuplicateRepository>;
+  let mockSpecComparison: jest.Mocked<SpecComparisonService>;
 
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
@@ -195,6 +199,21 @@ describe('ProductScrapeUpdaterService', () => {
       getConfig: jest.fn().mockReturnValue(undefined),
     } as unknown as jest.Mocked<CategoryConfigService>;
 
+    mockDuplicateRepo = {
+      upsertPair: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<ProductDuplicateRepository>;
+
+    mockSpecComparison = {
+      compareSpecs: jest.fn().mockReturnValue({
+        comparableCount: 0,
+        matchingCount: 0,
+        primaryMismatches: 0,
+        matcherSpecMismatches: 0,
+        nonPrimaryMismatches: 0,
+        details: [],
+      }),
+    } as unknown as jest.Mocked<SpecComparisonService>;
+
     service = new ProductScrapeUpdaterService(
       mockProductSearch,
       mockBrandResolution,
@@ -211,6 +230,8 @@ describe('ProductScrapeUpdaterService', () => {
       mockSellerResolution,
       mockOfferRepo,
       mockCategoryConfigService,
+      mockDuplicateRepo,
+      mockSpecComparison,
     );
   });
 

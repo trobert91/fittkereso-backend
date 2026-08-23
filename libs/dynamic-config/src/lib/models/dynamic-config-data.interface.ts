@@ -147,6 +147,12 @@ export interface DynamicConfigData {
       /** Hard cap on how many picks the decision LLM may return. Bounds prompt
        *  cost and downstream candidate fan-out. Default: 6 */
       maxLlmPicks?: number;
+      /** Minimum matcher score (0–100) a rejected candidate set's best
+       *  candidate must still clear before the scrape-time LLM merge decision
+       *  is worth invoking — below this, the candidate is simply wrong, not
+       *  "close but ambiguous," and asking an LLM to adjudicate wastes a call
+       *  and adds false-merge risk. Default: 50 */
+      llmDecisionFloor?: number;
     };
     // ProductSearchAgent configuration
     search?: ProductSearchAgentConfig;

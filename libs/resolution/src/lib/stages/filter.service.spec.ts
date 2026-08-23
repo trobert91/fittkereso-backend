@@ -17,6 +17,7 @@ const MATCHING_CONFIG: MatchingConfig = {
   defaultStrictness: 'moderate',
   defaultNumericTokenWeight: 2.5,
   ambiguityGapAnchored: 10,
+  llmDecisionFloor: 50,
 };
 
 const MONITORS_CONFIG = {

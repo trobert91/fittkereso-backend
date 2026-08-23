@@ -2,6 +2,7 @@ import { Column, Entity, Index, ManyToOne, Unique } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
 import { ProductDuplicateDecision } from '../types/product-duplicate-decision';
+import { ProductDuplicateOrigin } from '../types/product-duplicate-origin';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 import { Expose, Transform } from 'class-transformer';
 import { transfromExposeAll } from '@fittkereso-backend/utils';
@@ -51,4 +52,16 @@ export class ProductDuplicate extends BasePostgresEntity {
   @Column({ type: 'text', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList] })
   reviewNote?: string | null;
+
+  /** How this pair was discovered — nightly post-hoc cron vs. flagged live
+   *  during scraping. Nullable for backward compatibility with rows written
+   *  before this column existed (all of which came from the nightly job). */
+  @Index()
+  @Column({
+    type: 'enum',
+    enum: ProductDuplicateOrigin,
+    nullable: true,
+  })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  origin?: ProductDuplicateOrigin | null;
 }

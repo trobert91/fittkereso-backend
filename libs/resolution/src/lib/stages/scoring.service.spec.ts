@@ -22,6 +22,7 @@ const MATCHING_CONFIG: MatchingConfig = {
   defaultStrictness: 'moderate',
   defaultNumericTokenWeight: 2.5,
   ambiguityGapAnchored: 10,
+  llmDecisionFloor: 50,
 };
 
 function slim(id: string, model: string): SlimCandidate {

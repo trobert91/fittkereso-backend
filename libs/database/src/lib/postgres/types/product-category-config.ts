@@ -162,8 +162,16 @@ export interface ProductCategoryConfig {
    *  digit/alpha split between "identity" and "noise" (ebikes: "MACINA SCARP SX
    *  PRESTIGE Di2" has no digits at all). Relies on the LLM post-process step
    *  (ProductSourcePostProcessService) already having stripped offer-level
-   *  attributes like size/color from `model` upstream. */
-  normalizationStrategy?: 'digit-heuristic' | 'full';
+   *  attributes like size/color from `model` upstream.
+   *  'full-sorted': same as 'full', but additionally sorts the whitespace
+   *  tokens alphabetically before joining, so two sources whose post-processed
+   *  model strings differ only in word order (e.g. "Cross Macina 720" vs.
+   *  "Macina Cross 720") produce the same key. This key is queried by pg_trgm
+   *  similarity() (ProductFuzzySearchService, the nightly dedup job's recall)
+   *  in addition to the exact-match Path 1 lookup, so the fix applies to both.
+   *  Not used for the embedding column (ProductEmbeddingService), which is
+   *  deliberately natural-language for its semantic model. */
+  normalizationStrategy?: 'digit-heuristic' | 'full' | 'full-sorted';
   /** Spec keys (must exist in the category's jsonSchema.json) that describe a
    *  purchasable variant/listing attribute rather than the product model's
    *  identity — e.g. frameSize, color. Values for these keys are never merged

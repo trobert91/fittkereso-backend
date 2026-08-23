@@ -12,7 +12,7 @@ export class ProductNormalizerService {
    * free of brand-prefix noise and lets brand-less comment mentions match
    * cleanly.
    *
-   * Two strategies, selected per-category via ProductCategoryConfig.normalizationStrategy:
+   * Three strategies, selected per-category via ProductCategoryConfig.normalizationStrategy:
    *
    * 'digit-heuristic' (default): split on whitespace to preserve word boundaries
    * (so "G5 C34G55TWWP" stays two tokens), and for each whitespace-bounded
@@ -28,6 +28,13 @@ export class ProductNormalizerService {
    * "identity" and "noise" (bikes: "MACINA SCARP SX PRESTIGE Di2" has no
    * digits at all, so the digit-heuristic would discard the entire model
    * line). See normalizeFull() for details.
+   *
+   * 'full-sorted': same as 'full', but additionally sorts the whitespace-
+   * delimited words alphabetically before joining, so this key (and every
+   * pg_trgm similarity() query against it — ProductFuzzySearchService, the
+   * nightly dedup job's recall, Path 1's exact lookup) is insensitive to
+   * word-order differences between sources' post-processed model strings
+   * (e.g. "Cross Macina 720" vs. "Macina Cross 720"). See normalizeFullSorted().
    */
   public normalizeProduct({
     brand,
@@ -38,7 +45,7 @@ export class ProductNormalizerService {
     brand: string;
     model: string | undefined;
     displayName: string | undefined;
-    strategy?: 'digit-heuristic' | 'full';
+    strategy?: 'digit-heuristic' | 'full' | 'full-sorted';
   }): string {
     const source = model ?? displayName;
     if (!source) {
@@ -46,6 +53,10 @@ export class ProductNormalizerService {
     }
 
     const withoutBrand = this.stripBrandPrefix(source, brand);
+
+    if (strategy === 'full-sorted') {
+      return this.normalizeFullSorted(withoutBrand);
+    }
 
     if (strategy === 'full') {
       return this.normalizeFull(withoutBrand);
@@ -76,6 +87,26 @@ export class ProductNormalizerService {
    */
   private normalizeFull(input: string): string {
     return input.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Same as normalizeFull(), but sorts the whitespace-delimited words
+   * alphabetically before rejoining — makes the key order-insensitive.
+   * Words (not the finer alpha/digit tokens used by the similarity scorer)
+   * are the sort unit here deliberately: sorting inside a word like "Di2"
+   * would destroy it, and the fuzzy-matching layer downstream already does
+   * its own token-level, order-independent comparison — this key only needs
+   * to be stable and collision-resistant for exact/trigram lookups.
+   *
+   * Lossy by construction: two different trims whose words happen to sort to
+   * the same order will collide on this key. Callers that consume this key
+   * for exact-match identity (e.g. ProductScrapeUpdaterService's Path 1) must
+   * not treat a hit as authoritative when it resolves to more than one
+   * distinct ProductModel — see selectPath1Match's multi-model guard.
+   */
+  private normalizeFullSorted(input: string): string {
+    const words = this.normalizeFull(input).split(' ').filter(Boolean);
+    return words.sort().join(' ');
   }
 
   private stripBrandPrefix(source: string, brand: string): string {

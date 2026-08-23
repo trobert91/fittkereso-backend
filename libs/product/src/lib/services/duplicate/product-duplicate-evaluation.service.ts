@@ -4,6 +4,7 @@ import {
   ProductAliasSource,
   ProductCategoryRepository,
   ProductDuplicateDecision,
+  ProductDuplicateOrigin,
   ProductDuplicateRepository,
   ProductModelRepository,
   ProductAliasRepository,
@@ -213,6 +214,7 @@ export class ProductDuplicateEvaluationService {
         similarityScore: evaluation.inProcessScore ?? pair.similarityScore,
         specMatchDetails: evaluation.specMatchDetails,
         pendingReasons: evaluation.reasons,
+        origin: ProductDuplicateOrigin.nightly_detection,
       });
 
       if (!saved) {

@@ -79,6 +79,12 @@ export class ProductDuplicateSearchService {
       );
     }
 
+    if (params.origin) {
+      query.andWhere(`duplicate.${nameOf<ProductDuplicate>('origin')} = :origin`, {
+        origin: params.origin,
+      });
+    }
+
     query.orderBy(`duplicate.${nameOf<ProductDuplicate>('createdAt')}`, 'DESC');
 
     return query;

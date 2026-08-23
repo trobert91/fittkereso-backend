@@ -9,7 +9,8 @@
     "maxLlmPicks": 6,
     "defaultStrictness": "moderate",
     "defaultNumericTokenWeight": 2.5,
-    "importantTokenWeightThreshold": 2.0
+    "importantTokenWeightThreshold": 2.0,
+    "llmDecisionFloor": 50
   },
   "search": {
     "maxModelVariants": 20,

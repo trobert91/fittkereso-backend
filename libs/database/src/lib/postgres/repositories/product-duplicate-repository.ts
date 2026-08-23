@@ -5,6 +5,7 @@ import { nameOf } from '@fittkereso-backend/utils';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { ProductDuplicate } from '../models/product-duplicate.entity';
 import { ProductDuplicateDecision } from '../types/product-duplicate-decision';
+import type { ProductDuplicateOrigin } from '../types/product-duplicate-origin';
 import type { SpecMatchDetails } from '../types/spec-match-details';
 
 export interface UpsertProductDuplicateParams {
@@ -14,6 +15,7 @@ export interface UpsertProductDuplicateParams {
   similarityScore: number;
   specMatchDetails?: SpecMatchDetails;
   pendingReasons?: string[];
+  origin?: ProductDuplicateOrigin;
 }
 
 @Injectable()
@@ -76,6 +78,13 @@ export class ProductDuplicateRepository extends BasePostgresRepository<ProductDu
       existing.similarityScore = params.similarityScore;
       existing.specMatchDetails = params.specMatchDetails;
       existing.pendingReasons = params.pendingReasons;
+      // Simplest policy: the most recent upsert's origin wins, same as every
+      // other field here. A scrape_time pair the nightly job re-evaluates
+      // becomes nightly_detection-tagged going forward — the nightly job's
+      // fresher, full-catalog scoring is treated as authoritative. (See plan
+      // doc — flagged as a decision point, not a hard requirement to preserve
+      // the original scrape-time tag.)
+      existing.origin = params.origin ?? existing.origin;
       return this.repo.save(existing);
     }
 
@@ -95,6 +104,7 @@ export class ProductDuplicateRepository extends BasePostgresRepository<ProductDu
     duplicate.similarityScore = params.similarityScore;
     duplicate.specMatchDetails = params.specMatchDetails;
     duplicate.pendingReasons = params.pendingReasons;
+    duplicate.origin = params.origin;
     return this.repo.save(duplicate);
   }
 }

@@ -16,6 +16,7 @@ export interface MatchingConfig {
   defaultStrictness: 'strict' | 'moderate' | 'loose';
   defaultNumericTokenWeight: number;
   ambiguityGapAnchored: number;
+  llmDecisionFloor: number;
 }
 
 @Injectable()
@@ -39,6 +40,10 @@ export class MatchingConfigService {
         (overrides as Record<string, number> | undefined)?.[
           'ambiguityGapAnchored'
         ] ?? 10,
+      llmDecisionFloor:
+        overrides?.llmDecisionFloor ??
+        (defaults as { llmDecisionFloor?: number }).llmDecisionFloor ??
+        50,
     };
   }
 }

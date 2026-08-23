@@ -6,6 +6,29 @@ import type { FinalDecision } from '../models/resolution-context';
 import type { MatchResult } from '@fittkereso-backend/database';
 import { EMPTY_MATCH_RESULT_COMPONENTS } from '@fittkereso-backend/database';
 import type { QualityGatesService } from '../matching/quality-gates.service';
+import type { MatchingConfigService } from '../matching/matching-config.service';
+
+/** Strategy stub for the scrape-merge path — unused by these tests (none of
+ *  them opt into `llmDecisionEnabled`), asserted never-called where relevant. */
+function makeUnusedScrapeMergeStrategy(): DecisionStrategy {
+  return {
+    decide: jest.fn().mockRejectedValue(new Error('should not be called')),
+  };
+}
+
+function makeMatchingConfig(llmDecisionFloor = 50): MatchingConfigService {
+  return {
+    config: {
+      acceptThreshold: 70,
+      acceptThresholdStrict: 80,
+      ambiguityGap: 5,
+      defaultStrictness: 'moderate',
+      defaultNumericTokenWeight: 2.5,
+      ambiguityGapAnchored: 10,
+      llmDecisionFloor,
+    },
+  } as unknown as MatchingConfigService;
+}
 
 function slim(id: string, score?: number): SlimCandidate {
   return {
@@ -52,7 +75,12 @@ describe('DecisionService', () => {
       reason: 'never_called',
       selectedCandidates: [],
     });
-    const service = new DecisionService(strategy, makeGates([]));
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      makeGates([]),
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext();
     await service.decide(context);
@@ -71,7 +99,12 @@ describe('DecisionService', () => {
       selectedCandidates: [],
     });
     const gates = makeGates([match('p1', 92, 'g85sd')]);
-    const service = new DecisionService(strategy, gates);
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      gates,
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext({
       candidates: [slim('p1', 92)],
@@ -101,7 +134,12 @@ describe('DecisionService', () => {
       match('p2', 89, 'g85sb'),
       match('p3', 87, 'g85nb'),
     ]);
-    const service = new DecisionService(strategy, gates);
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      gates,
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext({
       candidates: [slim('p1', 92), slim('p2', 89), slim('p3', 87)],
@@ -136,7 +174,12 @@ describe('DecisionService', () => {
       selectedCandidates: [],
     });
     const gates = makeGates([]); // none above floor
-    const service = new DecisionService(strategy, gates);
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      gates,
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext({
       candidates: [slim('p1', 40)],
@@ -165,7 +208,12 @@ describe('DecisionService', () => {
       ],
     });
     const gates = makeGates([]);
-    const service = new DecisionService(strategy, gates);
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      gates,
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext({
       candidates: [slim('p1', 60), slim('p2', 58)],
@@ -195,7 +243,12 @@ describe('DecisionService', () => {
       true,
     );
     const gates = makeGates([]);
-    const service = new DecisionService(strategy, gates);
+    const service = new DecisionService(
+      strategy,
+      makeUnusedScrapeMergeStrategy(),
+      gates,
+      makeMatchingConfig(),
+    );
 
     const context = makeTestContext({
       candidates: [slim('p1')],
