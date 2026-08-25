@@ -23,6 +23,9 @@ export interface UpsertOfferFromScrapeParams {
   availability?: OfferAvailability;
   url?: string;
   externalId?: string;
+  /** Store/warehouse names where this offer is physically available —
+   *  always optional, absence is normal and must never block the upsert. */
+  locations?: string[];
   /** Offer-level spec values (e.g. frameSize, color) — always optional,
    *  absence is normal and must never block the upsert. */
   specs?: ProductSpecs;
@@ -58,6 +61,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       availability,
       url,
       externalId,
+      locations,
       specs,
     } = params;
 
@@ -72,6 +76,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     offer.availability = availability ?? OfferAvailability.unknown;
     offer.url = url;
     offer.externalId = externalId;
+    offer.locations = locations;
     offer.lastSeenAt = new Date();
     offer.active = true;
     offer.specs = specs;
@@ -93,6 +98,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
           raceWinner.availability = availability ?? OfferAvailability.unknown;
           raceWinner.url = url;
           raceWinner.sourceRecord = sourceRecord;
+          raceWinner.locations = locations;
           raceWinner.lastSeenAt = new Date();
           raceWinner.active = true;
           raceWinner.specs = specs;

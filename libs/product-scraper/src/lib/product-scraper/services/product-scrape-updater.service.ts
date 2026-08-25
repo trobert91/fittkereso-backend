@@ -519,6 +519,13 @@ export class ProductScrapeUpdaterService {
     );
 
     const upsertedOffers: Offer[] = [];
+    // Every ProductSourceRecord this scrape actually produced an offer for —
+    // the only records whose offers this pass is entitled to judge as
+    // stale. A scrape of one variant URL (e.g. the 53cm page, no offerLinks
+    // configured) never visits a sibling variant's page at all, so it has
+    // no way to know whether that sibling's own offer is still live; only
+    // records this pass actually touched get their unmatched offers deleted.
+    const touchedSourceRecordIds = new Set<string>();
     for (const scraped of offers!) {
       try {
         const normalizedScrapedUrl = scraped.url
@@ -528,6 +535,7 @@ export class ProductScrapeUpdaterService {
           ? (model.sources?.find((s) => s.url === normalizedScrapedUrl) ??
             primarySourceRecord)
           : primarySourceRecord;
+        touchedSourceRecordIds.add(sourceRecord.id);
         const seller = await this.sellerResolution.resolveOrCreate(
           scraped.sellerName,
         );
@@ -547,6 +555,7 @@ export class ProductScrapeUpdaterService {
           availability: scraped.availability,
           url: normalizedScrapedUrl,
           externalId: scraped.externalId,
+          locations: scraped.locations,
           specs: scraped.specs ?? pageOfferLevelSpecs,
         });
         upsertedOffers.push(offer);
@@ -563,12 +572,21 @@ export class ProductScrapeUpdaterService {
     }
 
     if (upsertedOffers.length > 0) {
-      // Anything preloaded but not matched this round is confirmed gone
-      // from the source and is hard-deleted (not soft-deactivated) — see
-      // OfferRepository/Offer.active doc comments.
+      // Anything preloaded, belonging to a record this scrape actually
+      // touched, but not matched this round is confirmed gone from that
+      // record's page and is hard-deleted (not soft-deactivated) — see
+      // OfferRepository/Offer.active doc comments. Offers on a
+      // ProductSourceRecord this scrape never visited (a sibling variant's
+      // own page) are left alone entirely — this pass has no evidence about
+      // whether they're still live.
       const matchedIds = new Set(upsertedOffers.map((o) => o.id));
       const staleIds = preloadedOffers
-        .filter((o) => !matchedIds.has(o.id))
+        .filter(
+          (o) =>
+            !matchedIds.has(o.id) &&
+            o.sourceRecord &&
+            touchedSourceRecordIds.has(o.sourceRecord.id),
+        )
         .map((o) => o.id);
       if (staleIds.length > 0) {
         await this.offerRepo.deleteByIds(staleIds);

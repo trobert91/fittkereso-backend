@@ -1,6 +1,7 @@
 import {
   ExtractAttrListOp,
   ExtractImageWithFallbackOp,
+  ExtractTextListOp,
 } from '@fittkereso-backend/database';
 import { CheerioSelection } from '../interfaces/scrape-execution-context.interface';
 import { OpHandler } from '../services/scrape-op-registry.service';
@@ -17,6 +18,21 @@ export const extractAttrList: OpHandler<ExtractAttrListOp> = (
     if (value) urls.push(op.trim === false ? value : value.trim());
   });
   return urls;
+};
+
+export const extractTextList: OpHandler<ExtractTextListOp> = (
+  ctx,
+  input,
+  op,
+) => {
+  const selection = input as CheerioSelection;
+  const texts: string[] = [];
+  selection.each((_i, el) => {
+    const text = ctx.$(el).text();
+    const trimmed = op.trim === false ? text : text.trim();
+    if (trimmed) texts.push(trimmed);
+  });
+  return texts;
 };
 
 export const extractImageWithFallback: OpHandler<

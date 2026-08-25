@@ -203,6 +203,7 @@ describe('ProductScrapeUpdaterService', () => {
       findFirstBySellerAndExternalIdsWithModelRelations: jest
         .fn()
         .mockResolvedValue(null),
+      deleteByIds: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<OfferRepository>;
 
     mockCategoryConfigService = {
@@ -589,5 +590,117 @@ describe('ProductScrapeUpdaterService', () => {
     expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(3);
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(1);
     expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a scrape of one variant URL (e.g. ebikeshop's 53cm frame-size
+  // page, no offerLinks configured) must never delete a sibling variant's
+  // offer (e.g. the 48cm page's own offer) just because this pass didn't
+  // happen to re-visit it. Only offers belonging to a ProductSourceRecord
+  // this scrape actually touched are eligible to be judged stale.
+  it('does not delete a sibling variant\'s offer when this scrape only touches one ProductSourceRecord', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({
+      offers: [
+        {
+          sellerName: 'ebikeshop.hu',
+          price: 3359000,
+          url: 'https://ebikeshop.hu/termek/53cm-variant',
+          externalId: 'sku-53cm',
+        },
+      ],
+    });
+    const existingModel = makeExistingModel();
+    const sourceRecord48cm = {
+      id: 'source-record-48cm',
+      url: 'https://ebikeshop.hu/termek/48cm-variant',
+    };
+    const sourceRecord53cm = {
+      id: 'source-record-53cm',
+      url: 'https://ebikeshop.hu/termek/53cm-variant',
+    };
+    existingModel.sources = [sourceRecord48cm, sourceRecord53cm] as never;
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockResolvedValue(existingModel);
+    mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
+      sourceRecord53cm as never,
+    );
+
+    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
+    mockSellerResolution.resolveOrCreate.mockResolvedValue(seller as never);
+
+    const offer48cm = {
+      id: 'offer-48cm',
+      seller,
+      sourceRecord: sourceRecord48cm,
+      externalId: 'sku-48cm',
+    };
+    const offer53cmExisting = {
+      id: 'offer-53cm',
+      seller,
+      sourceRecord: sourceRecord53cm,
+      externalId: 'sku-53cm',
+    };
+    mockOfferRepo.findAllByModelAndSource.mockResolvedValueOnce([
+      offer48cm,
+      offer53cmExisting,
+    ] as never);
+    mockOfferMatching.findMatch.mockReturnValueOnce(offer53cmExisting as never);
+    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce(
+      offer53cmExisting as never,
+    );
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
+  });
+
+  it('deletes an unmatched offer belonging to the ProductSourceRecord this scrape did touch', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({
+      offers: [
+        {
+          sellerName: 'ebikeshop.hu',
+          price: 3359000,
+          url: 'https://ebikeshop.hu/termek/53cm-variant',
+          externalId: 'sku-53cm-new',
+        },
+      ],
+    });
+    const existingModel = makeExistingModel();
+    const sourceRecord53cm = {
+      id: 'source-record-53cm',
+      url: 'https://ebikeshop.hu/termek/53cm-variant',
+    };
+    existingModel.sources = [sourceRecord53cm] as never;
+
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockProductRepo.save.mockResolvedValue(existingModel);
+    mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
+      sourceRecord53cm as never,
+    );
+
+    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
+    mockSellerResolution.resolveOrCreate.mockResolvedValue(seller as never);
+
+    const staleOfferSameRecord = {
+      id: 'offer-53cm-stale',
+      seller,
+      sourceRecord: sourceRecord53cm,
+      externalId: 'sku-53cm-old',
+    };
+    mockOfferRepo.findAllByModelAndSource.mockResolvedValueOnce([
+      staleOfferSameRecord,
+    ] as never);
+    mockOfferMatching.findMatch.mockReturnValueOnce(undefined); // no match — a new offer is created
+    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({
+      id: 'offer-53cm-new',
+    } as never);
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith([
+      'offer-53cm-stale',
+    ]);
   });
 });

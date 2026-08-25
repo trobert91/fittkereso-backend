@@ -167,6 +167,19 @@ export interface IdentityOp extends OpBase {
   value?: string;
 }
 
+// Always returns a single-element array `[value]`, regardless of the
+// resolved value's own type (object, undefined, etc.) — for sourcing
+// `forEachItem`/offer `offerList` from something that must iterate exactly
+// once even when the "natural" per-item array (e.g. a per-store stock list)
+// is empty. Wraps `undefined` as `[undefined]` rather than `[]`; pair with a
+// pipeline whose downstream fields don't depend on the wrapped item's shape
+// (e.g. assembleOffer sub-pipelines that re-read their own values via fresh
+// parseJsonAttr calls instead of reading off the iterated item).
+export interface WrapInArrayOp extends OpBase {
+  op: 'wrapInArray';
+  value?: string; // vars key; defaults to current pipeline value
+}
+
 export interface LiteralOp extends OpBase {
   op: 'literal';
   value: string; // fixed constant, e.g. a hardcoded sellerName/currency
@@ -367,6 +380,14 @@ export interface ExtractAttrListOp extends OpBase {
   trim?: boolean;
 }
 
+// Collects the trimmed text() of every element in a cheerio selection into a
+// string[] — the text-content counterpart to extractAttrList. Empty/blank
+// text per-element is dropped rather than kept as ''.
+export interface ExtractTextListOp extends OpBase {
+  op: 'extractTextList';
+  trim?: boolean;
+}
+
 export interface ExtractImageWithFallbackOp extends OpBase {
   op: 'extractImageWithFallback';
   primary: { selector: string; attr: string; mustContain?: string };
@@ -444,6 +465,10 @@ export interface AssembleOfferOp extends OpBase {
   availability?: ScrapeOperation[];
   url?: ScrapeOperation[];
   externalId?: ScrapeOperation[];
+  // Store/warehouse names where this offer is physically available (e.g.
+  // ["Törökbálinti raktár", "Törökbálint"]). Optional — most sources have no
+  // per-location breakdown; resolve to undefined (not []) when none apply.
+  locations?: ScrapeOperation[];
   specs?: Record<string, ScrapeOperation[]>;
 }
 
@@ -469,6 +494,7 @@ export type ScrapeOperation =
   | CoalesceOp
   | IdentityOp
   | LiteralOp
+  | WrapInArrayOp
   | RegexCaptureOp
   | FindScriptContainingOp
   | AssertContainsOp
@@ -493,6 +519,7 @@ export type ScrapeOperation =
   | ExtractSpecTableBySectionOp
   | AppendSyntheticSpecOp
   | ExtractAttrListOp
+  | ExtractTextListOp
   | ExtractImageWithFallbackOp
   | MapSpecValueOp
   | MapValueOp

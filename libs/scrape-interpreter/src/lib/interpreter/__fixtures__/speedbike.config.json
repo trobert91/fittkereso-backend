@@ -197,7 +197,7 @@
     },
 
     "offers": {
-      "listItems": [
+      "offerList": [
         { "op": "selectAll", "selector": ".productstock-param-row" }
       ],
       "itemMode": "cheerio",

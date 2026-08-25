@@ -1,5 +1,9 @@
 import * as cheerio from 'cheerio';
-import { extractAttrList, extractImageWithFallback } from './image-ops';
+import {
+  extractAttrList,
+  extractImageWithFallback,
+  extractTextList,
+} from './image-ops';
 import { ScrapeExecutionContext } from '../interfaces/scrape-execution-context.interface';
 
 function makeContext(html: string): ScrapeExecutionContext {
@@ -34,6 +38,61 @@ describe('extractAttrList', () => {
       'https://cdn.example/a.jpg',
       'https://cdn.example/b.jpg',
     ]);
+  });
+});
+
+describe('extractTextList', () => {
+  it('collects trimmed text from every matched element, in order', () => {
+    const ctx = makeContext(`
+      <ul class="stores">
+        <li><span>  Törökbálinti raktár  </span></li>
+        <li><a href="/uzletek/torokbalint">Törökbálint</a></li>
+      </ul>
+    `);
+    const selection = ctx.$('.stores li span, .stores li a');
+
+    const result = extractTextList(ctx, selection, { op: 'extractTextList' });
+
+    expect(result).toEqual(['Törökbálinti raktár', 'Törökbálint']);
+  });
+
+  it('returns an empty array when the selection has no elements', () => {
+    const ctx = makeContext(`<ul class="stores"></ul>`);
+    const selection = ctx.$('.stores li');
+
+    const result = extractTextList(ctx, selection, { op: 'extractTextList' });
+
+    expect(result).toEqual([]);
+  });
+
+  it('excludes elements whose text is blank/whitespace-only', () => {
+    const ctx = makeContext(`
+      <ul class="stores">
+        <li><span>   </span></li>
+        <li><span>Győr</span></li>
+      </ul>
+    `);
+    const selection = ctx.$('.stores li span');
+
+    const result = extractTextList(ctx, selection, { op: 'extractTextList' });
+
+    expect(result).toEqual(['Győr']);
+  });
+
+  it('keeps untrimmed text when trim is false, but still drops fully empty results', () => {
+    const ctx = makeContext(`
+      <ul class="stores">
+        <li><span> Szeged </span></li>
+      </ul>
+    `);
+    const selection = ctx.$('.stores li span');
+
+    const result = extractTextList(ctx, selection, {
+      op: 'extractTextList',
+      trim: false,
+    });
+
+    expect(result).toEqual([' Szeged ']);
   });
 });
 

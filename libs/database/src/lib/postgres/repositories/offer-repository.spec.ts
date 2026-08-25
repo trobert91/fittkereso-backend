@@ -51,6 +51,18 @@ describe('OfferRepository.upsertFromScrape', () => {
     expect(notDiscounted.priceWithoutDiscount).toBeUndefined();
   });
 
+  it('persists locations when the scrape reports store names, and leaves it undefined otherwise', async () => {
+    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
+
+    const withLocations = await repository.upsertFromScrape(
+      makeParams({ locations: ['Törökbálinti raktár', 'Törökbálint'] }),
+    );
+    expect(withLocations.locations).toEqual(['Törökbálinti raktár', 'Törökbálint']);
+
+    const withoutLocations = await repository.upsertFromScrape(makeParams());
+    expect(withoutLocations.locations).toBeUndefined();
+  });
+
   it('updates the passed-in existing offer in place without clobbering a non-default condition', async () => {
     const existing = new Offer();
     existing.id = 'offer-1';
@@ -92,13 +104,16 @@ describe('OfferRepository.upsertFromScrape', () => {
     mockRepo.findOne.mockResolvedValueOnce(raceWinner); // re-fetch after conflict
     mockRepo.save.mockImplementationOnce(async (offer: Offer) => offer);
 
-    const result = await repository.upsertFromScrape(makeParams());
+    const result = await repository.upsertFromScrape(
+      makeParams({ locations: ['Törökbálint'] }),
+    );
 
     expect(mockRepo.findOne).toHaveBeenCalledWith({
       where: { seller: { id: 'seller-1' }, externalId: 'listing-1' },
     });
     expect(result).toBe(raceWinner);
     expect(result.price).toBe(199990);
+    expect(result.locations).toEqual(['Törökbálint']);
   });
 
   it('does not attempt a race re-fetch when an existing offer was already passed in', async () => {

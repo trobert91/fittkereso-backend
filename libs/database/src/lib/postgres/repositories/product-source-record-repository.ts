@@ -19,7 +19,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   async findByUrl(url: string): Promise<ProductSourceRecord | null> {
     return this.repo.findOne({
       where: { url },
-      relations: [nameOf<ProductSourceRecord>('model')],
+      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
     });
   }
 
@@ -28,6 +28,12 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    * model code/slug, stable across URL changes. Used ahead of full identity
    * resolution to recognize an already-known listing so extraction/LLM
    * unification can be skipped when its rawSpecsHash is unchanged.
+   *
+   * Loads `offers` too — offer-level specs (e.g. frameSize/color) are
+   * deliberately stripped out of ProductSourceRecord.scrapedProduct.specs
+   * (they vary per offer, not per record), so the rawSpecsHash-unchanged
+   * fast path in ProductDetailsPageScraperService.extractProduct must read
+   * them back off the previously-persisted Offer row instead.
    */
   async findBySourceAndExternalId(
     sourceId: string,
@@ -38,7 +44,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         source: { id: sourceId },
         externalId,
       },
-      relations: [nameOf<ProductSourceRecord>('model')],
+      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
     });
   }
 

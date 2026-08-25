@@ -26,12 +26,12 @@ export interface ProductSourceListPageConfig {
 }
 
 export interface ProductSourceOffersConfig {
-  listItems: ScrapeOperation[];
+  offerList: ScrapeOperation[];
   // 'cheerio': each list item is exposed as a single-element CheerioSelection
   // under vars[itemVar]. 'json': each item is exposed as vars[itemVar]
   // directly. See ForEachItemOp.
   itemMode: 'cheerio' | 'json';
-  // Per-item pipeline, run once per entry in listItems; must terminate in an
+  // Per-item pipeline, run once per entry in offerList; must terminate in an
   // assembleOffer op. Replaces the old flat sellerName/price/etc. fields —
   // see AssembleOfferOp.
   itemPipeline: ScrapeOperation[];

@@ -10,7 +10,7 @@ export class EntityTools {
   @Tool({
     name: 'get_product_detail',
     description:
-      'Get detailed product information — display name, brand, model, specs, aliases, category. Use to investigate product resolution accuracy and verify if the correct product was matched.',
+      'Get detailed product information — display name, brand, model, specs, aliases, category, plus every ProductSourceRecord (one per scraped URL, with its own externalId/rawSpecsHash/spec validity) and every Offer (price, availability, seller, externalId, and which source record it belongs to). Use to investigate product resolution accuracy, verify if the correct product was matched, or debug why a scrape did or did not produce a new/updated offer.',
     parameters: z.object({
       productId: z.string().optional().describe('Product model UUID'),
       slug: z
@@ -32,7 +32,18 @@ export class EntityTools {
 
     const product = await this.productRepo.findOneOrFail({
       where,
-      relations: ['brand', 'productCategory', 'aliases'],
+      relations: [
+        'brand',
+        'productCategory',
+        'aliases',
+        'sources',
+        'sources.source',
+        'sources.offers',
+        'sources.offers.seller',
+        'offers',
+        'offers.seller',
+        'offers.sourceRecord',
+      ],
     });
 
     const L: string[] = [];
@@ -90,6 +101,69 @@ export class EntityTools {
       L.push('## Description');
       L.push(product.description);
       L.push('');
+    }
+
+    // Product Source Records
+    const sources = product.sources ?? [];
+    if (sources.length > 0) {
+      L.push(`## Product Source Records (${sources.length})`);
+      for (const record of sources) {
+        L.push(`### ${record.source?.name ?? '(no source)'} — ${record.url ?? '(no url)'}`);
+        L.push(`- **ID**: ${record.id}`);
+        if (record.externalId) L.push(`- **External ID**: ${record.externalId}`);
+        L.push(`- **Last Updated**: ${record.lastUpdated?.toISOString?.() ?? record.lastUpdated}`);
+        L.push(`- **Raw Specs Hash**: ${record.rawSpecsHash ?? '(none)'}`);
+        L.push(`- **Spec Valid**: ${record.specValid}`);
+        if (record.specErrors && Object.keys(record.specErrors).length > 0) {
+          L.push(`- **Spec Errors**: ${JSON.stringify(record.specErrors)}`);
+        }
+        L.push(`- **Deduplicated**: ${record.deduplicated}`);
+        if (record.normalizedSourceName)
+          L.push(`- **Normalized Source Name**: ${record.normalizedSourceName}`);
+
+        const recordOffers = record.offers ?? [];
+        if (recordOffers.length > 0) {
+          L.push(`- **Offers on this record (${recordOffers.length})**:`);
+          for (const offer of recordOffers) {
+            const locationsSuffix =
+              offer.locations && offer.locations.length > 0
+                ? ` · locations=${offer.locations.join(', ')}`
+                : '';
+            L.push(
+              `  - ${offer.seller?.name ?? '?'} · ${offer.price} ${offer.currency} · ${offer.availability} · externalId=${offer.externalId ?? '(none)'} · active=${offer.active}${locationsSuffix}`,
+            );
+          }
+        } else {
+          L.push(`- **Offers on this record**: none`);
+        }
+        L.push('');
+      }
+    }
+
+    // Offers (model-level, all sources combined)
+    const offers = product.offers ?? [];
+    if (offers.length > 0) {
+      L.push(`## Offers (${offers.length})`);
+      for (const offer of offers) {
+        L.push(`### ${offer.seller?.name ?? '(no seller)'} — ${offer.price} ${offer.currency}`);
+        L.push(`- **ID**: ${offer.id}`);
+        L.push(`- **Availability**: ${offer.availability}`);
+        L.push(`- **Condition**: ${offer.condition}`);
+        L.push(`- **URL**: ${offer.url ?? '(none)'}`);
+        L.push(`- **External ID**: ${offer.externalId ?? '(none)'}`);
+        L.push(
+          `- **Source Record**: ${offer.sourceRecord?.url ?? offer.sourceRecord?.id ?? '(none)'}`,
+        );
+        L.push(`- **Active**: ${offer.active}`);
+        L.push(`- **Last Seen At**: ${offer.lastSeenAt?.toISOString?.() ?? offer.lastSeenAt}`);
+        if (offer.locations && offer.locations.length > 0) {
+          L.push(`- **Locations**: ${offer.locations.join(', ')}`);
+        }
+        if (offer.specs && Object.keys(offer.specs).length > 0) {
+          L.push(`- **Offer Specs**: ${JSON.stringify(offer.specs)}`);
+        }
+        L.push('');
+      }
     }
 
     return L.join('\n');

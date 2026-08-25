@@ -10,6 +10,7 @@ import {
   StripPrefixOp,
   TrimEndOp,
   TrimOp,
+  WrapInArrayOp,
 } from '@fittkereso-backend/database';
 import { OpHandler } from '../services/scrape-op-registry.service';
 import { interpolate } from '../services/interpolation.util';
@@ -94,6 +95,11 @@ export const identity: OpHandler<IdentityOp> = (ctx, input, op) => {
 
 export const literal: OpHandler<LiteralOp> = (ctx, _input, op) => {
   return interpolate(op.value, ctx);
+};
+
+export const wrapInArray: OpHandler<WrapInArrayOp> = (ctx, input, op) => {
+  const value = op.value !== undefined ? ctx.vars[op.value] : input;
+  return [value];
 };
 
 function escapeRegExp(value: string): string {

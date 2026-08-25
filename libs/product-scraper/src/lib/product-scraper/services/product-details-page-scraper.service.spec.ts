@@ -278,4 +278,72 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     expect(result.scrapedProduct.extractedSpecs).toBeUndefined();
     expect(result.scrapedProduct.specs).toBeUndefined();
   });
+
+  // Regression: on the raw-specs-unchanged fast path, offer-level keys
+  // (e.g. frameSize/color) used to be hardcoded to {}. A first attempted fix
+  // picked them from existingSource.scrapedProduct.specs, but that field
+  // structurally never carries offer-level keys — they're omit()'d before
+  // being persisted there (see the non-fast-path branch's
+  // pageOfferLevelSpecs/strippedSpecs split). The only place they survive
+  // across scrapes is the previously-persisted Offer row itself, so that's
+  // what the fast path must read from.
+  it('picks offer-level specs from the existing Offer row on the raw-specs-unchanged fast path', async () => {
+    const task = buildTask();
+    const detailWithOffer = {
+      ...detail,
+      rawOffers: [{ sellerName: 'ebikeshop.hu', price: 3359000 }],
+    };
+    interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
+    categoryConfigService.getConfig.mockReturnValue({
+      offerLevelSpecs: ['frameSize', 'color'],
+    });
+    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
+      rawSpecsHash: hashRawSpecs(detailWithOffer.rawSpecs),
+      model: { model: 'Reused Model Name' },
+      // scrapedProduct.specs deliberately has no frameSize/color — proving
+      // the fix doesn't (and structurally can't) read offer-level keys from
+      // here.
+      scrapedProduct: { specs: { motorPosition: 'Középmotor' } },
+      offers: [
+        {
+          externalId: 'sku-1',
+          specs: { frameSize: 48, color: 'Olíva' },
+        },
+      ],
+    });
+
+    const result = await callExtractProduct(task);
+
+    expect(result.offerLevelSpecs).toEqual({ frameSize: 48, color: 'Olíva' });
+    expect(result.scrapedProduct.offers).toEqual([
+      expect.objectContaining({
+        sellerName: 'ebikeshop.hu',
+        price: 3359000,
+        specs: { frameSize: 48, color: 'Olíva' },
+      }),
+    ]);
+  });
+
+  it('falls back to the record\'s single offer when externalId does not match any of them', async () => {
+    const task = buildTask();
+    const detailWithOffer = {
+      ...detail,
+      externalId: 'sku-different',
+      rawOffers: [{ sellerName: 'ebikeshop.hu', price: 3359000 }],
+    };
+    interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
+    categoryConfigService.getConfig.mockReturnValue({
+      offerLevelSpecs: ['frameSize'],
+    });
+    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
+      rawSpecsHash: hashRawSpecs(detailWithOffer.rawSpecs),
+      model: { model: 'Reused Model Name' },
+      scrapedProduct: { specs: {} },
+      offers: [{ externalId: 'sku-1', specs: { frameSize: 53 } }],
+    });
+
+    const result = await callExtractProduct(task);
+
+    expect(result.offerLevelSpecs).toEqual({ frameSize: 53 });
+  });
 });

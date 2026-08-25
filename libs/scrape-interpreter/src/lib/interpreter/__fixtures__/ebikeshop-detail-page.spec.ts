@@ -9,9 +9,10 @@ import { registerOps } from '../ops/register-ops';
 import ebikeshopConfig from './ebikeshop.config.json';
 
 // Trimmed, real capture of ebikeshop.hu's Inertia `data-page` payload for a
-// product detail page (KTM Macina Scarp SX, manufacturer_planning stock —
-// exercises the "Gyártói készlet" -> preorder availability branch and the
-// non-sale price branch).
+// product detail page (KTM Macina Scarp SX). `stocks` is kept for the raw
+// spec/brand/model extraction it's unrelated to — offers themselves are now
+// built from the JSON-LD `Offer` script block and the "Üzletek" stores DOM
+// section (see buildHtml), confirmed live against real ebikeshop.hu pages.
 const EBIKESHOP_DETAIL_PAGE_DATA = {
   props: {
     product: {
@@ -100,11 +101,56 @@ const EBIKESHOP_DETAIL_PAGE_DATA = {
   },
 };
 
-function buildHtml(): string {
-  const json = JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;');
-  return `<div id="app" data-page="${json}"></div>`;
+// Mirrors the real <script type="application/ld+json"> schema.org Offer
+// block ebikeshop.hu embeds on every product page — confirmed live to carry
+// a reliable three-state availability (InStock/PreOrder/OutOfStock)
+// independent of props.product.stocks, which is empty whenever a variant is
+// out of stock.
+function buildJsonLdScript(price: number, availability: string): string {
+  const offer = {
+    '@type': 'Offer',
+    url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
+    priceCurrency: 'HUF',
+    price,
+    itemCondition: 'https://schema.org/NewCondition',
+    availability: `https://schema.org/${availability}`,
+    seller: 'https://ebikeshop.hu',
+  };
+  return `<script type="application/ld+json">[{"@context":"https://schema.org","@type":"Product","offers":${JSON.stringify(offer)}}]</script>`;
+}
+
+// Mirrors the real "Üzletek" (Stores) DOM section — confirmed live in three
+// shapes: no <li> at all when out of stock, one <li> for "Gyártói készlet"
+// (manufacturer/supplier stock, not a real store), or one <li> per physical
+// store when in stock at one or more locations.
+function buildStoresSection(storeNames: string[]): string {
+  const items = storeNames
+    .map(
+      (name) =>
+        `<li><div class="flex flex-wrap items-center gap-4"><span>${name}</span><div class="flex items-center gap-2"><span class="text-success">Elérhető</span></div></div></li>`,
+    )
+    .join('');
+  const body =
+    storeNames.length > 0
+      ? `<ul class="space-y-2">${items}</ul>`
+      : `<div class="flex flex-wrap items-center gap-4"><div class="flex items-center gap-2"><span class="text-error">Jelenleg nincs készleten</span></div></div>`;
+  return `<h3>Üzletek</h3>${body}<div data-slot="separator-root"></div>`;
+}
+
+function buildHtml(options?: {
+  data?: unknown;
+  jsonLdPrice?: number;
+  jsonLdAvailability?: string;
+  storeNames?: string[];
+}): string {
+  const data = options?.data ?? EBIKESHOP_DETAIL_PAGE_DATA;
+  const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const jsonLd = buildJsonLdScript(
+    options?.jsonLdPrice ?? 3879000.0017,
+    options?.jsonLdAvailability ?? 'PreOrder',
+  );
+  const stores = buildStoresSection(options?.storeNames ?? ['Gyártói készlet']);
+  return `<div id="app" data-page="${json}"></div>${jsonLd}${stores}`;
 }
 
 function makeTask(): ScrapeTask {
@@ -167,6 +213,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
         availability: 'preorder',
         url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
         externalId: '1260040108',
+        locations: undefined,
         specs: undefined,
       },
     ]);
@@ -176,8 +223,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
     data.props.product.manufacturer = null;
     data.props.product.legalManufacturerName = 'Riese & Müller GmbH';
-    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+    const $ = cheerio.load(buildHtml({ data }));
     const config = ebikeshopConfig as unknown as ProductSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
@@ -188,8 +234,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
   it('prefers the sale price when prices.sale is true, and reports priceWithoutDiscount', async () => {
     const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
     data.props.product.prices = { price: 4099000, priceSale: 3699000, sale: true };
-    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+    const $ = cheerio.load(buildHtml({ data, jsonLdPrice: 3699000 }));
     const config = ebikeshopConfig as unknown as ProductSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
@@ -208,54 +253,52 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     expect(result.rawOffers[0].priceWithoutDiscount).toBeUndefined();
   });
 
-  it('maps "Készleten" stock status to in_stock availability', async () => {
-    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
-    data.props.product.stocks = [
-      { stockType: 'stock', title: 'Törökbálint', qty: 1, preorderTypeTitle: 'Készleten' },
-    ];
-    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
-
-    const result = await interpreter.runDetailPage(makeTask(), $, config);
-
-    expect(result.rawOffers[0].availability).toBe('in_stock');
-  });
-
-  // props.product.stocks is a per-store array (e.g. one entry per physical
-  // warehouse), not multiple sellers/listings — confirmed live against a
-  // real ebikeshop.hu product with 2 store entries sharing one productCode.
-  // A single offer must still result, with availability aggregated across
-  // every store rather than just reading stocks[0].
-  it('collapses multiple per-store stock entries into a single offer with aggregated availability', async () => {
-    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
-    data.props.product.stocks = [
-      { stockType: 'stock', title: 'Győr', qty: 0, preorderTypeTitle: 'Nincs készleten' },
-      { stockType: 'stock', title: 'Szeged', qty: 1, preorderTypeTitle: 'Készleten' },
-    ];
-    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+  it('maps JSON-LD InStock availability to in_stock, with real store names as locations', async () => {
+    const $ = cheerio.load(
+      buildHtml({
+        jsonLdAvailability: 'InStock',
+        storeNames: ['Törökbálinti raktár', 'Törökbálint'],
+      }),
+    );
     const config = ebikeshopConfig as unknown as ProductSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.rawOffers).toHaveLength(1);
     expect(result.rawOffers[0].availability).toBe('in_stock');
+    expect(result.rawOffers[0].locations).toEqual(['Törökbálinti raktár', 'Törökbálint']);
   });
 
-  it('falls back to preorder when no store has stock but at least one has manufacturer stock', async () => {
-    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
-    data.props.product.stocks = [
-      { stockType: 'stock', title: 'Győr', qty: 0, preorderTypeTitle: 'Nincs készleten' },
-      { stockType: 'manufacturer_planning', title: 'Gyártói készlet', qty: 5, preorderTypeTitle: 'Gyártói készlet' },
-    ];
-    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+  // Confirmed live: an out-of-stock variant's props.product.stocks is an
+  // empty array (no per-store rows at all), so availability can only be
+  // recovered from the JSON-LD Offer block, and there is no "Üzletek" <li>
+  // list on the page at all (just a "Jelenleg nincs készleten" badge).
+  it('maps JSON-LD OutOfStock availability to out_of_stock, with no locations', async () => {
+    const $ = cheerio.load(
+      buildHtml({ jsonLdAvailability: 'OutOfStock', storeNames: [] }),
+    );
+    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers).toHaveLength(1);
+    expect(result.rawOffers[0].availability).toBe('out_of_stock');
+    expect(result.rawOffers[0].locations).toBeUndefined();
+  });
+
+  // Confirmed live: a preorder-only listing's sole "Üzletek" row is literally
+  // "Gyártói készlet" (manufacturer/supplier stock) — not a real physical
+  // store, so it must be filtered out of locations rather than reported as one.
+  it('filters "Gyártói készlet" out of locations, leaving it undefined', async () => {
+    const $ = cheerio.load(
+      buildHtml({ jsonLdAvailability: 'PreOrder', storeNames: ['Gyártói készlet'] }),
+    );
     const config = ebikeshopConfig as unknown as ProductSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.rawOffers).toHaveLength(1);
     expect(result.rawOffers[0].availability).toBe('preorder');
+    expect(result.rawOffers[0].locations).toBeUndefined();
   });
 });

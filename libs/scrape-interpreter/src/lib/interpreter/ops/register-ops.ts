@@ -21,6 +21,7 @@ import {
   stripPrefix,
   trim,
   trimEnd,
+  wrapInArray,
 } from './string-ops';
 import { findScriptContaining, regexCapture } from './regex-ops';
 import {
@@ -56,7 +57,11 @@ import {
   extractSpecTableV2,
   makeAppendSyntheticSpec,
 } from './spec-table-ops';
-import { extractAttrList, extractImageWithFallback } from './image-ops';
+import {
+  extractAttrList,
+  extractImageWithFallback,
+  extractTextList,
+} from './image-ops';
 import { makeMapSpecValue, mapValue } from './value-map-ops';
 import { makeBranch } from './control-ops';
 import { makeForEachItem } from './iteration-ops';
@@ -94,6 +99,7 @@ export function registerOps(
   registry.register('coalesce', coalesce);
   registry.register('identity', identity);
   registry.register('literal', literal);
+  registry.register('wrapInArray', wrapInArray);
 
   registry.register('regexCapture', regexCapture);
   registry.register('findScriptContaining', findScriptContaining);
@@ -126,6 +132,7 @@ export function registerOps(
   registry.register('appendSyntheticSpec', makeAppendSyntheticSpec(runner));
 
   registry.register('extractAttrList', extractAttrList);
+  registry.register('extractTextList', extractTextList);
   registry.register('extractImageWithFallback', extractImageWithFallback);
 
   registry.register('mapSpecValue', makeMapSpecValue(valueMapper));

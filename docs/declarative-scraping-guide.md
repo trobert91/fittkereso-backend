@@ -47,7 +47,7 @@ interface ProductSourceConfig {
     releaseYear?: ScrapeOperation[];
     images: ScrapeOperation[];
     specMapping: Record<string, SourceSpecConfig>; // keyed by category slug
-    offers?: { listItems: ScrapeOperation[]; sellerName: ScrapeOperation[]; price: ScrapeOperation[]; ... };
+    offers?: { offerList: ScrapeOperation[]; itemMode: 'cheerio' | 'json'; itemPipeline: ScrapeOperation[] /* terminates in assembleOffer */ };
     translation?: { enabled: boolean; sourceLanguage: string; targetLanguage: string; contextTemplate: string };
   };
 }

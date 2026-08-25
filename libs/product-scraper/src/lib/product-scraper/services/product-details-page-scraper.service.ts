@@ -350,10 +350,23 @@ export class ProductDetailsPageScraperService {
         'raw_specs_unchanged',
       );
       // No fresh specs extracted this pass (rawSpecsHash unchanged), so
-      // there's nothing to strip/pick offer-level keys from here — offers
-      // fall back to whichever offer-level specs the existing
-      // ProductSourceRecord already carries (see createOrUpdateOffers's
-      // pageOfferLevelSpecs).
+      // offer-level keys (e.g. frameSize) must come from somewhere other
+      // than existingSource.scrapedProduct.specs — that field structurally
+      // never carries them (they're omit()'d before being persisted there;
+      // see the non-fast-path branch below, pageOfferLevelSpecs/
+      // strippedSpecs). The only place they still live across scrapes is
+      // the previously-persisted Offer row(s) on this same record, so read
+      // them back from there instead — otherwise every re-scrape that hits
+      // this skip path would overwrite each offer's specs with {}, silently
+      // wiping out frameSize/color on every subsequent scrape after the
+      // first.
+      const existingOfferForSpecs =
+        existingSource.offers?.find((o) => o.externalId === detail.externalId) ??
+        existingSource.offers?.[0];
+      const existingPageOfferLevelSpecs = pick(
+        existingOfferForSpecs?.specs,
+        offerLevelKeys,
+      );
       return {
         scrapedProduct: {
           brand: detail.brand,
@@ -365,9 +378,9 @@ export class ProductDetailsPageScraperService {
           releaseYear: detail.releaseYear,
           externalId: detail.externalId,
           imageUrls: detail.imageUrls,
-          offers: this.toScrapedOffers(detail.rawOffers, {}),
+          offers: this.toScrapedOffers(detail.rawOffers, existingPageOfferLevelSpecs),
         },
-        offerLevelSpecs: {},
+        offerLevelSpecs: existingPageOfferLevelSpecs,
         offerLinks: detail.offerLinks,
       };
     }
@@ -519,6 +532,7 @@ export class ProductDetailsPageScraperService {
         availability: this.parseAvailability(offer.availability),
         url: offer.url ? normalizeUrl(offer.url) : offer.url,
         externalId: offer.externalId,
+        locations: offer.locations,
         specs: offer.specs ?? pageOfferLevelSpecs,
       }));
   }

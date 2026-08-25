@@ -66,6 +66,12 @@ export interface ScrapedOffer {
   url?: string;
   externalId?: string;
   /**
+   * Store/warehouse names where this offer is physically available (e.g.
+   * ["Törökbálinti raktár", "Törökbálint"]). Optional — most sources have no
+   * per-location breakdown.
+   */
+  locations?: string[];
+  /**
    * Offer-level spec values (e.g. frameSize, color) for this specific
    * listing — overrides the page-level offer-level specs derived from
    * ProductSourceRecord.specs when a source reports multiple size/color

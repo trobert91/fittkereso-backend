@@ -26,6 +26,7 @@ export interface RawOfferRecord {
   availability?: string;
   url?: string;
   externalId?: string;
+  locations?: string[];
   specs?: ProductSpecs;
 }
 
@@ -220,10 +221,10 @@ export class ScrapeInterpreterService {
     return null;
   }
 
-  // `listItems` gates whether this source populates offers at all (empty ->
+  // `offerList` gates whether this source populates offers at all (empty ->
   // opted out). Each entry is run through offersConfig.itemPipeline (which
   // must terminate in an assembleOffer op) via the forEachItem op, so a
-  // source can expose either a single implicit offer (listItems resolving to
+  // source can expose either a single implicit offer (offerList resolving to
   // one item — the common single-seller-storefront case) or several (a true
   // multi-seller aggregator page).
   private async runDetailPageOffers(
@@ -231,10 +232,10 @@ export class ScrapeInterpreterService {
     config: ProductSourceConfig,
   ): Promise<RawOfferRecord[]> {
     const offersConfig = config.detailPage.offers;
-    if (!offersConfig || offersConfig.listItems.length === 0) return [];
+    if (!offersConfig || offersConfig.offerList.length === 0) return [];
 
-    const listItems = await this.runner.run(offersConfig.listItems, ctx);
-    if (!listItems || (Array.isArray(listItems) && listItems.length === 0)) {
+    const offerList = await this.runner.run(offersConfig.offerList, ctx);
+    if (!offerList || (Array.isArray(offerList) && offerList.length === 0)) {
       return [];
     }
 
@@ -247,7 +248,7 @@ export class ScrapeInterpreterService {
         },
       ],
       ctx,
-      listItems,
+      offerList,
     );
 
     return (results as (RawOfferRecord | undefined)[]).filter(

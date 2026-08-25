@@ -326,7 +326,7 @@ describe('ScrapeInterpreterService', () => {
       specMapping: {},
     });
 
-    it('extracts a single self-offer when listItems resolves to one item and price resolves', async () => {
+    it('extracts a single self-offer when offerList resolves to one item and price resolves', async () => {
       const $ = cheerio.load(`
         <div id="app" data-page='{"props":{"product":{"stocks":[{"inStock":true}],"prices":{"price":3879000},"productCode":"1260040108"}}}'></div>
       `);
@@ -338,10 +338,10 @@ describe('ScrapeInterpreterService', () => {
           ...baseDetailPage(),
           offers: {
             // A genuine 1-element array, mirroring the real ebikeshop.hu
-            // config's listItems (props.product.stocks) — listItems must
+            // config's offerList (props.product.stocks) — offerList must
             // resolve to an actual array fed to forEachItem, not a scalar
             // (a plain string would incorrectly iterate its characters).
-            listItems: [
+            offerList: [
               {
                 op: 'parseJsonAttr',
                 selector: '#app',
@@ -415,7 +415,7 @@ describe('ScrapeInterpreterService', () => {
         detailPage: {
           ...baseDetailPage(),
           offers: {
-            listItems: [
+            offerList: [
               {
                 op: 'parseJsonAttr',
                 selector: '#app',
@@ -458,7 +458,7 @@ describe('ScrapeInterpreterService', () => {
         detailPage: {
           ...baseDetailPage(),
           offers: {
-            listItems: [{ op: 'selectAll', selector: '.seller-row' } as never],
+            offerList: [{ op: 'selectAll', selector: '.seller-row' } as never],
             itemMode: 'cheerio',
             itemPipeline: [
               {
@@ -496,7 +496,7 @@ describe('ScrapeInterpreterService', () => {
       // price is not (selectAttr always queries globally, so every item
       // gets the first row's price) — this still proves the primary new
       // capability under test: rawOffers.length > 1 for a real multi-item
-      // listItems result.
+      // offerList result.
       expect(result.rawOffers.length).toBeGreaterThan(1);
       expect(result.rawOffers.map((o) => o.sellerName)).toEqual([
         'Bike Shop A',

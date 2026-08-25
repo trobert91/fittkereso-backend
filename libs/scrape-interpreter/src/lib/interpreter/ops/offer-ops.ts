@@ -52,6 +52,14 @@ export function makeAssembleOffer(
       ? ((await runner.run(op.externalId, ctx, input)) as string | undefined)
       : undefined;
 
+    let locations: string[] | undefined;
+    if (op.locations) {
+      const rawLocations = (await runner.run(op.locations, ctx, input)) as
+        | string[]
+        | undefined;
+      locations = rawLocations && rawLocations.length > 0 ? rawLocations : undefined;
+    }
+
     let specs: ProductSpecs | undefined;
     if (op.specs) {
       specs = {};
@@ -71,6 +79,7 @@ export function makeAssembleOffer(
       availability,
       url,
       externalId,
+      locations,
       specs,
     };
 

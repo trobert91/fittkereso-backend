@@ -82,6 +82,15 @@ export class Offer extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   externalId?: string;
 
+  /**
+   * Store/warehouse names where this offer is physically available (e.g.
+   * ["Törökbálinti raktár", "Törökbálint"]) — always optional, most sources
+   * have no per-location breakdown.
+   */
+  @Expose({ groups: [SerializeGroup.details] })
+  @Column({ type: 'jsonb', nullable: true })
+  locations?: string[];
+
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: false })
   lastSeenAt: Date;

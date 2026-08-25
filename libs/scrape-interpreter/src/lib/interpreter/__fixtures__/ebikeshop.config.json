@@ -242,17 +242,10 @@
     },
 
     "offers": {
-      "listItems": [
-        {
-          "op": "parseJsonAttr",
-          "selector": "#app",
-          "attr": "data-page",
-          "path": "props.product.stocks"
-        },
-        {
-          "op": "takeFirst",
-          "count": 1
-        }
+      "offerList": [
+        { "op": "selectAll", "selector": "script" },
+        { "op": "findScriptContaining", "contains": "\"@type\":\"Offer\"" },
+        { "op": "wrapInArray" }
       ],
       "itemMode": "json",
       "itemPipeline": [
@@ -263,31 +256,10 @@
           ],
           "price": [
             {
-              "op": "parseJsonAttr",
-              "selector": "#app",
-              "attr": "data-page",
-              "path": "props.product.prices.sale",
-              "as": "onSale"
-            },
-            {
-              "op": "branch",
-              "condition": { "equals": { "value": "onSale", "to": true } },
-              "ifTrue": [
-                {
-                  "op": "parseJsonAttr",
-                  "selector": "#app",
-                  "attr": "data-page",
-                  "path": "props.product.prices.priceSale"
-                }
-              ],
-              "ifFalse": [
-                {
-                  "op": "parseJsonAttr",
-                  "selector": "#app",
-                  "attr": "data-page",
-                  "path": "props.product.prices.price"
-                }
-              ]
+              "op": "regexCapture",
+              "pattern": "\"price\":\\s*(\\d+(?:\\.\\d+)?)",
+              "group": 1,
+              "cast": "number"
             }
           ],
           "priceWithoutDiscount": [
@@ -324,44 +296,20 @@
           ],
           "availability": [
             {
-              "op": "parseJsonAttr",
-              "selector": "#app",
-              "attr": "data-page",
-              "path": "props.product.stocks",
-              "as": "allStocks"
+              "op": "regexCapture",
+              "pattern": "\"availability\":\"https://schema\\.org/(\\w+)\"",
+              "group": 1
             },
             {
-              "op": "filterJsonArray",
-              "on": "allStocks",
-              "path": "preorderTypeTitle",
-              "equals": "Készleten",
-              "as": "inStockLocations"
-            },
-            {
-              "op": "filterJsonArray",
-              "on": "allStocks",
-              "path": "preorderTypeTitle",
-              "equals": "Gyártói készlet",
-              "as": "preorderLocations"
-            },
-            {
-              "op": "branch",
-              "condition": { "isEmpty": "inStockLocations" },
-              "ifTrue": [
-                {
-                  "op": "branch",
-                  "condition": { "isEmpty": "preorderLocations" },
-                  "ifTrue": [
-                    { "op": "literal", "value": "unknown" }
-                  ],
-                  "ifFalse": [
-                    { "op": "literal", "value": "preorder" }
-                  ]
-                }
-              ],
-              "ifFalse": [
-                { "op": "literal", "value": "in_stock" }
-              ]
+              "op": "mapValue",
+              "cases": {
+                "InStock": "in_stock",
+                "PreOrder": "preorder",
+                "LimitedAvailability": "in_stock",
+                "OutOfStock": "out_of_stock",
+                "SoldOut": "out_of_stock"
+              },
+              "default": "unknown"
             }
           ],
           "url": [
@@ -373,6 +321,34 @@
               "selector": "#app",
               "attr": "data-page",
               "path": "props.product.productCode"
+            }
+          ],
+          "locations": [
+            {
+              "op": "literal",
+              "value": "Gyártói készlet",
+              "as": "manufacturerStockLabel"
+            },
+            {
+              "op": "selectFirst",
+              "selector": "h3:contains(\"Üzletek\")"
+            },
+            {
+              "op": "selectSiblingContainer",
+              "untilSelector": "[data-slot=\"separator-root\"]",
+              "filterSelector": "*",
+              "first": false,
+              "as": "storesContainer"
+            },
+            {
+              "op": "selectAll",
+              "selector": "li span:not(.text-success):not(.text-error), li a",
+              "within": "storesContainer"
+            },
+            { "op": "extractTextList" },
+            {
+              "op": "filterOutEqualsIgnoreCase",
+              "against": "manufacturerStockLabel"
             }
           ]
         }
