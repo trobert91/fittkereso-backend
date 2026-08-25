@@ -16,12 +16,18 @@ import {
 
 export type ScrapeResolutionOutcome =
   | 'skipped_no_category'
+  /** Path 2: group-level (ProductSourceRecord.externalId) match. */
   | 'external_id_hit'
-  | 'path1_hit'
+  /** Path 3: variant-level (Offer.externalId) match — no group-level id
+   *  available/matched, but one of this scrape's own offers' externalIds
+   *  matched an existing Offer for this seller. */
+  | 'offer_external_id_hit'
+  /** Path 4: normalized-name match. */
+  | 'path4_hit'
   | 'cross_source_merge'
   | 'cross_source_rejected_same_source'
   | 'new_product'
-  /** Path 2's scrape-merge LLM decision confidently accepted a candidate that
+  /** Path 5's scrape-merge LLM decision confidently accepted a candidate that
    *  the deterministic quality gates had rejected. */
   | 'llm_merge_accept'
   /** The scrape-merge LLM decision considered a near-miss candidate but was

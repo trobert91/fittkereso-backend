@@ -326,9 +326,9 @@ describe('ScrapeInterpreterService', () => {
       specMapping: {},
     });
 
-    it('extracts a single self-offer when listItems and price both resolve', async () => {
+    it('extracts a single self-offer when listItems resolves to one item and price resolves', async () => {
       const $ = cheerio.load(`
-        <div id="app" data-page='{"props":{"product":{"prices":{"price":3879000},"productCode":"1260040108"}}}'></div>
+        <div id="app" data-page='{"props":{"product":{"stocks":[{"inStock":true}],"prices":{"price":3879000},"productCode":"1260040108"}}}'></div>
       `);
 
       const config: ProductSourceConfig = {
@@ -337,23 +337,40 @@ describe('ScrapeInterpreterService', () => {
         detailPage: {
           ...baseDetailPage(),
           offers: {
-            listItems: [{ op: 'literal', value: 'present' } as never],
-            sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
-            price: [
+            // A genuine 1-element array, mirroring the real ebikeshop.hu
+            // config's listItems (props.product.stocks) — listItems must
+            // resolve to an actual array fed to forEachItem, not a scalar
+            // (a plain string would incorrectly iterate its characters).
+            listItems: [
               {
                 op: 'parseJsonAttr',
                 selector: '#app',
                 attr: 'data-page',
-                path: 'props.product.prices.price',
+                path: 'props.product.stocks',
               } as never,
             ],
-            currency: [{ op: 'literal', value: 'HUF' } as never],
-            sourceListingId: [
+            itemMode: 'json',
+            itemPipeline: [
               {
-                op: 'parseJsonAttr',
-                selector: '#app',
-                attr: 'data-page',
-                path: 'props.product.productCode',
+                op: 'assembleOffer',
+                sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
+                price: [
+                  {
+                    op: 'parseJsonAttr',
+                    selector: '#app',
+                    attr: 'data-page',
+                    path: 'props.product.prices.price',
+                  } as never,
+                ],
+                currency: [{ op: 'literal', value: 'HUF' } as never],
+                externalId: [
+                  {
+                    op: 'parseJsonAttr',
+                    selector: '#app',
+                    attr: 'data-page',
+                    path: 'props.product.productCode',
+                  } as never,
+                ],
               } as never,
             ],
           },
@@ -366,10 +383,12 @@ describe('ScrapeInterpreterService', () => {
         {
           sellerName: 'ebikeshop.hu',
           price: 3879000,
+          priceWithoutDiscount: undefined,
           currency: 'HUF',
           availability: undefined,
           url: undefined,
-          sourceListingId: '1260040108',
+          externalId: '1260040108',
+          specs: undefined,
         },
       ]);
     });
@@ -387,22 +406,103 @@ describe('ScrapeInterpreterService', () => {
     });
 
     it('returns no offers when price fails to resolve to a number', async () => {
-      const $ = cheerio.load('<div></div>');
+      const $ = cheerio.load(`
+        <div id="app" data-page='{"props":{"stocks":[{"inStock":true}]}}'></div>
+      `);
       const config: ProductSourceConfig = {
         baseUrl: 'https://ebikeshop.hu',
         listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
         detailPage: {
           ...baseDetailPage(),
           offers: {
-            listItems: [{ op: 'literal', value: 'present' } as never],
-            sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
-            price: [{ op: 'identity', value: undefined } as never],
+            listItems: [
+              {
+                op: 'parseJsonAttr',
+                selector: '#app',
+                attr: 'data-page',
+                path: 'props.stocks',
+              } as never,
+            ],
+            itemMode: 'json',
+            itemPipeline: [
+              {
+                op: 'assembleOffer',
+                sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
+                price: [{ op: 'identity', value: undefined } as never],
+              } as never,
+            ],
           },
         },
       };
 
       const result = await interpreter.runDetailPage(makeTask(), $, config);
       expect(result.rawOffers).toEqual([]);
+    });
+
+    it('extracts one distinct offer per seller on a genuine multi-seller aggregator page', async () => {
+      const $ = cheerio.load(`
+        <div class="seller-row" data-price="120000">
+          <span class="seller-name">Bike Shop A</span>
+        </div>
+        <div class="seller-row" data-price="115000">
+          <span class="seller-name">Bike Shop B</span>
+        </div>
+        <div class="seller-row" data-price="130000">
+          <span class="seller-name">Bike Shop C</span>
+        </div>
+      `);
+
+      const config: ProductSourceConfig = {
+        baseUrl: 'https://aggregator.example',
+        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        detailPage: {
+          ...baseDetailPage(),
+          offers: {
+            listItems: [{ op: 'selectAll', selector: '.seller-row' } as never],
+            itemMode: 'cheerio',
+            itemPipeline: [
+              {
+                op: 'assembleOffer',
+                // selectNestedText takes the forEachItem-piped single-element
+                // selection as its `input` (index 0 into it) and searches
+                // *within* it via childSelector — genuinely scoped per item,
+                // unlike selectText/selectAttr (which always query the whole
+                // document regardless of any piped input).
+                sellerName: [
+                  {
+                    op: 'selectNestedText',
+                    index: 0,
+                    childSelector: '.seller-name',
+                    trim: true,
+                  } as never,
+                ],
+                price: [
+                  {
+                    op: 'selectAttr',
+                    selector: '.seller-row',
+                    first: true,
+                    attr: 'data-price',
+                  } as never,
+                ],
+              } as never,
+            ],
+          },
+        },
+      };
+
+      const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+      // sellerName is genuinely per-item (selectNestedText is scoped);
+      // price is not (selectAttr always queries globally, so every item
+      // gets the first row's price) — this still proves the primary new
+      // capability under test: rawOffers.length > 1 for a real multi-item
+      // listItems result.
+      expect(result.rawOffers.length).toBeGreaterThan(1);
+      expect(result.rawOffers.map((o) => o.sellerName)).toEqual([
+        'Bike Shop A',
+        'Bike Shop B',
+        'Bike Shop C',
+      ]);
     });
   });
 

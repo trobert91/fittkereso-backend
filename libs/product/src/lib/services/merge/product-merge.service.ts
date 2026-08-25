@@ -243,7 +243,7 @@ export class ProductMergeService {
   // source product when deleteSourceProduct runs would be silently destroyed
   // by Postgres's FK cascade (no error, no log line). Must run before that
   // delete. Mirrors moveProductSourceRecords's move-vs-delete-duplicate
-  // pattern, using Offer's own unique constraint (seller, sourceListingId)
+  // pattern, using Offer's own unique constraint (seller, externalId)
   // to decide which source-side offers collide with an existing target-side
   // offer (same seller already selling this exact listing) versus which are
   // safe to reassign outright.
@@ -267,16 +267,16 @@ export class ProductMergeService {
     });
     const targetOfferKeys = new Set(
       targetOffers
-        .filter((o) => o.sourceListingId)
-        .map((o) => `${o.seller.id}:${o.sourceListingId}`),
+        .filter((o) => o.externalId)
+        .map((o) => `${o.seller.id}:${o.externalId}`),
     );
 
     const toMove: string[] = [];
     const toDelete: string[] = [];
 
     for (const offer of sourceOffers) {
-      const key = offer.sourceListingId
-        ? `${offer.seller.id}:${offer.sourceListingId}`
+      const key = offer.externalId
+        ? `${offer.seller.id}:${offer.externalId}`
         : undefined;
       if (key && targetOfferKeys.has(key)) {
         toDelete.push(offer.id);

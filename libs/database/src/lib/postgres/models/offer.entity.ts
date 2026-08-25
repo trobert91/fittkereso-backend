@@ -15,7 +15,7 @@ import { ProductSpecs } from '../../models/product-spec';
 
 @Entity()
 @Index([nameOf<Offer>('model'), nameOf<Offer>('condition')])
-@Unique([nameOf<Offer>('seller'), nameOf<Offer>('sourceListingId')])
+@Unique([nameOf<Offer>('seller'), nameOf<Offer>('externalId')])
 export class Offer extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   @ManyToOne(() => ProductModel, (model) => model.offers, {
@@ -66,7 +66,7 @@ export class Offer extends BasePostgresEntity {
   currency: string;
 
   @Expose({ groups: [SerializeGroup.list] })
-  @Column({ type: 'varchar', nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true })
   url?: string;
 
   @Expose({ groups: [SerializeGroup.list] })
@@ -80,7 +80,7 @@ export class Offer extends BasePostgresEntity {
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'varchar', nullable: true })
-  sourceListingId?: string;
+  externalId?: string;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: false })

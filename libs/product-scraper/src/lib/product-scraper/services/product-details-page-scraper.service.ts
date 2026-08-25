@@ -2,6 +2,7 @@ import {
   OfferAvailability,
   ProductSourceRecord,
   ProductSourceRecordRepository,
+  ProductSpecs,
   ScrapeTask,
   SourceSpecConfig,
   SpecDefinitionJsonSchema,
@@ -9,11 +10,14 @@ import {
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
 import { Injectable } from '@nestjs/common';
-import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
+import {
+  ProductScrapeUpdaterService,
+  VariantSourcePage,
+} from './product-scrape-updater.service';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { hashRawSpecs } from '@fittkereso-backend/utils';
+import { hashRawSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import {
   DeterministicProductData,
   MergedProductData,
@@ -25,12 +29,22 @@ import {
   SpecExtractionService,
   SpecTranslationSelectorService,
 } from '@fittkereso-backend/product';
-import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
+import {
+  DetailPageResult,
+  RawOfferRecord,
+} from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
 import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
+import { omit, pick } from 'lodash';
+
+interface ExtractedPage {
+  scrapedProduct: ScrapedProduct;
+  offerLevelSpecs: ProductSpecs;
+  offerLinks: DetailPageResult['offerLinks'];
+}
 
 @Injectable()
 export class ProductDetailsPageScraperService {
@@ -64,17 +78,18 @@ export class ProductDetailsPageScraperService {
     });
 
     try {
-      const html = await this.scraperService.getHtml(task.url);
+      const primaryUrl = normalizeUrl(task.url);
+      const html = await this.scraperService.getHtml(primaryUrl);
       const $ = cheerio.load(html);
 
       const extractionStart = Date.now();
-      const scrapedProduct = await this.extractProduct(task, $);
+      const extracted = await this.extractProduct(task, $);
       this.scrapingMetrics.recordExtractionDuration(
         sourceName,
         (Date.now() - extractionStart) / 1000,
       );
 
-      if (!scrapedProduct) {
+      if (!extracted) {
         this.logger.debug('Product extraction skipped', {
           taskId: task.id,
           url: task.url,
@@ -84,9 +99,13 @@ export class ProductDetailsPageScraperService {
         return;
       }
 
+      const { scrapedProduct, variantSourcePages } =
+        await this.fetchAndFoldVariants(task, extracted);
+
       const result = await this.productUpdaterService.createOrUpdateProduct(
         task,
         scrapedProduct,
+        variantSourcePages,
       );
 
       if (result) {
@@ -127,10 +146,110 @@ export class ProductDetailsPageScraperService {
     }
   }
 
+  // Fetches every sibling variant page (§ cross-page variant-link following)
+  // synchronously, sequentially — not in parallel, since ScraperService goes
+  // through a shared external scraping/proxy resource and bursting N
+  // requests at once for one page's variant discovery works against
+  // whatever rate-limiting it enforces. A failed sibling fetch is logged and
+  // skipped, not fatal to the whole task — that variant's offer simply
+  // doesn't land this pass, picked up on a future re-scrape. Returns the
+  // primary scrapedProduct with every sibling's offer(s) folded into
+  // `offers`, plus one VariantSourcePage per successfully fetched sibling
+  // for ProductScrapeUpdaterService to give its own ProductSourceRecord.
+  private async fetchAndFoldVariants(
+    task: ScrapeTask,
+    primary: ExtractedPage,
+  ): Promise<{
+    scrapedProduct: ScrapedProduct;
+    variantSourcePages: VariantSourcePage[];
+  }> {
+    if (primary.offerLinks.length === 0) {
+      return {
+        scrapedProduct: primary.scrapedProduct,
+        variantSourcePages: [],
+      };
+    }
+
+    const config = task.source.config;
+    const siblingOffers: ScrapedOffer[] = [];
+    const variantSourcePages: VariantSourcePage[] = [];
+
+    for (const link of primary.offerLinks) {
+      const siblingUrl = normalizeUrl(link.url);
+      try {
+        const html = await this.scraperService.getHtml(siblingUrl);
+        const $ = cheerio.load(html);
+        const siblingTask = { ...task, url: siblingUrl };
+        const detail = await this.interpreter.runDetailPage(
+          siblingTask,
+          $,
+          config,
+        );
+
+        // Siblings are fetched purely to source their own Offer data — the
+        // deterministic spec mapping runs (so offer-level keys like
+        // frameSize resolve correctly), but not the LLM post-process or
+        // rawSpecsHash skip check the primary page's full extractProduct
+        // does; every fetched sibling always contributes its current offer.
+        let mappedSpecs: ProductSpecs = {};
+        if (detail.categorySlug) {
+          const jsonSchema = this.categoryConfigService.getJsonSchema(
+            detail.categorySlug,
+          );
+          const sourceConfig =
+            config.detailPage.specMapping[detail.categorySlug];
+          if (jsonSchema && sourceConfig) {
+            mappedSpecs = this.specExtraction.extractSpecs({
+              scrapedSpecs: detail.rawSpecs,
+              schema: jsonSchema,
+              sourceConfig,
+            });
+          }
+        }
+        const offerLevelKeys = detail.categorySlug
+          ? this.categoryConfigService.getConfig(detail.categorySlug)
+              ?.offerLevelSpecs ?? []
+          : [];
+        const siblingOfferLevelSpecs = pick(mappedSpecs, offerLevelKeys);
+        const strippedSiblingSpecs = omit(mappedSpecs, offerLevelKeys);
+
+        const siblingOffersForPage = this.toScrapedOffers(
+          detail.rawOffers,
+          siblingOfferLevelSpecs,
+        ).map((offer) => ({ ...offer, url: offer.url ?? siblingUrl }));
+        siblingOffers.push(...siblingOffersForPage);
+
+        variantSourcePages.push({
+          sourceUrl: siblingUrl,
+          scrapedProduct: {
+            specs: strippedSiblingSpecs,
+            rawSpecs: detail.rawSpecs,
+            externalId: detail.externalId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn('Failed to fetch/extract variant page, skipping', {
+          taskId: task.id,
+          primaryUrl: task.url,
+          variantUrl: siblingUrl,
+          error,
+        });
+      }
+    }
+
+    return {
+      scrapedProduct: {
+        ...primary.scrapedProduct,
+        offers: [...(primary.scrapedProduct.offers ?? []), ...siblingOffers],
+      },
+      variantSourcePages,
+    };
+  }
+
   private async extractProduct(
     task: ScrapeTask,
     $: cheerio.CheerioAPI,
-  ): Promise<ScrapedProduct | null> {
+  ): Promise<ExtractedPage | null> {
     const config = task.source.config;
     const detail = await this.interpreter.runDetailPage(task, $, config);
 
@@ -214,6 +333,10 @@ export class ProductDetailsPageScraperService {
     // The model name is also reused from the already-persisted ProductModel
     // rather than re-derived from the raw title, so a skipped re-scrape never
     // needs an LLM call either.
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ??
+      [];
+
     const existingSource = await this.findExistingSource(task, detail.externalId);
     if (!task.force && existingSource?.rawSpecsHash === rawSpecsHash) {
       const model = existingSource.model?.model ?? detail.model;
@@ -226,17 +349,26 @@ export class ProductDetailsPageScraperService {
         task.source.name,
         'raw_specs_unchanged',
       );
+      // No fresh specs extracted this pass (rawSpecsHash unchanged), so
+      // there's nothing to strip/pick offer-level keys from here — offers
+      // fall back to whichever offer-level specs the existing
+      // ProductSourceRecord already carries (see createOrUpdateOffers's
+      // pageOfferLevelSpecs).
       return {
-        brand: detail.brand,
-        model,
-        displayName: `${detail.brand} ${model}`.trim(),
-        originalName: detail.model,
-        category,
-        aliases: detail.aliases,
-        releaseYear: detail.releaseYear,
-        externalId: detail.externalId,
-        imageUrls: detail.imageUrls,
-        offers: this.toScrapedOffers(detail.rawOffers),
+        scrapedProduct: {
+          brand: detail.brand,
+          model,
+          displayName: `${detail.brand} ${model}`.trim(),
+          originalName: detail.model,
+          category,
+          aliases: detail.aliases,
+          releaseYear: detail.releaseYear,
+          externalId: detail.externalId,
+          imageUrls: detail.imageUrls,
+          offers: this.toScrapedOffers(detail.rawOffers, {}),
+        },
+        offerLevelSpecs: {},
+        offerLinks: detail.offerLinks,
       };
     }
 
@@ -272,20 +404,32 @@ export class ProductDetailsPageScraperService {
       categorySlug: category.slug,
     });
 
+    // Offer-level keys (e.g. frameSize) never reach the shared
+    // ProductModel/ProductSourceRecord.specs — they vary between the very
+    // offers a single ProductModel groups together, so they have no single
+    // correct value at the model level. The pre-strip value is what each
+    // offer's own specs is picked from instead — see toScrapedOffers below.
+    const pageOfferLevelSpecs = pick(specs, offerLevelKeys);
+    const strippedSpecs = omit(specs, offerLevelKeys);
+
     return {
-      brand,
-      model,
-      displayName: `${brand} ${model}`.trim(),
-      originalName: detail.model,
-      category,
-      specs,
-      extractedSpecs: deterministicSpecs,
-      rawSpecs: detail.rawSpecs,
-      externalId: detail.externalId,
-      aliases: detail.aliases,
-      releaseYear,
-      imageUrls: detail.imageUrls,
-      offers: this.toScrapedOffers(detail.rawOffers),
+      scrapedProduct: {
+        brand,
+        model,
+        displayName: `${brand} ${model}`.trim(),
+        originalName: detail.model,
+        category,
+        specs: strippedSpecs,
+        extractedSpecs: deterministicSpecs,
+        rawSpecs: detail.rawSpecs,
+        externalId: detail.externalId,
+        aliases: detail.aliases,
+        releaseYear,
+        imageUrls: detail.imageUrls,
+        offers: this.toScrapedOffers(detail.rawOffers, pageOfferLevelSpecs),
+      },
+      offerLevelSpecs: pageOfferLevelSpecs,
+      offerLinks: detail.offerLinks,
     };
   }
 
@@ -307,7 +451,7 @@ export class ProductDetailsPageScraperService {
         externalId,
       );
     }
-    return this.sourceRecordRepo.findByUrl(task.url);
+    return this.sourceRecordRepo.findByUrl(normalizeUrl(task.url));
   }
 
   private async maybePostProcess(params: {
@@ -354,7 +498,14 @@ export class ProductDetailsPageScraperService {
   // RawOfferRecord's fields are all optional (interpreter output before
   // validation); ScrapedOffer requires sellerName/price, so entries missing
   // either are dropped here rather than persisted as broken Offer rows.
-  private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
+  // Each offer's own specs (from an assembleOffer op's per-item `specs`
+  // sub-pipelines, e.g. frameSize varying per variant) take priority; the
+  // page-level offerLevelSpecs is the fallback for offers with none of
+  // their own — the ordinary single-offer-per-page case.
+  private toScrapedOffers(
+    rawOffers: RawOfferRecord[],
+    pageOfferLevelSpecs: ProductSpecs,
+  ): ScrapedOffer[] {
     return rawOffers
       .filter(
         (offer): offer is RawOfferRecord & { sellerName: string; price: number } =>
@@ -366,8 +517,9 @@ export class ProductDetailsPageScraperService {
         priceWithoutDiscount: offer.priceWithoutDiscount,
         currency: offer.currency,
         availability: this.parseAvailability(offer.availability),
-        url: offer.url,
-        sourceListingId: offer.sourceListingId,
+        url: offer.url ? normalizeUrl(offer.url) : offer.url,
+        externalId: offer.externalId,
+        specs: offer.specs ?? pageOfferLevelSpecs,
       }));
   }
 

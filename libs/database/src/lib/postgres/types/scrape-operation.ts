@@ -413,6 +413,40 @@ export interface BranchOp extends OpBase {
   ifFalse: ScrapeOperation[];
 }
 
+// ─── Iteration ──────────────────────────────────────────────────────────
+
+// Runs itemPipeline once per entry of the input collection, against a
+// per-item-scoped vars clone (so an `as`-stored value from one item never
+// leaks into the next — see interfaces/scrape-execution-context.interface.ts).
+// 'cheerio': input is a CheerioSelection; each item exposed as a
+// single-element selection under vars[itemVar]. 'json': input is an array;
+// each item exposed as vars[itemVar] directly.
+export interface ForEachItemOp extends OpBase {
+  op: 'forEachItem';
+  itemMode: 'cheerio' | 'json';
+  itemVar?: string; // default "item"
+  indexVar?: string; // default "itemIndex"
+  itemPipeline: ScrapeOperation[];
+  skipEmptyResults?: boolean; // default true — drop items whose pipeline yields nothing
+}
+
+// Assembles a RawOfferRecord from several independent sub-pipelines run
+// against the item-scoped context — the per-item counterpart of
+// ProductSourceOffersConfig.itemPipeline's terminal op. Returns undefined
+// (dropped by forEachItem when skipEmptyResults) if sellerName/price don't
+// resolve.
+export interface AssembleOfferOp extends OpBase {
+  op: 'assembleOffer';
+  sellerName: ScrapeOperation[];
+  price: ScrapeOperation[];
+  priceWithoutDiscount?: ScrapeOperation[];
+  currency?: ScrapeOperation[];
+  availability?: ScrapeOperation[];
+  url?: ScrapeOperation[];
+  externalId?: ScrapeOperation[];
+  specs?: Record<string, ScrapeOperation[]>;
+}
+
 export type ScrapeOperation =
   | SelectAllOp
   | SelectFirstOp
@@ -462,7 +496,9 @@ export type ScrapeOperation =
   | ExtractImageWithFallbackOp
   | MapSpecValueOp
   | MapValueOp
-  | BranchOp;
+  | BranchOp
+  | ForEachItemOp
+  | AssembleOfferOp;
 
 // ─── Category slug resolution rules ────────────────────────────────────────
 

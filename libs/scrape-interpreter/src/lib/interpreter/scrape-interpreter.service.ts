@@ -3,6 +3,7 @@ import type { CheerioAPI } from 'cheerio';
 import {
   CategoryLookupCondition,
   ProductSourceConfig,
+  ProductSpecs,
   ScrapeQueueName,
   ScrapeTask,
 } from '@fittkereso-backend/database';
@@ -24,7 +25,8 @@ export interface RawOfferRecord {
   currency?: string;
   availability?: string;
   url?: string;
-  sourceListingId?: string;
+  externalId?: string;
+  specs?: ProductSpecs;
 }
 
 export interface DetailPageResult {
@@ -37,6 +39,7 @@ export interface DetailPageResult {
   externalId?: string;
   imageUrls: string[];
   rawOffers: RawOfferRecord[];
+  offerLinks: WebLink[];
 }
 
 @Injectable()
@@ -161,6 +164,13 @@ export class ScrapeInterpreterService {
 
     const rawOffers = await this.runDetailPageOffers(ctx, config);
 
+    const offerLinks = config.detailPage.offerLinks
+      ? ((await this.runner.run(
+          config.detailPage.offerLinks,
+          ctx,
+        )) as WebLink[] | undefined) ?? []
+      : [];
+
     return {
       rawSpecs,
       categorySlug,
@@ -171,6 +181,7 @@ export class ScrapeInterpreterService {
       externalId,
       imageUrls,
       rawOffers,
+      offerLinks,
     };
   }
 
@@ -210,13 +221,11 @@ export class ScrapeInterpreterService {
   }
 
   // `listItems` gates whether this source populates offers at all (empty ->
-  // opted out, matching every source's config today). There's no per-item
-  // iteration op in the vocabulary yet, so this only supports a source
-  // exposing a single implicit offer per detail page (e.g. a single-seller
-  // storefront selling its own listing) — sellerName/price/etc. run once as
-  // page-global pipelines rather than once per `listItems` entry. A true
-  // multi-offer aggregator (several sellers' prices on one page) would need
-  // a per-item iteration primitive added first.
+  // opted out). Each entry is run through offersConfig.itemPipeline (which
+  // must terminate in an assembleOffer op) via the forEachItem op, so a
+  // source can expose either a single implicit offer (listItems resolving to
+  // one item — the common single-seller-storefront case) or several (a true
+  // multi-seller aggregator page).
   private async runDetailPageOffers(
     ctx: ScrapeExecutionContext,
     config: ProductSourceConfig,
@@ -229,61 +238,21 @@ export class ScrapeInterpreterService {
       return [];
     }
 
-    const sellerName = (await this.runner.run(
-      offersConfig.sellerName,
+    const results = await this.runner.run(
+      [
+        {
+          op: 'forEachItem',
+          itemMode: offersConfig.itemMode,
+          itemPipeline: offersConfig.itemPipeline,
+        },
+      ],
       ctx,
-    )) as string | undefined;
+      listItems,
+    );
 
-    const rawPrice = await this.runner.run(offersConfig.price, ctx);
-    const price = this.toFiniteNumber(rawPrice);
-    if (!sellerName || !Number.isFinite(price)) return [];
-
-    const priceWithoutDiscount = offersConfig.priceWithoutDiscount
-      ? this.toFiniteNumber(
-          await this.runner.run(offersConfig.priceWithoutDiscount, ctx),
-        )
-      : undefined;
-
-    const currency = offersConfig.currency
-      ? ((await this.runner.run(offersConfig.currency, ctx)) as
-          | string
-          | undefined)
-      : undefined;
-    const availability = offersConfig.availability
-      ? ((await this.runner.run(offersConfig.availability, ctx)) as
-          | string
-          | undefined)
-      : undefined;
-    const url = offersConfig.url
-      ? ((await this.runner.run(offersConfig.url, ctx)) as string | undefined)
-      : undefined;
-    const sourceListingId = offersConfig.sourceListingId
-      ? ((await this.runner.run(offersConfig.sourceListingId, ctx)) as
-          | string
-          | undefined)
-      : undefined;
-
-    return [
-      {
-        sellerName,
-        price,
-        priceWithoutDiscount,
-        currency,
-        availability,
-        url,
-        sourceListingId,
-      },
-    ];
-  }
-
-  private toFiniteNumber(value: unknown): number | undefined {
-    const num =
-      typeof value === 'number'
-        ? value
-        : typeof value === 'string'
-          ? Number(value)
-          : undefined;
-    return Number.isFinite(num) ? num : undefined;
+    return (results as (RawOfferRecord | undefined)[]).filter(
+      (r): r is RawOfferRecord => !!r,
+    );
   }
 
   private resolveCategorySlug(

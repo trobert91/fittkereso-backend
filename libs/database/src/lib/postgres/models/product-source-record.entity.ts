@@ -34,7 +34,7 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * "what did this source actually say"), brand/model/displayName/aliases/
    * releaseYear/imageUrls/offers. ProductModel/ProductImage/Offer hold the
    * resolved, deduped, cross-source-merged results (brand FK lookup,
-   * CDN-uploaded images, offers keyed by (seller, sourceListingId)); this
+   * CDN-uploaded images, offers keyed by (seller, externalId)); this
    * column is the pre-resolution source claim those were built from, kept
    * so ProductMergeService.mergeSources can recompute ProductModel's specs
    * and identity fields from sources without a re-scrape.

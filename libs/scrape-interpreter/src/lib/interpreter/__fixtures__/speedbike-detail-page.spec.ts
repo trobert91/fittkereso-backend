@@ -252,7 +252,8 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
         currency: 'HUF',
         availability: 'in_stock',
         url: 'https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben',
-        sourceListingId: '1260044103',
+        externalId: '1260044103',
+        specs: undefined,
       },
     ]);
   });
@@ -275,7 +276,8 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
         currency: 'HUF',
         availability: 'in_stock',
         url: 'https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben',
-        sourceListingId: '1260044103',
+        externalId: '1260044103',
+        specs: undefined,
       },
     ]);
   });

@@ -59,11 +59,13 @@ import {
 import { extractAttrList, extractImageWithFallback } from './image-ops';
 import { makeMapSpecValue, mapValue } from './value-map-ops';
 import { makeBranch } from './control-ops';
+import { makeForEachItem } from './iteration-ops';
+import { makeAssembleOffer } from './offer-ops';
 
 // Registers every op handler in the vocabulary. Ops that need to recursively
-// run a sub-pipeline (branch, extractLinkFromBox, appendSyntheticSpec) are
-// built via factory functions closing over the runner; everything else is a
-// stateless pure function.
+// run a sub-pipeline (branch, extractLinkFromBox, appendSyntheticSpec,
+// forEachItem, assembleOffer) are built via factory functions closing over
+// the runner; everything else is a stateless pure function.
 export function registerOps(
   registry: ScrapeOpRegistryService,
   runner: ScrapePipelineRunnerService,
@@ -130,4 +132,7 @@ export function registerOps(
   registry.register('mapValue', mapValue);
 
   registry.register('branch', makeBranch(runner));
+
+  registry.register('forEachItem', makeForEachItem(runner));
+  registry.register('assembleOffer', makeAssembleOffer(runner));
 }

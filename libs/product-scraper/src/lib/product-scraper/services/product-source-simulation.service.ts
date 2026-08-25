@@ -310,7 +310,7 @@ export class ProductSourceSimulationService {
         currency: offer.currency,
         availability: this.parseAvailability(offer.availability),
         url: offer.url,
-        sourceListingId: offer.sourceListingId,
+        externalId: offer.externalId,
       }));
   }
 

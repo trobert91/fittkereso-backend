@@ -248,97 +248,133 @@
           "selector": "#app",
           "attr": "data-page",
           "path": "props.product.stocks"
-        }
-      ],
-      "sellerName": [
-        { "op": "literal", "value": "ebikeshop.hu" }
-      ],
-      "price": [
-        {
-          "op": "parseJsonAttr",
-          "selector": "#app",
-          "attr": "data-page",
-          "path": "props.product.prices.sale",
-          "as": "onSale"
         },
         {
-          "op": "branch",
-          "condition": { "equals": { "value": "onSale", "to": true } },
-          "ifTrue": [
+          "op": "takeFirst",
+          "count": 1
+        }
+      ],
+      "itemMode": "json",
+      "itemPipeline": [
+        {
+          "op": "assembleOffer",
+          "sellerName": [
+            { "op": "literal", "value": "ebikeshop.hu" }
+          ],
+          "price": [
             {
               "op": "parseJsonAttr",
               "selector": "#app",
               "attr": "data-page",
-              "path": "props.product.prices.priceSale"
+              "path": "props.product.prices.sale",
+              "as": "onSale"
+            },
+            {
+              "op": "branch",
+              "condition": { "equals": { "value": "onSale", "to": true } },
+              "ifTrue": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.priceSale"
+                }
+              ],
+              "ifFalse": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.price"
+                }
+              ]
             }
           ],
-          "ifFalse": [
+          "priceWithoutDiscount": [
             {
               "op": "parseJsonAttr",
               "selector": "#app",
               "attr": "data-page",
-              "path": "props.product.prices.price"
-            }
-          ]
-        }
-      ],
-      "priceWithoutDiscount": [
-        {
-          "op": "parseJsonAttr",
-          "selector": "#app",
-          "attr": "data-page",
-          "path": "props.product.prices.sale",
-          "as": "onSaleForOriginalPrice"
-        },
-        {
-          "op": "branch",
-          "condition": { "equals": { "value": "onSaleForOriginalPrice", "to": true } },
-          "ifTrue": [
+              "path": "props.product.prices.sale",
+              "as": "onSaleForOriginalPrice"
+            },
             {
-              "op": "parseJsonAttr",
-              "selector": "#app",
-              "attr": "data-page",
-              "path": "props.product.prices.price"
+              "op": "branch",
+              "condition": { "equals": { "value": "onSaleForOriginalPrice", "to": true } },
+              "ifTrue": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.price"
+                }
+              ],
+              "ifFalse": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.__notPresent"
+                }
+              ]
             }
           ],
-          "ifFalse": [
+          "currency": [
+            { "op": "literal", "value": "HUF" }
+          ],
+          "availability": [
             {
               "op": "parseJsonAttr",
               "selector": "#app",
               "attr": "data-page",
-              "path": "props.product.prices.__notPresent"
+              "path": "props.product.stocks",
+              "as": "allStocks"
+            },
+            {
+              "op": "filterJsonArray",
+              "on": "allStocks",
+              "path": "preorderTypeTitle",
+              "equals": "Készleten",
+              "as": "inStockLocations"
+            },
+            {
+              "op": "filterJsonArray",
+              "on": "allStocks",
+              "path": "preorderTypeTitle",
+              "equals": "Gyártói készlet",
+              "as": "preorderLocations"
+            },
+            {
+              "op": "branch",
+              "condition": { "isEmpty": "inStockLocations" },
+              "ifTrue": [
+                {
+                  "op": "branch",
+                  "condition": { "isEmpty": "preorderLocations" },
+                  "ifTrue": [
+                    { "op": "literal", "value": "unknown" }
+                  ],
+                  "ifFalse": [
+                    { "op": "literal", "value": "preorder" }
+                  ]
+                }
+              ],
+              "ifFalse": [
+                { "op": "literal", "value": "in_stock" }
+              ]
+            }
+          ],
+          "url": [
+            { "op": "buildBaseUrl", "from": "task.url" }
+          ],
+          "externalId": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.productCode"
             }
           ]
-        }
-      ],
-      "currency": [
-        { "op": "literal", "value": "HUF" }
-      ],
-      "availability": [
-        {
-          "op": "parseJsonAttr",
-          "selector": "#app",
-          "attr": "data-page",
-          "path": "props.product.stocks.0.preorderTypeTitle"
-        },
-        {
-          "op": "mapValue",
-          "cases": {
-            "Készleten": "in_stock",
-            "Gyártói készlet": "preorder"
-          },
-          "default": "unknown"
-        }
-      ],
-      "url": [
-        { "op": "buildBaseUrl", "from": "task.url" }
-      ],
-      "sourceListingId": [
-        {
-          "op": "parseJsonAttr",
-          "selector": "#app",
-          "attr": "data-page",
-          "path": "props.product.productCode"
         }
       ]
     },

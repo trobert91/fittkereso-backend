@@ -162,10 +162,12 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
       {
         sellerName: 'ebikeshop.hu',
         price: 3879000.0017,
+        priceWithoutDiscount: undefined,
         currency: 'HUF',
         availability: 'preorder',
         url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
-        sourceListingId: '1260040108',
+        externalId: '1260040108',
+        specs: undefined,
       },
     ]);
   });
@@ -218,5 +220,42 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.rawOffers[0].availability).toBe('in_stock');
+  });
+
+  // props.product.stocks is a per-store array (e.g. one entry per physical
+  // warehouse), not multiple sellers/listings — confirmed live against a
+  // real ebikeshop.hu product with 2 store entries sharing one productCode.
+  // A single offer must still result, with availability aggregated across
+  // every store rather than just reading stocks[0].
+  it('collapses multiple per-store stock entries into a single offer with aggregated availability', async () => {
+    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
+    data.props.product.stocks = [
+      { stockType: 'stock', title: 'Győr', qty: 0, preorderTypeTitle: 'Nincs készleten' },
+      { stockType: 'stock', title: 'Szeged', qty: 1, preorderTypeTitle: 'Készleten' },
+    ];
+    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers).toHaveLength(1);
+    expect(result.rawOffers[0].availability).toBe('in_stock');
+  });
+
+  it('falls back to preorder when no store has stock but at least one has manufacturer stock', async () => {
+    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
+    data.props.product.stocks = [
+      { stockType: 'stock', title: 'Győr', qty: 0, preorderTypeTitle: 'Nincs készleten' },
+      { stockType: 'manufacturer_planning', title: 'Gyártói készlet', qty: 5, preorderTypeTitle: 'Gyártói készlet' },
+    ];
+    const json = JSON.stringify(data).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const $ = cheerio.load(`<div id="app" data-page="${json}"></div>`);
+    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers).toHaveLength(1);
+    expect(result.rawOffers[0].availability).toBe('preorder');
   });
 });

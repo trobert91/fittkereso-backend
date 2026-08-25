@@ -8,7 +8,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { chain, isBoolean, isEmpty, isNumber } from 'lodash';
-import { hashRawSpecs } from '@fittkereso-backend/utils';
+import { hashRawSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
@@ -43,9 +43,13 @@ export class ProductSourceRecordUpdaterService {
       source: newSource,
       scrapedProduct,
       externalId,
-      sourceUrl,
       normalizedSourceName,
     } = params;
+    // Trimmed/trailing-slash-stripped once here so every ProductSourceRecord.url
+    // stored is already normalized — callers matching against model.sources
+    // (e.g. ProductScrapeUpdaterService.createOrUpdateOffers's per-offer
+    // sourceRecord resolution) rely on this.
+    const sourceUrl = params.sourceUrl ? normalizeUrl(params.sourceUrl) : undefined;
     // Label used only for metrics/logging — admin-entered specs have no
     // ProductSource (source: null), everything else is scraped.
     const sourceLabel = newSource?.name ?? 'manual';

@@ -1,3 +1,5 @@
+export const normalizeUrl = (url: string): string => url.trim().replace(/\/+$/, '');
+
 export const domainFromUrl = (url: string): string => {
   const urlObject = new URL(url);
   return urlObject.hostname.replace('www.', '');

@@ -64,7 +64,7 @@ export interface ScrapedOffer {
   currency?: string;
   availability?: OfferAvailability;
   url?: string;
-  sourceListingId?: string;
+  externalId?: string;
   /**
    * Offer-level spec values (e.g. frameSize, color) for this specific
    * listing — overrides the page-level offer-level specs derived from

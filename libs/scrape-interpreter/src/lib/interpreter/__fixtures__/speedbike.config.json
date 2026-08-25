@@ -198,53 +198,59 @@
 
     "offers": {
       "listItems": [
-        { "op": "selectAll", "selector": ".price_special_color, .price:not(.price_special_color)" }
+        { "op": "selectAll", "selector": ".productstock-param-row" }
       ],
-      "sellerName": [
-        { "op": "literal", "value": "speedbike.hu" }
-      ],
-      "price": [
-        { "op": "selectText", "selector": ".price_special_color", "first": true, "trim": true, "as": "specialPriceText" },
-        { "op": "selectText", "selector": ".price:not(.price_special_color):not(.price_original_color)", "first": true, "trim": true, "as": "regularPriceText" },
-        { "op": "coalesce", "candidates": ["specialPriceText", "regularPriceText"] },
-        { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithDots" },
-        { "op": "stripPattern", "value": "priceWithDots", "pattern": "\\.", "flags": "g" }
-      ],
-      "priceWithoutDiscount": [
-        { "op": "selectText", "selector": ".price_original_color", "first": true, "trim": true },
-        { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithoutDiscountWithDots" },
-        { "op": "stripPattern", "value": "priceWithoutDiscountWithDots", "pattern": "\\.", "flags": "g" }
-      ],
-      "currency": [
-        { "op": "literal", "value": "HUF" }
-      ],
-      "availability": [
-        { "op": "selectText", "selector": ".productstock-param.param-value", "first": true, "trim": true },
+      "itemMode": "cheerio",
+      "itemPipeline": [
         {
-          "op": "mapValue",
-          "cases": {
-            "Raktáron": "in_stock",
-            "Készleten": "in_stock",
-            "Beszerezhető": "preorder",
-            "Gyártói készlet": "preorder",
-            "Nincs készleten": "out_of_stock",
-            "Elfogyott": "out_of_stock"
-          },
-          "default": "unknown"
-        }
-      ],
-      "url": [
-        { "op": "buildBaseUrl", "from": "task.url" }
-      ],
-      "sourceListingId": [
-        { "op": "selectAll", "selector": "script", "as": "scripts" },
-        { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
-        {
-          "op": "regexCapture",
-          "value": "shopRenterJson",
-          "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
-          "group": 1,
-          "trim": true
+          "op": "assembleOffer",
+          "sellerName": [
+            { "op": "literal", "value": "speedbike.hu" }
+          ],
+          "price": [
+            { "op": "selectText", "selector": ".price_special_color", "first": true, "trim": true, "as": "specialPriceText" },
+            { "op": "selectText", "selector": ".price:not(.price_special_color):not(.price_original_color)", "first": true, "trim": true, "as": "regularPriceText" },
+            { "op": "coalesce", "candidates": ["specialPriceText", "regularPriceText"] },
+            { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithDots" },
+            { "op": "stripPattern", "value": "priceWithDots", "pattern": "\\.", "flags": "g" }
+          ],
+          "priceWithoutDiscount": [
+            { "op": "selectText", "selector": ".price_original_color", "first": true, "trim": true },
+            { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithoutDiscountWithDots" },
+            { "op": "stripPattern", "value": "priceWithoutDiscountWithDots", "pattern": "\\.", "flags": "g" }
+          ],
+          "currency": [
+            { "op": "literal", "value": "HUF" }
+          ],
+          "availability": [
+            { "op": "selectText", "selector": ".productstock-param.param-value", "first": true, "trim": true },
+            {
+              "op": "mapValue",
+              "cases": {
+                "Raktáron": "in_stock",
+                "Készleten": "in_stock",
+                "Beszerezhető": "preorder",
+                "Gyártói készlet": "preorder",
+                "Nincs készleten": "out_of_stock",
+                "Elfogyott": "out_of_stock"
+              },
+              "default": "unknown"
+            }
+          ],
+          "url": [
+            { "op": "buildBaseUrl", "from": "task.url" }
+          ],
+          "externalId": [
+            { "op": "selectAll", "selector": "script", "as": "scripts" },
+            { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+            {
+              "op": "regexCapture",
+              "value": "shopRenterJson",
+              "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
+              "group": 1,
+              "trim": true
+            }
+          ]
         }
       ]
     },

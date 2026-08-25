@@ -15,6 +15,7 @@ import type { ResolutionService } from '@fittkereso-backend/resolution';
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   BrandResolutionService,
+  OfferMatchingService,
   ProductEmbeddingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -118,6 +119,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
   let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
   let mockSellerResolution: jest.Mocked<SellerResolutionService>;
+  let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
   let mockDuplicateRepo: jest.Mocked<ProductDuplicateRepository>;
@@ -191,8 +193,16 @@ describe('ProductScrapeUpdaterService', () => {
       resolveOrCreate: jest.fn(),
     } as unknown as jest.Mocked<SellerResolutionService>;
 
+    mockOfferMatching = {
+      findMatch: jest.fn().mockReturnValue(undefined),
+    } as unknown as jest.Mocked<OfferMatchingService>;
+
     mockOfferRepo = {
       upsertFromScrape: jest.fn(),
+      findAllByModelAndSource: jest.fn().mockResolvedValue([]),
+      findFirstBySellerAndExternalIdsWithModelRelations: jest
+        .fn()
+        .mockResolvedValue(null),
     } as unknown as jest.Mocked<OfferRepository>;
 
     mockCategoryConfigService = {
@@ -228,6 +238,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockMetricsService,
       mockProductNormalizer,
       mockSellerResolution,
+      mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
       mockDuplicateRepo,
@@ -256,7 +267,7 @@ describe('ProductScrapeUpdaterService', () => {
     expect(mockBrandResolution.resolve).not.toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
-      'path1_hit',
+      'path4_hit',
     );
     expect(mockMetricsService.productUpdated).toHaveBeenCalledWith('arukereso');
     expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
@@ -312,7 +323,7 @@ describe('ProductScrapeUpdaterService', () => {
     expect(mockProductSearch.search).not.toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
-      'path1_hit',
+      'path4_hit',
     );
   });
 
@@ -517,7 +528,7 @@ describe('ProductScrapeUpdaterService', () => {
           priceWithoutDiscount: 249990,
           currency: 'HUF',
           url: 'https://alza.hu/product/1',
-          sourceListingId: 'listing-1',
+          externalId: 'listing-1',
         },
       ],
     });
@@ -528,9 +539,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
     const mockSeller = { id: 'seller-1', name: 'Alza.hu' };
-    mockSellerResolution.resolveOrCreate.mockResolvedValueOnce(
-      mockSeller as never,
-    );
+    mockSellerResolution.resolveOrCreate.mockResolvedValue(mockSeller as never);
     mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
     await service.createOrUpdateProduct(task, scrapedProduct);
@@ -546,7 +555,7 @@ describe('ProductScrapeUpdaterService', () => {
         priceWithoutDiscount: 249990,
         currency: 'HUF',
         url: 'https://alza.hu/product/1',
-        sourceListingId: 'listing-1',
+        externalId: 'listing-1',
       }),
     );
     expect(mockMergeService.recomputePrice).toHaveBeenCalledWith(
@@ -569,14 +578,15 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
     mockSellerResolution.resolveOrCreate
-      .mockRejectedValueOnce(new Error('seller resolution failed'))
-      .mockResolvedValueOnce({ id: 'seller-2', name: 'GoodSeller' } as never);
+      .mockResolvedValueOnce({ id: 'seller-bad', name: 'BadSeller' } as never) // early primary-seller resolution in createOrUpdateProduct
+      .mockRejectedValueOnce(new Error('seller resolution failed')) // per-offer: BadSeller
+      .mockResolvedValueOnce({ id: 'seller-2', name: 'GoodSeller' } as never); // per-offer: GoodSeller
     mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
     const result = await service.createOrUpdateProduct(task, scrapedProduct);
 
     expect(result).toBeDefined();
-    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(2);
+    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(3);
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(1);
     expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
   });

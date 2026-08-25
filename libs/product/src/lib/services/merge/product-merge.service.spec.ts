@@ -18,7 +18,7 @@ function makeOffer(overrides: Partial<Offer>): Offer {
   return {
     id: overrides.id ?? 'offer-1',
     seller: overrides.seller ?? ({ id: 'seller-1' } as any),
-    sourceListingId: overrides.sourceListingId,
+    externalId: overrides.externalId,
     ...overrides,
   } as Offer;
 }
@@ -67,7 +67,7 @@ describe('ProductMergeService.moveOffers', () => {
   it('reassigns offers with no colliding target-side offer', async () => {
     manager.find
       .mockResolvedValueOnce([
-        makeOffer({ id: 'offer-1', sourceListingId: 'listing-a' }),
+        makeOffer({ id: 'offer-1', externalId: 'listing-a' }),
       ]) // source offers
       .mockResolvedValueOnce([]); // target offers (none)
 
@@ -87,15 +87,15 @@ describe('ProductMergeService.moveOffers', () => {
     const seller = { id: 'seller-1' } as any;
     manager.find
       .mockResolvedValueOnce([
-        makeOffer({ id: 'offer-src', seller, sourceListingId: 'listing-a' }),
+        makeOffer({ id: 'offer-src', seller, externalId: 'listing-a' }),
       ]) // source offers
       .mockResolvedValueOnce([
         makeOffer({
           id: 'offer-target',
           seller,
-          sourceListingId: 'listing-a',
+          externalId: 'listing-a',
         }),
-      ]); // target offers — same seller + sourceListingId
+      ]); // target offers — same seller + externalId
 
     await callMoveOffers('source-1', 'target-1');
 
@@ -106,14 +106,14 @@ describe('ProductMergeService.moveOffers', () => {
     expect(queryBuilder.update).not.toHaveBeenCalled();
   });
 
-  it('always moves (never deletes) offers with no sourceListingId, since the unique constraint does not cover them', async () => {
+  it('always moves (never deletes) offers with no externalId, since the unique constraint does not cover them', async () => {
     const seller = { id: 'seller-1' } as any;
     manager.find
       .mockResolvedValueOnce([
-        makeOffer({ id: 'offer-src', seller, sourceListingId: undefined }),
+        makeOffer({ id: 'offer-src', seller, externalId: undefined }),
       ])
       .mockResolvedValueOnce([
-        makeOffer({ id: 'offer-target', seller, sourceListingId: undefined }),
+        makeOffer({ id: 'offer-target', seller, externalId: undefined }),
       ]);
 
     await callMoveOffers('source-1', 'target-1');
@@ -129,14 +129,14 @@ describe('ProductMergeService.moveOffers', () => {
     const seller = { id: 'seller-1' } as any;
     manager.find
       .mockResolvedValueOnce([
-        makeOffer({ id: 'offer-move', seller, sourceListingId: 'listing-b' }),
-        makeOffer({ id: 'offer-dupe', seller, sourceListingId: 'listing-a' }),
+        makeOffer({ id: 'offer-move', seller, externalId: 'listing-b' }),
+        makeOffer({ id: 'offer-dupe', seller, externalId: 'listing-a' }),
       ])
       .mockResolvedValueOnce([
         makeOffer({
           id: 'offer-target',
           seller,
-          sourceListingId: 'listing-a',
+          externalId: 'listing-a',
         }),
       ]);
 

@@ -27,20 +27,14 @@ export interface ProductSourceListPageConfig {
 
 export interface ProductSourceOffersConfig {
   listItems: ScrapeOperation[];
-  sellerName: ScrapeOperation[];
-  price: ScrapeOperation[];
-  /**
-   * The pre-discount price pipeline. Optional: most sources don't surface a
-   * separate "original price" element. Should resolve to undefined (e.g. an
-   * empty selector match) on listings that aren't currently discounted,
-   * rather than being run conditionally — see speedbike.hu's config for the
-   * pattern.
-   */
-  priceWithoutDiscount?: ScrapeOperation[];
-  currency?: ScrapeOperation[];
-  availability?: ScrapeOperation[];
-  url?: ScrapeOperation[];
-  sourceListingId?: ScrapeOperation[];
+  // 'cheerio': each list item is exposed as a single-element CheerioSelection
+  // under vars[itemVar]. 'json': each item is exposed as vars[itemVar]
+  // directly. See ForEachItemOp.
+  itemMode: 'cheerio' | 'json';
+  // Per-item pipeline, run once per entry in listItems; must terminate in an
+  // assembleOffer op. Replaces the old flat sellerName/price/etc. fields —
+  // see AssembleOfferOp.
+  itemPipeline: ScrapeOperation[];
 }
 
 export interface ProductSourceTranslationConfig {
@@ -101,9 +95,11 @@ export interface ProductSourceDetailPageConfig {
   aliases?: ScrapeOperation[];
   releaseYear?: ScrapeOperation[];
   // Source-native listing identifier (SKU/model code/slug), stable across URL
-  // changes. Extracted once here (not only inside offers.sourceListingId) so
+  // changes. Extracted once here (not only inside offers.itemPipeline) so
   // ProductSourceRecord.externalId can be populated independent of whether the
-  // source's config populates `offers` at all.
+  // source's config populates `offers` at all. May be a group-level id shared
+  // across variant siblings (e.g. ShopRenter's parent.sku) when the source
+  // exposes one — see offerLinks below.
   externalId?: ScrapeOperation[];
   images: ScrapeOperation[];
   // Keyed by category slug — replaces the old per-category specMappings.json
@@ -111,6 +107,17 @@ export interface ProductSourceDetailPageConfig {
   // ProductSource row this config belongs to").
   specMapping: Record<string, SourceSpecConfig>;
   offers?: ProductSourceOffersConfig;
+  /**
+   * Links to sibling detail pages for the SAME underlying product under a
+   * different URL — e.g. frame-size/color variants each on their own page.
+   * ProductDetailsPageScraperService fetches each of these synchronously
+   * within the same scrape and folds their offers into one combined
+   * ScrapedProduct before a single createOrUpdateProduct call — no separate
+   * ScrapeTask is queued. Each fetched sibling still gets its own
+   * ProductSourceRecord (one per URL) under the same resolved ProductModel.
+   * Absent/empty for the overwhelming majority of sources.
+   */
+  offerLinks?: ScrapeOperation[];
   translation?: ProductSourceTranslationConfig;
   postProcess?: ProductSourcePostProcessConfig;
 }

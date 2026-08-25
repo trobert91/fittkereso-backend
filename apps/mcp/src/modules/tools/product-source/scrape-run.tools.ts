@@ -50,7 +50,6 @@ export class ScrapeRunTools {
     try {
       const task = await this.scrapeTaskCreator.create({
         queue: args.queue,
-        sourceId: args.productSourceId,
         url: args.url,
       });
 
@@ -124,7 +123,7 @@ export class ScrapeRunTools {
             ? ` (was ${offer.priceWithoutDiscount} ${offer.currency})`
             : '';
           L.push(
-            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability} · condition: ${offer.condition} · sourceListingId: ${offer.sourceListingId ?? '_none_'} · lastSeenAt: ${offer.lastSeenAt?.toISOString?.() ?? ''}`,
+            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · lastSeenAt: ${offer.lastSeenAt?.toISOString?.() ?? ''}`,
           );
         }
       } else if (task.queue === ScrapeQueueName.ScrapeProductDetails) {

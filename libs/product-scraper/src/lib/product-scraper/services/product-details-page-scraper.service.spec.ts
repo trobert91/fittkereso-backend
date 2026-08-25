@@ -188,6 +188,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     imageUrls: [],
     aliases: [],
     externalId: 'sku-1',
+    offerLinks: [],
   };
 
   beforeEach(() => {
@@ -231,8 +232,8 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
     const result = await callExtractProduct(task);
 
-    expect(result.model).toBe(detail.model);
-    expect(result.originalName).toBe(detail.model);
+    expect(result.scrapedProduct.model).toBe(detail.model);
+    expect(result.scrapedProduct.originalName).toBe(detail.model);
   });
 
   it('sets originalName on the raw-specs-unchanged fast path too', async () => {
@@ -244,8 +245,8 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
     const result = await callExtractProduct(task);
 
-    expect(result.model).toBe('Reused Model Name');
-    expect(result.originalName).toBe(detail.model);
+    expect(result.scrapedProduct.model).toBe('Reused Model Name');
+    expect(result.scrapedProduct.originalName).toBe(detail.model);
   });
 
   it('carries the pre-LLM deterministic specs through alongside the post-process-merged specs', async () => {
@@ -261,8 +262,8 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
     const result = await callExtractProduct(task);
 
-    expect(result.extractedSpecs).toBe(deterministicSpecs);
-    expect(result.specs).toEqual({ weight: 17, motorPosition: 'Középmotor' });
+    expect(result.scrapedProduct.extractedSpecs).toBe(deterministicSpecs);
+    expect(result.scrapedProduct.specs).toEqual({ weight: 17, motorPosition: 'Középmotor' });
   });
 
   it('leaves extractedSpecs undefined on the raw-specs-unchanged fast path', async () => {
@@ -274,7 +275,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
     const result = await callExtractProduct(task);
 
-    expect(result.extractedSpecs).toBeUndefined();
-    expect(result.specs).toBeUndefined();
+    expect(result.scrapedProduct.extractedSpecs).toBeUndefined();
+    expect(result.scrapedProduct.specs).toBeUndefined();
   });
 });

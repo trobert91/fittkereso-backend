@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Offer,
   OfferRepository,
   ProductAlias,
   ProductAliasRepository,
@@ -15,6 +16,7 @@ import {
   ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
+  Seller,
 } from '@fittkereso-backend/database';
 import {
   ResolutionContext,
@@ -22,11 +24,17 @@ import {
   ResolutionService,
   productSpecsToStructuredSpecs,
 } from '@fittkereso-backend/resolution';
-import { generateSlug, nameOf, normalize } from '@fittkereso-backend/utils';
+import {
+  generateSlug,
+  nameOf,
+  normalize,
+  normalizeUrl,
+} from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BrandResolutionService,
+  OfferMatchingService,
   ProductEmbeddingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -36,7 +44,7 @@ import {
   SpecComparisonService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
-import { isEmpty, minBy, pick } from 'lodash';
+import { compact, isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 interface PendingScrapeDuplicate {
@@ -49,7 +57,7 @@ interface ResolvedIdentity {
   model?: ProductModel;
   isExistingMatch: boolean;
   resolutionContext?: ResolutionContext;
-  /** Set when Path 2's LLM merge decision considered a candidate close enough
+  /** Set when Path 5's LLM merge decision considered a candidate close enough
    *  to adjudicate but did not confidently accept it. The scraper proceeds to
    *  create a new product (the safe default), but also flags this candidate
    *  pair for human review — see `writeScrapeAmbiguousDuplicate`. */
@@ -60,6 +68,16 @@ interface PersistResult {
   model: ProductModel;
   created: boolean;
   sourceRecord?: ProductSourceRecord;
+}
+
+// A sibling variant page (§4) fetched and folded into the same scrape as the
+// primary page — its own URL/externalId/specs, kept separate from the
+// primary's so each gets its own ProductSourceRecord (one per URL), rather
+// than a merged/shared record. Its offer(s) already live in the combined
+// scrapedProduct.offers by the time this reaches persistProduct.
+export interface VariantSourcePage {
+  sourceUrl: string;
+  scrapedProduct: Partial<ScrapedProduct>;
 }
 
 @Injectable()
@@ -82,6 +100,7 @@ export class ProductScrapeUpdaterService {
     private readonly productMetricsService: ProductMetricsService,
     private readonly productNormalizer: ProductNormalizerService,
     private readonly sellerResolution: SellerResolutionService,
+    private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly duplicateRepo: ProductDuplicateRepository,
@@ -91,6 +110,7 @@ export class ProductScrapeUpdaterService {
   public async createOrUpdateProduct(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
+    variantSourcePages: VariantSourcePage[] = [],
   ): Promise<ProductModel | undefined> {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
@@ -108,16 +128,27 @@ export class ProductScrapeUpdaterService {
     try {
       const normalizedSourceName =
         this.buildNormalizedSourceName(scrapedProduct);
+      // Resolved here, ahead of identity resolution, because Path 3 needs a
+      // seller to key its (seller, externalId) lookup — and it's cheap/safe
+      // to resolve early since SellerResolutionService.resolveOrCreate is
+      // idempotent (createOrUpdateOffers below resolves per-offer sellers
+      // again, independently, for multi-seller pages).
+      const primarySellerName = scrapedProduct.offers?.[0]?.sellerName;
+      const seller = primarySellerName
+        ? await this.sellerResolution.resolveOrCreate(primarySellerName)
+        : undefined;
       const identity = await this.resolveProductIdentity(
         task,
         scrapedProduct,
         normalizedSourceName,
+        seller,
       );
       const persisted = await this.persistProduct({
         task,
         scrapedProduct,
         normalizedSourceName,
         identity,
+        variantSourcePages,
       });
       await this.applyPostSaveSideEffects({
         task,
@@ -138,7 +169,7 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  // One canonical name for this scrape, used for Path 1 lookup, for the new
+  // One canonical name for this scrape, used for Path 4 lookup, for the new
   // ProductSourceRecord row, and for ProductModel.normalizedName on new products.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
     const strategy =
@@ -156,8 +187,9 @@ export class ProductScrapeUpdaterService {
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
     normalizedSourceName: string,
+    seller: Seller | undefined,
   ): Promise<ResolvedIdentity> {
-    // Path 0: task already pinned to a product
+    // Path 1: task already pinned to a product
     if (task.product?.id) {
       const model = await this.productRepo.findOneOrFail({
         where: { id: task.product.id },
@@ -166,12 +198,12 @@ export class ProductScrapeUpdaterService {
       return { model, isExistingMatch: true };
     }
 
-    // Path 0.5: this exact (source, externalId) listing was already scraped
+    // Path 2: this exact (source, externalId) listing was already scraped
     // and linked to a product — reuse that link directly rather than
     // re-deriving identity from the name or falling through to the
-    // matcher/embedding/LLM pipeline in Path 2. externalId is the
-    // source-native SKU/model code/slug and is stable across URL and
-    // display-name changes, unlike Path 1's normalizedSourceName.
+    // matcher/embedding/LLM pipeline in Path 5. externalId is a group-level
+    // id (e.g. ShopRenter's parent.sku), stable across URL, variant, and
+    // display-name changes, unlike Path 4's normalizedSourceName.
     if (scrapedProduct.externalId) {
       const existingSource =
         await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
@@ -188,7 +220,34 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    // Path 1: name-anchored identity lookup (any source, same category).
+    // Path 3: no group-level externalId match (either the source doesn't
+    // expose one, or this product/group has never been seen before) — try
+    // every offer's own externalId gathered by this scrape (the primary
+    // page's offer plus any variant offers folded in by a multi-fetch
+    // scrape) and take the first that matches an existing Offer for this
+    // seller. Whichever variant URL we land on, and regardless of which
+    // sibling's sku happens to already be in the DB, this resolves straight
+    // back to the product we already created.
+    const candidateExternalIds = compact(
+      (scrapedProduct.offers ?? []).map((o) => o.externalId),
+    );
+    if (candidateExternalIds.length > 0 && seller) {
+      const existingOffer =
+        await this.offerRepo.findFirstBySellerAndExternalIdsWithModelRelations(
+          seller.id,
+          candidateExternalIds,
+          this.getProductRelations(),
+        );
+      if (existingOffer?.model) {
+        this.productMetricsService.scrapeResolutionOutcome(
+          task.source.name,
+          'offer_external_id_hit',
+        );
+        return { model: existingOffer.model, isExistingMatch: true };
+      }
+    }
+
+    // Path 4: name-anchored identity lookup (any source, same category).
     // Category presence is guaranteed by the caller's pre-check.
     const categoryId = scrapedProduct.category?.id;
     if (!categoryId) {
@@ -199,18 +258,18 @@ export class ProductScrapeUpdaterService {
         normalizedSourceName,
         categoryId,
       );
-    const path1Match = this.hasCollidedKey(sourceRows)
+    const path4Match = this.hasCollidedKey(sourceRows)
       ? undefined
-      : this.selectPath1Match(sourceRows, task, scrapedProduct);
-    if (path1Match) {
+      : this.selectPath4Match(sourceRows, task, scrapedProduct);
+    if (path4Match) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
-        'path1_hit',
+        'path4_hit',
       );
-      return { model: path1Match.model, isExistingMatch: true };
+      return { model: path4Match.model, isExistingMatch: true };
     }
 
-    // Path 2: strict cross-source search.
+    // Path 5: strict cross-source search.
     // Agent already filters candidates to category C via preResolvedCategories.
     const resolved = await this.findExistingProductModel(scrapedProduct, {
       taskId: task.id,
@@ -226,7 +285,7 @@ export class ProductScrapeUpdaterService {
         'cross_source_rejected_same_source',
       );
       this.logger.debug(
-        'Path 2 candidate rejected — source already has a row on this product',
+        'Path 5 candidate rejected — source already has a row on this product',
         {
           taskId: task.id,
           url: task.url,
@@ -271,8 +330,15 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct;
     normalizedSourceName: string;
     identity: ResolvedIdentity;
+    variantSourcePages?: VariantSourcePage[];
   }): Promise<PersistResult> {
-    const { task, scrapedProduct, normalizedSourceName, identity } = params;
+    const {
+      task,
+      scrapedProduct,
+      normalizedSourceName,
+      identity,
+      variantSourcePages,
+    } = params;
 
     let model = identity.model;
     if (!model) {
@@ -297,6 +363,23 @@ export class ProductScrapeUpdaterService {
       sourceUrl: task.url,
       normalizedSourceName,
     });
+
+    // One ProductSourceRecord per fetched sibling page (§4) — a
+    // ProductSourceRecord represents one URL, so each variant gets its own
+    // record under the same model, each keeping its own (unmerged) specs.
+    // Run before mergeSources so their specs participate in that merge the
+    // same way any other source record's would.
+    for (const variantPage of variantSourcePages ?? []) {
+      await this.sourceRecordUpdater.upsertSourceRecord({
+        model,
+        scrapedProduct: variantPage.scrapedProduct,
+        externalId: variantPage.scrapedProduct.externalId,
+        source: task.source,
+        sourceUrl: variantPage.sourceUrl,
+        normalizedSourceName,
+      });
+    }
+
     // model.productCategory may only be the { id } stub set by
     // newProductModel/applyScrapedProductDetails — pass the slug explicitly
     // from ScrapedProduct.category, which is always fully populated.
@@ -387,16 +470,22 @@ export class ProductScrapeUpdaterService {
   }
 
   // No-op for sources whose config doesn't populate ScrapedProduct.offers.
+  // scrapedProduct.offers can span several distinct pages in one combined
+  // scrape (see ProductDetailsPageScraperService's variant-fetch step), each
+  // carrying its own `url` — a ProductSourceRecord represents one URL, so
+  // sourceRecord is resolved per offer here rather than passed as one shared
+  // value, falling back to the primary page's own sourceRecord (the ordinary
+  // single-offer-per-page case, and the shared-URL multi-seller-table case).
   private async createOrUpdateOffers(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
     model: ProductModel,
-    sourceRecord: ProductSourceRecord | undefined,
+    primarySourceRecord: ProductSourceRecord | undefined,
   ): Promise<void> {
     const offers = scrapedProduct.offers;
     if (isEmpty(offers)) return;
 
-    if (!sourceRecord) {
+    if (!primarySourceRecord) {
       this.logger.warn(
         'No ProductSourceRecord resolved for this scrape, skipping offer upsert',
         { taskId: task.id, url: task.url },
@@ -404,26 +493,51 @@ export class ProductScrapeUpdaterService {
       return;
     }
 
-    // Page-level offer-level specs (e.g. frameSize, color), derived from this
-    // listing's own spec set. Applied to every offer on the page by default;
-    // an individual ScrapedOffer.specs overrides this for sources that report
-    // multiple size/color variants on a single product page. Always optional
-    // — a listing with no extractable offer-level values simply yields {}.
+    // Page-level offer-level specs (e.g. frameSize, color), derived from the
+    // primary page's own spec set. Applied to every offer on the page by
+    // default; an individual ScrapedOffer.specs overrides this for sources
+    // that report multiple size/color variants, each with its own price.
+    // Always optional — a listing with no extractable offer-level values
+    // simply yields {}.
     const offerLevelKeys =
       this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
         ?.offerLevelSpecs ?? [];
     const pageOfferLevelSpecs = pick(
-      sourceRecord.scrapedProduct?.specs,
+      primarySourceRecord.scrapedProduct?.specs,
       offerLevelKeys,
     );
 
-    let upsertedAny = false;
+    // Scoped by source, not by a single sourceRecord — a multi-variant
+    // scrape persists offers under several ProductSourceRecords for this
+    // source (one per URL), and two independently enqueued tasks can each
+    // create their own record for overlapping variants. Preloading by
+    // source lets OfferMatchingService find and update an offer regardless
+    // of which record originally created it.
+    const preloadedOffers = await this.offerRepo.findAllByModelAndSource(
+      model.id,
+      task.source.id,
+    );
+
+    const upsertedOffers: Offer[] = [];
     for (const scraped of offers!) {
       try {
+        const normalizedScrapedUrl = scraped.url
+          ? normalizeUrl(scraped.url)
+          : undefined;
+        const sourceRecord = normalizedScrapedUrl
+          ? (model.sources?.find((s) => s.url === normalizedScrapedUrl) ??
+            primarySourceRecord)
+          : primarySourceRecord;
         const seller = await this.sellerResolution.resolveOrCreate(
           scraped.sellerName,
         );
-        await this.offerRepo.upsertFromScrape({
+        const existing = this.offerMatching.findMatch(
+          preloadedOffers,
+          scraped,
+          seller.id,
+        );
+        const offer = await this.offerRepo.upsertFromScrape({
+          existing,
           model,
           seller,
           sourceRecord,
@@ -431,11 +545,11 @@ export class ProductScrapeUpdaterService {
           priceWithoutDiscount: scraped.priceWithoutDiscount,
           currency: scraped.currency,
           availability: scraped.availability,
-          url: scraped.url,
-          sourceListingId: scraped.sourceListingId,
+          url: normalizedScrapedUrl,
+          externalId: scraped.externalId,
           specs: scraped.specs ?? pageOfferLevelSpecs,
         });
-        upsertedAny = true;
+        upsertedOffers.push(offer);
       } catch (error) {
         // Do not fail the whole product scrape if one offer fails — mirrors
         // the existing brand-resolution-failure tolerance in this service.
@@ -448,7 +562,17 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    if (upsertedAny) {
+    if (upsertedOffers.length > 0) {
+      // Anything preloaded but not matched this round is confirmed gone
+      // from the source and is hard-deleted (not soft-deactivated) — see
+      // OfferRepository/Offer.active doc comments.
+      const matchedIds = new Set(upsertedOffers.map((o) => o.id));
+      const staleIds = preloadedOffers
+        .filter((o) => !matchedIds.has(o.id))
+        .map((o) => o.id);
+      if (staleIds.length > 0) {
+        await this.offerRepo.deleteByIds(staleIds);
+      }
       await this.mergeService.recomputePrice(model);
       await this.productRepo.save(model);
     }
@@ -592,7 +716,7 @@ export class ProductScrapeUpdaterService {
   // so two genuinely different models can coincidentally sort to the same
   // key) — if the rows sharing this key actually point at more than one
   // distinct ProductModel, the key match can't be trusted as identity.
-  // Skip Path 1 entirely rather than guess; Path 2's full scoring pipeline
+  // Skip Path 4 entirely rather than guess; Path 5's full scoring pipeline
   // (name/spec similarity, not just the trigram key) is the fallback.
   private hasCollidedKey(sourceRows: ProductSourceRecord[]): boolean {
     const distinctModelIds = new Set(
@@ -601,12 +725,12 @@ export class ProductScrapeUpdaterService {
     return distinctModelIds.size > 1;
   }
 
-  // Pick the right Path 1 hit when multiple source rows share a normalizedSourceName
+  // Pick the right Path 4 hit when multiple source rows share a normalizedSourceName
   // (e.g. color/variant siblings like "39GS95QE-B" and "39GS95QE-W" both normalize
   // to "39gs95qe"). Prefer an exact name match from the same source; accept any
-  // cross-source row; reject same-source-different-name rows so Path 2's same-source
+  // cross-source row; reject same-source-different-name rows so Path 5's same-source
   // gate can treat the scrape as a distinct product.
-  private selectPath1Match(
+  private selectPath4Match(
     sourceRows: ProductSourceRecord[],
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
@@ -649,7 +773,7 @@ export class ProductScrapeUpdaterService {
         // Let DecisionService fall back to the scrape-merge LLM decision when
         // quality gates reject every candidate but the best one is still
         // close to threshold (see MatchingConfig.llmDecisionFloor) — without
-        // this, an ambiguous Path 2 result silently became a new product with
+        // this, an ambiguous Path 5 result silently became a new product with
         // no adjudication or review trail. Explicitly NOT webSearchEnabled:
         // true — that would also turn on SERP web search, a different cost/
         // evidence profile this change isn't meant to introduce.
