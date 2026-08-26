@@ -88,9 +88,8 @@ export class ProductSourceRecord extends BasePostgresEntity {
   /**
    * Normalized identity key derived from scrapedProduct.{brand,model,
    * displayName} at scrape time (see ProductScrapeUpdaterService.
-   * buildNormalizedSourceName), kept as its own indexed column so Path-1
-   * identity lookup (findAllByNormalizedName) can query it directly instead
-   * of recomputing normalization for every row on every scrape.
+   * buildNormalizedSourceName). Also feeds ProductModel.normalizedName on
+   * new products.
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })

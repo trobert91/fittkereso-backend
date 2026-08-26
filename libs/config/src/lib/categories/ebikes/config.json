@@ -262,7 +262,7 @@
   "matchingConfig": {
     "maxMatcherSpecMismatches": 2
   },
-  "normalizationStrategy": "full",
+  "normalizationStrategy": "full-sorted",
   "offerLevelSpecs": [
     "frameSize",
     "frameSizeLabel",

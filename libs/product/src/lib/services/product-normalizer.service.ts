@@ -14,33 +14,36 @@ export class ProductNormalizerService {
    *
    * Three strategies, selected per-category via ProductCategoryConfig.normalizationStrategy:
    *
-   * 'digit-heuristic' (default): split on whitespace to preserve word boundaries
+   * 'full-sorted' (default): keeps the whole brand-stripped string (lowercased,
+   * whitespace-collapsed), then sorts the whitespace-delimited words
+   * alphabetically before joining, so this key (and every pg_trgm
+   * similarity() query against it — ProductFuzzySearchService, the nightly
+   * dedup job's recall, Path 1's exact lookup) is insensitive to word-order
+   * differences between sources' post-processed model strings (e.g. "Cross
+   * Macina 720" vs. "Macina Cross 720"). See normalizeFullSorted(). Lossy by
+   * construction — see that method's doc comment for the collision caveat.
+   *
+   * 'full': same as 'full-sorted' but without the word-sort — keeps the
+   * whole brand-stripped string (lowercased, whitespace-collapsed only). Use
+   * when word order is already reliable and the sort's collision risk isn't
+   * worth taking. See normalizeFull() for details.
+   *
+   * 'digit-heuristic': split on whitespace to preserve word boundaries
    * (so "G5 C34G55TWWP" stays two tokens), and for each whitespace-bounded
    * word that contains a digit, keep all alphanumeric characters (dashes,
    * slashes and other glue characters are dropped, but everything they tie
    * together is preserved). So "34GN850P-B" → "34gn850pb", "39GS95QE-W" →
    * "39gs95qew", "XB271HU-bmiprz" → "xb271hubmiprz". Marketing words
    * (UltraGear, OLED, Pro, Swift, Gaming) are digit-free and fall out. Correct
-   * when the model code is the one alphanumeric token in the name (monitors).
-   *
-   * 'full': keeps the whole brand-stripped string (lowercased, whitespace-
-   * collapsed only). Use when there's no reliable digit/alpha split between
-   * "identity" and "noise" (bikes: "MACINA SCARP SX PRESTIGE Di2" has no
-   * digits at all, so the digit-heuristic would discard the entire model
-   * line). See normalizeFull() for details.
-   *
-   * 'full-sorted': same as 'full', but additionally sorts the whitespace-
-   * delimited words alphabetically before joining, so this key (and every
-   * pg_trgm similarity() query against it — ProductFuzzySearchService, the
-   * nightly dedup job's recall, Path 1's exact lookup) is insensitive to
-   * word-order differences between sources' post-processed model strings
-   * (e.g. "Cross Macina 720" vs. "Macina Cross 720"). See normalizeFullSorted().
+   * when the model code is the one alphanumeric token in the name (monitors);
+   * wrong for categories like bikes whose model line has no digits at all —
+   * the heuristic would discard the entire model line.
    */
   public normalizeProduct({
     brand,
     model,
     displayName,
-    strategy = 'digit-heuristic',
+    strategy = 'full-sorted',
   }: {
     brand: string;
     model: string | undefined;

@@ -56,7 +56,7 @@ interface ResolvedIdentity {
   model?: ProductModel;
   isExistingMatch: boolean;
   resolutionContext?: ResolutionContext;
-  /** Set when Path 5's LLM merge decision considered a candidate close enough
+  /** Set when Path 4's LLM merge decision considered a candidate close enough
    *  to adjudicate but did not confidently accept it. The scraper proceeds to
    *  create a new product (the safe default), but also flags this candidate
    *  pair for human review — see `writeScrapeAmbiguousDuplicate`. */
@@ -116,7 +116,7 @@ export class ProductScrapeUpdaterService {
       const normalizedSourceName =
         this.buildNormalizedSourceName(scrapedProduct);
       // Every offer belongs to its ProductSource's own seller — no per-offer
-      // seller resolution needed. Path 3 keys its (seller, externalId)
+      // seller resolution needed. Path 2 keys its (seller, externalId)
       // lookup off this.
       const seller = task.source.seller;
       const identity = await this.resolveProductIdentity(
@@ -150,12 +150,12 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  // One canonical name for this scrape, used for Path 4 lookup, for the new
-  // ProductSourceRecord row, and for ProductModel.normalizedName on new products.
+  // One canonical name for this scrape, stored on the new ProductSourceRecord
+  // row and used for ProductModel.normalizedName on new products.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
     const strategy =
       this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
-        ?.normalizationStrategy ?? 'digit-heuristic';
+        ?.normalizationStrategy ?? 'full-sorted';
     return this.productNormalizer.normalizeProduct({
       brand: scrapedProduct.brand,
       model: scrapedProduct.model,
@@ -179,36 +179,16 @@ export class ProductScrapeUpdaterService {
       return { model, isExistingMatch: true };
     }
 
-    // Path 2: this exact (source, externalId) listing was already scraped
-    // and linked to a product — reuse that link directly rather than
-    // re-deriving identity from the name or falling through to the
-    // matcher/embedding/LLM pipeline in Path 5. externalId is a group-level
-    // id (e.g. ShopRenter's parent.sku), stable across URL, variant, and
-    // display-name changes, unlike Path 4's normalizedSourceName.
-    if (scrapedProduct.externalId) {
-      const existingSource =
-        await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
-          task.source.id,
-          scrapedProduct.externalId,
-          this.getProductRelations(),
-        );
-      if (existingSource?.model) {
-        this.productMetricsService.scrapeResolutionOutcome(
-          task.source.name,
-          'external_id_hit',
-        );
-        return { model: existingSource.model, isExistingMatch: true };
-      }
-    }
-
-    // Path 3: no group-level externalId match (either the source doesn't
-    // expose one, or this product/group has never been seen before) — try
+    // Path 2: variant-level Offer.externalId reuse, multi-candidate — try
     // every offer's own externalId gathered by this scrape (the primary
     // page's offer plus any variant offers folded in by a multi-fetch
     // scrape) and take the first that matches an existing Offer for this
     // seller. Whichever variant URL we land on, and regardless of which
     // sibling's sku happens to already be in the DB, this resolves straight
-    // back to the product we already created.
+    // back to the product we already created. Tried before Path 3's
+    // group-level lookup because it's available whenever a source
+    // identifies its listings at all (an offer's own sku), whereas the
+    // group-level id is optional and only some sources populate it.
     const candidateExternalIds = compact(
       (scrapedProduct.offers ?? []).map((o) => o.externalId),
     );
@@ -228,29 +208,31 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    // Path 4: name-anchored identity lookup (any source, same category).
-    // Category presence is guaranteed by the caller's pre-check.
-    const categoryId = scrapedProduct.category?.id;
-    if (!categoryId) {
-      return { isExistingMatch: false };
-    }
-    const sourceRows =
-      await this.sourceRecordRepo.findAllByNormalizedName(
-        normalizedSourceName,
-        categoryId,
-      );
-    const path4Match = this.hasCollidedKey(sourceRows)
-      ? undefined
-      : this.selectPath4Match(sourceRows, task, scrapedProduct);
-    if (path4Match) {
-      this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
-        'path4_hit',
-      );
-      return { model: path4Match.model, isExistingMatch: true };
+    // Path 3: this exact (source, externalId) listing was already scraped
+    // and linked to a product — reuse that link directly rather than
+    // re-deriving identity from the name or falling through to the
+    // matcher/embedding/LLM pipeline in Path 4. externalId is a group-level
+    // id (e.g. ShopRenter's parent.sku), stable across URL, variant, and
+    // display-name changes. Only reached when Path 2 found no offer-level
+    // match (either no offer externalId matched, or this scrape carries
+    // none at all).
+    if (scrapedProduct.externalId) {
+      const existingSource =
+        await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
+          task.source.id,
+          scrapedProduct.externalId,
+          this.getProductRelations(),
+        );
+      if (existingSource?.model) {
+        this.productMetricsService.scrapeResolutionOutcome(
+          task.source.name,
+          'external_id_hit',
+        );
+        return { model: existingSource.model, isExistingMatch: true };
+      }
     }
 
-    // Path 5: strict cross-source search.
+    // Path 4: strict cross-source search.
     // Agent already filters candidates to category C via preResolvedCategories.
     const resolved = await this.findExistingProductModel(scrapedProduct, {
       taskId: task.id,
@@ -266,7 +248,7 @@ export class ProductScrapeUpdaterService {
         'cross_source_rejected_same_source',
       );
       this.logger.debug(
-        'Path 5 candidate rejected — source already has a row on this product',
+        'Path 4 candidate rejected — source already has a row on this product',
         {
           taskId: task.id,
           url: task.url,
@@ -685,43 +667,6 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  // A normalizedSourceName key is expected to identify one product. Under the
-  // 'full-sorted' normalization strategy the key is lossy (words are sorted,
-  // so two genuinely different models can coincidentally sort to the same
-  // key) — if the rows sharing this key actually point at more than one
-  // distinct ProductModel, the key match can't be trusted as identity.
-  // Skip Path 4 entirely rather than guess; Path 5's full scoring pipeline
-  // (name/spec similarity, not just the trigram key) is the fallback.
-  private hasCollidedKey(sourceRows: ProductSourceRecord[]): boolean {
-    const distinctModelIds = new Set(
-      sourceRows.map((row) => row.model?.id).filter(Boolean),
-    );
-    return distinctModelIds.size > 1;
-  }
-
-  // Pick the right Path 4 hit when multiple source rows share a normalizedSourceName
-  // (e.g. color/variant siblings like "39GS95QE-B" and "39GS95QE-W" both normalize
-  // to "39gs95qe"). Prefer an exact name match from the same source; accept any
-  // cross-source row; reject same-source-different-name rows so Path 5's same-source
-  // gate can treat the scrape as a distinct product.
-  private selectPath4Match(
-    sourceRows: ProductSourceRecord[],
-    task: ScrapeTask,
-    scrapedProduct: ScrapedProduct,
-  ): ProductSourceRecord | undefined {
-    if (isEmpty(sourceRows)) return undefined;
-
-    const incomingName = scrapedProduct.displayName?.toLowerCase();
-    const exactMatch = sourceRows.find(
-      (row) =>
-        row.source?.id === task.source.id &&
-        row.scrapedProduct?.displayName?.toLowerCase() === incomingName,
-    );
-    if (exactMatch) return exactMatch;
-
-    return sourceRows.find((row) => row.source?.id !== task.source.id);
-  }
-
   private async findExistingProductModel(
     scrapedProduct: ScrapedProduct,
     logContext?: Record<string, string>,
@@ -747,7 +692,7 @@ export class ProductScrapeUpdaterService {
         // Let DecisionService fall back to the scrape-merge LLM decision when
         // quality gates reject every candidate but the best one is still
         // close to threshold (see MatchingConfig.llmDecisionFloor) — without
-        // this, an ambiguous Path 5 result silently became a new product with
+        // this, an ambiguous Path 4 result silently became a new product with
         // no adjudication or review trail. Explicitly NOT webSearchEnabled:
         // true — that would also turn on SERP web search, a different cost/
         // evidence profile this change isn't meant to introduce.

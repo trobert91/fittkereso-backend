@@ -12,11 +12,15 @@ describe('ProductNormalizerService', () => {
     service = module.get<ProductNormalizerService>(ProductNormalizerService);
   });
 
+  // These tests exercise 'digit-heuristic' specifically, not the service's
+  // default — 'full-sorted' is the default (see ProductNormalizerService),
+  // so strategy is passed explicitly here rather than relied on implicitly.
   const run = (brand: string, model: string, displayName?: string) =>
     service.normalizeProduct({
       brand,
       model,
       displayName: displayName ?? `${brand} ${model}`,
+      strategy: 'digit-heuristic',
     });
 
   it('preserves series-prefixed model code: AOC CU34G4', () => {
@@ -73,6 +77,7 @@ describe('ProductNormalizerService', () => {
       brand: 'Brand',
       model: 'Some ProductName',
       displayName: 'Brand Some ProductName',
+      strategy: 'digit-heuristic',
     });
     expect(result).toBe('productname');
   });
@@ -82,6 +87,7 @@ describe('ProductNormalizerService', () => {
       brand: 'LG',
       model: undefined,
       displayName: 'LG UltraGear 34GN850',
+      strategy: 'digit-heuristic',
     });
     expect(result).toBe('34gn850');
   });
@@ -133,6 +139,47 @@ describe('ProductNormalizerService', () => {
       // Under 'digit-heuristic' this would collapse to just "di2" (see the
       // top-level describe block) — 'full' must keep the whole model line.
       expect(runFull('KTM', 'MACINA SCARP SX PRESTIGE Di2')).not.toBe('di2');
+    });
+  });
+
+  describe("strategy: 'full-sorted' (the default)", () => {
+    const runFullSorted = (
+      brand: string,
+      model: string,
+      displayName?: string,
+    ) =>
+      service.normalizeProduct({
+        brand,
+        model,
+        displayName: displayName ?? `${brand} ${model}`,
+        strategy: 'full-sorted',
+      });
+
+    it('is used when strategy is omitted', () => {
+      const result = service.normalizeProduct({
+        brand: 'KTM',
+        model: 'MACINA SCARP SX PRESTIGE Di2',
+        displayName: 'KTM MACINA SCARP SX PRESTIGE Di2',
+      });
+      expect(result).toBe(runFullSorted('KTM', 'MACINA SCARP SX PRESTIGE Di2'));
+    });
+
+    it('strips the brand prefix, lowercases, and sorts words alphabetically', () => {
+      expect(runFullSorted('KTM', 'MACINA SCARP SX PRESTIGE Di2')).toBe(
+        'di2 macina prestige scarp sx',
+      );
+    });
+
+    it('produces the same key regardless of word order', () => {
+      const crossFirst = runFullSorted('KTM', 'Cross Macina 720');
+      const macinaFirst = runFullSorted('KTM', 'Macina Cross 720');
+      expect(crossFirst).toBe(macinaFirst);
+    });
+
+    it('does not fall back to the digit-heuristic word-dropping behavior', () => {
+      expect(runFullSorted('KTM', 'MACINA SCARP SX PRESTIGE Di2')).not.toBe(
+        'di2',
+      );
     });
   });
 });

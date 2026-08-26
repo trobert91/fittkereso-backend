@@ -112,7 +112,7 @@ export class ProductUpdateMapperService {
       });
     const strategy =
       this.categoryConfigService.getConfig(entity.productCategory?.slug)
-        ?.normalizationStrategy ?? 'digit-heuristic';
+        ?.normalizationStrategy ?? 'full-sorted';
     entity.normalizedName = this.productNormalizer.normalizeProduct({
       brand: entity.brand.name,
       model: entity.model,

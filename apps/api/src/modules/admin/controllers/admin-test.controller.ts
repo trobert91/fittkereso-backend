@@ -33,7 +33,7 @@ export class AdminTestController {
     products.forEach((product, idx) => {
       const strategy =
         this.categoryConfigService.getConfig(product.productCategory?.slug)
-          ?.normalizationStrategy ?? 'digit-heuristic';
+          ?.normalizationStrategy ?? 'full-sorted';
       product.normalizedName = this.productNormalizer.normalizeProduct({
         brand: product.brand?.name || '',
         model: product.model,

@@ -39,7 +39,7 @@ async function bootstrap() {
       const brandName = model.brand?.name ?? '';
       const strategy =
         categoryConfigService.getConfig(model.productCategory?.slug)
-          ?.normalizationStrategy ?? 'digit-heuristic';
+          ?.normalizationStrategy ?? 'full-sorted';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,
@@ -106,7 +106,7 @@ async function bootstrap() {
       }
       const strategy =
         categoryConfigService.getConfig(source.model?.productCategory?.slug)
-          ?.normalizationStrategy ?? 'digit-heuristic';
+          ?.normalizationStrategy ?? 'full-sorted';
       try {
         const next = normalizer.normalizeProduct({
           brand: brandName,

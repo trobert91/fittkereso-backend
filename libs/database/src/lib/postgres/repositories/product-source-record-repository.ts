@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
-import { ProductModel } from '../models/product-model.entity';
 import { isEmpty } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
 
@@ -85,37 +84,5 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .getMany();
 
     return new Set(results.map((source) => source.url!));
-  }
-
-  async findAllByNormalizedName(
-    normalizedSourceName: string,
-    categoryId: string,
-  ): Promise<ProductSourceRecord[]> {
-    return this.repo
-      .createQueryBuilder('source')
-      .innerJoinAndSelect(
-        `source.${nameOf<ProductSourceRecord>('model')}`,
-        'model',
-      )
-      .innerJoinAndSelect(
-        `model.${nameOf<ProductModel>('productCategory')}`,
-        'category',
-      )
-      .leftJoinAndSelect(
-        `model.${nameOf<ProductModel>('mainImage')}`,
-        'mainImage',
-      )
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>('images')}`, 'images')
-      .leftJoinAndSelect(
-        `model.${nameOf<ProductModel>('embedding')}`,
-        'embedding',
-      )
-      .leftJoinAndSelect(`model.${nameOf<ProductModel>('sources')}`, 'sources')
-      .where(
-        `source.${nameOf<ProductSourceRecord>('normalizedSourceName')} = :normalizedSourceName`,
-        { normalizedSourceName },
-      )
-      .andWhere('category.id = :categoryId', { categoryId })
-      .getMany();
   }
 }

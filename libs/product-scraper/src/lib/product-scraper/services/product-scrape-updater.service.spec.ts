@@ -156,7 +156,9 @@ describe('ProductScrapeUpdaterService', () => {
     } as unknown as jest.Mocked<ProductAliasRepository>;
 
     mockSourceRecordRepo = {
-      findAllByNormalizedName: jest.fn().mockResolvedValue([]),
+      findBySourceAndExternalIdWithModelRelations: jest
+        .fn()
+        .mockResolvedValue(null),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSourceRecordUpdater = {
@@ -241,35 +243,6 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
-  it('reuses an exact normalizedName match before creating a new product', async () => {
-    const task = makeTask();
-    const scrapedProduct = makeScrapedProduct();
-    const existingModel = makeExistingModel();
-
-    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
-      {
-        model: existingModel,
-        source: { id: 'source-arukereso' },
-        scrapedProduct: { displayName: scrapedProduct.displayName },
-      } as never,
-    ]);
-    mockProductRepo.save.mockResolvedValue(existingModel);
-
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
-
-    expect(result).toBe(existingModel);
-    expect(mockProductSearch.search).not.toHaveBeenCalled();
-    expect(mockBrandResolution.resolve).not.toHaveBeenCalled();
-    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      'arukereso',
-      'path4_hit',
-    );
-    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith('arukereso');
-    expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
-    expect(mockTaskRepo.save).toHaveBeenCalledWith(task);
-    expect(task.product).toBe(existingModel);
-  });
-
   it('preserves the existing model\'s fully-loaded productCategory (slug included) on a rescrape of the same category', async () => {
     // Regression: applyScrapedProductDetails used to unconditionally replace
     // model.productCategory with a bare { id } stub, dropping `slug` even
@@ -279,47 +252,18 @@ describe('ProductScrapeUpdaterService', () => {
     // emptying ProductModel.orderedSpecs (the "Specifications" admin tab)
     // after every single scrape.
     const task = makeTask();
+    task.product = { id: 'existing-model-1' } as never; // Path 1: task pinned to a product
     const scrapedProduct = makeScrapedProduct();
     const existingModel = makeExistingModel();
     const originalCategory = existingModel.productCategory;
 
-    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
-      {
-        model: existingModel,
-        source: { id: 'source-arukereso' },
-        scrapedProduct: { displayName: scrapedProduct.displayName },
-      } as never,
-    ]);
+    mockProductRepo.findOneOrFail.mockResolvedValueOnce(existingModel);
     mockProductRepo.save.mockResolvedValue(existingModel);
 
     await service.createOrUpdateProduct(task, scrapedProduct);
 
     expect(existingModel.productCategory).toBe(originalCategory);
     expect(existingModel.productCategory?.slug).toBe('keyboards');
-  });
-
-  it('takes a cross-source row when no same-source exact match exists', async () => {
-    const task = makeTask();
-    const scrapedProduct = makeScrapedProduct();
-    const existingModel = makeExistingModel();
-
-    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
-      {
-        model: existingModel,
-        source: { id: 'source-displayspecs' },
-        scrapedProduct: { displayName: 'Logitech MX Keys (different display name)' },
-      } as never,
-    ]);
-    mockProductRepo.save.mockResolvedValue(existingModel);
-
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
-
-    expect(result).toBe(existingModel);
-    expect(mockProductSearch.search).not.toHaveBeenCalled();
-    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      'arukereso',
-      'path4_hit',
-    );
   });
 
   it('skips Path 1 when only same-source-different-name rows exist (variant siblings)', async () => {
@@ -333,13 +277,6 @@ describe('ProductScrapeUpdaterService', () => {
     otherVariant.id = 'model-variant-b';
     otherVariant.sources = [{ source: { id: 'source-arukereso' } } as never];
 
-    mockSourceRecordRepo.findAllByNormalizedName.mockResolvedValueOnce([
-      {
-        model: otherVariant,
-        source: { id: 'source-arukereso' },
-        scrapedProduct: { displayName: 'LG UltraGear 39GS95QE-B' },
-      } as never,
-    ]);
     mockProductSearch.search.mockResolvedValueOnce({
       resolvedModel: { id: otherVariant.id } as never,
       context: undefined,
