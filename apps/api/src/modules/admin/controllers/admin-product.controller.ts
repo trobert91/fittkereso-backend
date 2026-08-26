@@ -47,6 +47,9 @@ import { ProductSpecUpdaterService } from '@fittkereso-backend/product';
 import {
   DuplicateSearchParams,
   DuplicateSearchResult,
+  OfferSearchParams,
+  OfferSearchResult,
+  OfferSearchService,
   ProductDuplicationSearchService,
   ProductSearchService,
 } from '@fittkereso-backend/search';
@@ -75,6 +78,7 @@ export class AdminProductController {
     private readonly mergeService: ProductMergeService,
     private readonly duplicationSearchService: ProductDuplicationSearchService,
     private readonly aliasRepo: ProductAliasRepository,
+    private readonly offerSearchService: OfferSearchService,
   ) {}
 
   @Post('search')
@@ -107,6 +111,25 @@ export class AdminProductController {
   @Roles([UserRole.admin])
   async getProduct(@Param('id') id: string) {
     return this.detailService.getProductById(id);
+  }
+
+  @Post(':id/offers/search')
+  @SerializeOptions({
+    groups: [
+      SerializeGroup.adminList,
+      SerializeGroup.list,
+      SerializeGroup.adminDetails,
+      SerializeGroup.details,
+    ],
+  })
+  async searchOffersForProduct(
+    @Param('id') id: string,
+    @Body() searchParams: OfferSearchParams,
+  ): Promise<OfferSearchResult> {
+    return this.offerSearchService.search({
+      ...searchParams,
+      productId: id,
+    });
   }
 
   @Put(':id')

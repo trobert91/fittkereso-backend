@@ -24,3 +24,6 @@ export * from './product-duplicate-search-result';
 
 export * from './seller-search-params';
 export * from './seller-search-result';
+
+export * from './offer-search-params';
+export * from './offer-search-result';
