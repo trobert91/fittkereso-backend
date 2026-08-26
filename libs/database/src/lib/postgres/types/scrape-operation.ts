@@ -182,7 +182,7 @@ export interface WrapInArrayOp extends OpBase {
 
 export interface LiteralOp extends OpBase {
   op: 'literal';
-  value: string; // fixed constant, e.g. a hardcoded sellerName/currency
+  value: string; // fixed constant, e.g. a hardcoded currency code
 }
 
 // ─── Regex ───────────────────────────────────────────────────────────────
@@ -454,11 +454,11 @@ export interface ForEachItemOp extends OpBase {
 // Assembles a RawOfferRecord from several independent sub-pipelines run
 // against the item-scoped context — the per-item counterpart of
 // ProductSourceOffersConfig.itemPipeline's terminal op. Returns undefined
-// (dropped by forEachItem when skipEmptyResults) if sellerName/price don't
-// resolve.
+// (dropped by forEachItem when skipEmptyResults) if price doesn't resolve.
+// Seller is never scraped — every offer belongs to its ProductSource's own
+// seller (ProductSource.seller), resolved by the caller.
 export interface AssembleOfferOp extends OpBase {
   op: 'assembleOffer';
-  sellerName: ScrapeOperation[];
   price: ScrapeOperation[];
   priceWithoutDiscount?: ScrapeOperation[];
   currency?: ScrapeOperation[];

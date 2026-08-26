@@ -153,7 +153,7 @@ This service was already the persistence core before this change and is mostly u
 
 **`createOrUpdateOffers`** (new): if `scrapedProduct.offers` is populated, for each entry it resolves/creates a `Seller` via `SellerResolutionService` (`libs/product/src/lib/services/resolution/seller-resolution.service.ts` — exact-name lookup, create if missing) and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSeenAt`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
 
-Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`sellerName`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup.
+Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup. Seller is never scraped per offer — every offer belongs to its `ProductSource.seller`.
 
 ---
 

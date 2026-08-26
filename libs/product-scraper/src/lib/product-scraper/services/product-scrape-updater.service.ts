@@ -40,7 +40,6 @@ import {
   ProductMergeService,
   ProductNormalizerService,
   ProductSourceRecordUpdaterService,
-  SellerResolutionService,
   SpecComparisonService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
@@ -89,7 +88,6 @@ export class ProductScrapeUpdaterService {
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
     private readonly productNormalizer: ProductNormalizerService,
-    private readonly sellerResolution: SellerResolutionService,
     private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
@@ -117,15 +115,10 @@ export class ProductScrapeUpdaterService {
     try {
       const normalizedSourceName =
         this.buildNormalizedSourceName(scrapedProduct);
-      // Resolved here, ahead of identity resolution, because Path 3 needs a
-      // seller to key its (seller, externalId) lookup — and it's cheap/safe
-      // to resolve early since SellerResolutionService.resolveOrCreate is
-      // idempotent (createOrUpdateOffers below resolves per-offer sellers
-      // again, independently, for multi-seller pages).
-      const primarySellerName = scrapedProduct.offers?.[0]?.sellerName;
-      const seller = primarySellerName
-        ? await this.sellerResolution.resolveOrCreate(primarySellerName)
-        : undefined;
+      // Every offer belongs to its ProductSource's own seller — no per-offer
+      // seller resolution needed. Path 3 keys its (seller, externalId)
+      // lookup off this.
+      const seller = task.source.seller;
       const identity = await this.resolveProductIdentity(
         task,
         scrapedProduct,
@@ -175,7 +168,7 @@ export class ProductScrapeUpdaterService {
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
     normalizedSourceName: string,
-    seller: Seller | undefined,
+    seller: Seller,
   ): Promise<ResolvedIdentity> {
     // Path 1: task already pinned to a product
     if (task.product?.id) {
@@ -219,7 +212,7 @@ export class ProductScrapeUpdaterService {
     const candidateExternalIds = compact(
       (scrapedProduct.offers ?? []).map((o) => o.externalId),
     );
-    if (candidateExternalIds.length > 0 && seller) {
+    if (candidateExternalIds.length > 0) {
       const existingOffer =
         await this.offerRepo.findFirstBySellerAndExternalIdsWithModelRelations(
           seller.id,
@@ -502,9 +495,7 @@ export class ProductScrapeUpdaterService {
             primarySourceRecord)
           : primarySourceRecord;
         touchedSourceRecordIds.add(sourceRecord.id);
-        const seller = await this.sellerResolution.resolveOrCreate(
-          scraped.sellerName,
-        );
+        const seller = task.source.seller;
         const existing = this.offerMatching.findMatch(
           preloadedOffers,
           scraped,
@@ -531,7 +522,6 @@ export class ProductScrapeUpdaterService {
         this.logger.warn('Failed to upsert offer, continuing', {
           taskId: task.id,
           url: task.url,
-          sellerName: scraped.sellerName,
           error,
         });
       }

@@ -353,7 +353,6 @@ describe('ScrapeInterpreterService', () => {
             itemPipeline: [
               {
                 op: 'assembleOffer',
-                sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
                 price: [
                   {
                     op: 'parseJsonAttr',
@@ -381,7 +380,6 @@ describe('ScrapeInterpreterService', () => {
 
       expect(result.rawOffers).toEqual([
         {
-          sellerName: 'ebikeshop.hu',
           price: 3879000,
           priceWithoutDiscount: undefined,
           currency: 'HUF',
@@ -427,7 +425,6 @@ describe('ScrapeInterpreterService', () => {
             itemPipeline: [
               {
                 op: 'assembleOffer',
-                sellerName: [{ op: 'literal', value: 'ebikeshop.hu' } as never],
                 price: [{ op: 'identity', value: undefined } as never],
               } as never,
             ],
@@ -439,16 +436,16 @@ describe('ScrapeInterpreterService', () => {
       expect(result.rawOffers).toEqual([]);
     });
 
-    it('extracts one distinct offer per seller on a genuine multi-seller aggregator page', async () => {
+    it('extracts one distinct offer per item on a genuine multi-item offer list', async () => {
       const $ = cheerio.load(`
-        <div class="seller-row" data-price="120000">
-          <span class="seller-name">Bike Shop A</span>
+        <div class="variant-row">
+          <span class="variant-price">120000</span>
         </div>
-        <div class="seller-row" data-price="115000">
-          <span class="seller-name">Bike Shop B</span>
+        <div class="variant-row">
+          <span class="variant-price">115000</span>
         </div>
-        <div class="seller-row" data-price="130000">
-          <span class="seller-name">Bike Shop C</span>
+        <div class="variant-row">
+          <span class="variant-price">130000</span>
         </div>
       `);
 
@@ -458,7 +455,7 @@ describe('ScrapeInterpreterService', () => {
         detailPage: {
           ...baseDetailPage(),
           offers: {
-            offerList: [{ op: 'selectAll', selector: '.seller-row' } as never],
+            offerList: [{ op: 'selectAll', selector: '.variant-row' } as never],
             itemMode: 'cheerio',
             itemPipeline: [
               {
@@ -468,20 +465,12 @@ describe('ScrapeInterpreterService', () => {
                 // *within* it via childSelector — genuinely scoped per item,
                 // unlike selectText/selectAttr (which always query the whole
                 // document regardless of any piped input).
-                sellerName: [
+                price: [
                   {
                     op: 'selectNestedText',
                     index: 0,
-                    childSelector: '.seller-name',
+                    childSelector: '.variant-price',
                     trim: true,
-                  } as never,
-                ],
-                price: [
-                  {
-                    op: 'selectAttr',
-                    selector: '.seller-row',
-                    first: true,
-                    attr: 'data-price',
                   } as never,
                 ],
               } as never,
@@ -492,16 +481,8 @@ describe('ScrapeInterpreterService', () => {
 
       const result = await interpreter.runDetailPage(makeTask(), $, config);
 
-      // sellerName is genuinely per-item (selectNestedText is scoped);
-      // price is not (selectAttr always queries globally, so every item
-      // gets the first row's price) — this still proves the primary new
-      // capability under test: rawOffers.length > 1 for a real multi-item
-      // offerList result.
-      expect(result.rawOffers.length).toBeGreaterThan(1);
-      expect(result.rawOffers.map((o) => o.sellerName)).toEqual([
-        'Bike Shop A',
-        'Bike Shop B',
-        'Bike Shop C',
+      expect(result.rawOffers.map((o) => o.price)).toEqual([
+        120000, 115000, 130000,
       ]);
     });
   });

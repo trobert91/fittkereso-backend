@@ -293,7 +293,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     const task = buildTask();
     const detailWithOffer = {
       ...detail,
-      rawOffers: [{ sellerName: 'ebikeshop.hu', price: 3359000 }],
+      rawOffers: [{ price: 3359000 }],
     };
     interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
     categoryConfigService.getConfig.mockReturnValue({
@@ -319,7 +319,6 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     expect(result.offerLevelSpecs).toEqual({ frameSize: 48, color: 'Olíva' });
     expect(result.scrapedProduct.offers).toEqual([
       expect.objectContaining({
-        sellerName: 'ebikeshop.hu',
         price: 3359000,
         specs: { frameSize: 48, color: 'Olíva' },
       }),
@@ -331,7 +330,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     const detailWithOffer = {
       ...detail,
       externalId: 'sku-different',
-      rawOffers: [{ sellerName: 'ebikeshop.hu', price: 3359000 }],
+      rawOffers: [{ price: 3359000 }],
     };
     interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
     categoryConfigService.getConfig.mockReturnValue({

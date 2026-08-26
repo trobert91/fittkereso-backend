@@ -4,12 +4,11 @@
  * libs/scrape-interpreter's fixtures directory (same files validated by
  * that library's test suite).
  *
- * Upserts by name, so it's safe to re-run. Sources with a `seller` spec
- * resolve-or-create the matching Seller row by exact name and link it via
- * ProductSource.seller — the name here must match byte-for-byte what the
- * config's detailPage.offers.sellerName pipeline emits, since
- * SellerResolutionService (used at scrape time) does exact-name lookup, not
- * fuzzy matching.
+ * Upserts by name, so it's safe to re-run. Every source resolves-or-creates
+ * its `seller` spec into a Seller row and links it via ProductSource.seller
+ * — this is the sole source of truth for which seller every offer scraped
+ * from this source belongs to (ProductSource.seller is non-nullable; there
+ * is no per-offer sellerName in the scrape pipeline).
  *
  * Usage:
  *   npx ts-node -r tsconfig-paths/register apps/product-collector/scripts/seed-product-source-configs.ts
@@ -47,7 +46,7 @@ interface SeedSourceSpec {
   priority: number;
   fullSyncInterval: string;
   incrementalSyncInterval: string;
-  seller?: SeedSellerSpec;
+  seller: SeedSellerSpec;
   // Only applied when creating the row for the first time (existing rows
   // keep whatever scheduling state an operator already set). Defaults to
   // true when omitted — set false for a new source pending a manual dry-run
@@ -141,10 +140,7 @@ async function main(): Promise<void> {
           spec.incrementalSyncInterval as ms.StringValue;
       }
 
-      if (spec.seller) {
-        source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);
-      }
-
+      source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);
       source.config = config;
       const saved = await sourceRepo.save(source);
 

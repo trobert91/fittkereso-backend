@@ -13,15 +13,13 @@ export class ProductSource extends BasePostgresEntity {
   @Column({ unique: true })
   name: string;
 
-  // Nullable: aggregator/reference sources (e.g. a price-comparison site or a
-  // spec-reference site) don't correspond to a single storefront seller. This FK
-  // is for sources that ARE one seller's own site.
+  // The one storefront seller this source's offers belong to — Offer.seller
+  // is always derived from here, never from per-offer scrape data.
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @ManyToOne(() => Seller, (seller) => seller.productSources, {
-    nullable: true,
-    onDelete: 'SET NULL',
+    nullable: false,
   })
-  seller?: Seller | null;
+  seller: Seller;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'jsonb', nullable: false, default: '{}' })

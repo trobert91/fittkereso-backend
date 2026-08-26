@@ -16,19 +16,15 @@ function toFiniteNumber(value: unknown): number | undefined {
 // Assembles one RawOfferRecord from independent sub-pipelines run against
 // the current (typically item-scoped, under forEachItem) context. Returns
 // undefined — dropped by forEachItem's default skipEmptyResults — when
-// sellerName/price don't resolve, mirroring the previous single-offer
+// price doesn't resolve, mirroring the previous single-offer
 // runDetailPageOffers required-field check.
 export function makeAssembleOffer(
   runner: ScrapePipelineRunnerService,
 ): OpHandler<AssembleOfferOp> {
   return async (ctx, input, op) => {
-    const sellerName = (await runner.run(op.sellerName, ctx, input)) as
-      | string
-      | undefined;
-
     const rawPrice = await runner.run(op.price, ctx, input);
     const price = toFiniteNumber(rawPrice);
-    if (!sellerName || !Number.isFinite(price)) return undefined;
+    if (!Number.isFinite(price)) return undefined;
 
     const priceWithoutDiscount = op.priceWithoutDiscount
       ? toFiniteNumber(await runner.run(op.priceWithoutDiscount, ctx, input))
@@ -72,7 +68,6 @@ export function makeAssembleOffer(
     }
 
     const record: RawOfferRecord = {
-      sellerName,
       price,
       priceWithoutDiscount,
       currency,

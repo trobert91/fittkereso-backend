@@ -22,7 +22,6 @@ import type {
   ProductNormalizerService,
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
-  SellerResolutionService,
   SpecComparisonService,
 } from '@fittkereso-backend/product';
 
@@ -71,6 +70,7 @@ function makeTask(): ScrapeTask {
     source: {
       id: 'source-arukereso',
       name: 'arukereso',
+      seller: { id: 'seller-arukereso', name: 'arukereso' },
     },
   } as ScrapeTask;
 }
@@ -118,7 +118,6 @@ describe('ProductScrapeUpdaterService', () => {
   let mockImageCopyService: jest.Mocked<ProductImageCopyService>;
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
   let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
-  let mockSellerResolution: jest.Mocked<SellerResolutionService>;
   let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
@@ -189,10 +188,6 @@ describe('ProductScrapeUpdaterService', () => {
       normalizeProduct: jest.fn().mockReturnValue('mx keys'),
     } as unknown as jest.Mocked<ProductNormalizerService>;
 
-    mockSellerResolution = {
-      resolveOrCreate: jest.fn(),
-    } as unknown as jest.Mocked<SellerResolutionService>;
-
     mockOfferMatching = {
       findMatch: jest.fn().mockReturnValue(undefined),
     } as unknown as jest.Mocked<OfferMatchingService>;
@@ -238,7 +233,6 @@ describe('ProductScrapeUpdaterService', () => {
       mockImageCopyService,
       mockMetricsService,
       mockProductNormalizer,
-      mockSellerResolution,
       mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
@@ -497,12 +491,11 @@ describe('ProductScrapeUpdaterService', () => {
 
     await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
-  it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is an empty array', async () => {
+  it('does not touch Offer plumbing when ScrapedProduct.offers is an empty array', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({ offers: [] });
 
@@ -514,17 +507,15 @@ describe('ProductScrapeUpdaterService', () => {
 
     await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(mockSellerResolution.resolveOrCreate).not.toHaveBeenCalled();
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
-  it('resolves a seller and upserts an offer per entry when ScrapedProduct.offers is populated, then recomputes model price', async () => {
+  it('upserts an offer per entry using the task source\'s seller when ScrapedProduct.offers is populated, then recomputes model price', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
-          sellerName: 'Alza.hu',
           price: 199990,
           priceWithoutDiscount: 249990,
           currency: 'HUF',
@@ -539,18 +530,13 @@ describe('ProductScrapeUpdaterService', () => {
       if (!model.id) model.id = 'model-with-offers';
       return model;
     });
-    const mockSeller = { id: 'seller-1', name: 'Alza.hu' };
-    mockSellerResolution.resolveOrCreate.mockResolvedValue(mockSeller as never);
     mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
     await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledWith(
-      'Alza.hu',
-    );
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledWith(
       expect.objectContaining({
-        seller: mockSeller,
+        seller: task.source.seller,
         sourceRecord: { id: 'source-record-1' },
         price: 199990,
         priceWithoutDiscount: 249990,
@@ -568,8 +554,8 @@ describe('ProductScrapeUpdaterService', () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       offers: [
-        { sellerName: 'BadSeller', price: 1000 },
-        { sellerName: 'GoodSeller', price: 2000 },
+        { price: 1000 },
+        { price: 2000 },
       ],
     });
 
@@ -578,17 +564,14 @@ describe('ProductScrapeUpdaterService', () => {
       if (!model.id) model.id = 'model-partial-offer-failure';
       return model;
     });
-    mockSellerResolution.resolveOrCreate
-      .mockResolvedValueOnce({ id: 'seller-bad', name: 'BadSeller' } as never) // early primary-seller resolution in createOrUpdateProduct
-      .mockRejectedValueOnce(new Error('seller resolution failed')) // per-offer: BadSeller
-      .mockResolvedValueOnce({ id: 'seller-2', name: 'GoodSeller' } as never); // per-offer: GoodSeller
-    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
+    mockOfferRepo.upsertFromScrape
+      .mockRejectedValueOnce(new Error('offer upsert failed'))
+      .mockResolvedValueOnce({} as never);
 
     const result = await service.createOrUpdateProduct(task, scrapedProduct);
 
     expect(result).toBeDefined();
-    expect(mockSellerResolution.resolveOrCreate).toHaveBeenCalledTimes(3);
-    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(1);
+    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(2);
     expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
   });
 
@@ -598,11 +581,14 @@ describe('ProductScrapeUpdaterService', () => {
   // happen to re-visit it. Only offers belonging to a ProductSourceRecord
   // this scrape actually touched are eligible to be judged stale.
   it('does not delete a sibling variant\'s offer when this scrape only touches one ProductSourceRecord', async () => {
-    const task = makeTask();
+    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
+    const task = {
+      ...makeTask(),
+      source: { ...makeTask().source, seller },
+    } as ScrapeTask;
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
-          sellerName: 'ebikeshop.hu',
           price: 3359000,
           url: 'https://ebikeshop.hu/termek/53cm-variant',
           externalId: 'sku-53cm',
@@ -625,9 +611,6 @@ describe('ProductScrapeUpdaterService', () => {
     mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
       sourceRecord53cm as never,
     );
-
-    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
-    mockSellerResolution.resolveOrCreate.mockResolvedValue(seller as never);
 
     const offer48cm = {
       id: 'offer-48cm',
@@ -656,11 +639,14 @@ describe('ProductScrapeUpdaterService', () => {
   });
 
   it('deletes an unmatched offer belonging to the ProductSourceRecord this scrape did touch', async () => {
-    const task = makeTask();
+    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
+    const task = {
+      ...makeTask(),
+      source: { ...makeTask().source, seller },
+    } as ScrapeTask;
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
-          sellerName: 'ebikeshop.hu',
           price: 3359000,
           url: 'https://ebikeshop.hu/termek/53cm-variant',
           externalId: 'sku-53cm-new',
@@ -679,9 +665,6 @@ describe('ProductScrapeUpdaterService', () => {
     mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
       sourceRecord53cm as never,
     );
-
-    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
-    mockSellerResolution.resolveOrCreate.mockResolvedValue(seller as never);
 
     const staleOfferSameRecord = {
       id: 'offer-53cm-stale',

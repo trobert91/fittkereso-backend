@@ -246,7 +246,6 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
 
     expect(result.rawOffers).toEqual([
       {
-        sellerName: 'speedbike.hu',
         price: 3045957,
         priceWithoutDiscount: 3359000,
         currency: 'HUF',
@@ -270,7 +269,6 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
 
     expect(result.rawOffers).toEqual([
       {
-        sellerName: 'speedbike.hu',
         price: 3045957,
         priceWithoutDiscount: undefined,
         currency: 'HUF',

@@ -32,8 +32,8 @@ export interface ProductSourceOffersConfig {
   // directly. See ForEachItemOp.
   itemMode: 'cheerio' | 'json';
   // Per-item pipeline, run once per entry in offerList; must terminate in an
-  // assembleOffer op. Replaces the old flat sellerName/price/etc. fields —
-  // see AssembleOfferOp.
+  // assembleOffer op. Replaces the old flat price/etc. fields — see
+  // AssembleOfferOp.
   itemPipeline: ScrapeOperation[];
 }
 

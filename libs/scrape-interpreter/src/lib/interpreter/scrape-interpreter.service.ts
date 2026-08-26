@@ -19,7 +19,6 @@ export interface ListPageResult {
 }
 
 export interface RawOfferRecord {
-  sellerName?: string;
   price?: number;
   priceWithoutDiscount?: number;
   currency?: string;

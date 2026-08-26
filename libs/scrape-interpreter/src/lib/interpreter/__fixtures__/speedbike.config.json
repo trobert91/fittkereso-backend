@@ -204,9 +204,6 @@
       "itemPipeline": [
         {
           "op": "assembleOffer",
-          "sellerName": [
-            { "op": "literal", "value": "speedbike.hu" }
-          ],
           "price": [
             { "op": "selectText", "selector": ".price_special_color", "first": true, "trim": true, "as": "specialPriceText" },
             { "op": "selectText", "selector": ".price:not(.price_special_color):not(.price_original_color)", "first": true, "trim": true, "as": "regularPriceText" },

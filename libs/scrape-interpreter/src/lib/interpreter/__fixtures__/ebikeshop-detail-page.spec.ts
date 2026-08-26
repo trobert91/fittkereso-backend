@@ -206,7 +206,6 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
     expect(result.rawOffers).toEqual([
       {
-        sellerName: 'ebikeshop.hu',
         price: 3879000.0017,
         priceWithoutDiscount: undefined,
         currency: 'HUF',

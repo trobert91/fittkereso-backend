@@ -53,7 +53,6 @@ export interface ScrapedProduct {
 // Seller-listing data (price/availability/etc.) captured alongside a scraped
 // product, populated when a source's config defines detailPage.offers.
 export interface ScrapedOffer {
-  sellerName: string;
   price: number;
   /**
    * The pre-discount price, only set when the source shows this offer as

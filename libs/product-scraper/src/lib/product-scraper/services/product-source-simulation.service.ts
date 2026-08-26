@@ -300,11 +300,10 @@ export class ProductSourceSimulationService {
   private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
     return rawOffers
       .filter(
-        (offer): offer is RawOfferRecord & { sellerName: string; price: number } =>
-          !!offer.sellerName && typeof offer.price === 'number' && Number.isFinite(offer.price),
+        (offer): offer is RawOfferRecord & { price: number } =>
+          typeof offer.price === 'number' && Number.isFinite(offer.price),
       )
       .map((offer) => ({
-        sellerName: offer.sellerName,
         price: offer.price,
         priceWithoutDiscount: offer.priceWithoutDiscount,
         currency: offer.currency,

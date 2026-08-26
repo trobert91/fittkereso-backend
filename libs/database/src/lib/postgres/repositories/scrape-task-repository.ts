@@ -203,6 +203,7 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
         where: { id: lockedTask.id },
         relations: [
           nameOf<ScrapeTask>('source'),
+          `${nameOf<ScrapeTask>('source')}.${nameOf<ProductSource>('seller')}`,
           nameOf<ScrapeTask>('product'),
         ],
       });

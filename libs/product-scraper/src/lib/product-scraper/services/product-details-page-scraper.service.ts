@@ -464,8 +464,8 @@ export class ProductDetailsPageScraperService {
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before
-  // validation); ScrapedOffer requires sellerName/price, so entries missing
-  // either are dropped here rather than persisted as broken Offer rows.
+  // validation); ScrapedOffer requires price, so entries missing it are
+  // dropped here rather than persisted as broken Offer rows.
   // Each offer's own specs (from an assembleOffer op's per-item `specs`
   // sub-pipelines, e.g. frameSize varying per variant) take priority; the
   // page-level offerLevelSpecs is the fallback for offers with none of
@@ -476,11 +476,10 @@ export class ProductDetailsPageScraperService {
   ): ScrapedOffer[] {
     return rawOffers
       .filter(
-        (offer): offer is RawOfferRecord & { sellerName: string; price: number } =>
-          !!offer.sellerName && typeof offer.price === 'number' && Number.isFinite(offer.price),
+        (offer): offer is RawOfferRecord & { price: number } =>
+          typeof offer.price === 'number' && Number.isFinite(offer.price),
       )
       .map((offer) => ({
-        sellerName: offer.sellerName,
         price: offer.price,
         priceWithoutDiscount: offer.priceWithoutDiscount,
         currency: offer.currency,

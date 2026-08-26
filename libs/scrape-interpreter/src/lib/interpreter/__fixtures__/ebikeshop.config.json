@@ -251,9 +251,6 @@
       "itemPipeline": [
         {
           "op": "assembleOffer",
-          "sellerName": [
-            { "op": "literal", "value": "ebikeshop.hu" }
-          ],
           "price": [
             {
               "op": "regexCapture",
