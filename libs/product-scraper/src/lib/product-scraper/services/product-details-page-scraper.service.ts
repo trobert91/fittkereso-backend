@@ -3,6 +3,7 @@ import {
   ProductSourceRecord,
   ProductSourceRecordRepository,
   ProductSpecs,
+  ScrapeQueueName,
   ScrapeTask,
   SourceSpecConfig,
   SpecDefinitionJsonSchema,
@@ -10,10 +11,8 @@ import {
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
 import { Injectable } from '@nestjs/common';
-import {
-  ProductScrapeUpdaterService,
-  VariantSourcePage,
-} from './product-scrape-updater.service';
+import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
+import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -38,7 +37,8 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
-import { omit, pick } from 'lodash';
+import { omit, pick, uniqBy } from 'lodash';
+import ms from 'ms';
 
 interface ExtractedPage {
   scrapedProduct: ScrapedProduct;
@@ -65,6 +65,7 @@ export class ProductDetailsPageScraperService {
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
   ) {}
 
   public async scrapeProductDetailsPage(task: ScrapeTask): Promise<void> {
@@ -99,13 +100,12 @@ export class ProductDetailsPageScraperService {
         return;
       }
 
-      const { scrapedProduct, variantSourcePages } =
-        await this.fetchAndFoldVariants(task, extracted);
+      await this.dispatchVariantTasks(task, extracted);
+      const { scrapedProduct } = extracted;
 
       const result = await this.productUpdaterService.createOrUpdateProduct(
         task,
         scrapedProduct,
-        variantSourcePages,
       );
 
       if (result) {
@@ -146,104 +146,59 @@ export class ProductDetailsPageScraperService {
     }
   }
 
-  // Fetches every sibling variant page (§ cross-page variant-link following)
-  // synchronously, sequentially — not in parallel, since ScraperService goes
-  // through a shared external scraping/proxy resource and bursting N
-  // requests at once for one page's variant discovery works against
-  // whatever rate-limiting it enforces. A failed sibling fetch is logged and
-  // skipped, not fatal to the whole task — that variant's offer simply
-  // doesn't land this pass, picked up on a future re-scrape. Returns the
-  // primary scrapedProduct with every sibling's offer(s) folded into
-  // `offers`, plus one VariantSourcePage per successfully fetched sibling
-  // for ProductScrapeUpdaterService to give its own ProductSourceRecord.
-  private async fetchAndFoldVariants(
+  // Cross-page variant-link following. Rather than fetching every sibling
+  // variant page inline within this task (the old behavior), each distinct
+  // variant URL is dispatched as its own independently scheduled
+  // ScrapeTask — it gets picked up, scraped, and resolved back to this same
+  // product on its own schedule, going through the normal pipeline's
+  // scheduling/concurrency/retry/metrics machinery instead of bypassing it.
+  // Multiple `offerLinks` entries pointing at the same URL (e.g. several
+  // offer anchors on the page linking to one shared variant page) count as
+  // one variant, not several — dedup by normalized URL before dispatching.
+  private async dispatchVariantTasks(
     task: ScrapeTask,
     primary: ExtractedPage,
-  ): Promise<{
-    scrapedProduct: ScrapedProduct;
-    variantSourcePages: VariantSourcePage[];
-  }> {
+  ): Promise<void> {
     if (primary.offerLinks.length === 0) {
-      return {
-        scrapedProduct: primary.scrapedProduct,
-        variantSourcePages: [],
-      };
+      return;
     }
 
-    const config = task.source.config;
-    const siblingOffers: ScrapedOffer[] = [];
-    const variantSourcePages: VariantSourcePage[] = [];
+    const distinctLinks = uniqBy(primary.offerLinks, (link) =>
+      normalizeUrl(link.url),
+    );
+    const processedSince = new Date(
+      Date.now() - ms(task.source.fullSyncInterval ?? '7 days'),
+    );
 
-    for (const link of primary.offerLinks) {
-      const siblingUrl = normalizeUrl(link.url);
+    for (const link of distinctLinks) {
+      const variantUrl = normalizeUrl(link.url);
       try {
-        const html = await this.scraperService.getHtml(siblingUrl);
-        const $ = cheerio.load(html);
-        const siblingTask = { ...task, url: siblingUrl };
-        const detail = await this.interpreter.runDetailPage(
-          siblingTask,
-          $,
-          config,
-        );
-
-        // Siblings are fetched purely to source their own Offer data — the
-        // deterministic spec mapping runs (so offer-level keys like
-        // frameSize resolve correctly), but not the LLM post-process or
-        // rawSpecsHash skip check the primary page's full extractProduct
-        // does; every fetched sibling always contributes its current offer.
-        let mappedSpecs: ProductSpecs = {};
-        if (detail.categorySlug) {
-          const jsonSchema = this.categoryConfigService.getJsonSchema(
-            detail.categorySlug,
-          );
-          const sourceConfig =
-            config.detailPage.specMapping[detail.categorySlug];
-          if (jsonSchema && sourceConfig) {
-            mappedSpecs = this.specExtraction.extractSpecs({
-              scrapedSpecs: detail.rawSpecs,
-              schema: jsonSchema,
-              sourceConfig,
-            });
-          }
-        }
-        const offerLevelKeys = detail.categorySlug
-          ? this.categoryConfigService.getConfig(detail.categorySlug)
-              ?.offerLevelSpecs ?? []
-          : [];
-        const siblingOfferLevelSpecs = pick(mappedSpecs, offerLevelKeys);
-        const strippedSiblingSpecs = omit(mappedSpecs, offerLevelKeys);
-
-        const siblingOffersForPage = this.toScrapedOffers(
-          detail.rawOffers,
-          siblingOfferLevelSpecs,
-        ).map((offer) => ({ ...offer, url: offer.url ?? siblingUrl }));
-        siblingOffers.push(...siblingOffersForPage);
-
-        variantSourcePages.push({
-          sourceUrl: siblingUrl,
-          scrapedProduct: {
-            specs: strippedSiblingSpecs,
-            rawSpecs: detail.rawSpecs,
-            externalId: detail.externalId,
-          },
+        const outcome = await this.scrapeTaskPublisher.dispatchIfNeeded({
+          url: variantUrl,
+          source: task.source,
+          queue: ScrapeQueueName.ScrapeProductDetails,
+          processedSince,
         });
-      } catch (error) {
-        this.logger.warn('Failed to fetch/extract variant page, skipping', {
+        let reason: string | undefined;
+        if (outcome.dispatched === false) {
+          reason = outcome.reason;
+        }
+        this.logger.debug('Variant task dispatch outcome', {
           taskId: task.id,
           primaryUrl: task.url,
-          variantUrl: siblingUrl,
+          variantUrl,
+          dispatched: outcome.dispatched,
+          reason,
+        });
+      } catch (error) {
+        this.logger.warn('Failed to dispatch variant task, skipping', {
+          taskId: task.id,
+          primaryUrl: task.url,
+          variantUrl,
           error,
         });
       }
     }
-
-    return {
-      scrapedProduct: {
-        ...primary.scrapedProduct,
-        offers: [...(primary.scrapedProduct.offers ?? []), ...siblingOffers],
-      },
-      variantSourcePages,
-    };
   }
 
   private async extractProduct(

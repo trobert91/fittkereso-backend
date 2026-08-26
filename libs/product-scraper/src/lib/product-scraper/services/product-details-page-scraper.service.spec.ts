@@ -62,6 +62,7 @@ describe('ProductDetailsPageScraperService', () => {
       {} as any, // translationSelector
       {} as any, // translationService
       {} as any, // sourceRecordRepo
+      {} as any, // scrapeTaskPublisher
     );
   });
 
@@ -220,6 +221,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       {} as any, // translationSelector
       {} as any, // translationService
       sourceRecordRepo as any,
+      {} as any, // scrapeTaskPublisher
     );
   });
 
@@ -345,5 +347,131 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     const result = await callExtractProduct(task);
 
     expect(result.offerLevelSpecs).toEqual({ frameSize: 53 });
+  });
+});
+
+describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
+  let service: ProductDetailsPageScraperService;
+  let scrapeTaskPublisher: { dispatchIfNeeded: jest.Mock };
+
+  function buildTask(fullSyncInterval?: string): ScrapeTask {
+    return {
+      id: 'task-1',
+      url: 'https://speedbike.hu/product/1',
+      source: {
+        id: 'source-1',
+        name: 'speedbike',
+        fullSyncInterval,
+        config: {},
+      },
+    } as unknown as ScrapeTask;
+  }
+
+  function callDispatchVariantTasks(task: ScrapeTask, offerLinks: Array<{ url: string; title?: string }>) {
+    return (service as any).dispatchVariantTasks(task, {
+      scrapedProduct: {} as any,
+      offerLevelSpecs: {},
+      offerLinks,
+    });
+  }
+
+  beforeEach(() => {
+    scrapeTaskPublisher = {
+      dispatchIfNeeded: jest.fn().mockResolvedValue({ dispatched: true, task: {} }),
+    };
+
+    service = new ProductDetailsPageScraperService(
+      {} as any, // scraperService
+      {} as any, // productUpdaterService
+      {} as any, // scrapingMetrics
+      {} as any, // interpreter
+      {} as any, // runtime
+      {} as any, // categoryConfigService
+      {} as any, // specExtraction
+      {} as any, // postProcess
+      {} as any, // postProcessMerge
+      {} as any, // translationSelector
+      {} as any, // translationService
+      {} as any, // sourceRecordRepo
+      scrapeTaskPublisher as any,
+    );
+  });
+
+  it('does nothing when there are no offerLinks', async () => {
+    const task = buildTask();
+
+    await callDispatchVariantTasks(task, []);
+
+    expect(scrapeTaskPublisher.dispatchIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('dedupes offerLinks pointing at the same normalized URL into a single dispatch', async () => {
+    const task = buildTask();
+
+    await callDispatchVariantTasks(task, [
+      { url: 'https://speedbike.hu/product/1-red', title: 'Red' },
+      { url: 'https://speedbike.hu/product/1-red/', title: 'Red (again)' },
+      { url: 'https://speedbike.hu/product/1-blue', title: 'Blue' },
+    ]);
+
+    expect(scrapeTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
+    const dispatchedUrls = scrapeTaskPublisher.dispatchIfNeeded.mock.calls.map(
+      ([params]) => params.url,
+    );
+    expect(dispatchedUrls).toEqual([
+      'https://speedbike.hu/product/1-red',
+      'https://speedbike.hu/product/1-blue',
+    ]);
+  });
+
+  it('passes a processedSince cutoff derived from the source fullSyncInterval', async () => {
+    const task = buildTask('1 day');
+    const before = Date.now();
+
+    await callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]);
+
+    const [params] = scrapeTaskPublisher.dispatchIfNeeded.mock.calls[0];
+    expect(params.source).toBe(task.source);
+    expect(params.queue).toBeDefined();
+    const expectedCutoff = before - 24 * 60 * 60 * 1000;
+    expect(params.processedSince.getTime()).toBeGreaterThanOrEqual(expectedCutoff - 1000);
+    expect(params.processedSince.getTime()).toBeLessThanOrEqual(Date.now() - 24 * 60 * 60 * 1000 + 1000);
+  });
+
+  it('defaults to a 7 day cutoff when fullSyncInterval is unset', async () => {
+    const task = buildTask(undefined);
+
+    await callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]);
+
+    const [params] = scrapeTaskPublisher.dispatchIfNeeded.mock.calls[0];
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    expect(params.processedSince.getTime()).toBeGreaterThanOrEqual(sevenDaysAgo - 1000);
+    expect(params.processedSince.getTime()).toBeLessThanOrEqual(sevenDaysAgo + 1000);
+  });
+
+  it('does not throw when dispatchIfNeeded reports the URL is pending or recently processed', async () => {
+    const task = buildTask();
+    scrapeTaskPublisher.dispatchIfNeeded.mockResolvedValueOnce({
+      dispatched: false,
+      reason: 'pending_task',
+    });
+
+    await expect(
+      callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]),
+    ).resolves.toBeUndefined();
+  });
+
+  it('isolates a failing dispatch for one link, continuing to dispatch the rest', async () => {
+    const task = buildTask();
+    scrapeTaskPublisher.dispatchIfNeeded
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ dispatched: true, task: {} });
+
+    await callDispatchVariantTasks(task, [
+      { url: 'https://speedbike.hu/product/1-red' },
+      { url: 'https://speedbike.hu/product/1-blue' },
+    ]);
+
+    expect(scrapeTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
   });
 });

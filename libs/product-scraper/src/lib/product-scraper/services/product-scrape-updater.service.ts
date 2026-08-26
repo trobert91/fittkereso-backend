@@ -70,16 +70,6 @@ interface PersistResult {
   sourceRecord?: ProductSourceRecord;
 }
 
-// A sibling variant page (§4) fetched and folded into the same scrape as the
-// primary page — its own URL/externalId/specs, kept separate from the
-// primary's so each gets its own ProductSourceRecord (one per URL), rather
-// than a merged/shared record. Its offer(s) already live in the combined
-// scrapedProduct.offers by the time this reaches persistProduct.
-export interface VariantSourcePage {
-  sourceUrl: string;
-  scrapedProduct: Partial<ScrapedProduct>;
-}
-
 @Injectable()
 export class ProductScrapeUpdaterService {
   private readonly logger = new CustomLogger(ProductScrapeUpdaterService.name);
@@ -110,7 +100,6 @@ export class ProductScrapeUpdaterService {
   public async createOrUpdateProduct(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
-    variantSourcePages: VariantSourcePage[] = [],
   ): Promise<ProductModel | undefined> {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
@@ -148,7 +137,6 @@ export class ProductScrapeUpdaterService {
         scrapedProduct,
         normalizedSourceName,
         identity,
-        variantSourcePages,
       });
       await this.applyPostSaveSideEffects({
         task,
@@ -330,15 +318,8 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct;
     normalizedSourceName: string;
     identity: ResolvedIdentity;
-    variantSourcePages?: VariantSourcePage[];
   }): Promise<PersistResult> {
-    const {
-      task,
-      scrapedProduct,
-      normalizedSourceName,
-      identity,
-      variantSourcePages,
-    } = params;
+    const { task, scrapedProduct, normalizedSourceName, identity } = params;
 
     let model = identity.model;
     if (!model) {
@@ -363,22 +344,6 @@ export class ProductScrapeUpdaterService {
       sourceUrl: task.url,
       normalizedSourceName,
     });
-
-    // One ProductSourceRecord per fetched sibling page (§4) — a
-    // ProductSourceRecord represents one URL, so each variant gets its own
-    // record under the same model, each keeping its own (unmerged) specs.
-    // Run before mergeSources so their specs participate in that merge the
-    // same way any other source record's would.
-    for (const variantPage of variantSourcePages ?? []) {
-      await this.sourceRecordUpdater.upsertSourceRecord({
-        model,
-        scrapedProduct: variantPage.scrapedProduct,
-        externalId: variantPage.scrapedProduct.externalId,
-        source: task.source,
-        sourceUrl: variantPage.sourceUrl,
-        normalizedSourceName,
-      });
-    }
 
     // model.productCategory may only be the { id } stub set by
     // newProductModel/applyScrapedProductDetails — pass the slug explicitly
@@ -470,12 +435,12 @@ export class ProductScrapeUpdaterService {
   }
 
   // No-op for sources whose config doesn't populate ScrapedProduct.offers.
-  // scrapedProduct.offers can span several distinct pages in one combined
-  // scrape (see ProductDetailsPageScraperService's variant-fetch step), each
-  // carrying its own `url` — a ProductSourceRecord represents one URL, so
-  // sourceRecord is resolved per offer here rather than passed as one shared
-  // value, falling back to the primary page's own sourceRecord (the ordinary
-  // single-offer-per-page case, and the shared-URL multi-seller-table case).
+  // Each offer can carry its own `url` (a multi-seller/multi-listing page's
+  // itemPipeline can stamp a distinct URL per offer) — a ProductSourceRecord
+  // represents one URL, so sourceRecord is resolved per offer here rather
+  // than passed as one shared value, falling back to the primary page's own
+  // sourceRecord (the ordinary single-offer-per-page case, and the
+  // shared-URL multi-seller-table case).
   private async createOrUpdateOffers(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
@@ -521,10 +486,11 @@ export class ProductScrapeUpdaterService {
     const upsertedOffers: Offer[] = [];
     // Every ProductSourceRecord this scrape actually produced an offer for —
     // the only records whose offers this pass is entitled to judge as
-    // stale. A scrape of one variant URL (e.g. the 53cm page, no offerLinks
-    // configured) never visits a sibling variant's page at all, so it has
-    // no way to know whether that sibling's own offer is still live; only
-    // records this pass actually touched get their unmatched offers deleted.
+    // stale. A scrape of one variant URL never visits a sibling variant's
+    // own page (each variant is now its own independently scheduled
+    // ScrapeTask), so it has no way to know whether that sibling's own offer
+    // is still live; only records this pass actually touched get their
+    // unmatched offers deleted.
     const touchedSourceRecordIds = new Set<string>();
     for (const scraped of offers!) {
       try {
