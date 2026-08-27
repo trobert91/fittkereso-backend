@@ -78,24 +78,8 @@ export class LoggerService implements NestLoggerService {
     this.logger.info(message, { context, ...meta });
   }
 
-  error(
-    message: string,
-    trace?: Record<string, any>,
-    context?: string,
-    meta?: Record<string, any>,
-  ) {
-    let extendedMeta: any = {
-      ...meta,
-      ...(trace ? trace['trace'] : undefined),
-    };
-    if (extendedMeta.error) {
-      extendedMeta = {
-        ...extendedMeta,
-        errorMessage: (extendedMeta.error as Error).message,
-        stack: (extendedMeta.error as Error).stack,
-      };
-    }
-    this.logger.error(message, { trace, context, ...extendedMeta });
+  error(message: string, meta?: Record<string, any>) {
+    this.logger.error(message, meta);
   }
 
   warn(message: string, context?: string, meta?: Record<string, any>) {

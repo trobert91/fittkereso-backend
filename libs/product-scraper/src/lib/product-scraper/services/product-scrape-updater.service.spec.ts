@@ -266,7 +266,14 @@ describe('ProductScrapeUpdaterService', () => {
     expect(existingModel.productCategory?.slug).toBe('keyboards');
   });
 
-  it('skips Path 1 when only same-source-different-name rows exist (variant siblings)', async () => {
+  // Regression: a source's own catalog legitimately accumulates several
+  // ProductSourceRecords on one ProductModel (one per variant URL — see
+  // §2.1a's offerLinks dispatch), so a same-source match from the resolution
+  // engine is not inherently a false positive. Rejecting it (the old
+  // hasSourceRow gate) forced a new ProductModel per variant for sources with
+  // no group-level externalId configured, which raced two variant scrapes
+  // into a ProductModel.slug uniqueness violation in production.
+  it('reuses a same-source match from the cross-source search (variant siblings)', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       displayName: 'LG 39GS95QE-W',
@@ -282,20 +289,17 @@ describe('ProductScrapeUpdaterService', () => {
       context: undefined,
     } as never);
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(otherVariant);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-variant-w';
-      return model;
-    });
+    mockProductRepo.save.mockResolvedValue(otherVariant);
 
     const result = await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(result?.id).toBe('model-variant-w');
+    expect(result?.id).toBe('model-variant-b');
     expect(mockProductSearch.search).toHaveBeenCalled();
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
-      'cross_source_rejected_same_source',
+      'cross_source_merge',
     );
-    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+    expect(mockMetricsService.scrapeResolutionOutcome).not.toHaveBeenCalledWith(
       'arukereso',
       'new_product',
     );

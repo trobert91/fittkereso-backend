@@ -122,7 +122,6 @@ export class ProductScrapeUpdaterService {
       const identity = await this.resolveProductIdentity(
         task,
         scrapedProduct,
-        normalizedSourceName,
         seller,
       );
       const persisted = await this.persistProduct({
@@ -167,7 +166,6 @@ export class ProductScrapeUpdaterService {
   private async resolveProductIdentity(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
-    normalizedSourceName: string,
     seller: Seller,
   ): Promise<ResolvedIdentity> {
     // Path 1: task already pinned to a product
@@ -232,33 +230,20 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    // Path 4: strict cross-source search.
+    // Path 4: strict cross-source search. Also the fallback for same-source
+    // variant siblings that carry no group-level externalId (Path 3) — a
+    // source's own catalog legitimately accumulates several
+    // ProductSourceRecords on one ProductModel (one per variant URL; see
+    // §2.1a's offerLinks dispatch), so a same-source hit here is not
+    // inherently a false positive. The engine already runs in `strict` mode
+    // with brand/category/spec gates, so trusting it here is no weaker than
+    // trusting it for cross-source matches.
     // Agent already filters candidates to category C via preResolvedCategories.
     const resolved = await this.findExistingProductModel(scrapedProduct, {
       taskId: task.id,
     });
     const candidate = resolved.resolvedModel;
     const resolutionContext = resolved.context;
-
-    if (candidate && this.hasSourceRow(candidate, task.source.id)) {
-      // The same source already has a different name pointing at this product —
-      // this scrape is a distinct product by the source catalog's own definition.
-      this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
-        'cross_source_rejected_same_source',
-      );
-      this.logger.debug(
-        'Path 4 candidate rejected — source already has a row on this product',
-        {
-          taskId: task.id,
-          url: task.url,
-          candidateId: candidate.id,
-          sourceName: task.source.name,
-          normalizedSourceName,
-        },
-      );
-      return { isExistingMatch: false, resolutionContext };
-    }
 
     if (candidate) {
       const isLlmMerge = resolutionContext?.decision?.kind === 'llm_resolved';
@@ -566,12 +551,6 @@ export class ProductScrapeUpdaterService {
       .execute();
 
     return result.generatedMaps.length || result.identifiers.length;
-  }
-
-  private hasSourceRow(model: ProductModel, sourceId: string): boolean {
-    return (
-      model.sources?.some((source) => source.source?.id === sourceId) ?? false
-    );
   }
 
   // Extract the near-miss candidate from an `llm_unresolved` decision, so it

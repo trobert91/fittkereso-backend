@@ -25,7 +25,6 @@ export type ScrapeResolutionOutcome =
    *  source identifies its listings at all. */
   | 'offer_external_id_hit'
   | 'cross_source_merge'
-  | 'cross_source_rejected_same_source'
   | 'new_product'
   /** Path 4's scrape-merge LLM decision confidently accepted a candidate that
    *  the deterministic quality gates had rejected. */

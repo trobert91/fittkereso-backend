@@ -231,7 +231,7 @@ export class ScrapeInterpreterService {
     config: ProductSourceConfig,
   ): Promise<RawOfferRecord[]> {
     const offersConfig = config.detailPage.offers;
-    if (!offersConfig || offersConfig.offerList.length === 0) return [];
+    if (!offersConfig || !offersConfig.offerList?.length) return [];
 
     const offerList = await this.runner.run(offersConfig.offerList, ctx);
     if (!offerList || (Array.isArray(offerList) && offerList.length === 0)) {
