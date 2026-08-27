@@ -60,7 +60,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
   });
 
-  it('creates/updates the source row when scrapedProduct is provided, storing specs and both spec hashes from the already-split deterministic objects', async () => {
+  it('creates/updates the source row when scrapedProduct is provided, persisting the hashes supplied by the caller as given', async () => {
     const model = makeModel();
 
     const result = await service.upsertSourceRecord({
@@ -71,6 +71,8 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         specs: { weight: 22 },
         offerLevelDeterministicSpecs: { frameSize: 43 },
         productLevelDeterministicSpecs: { weight: 22 },
+        offerSpecsHash: hashSpecs({ frameSize: 43 }),
+        productSpecsHash: hashSpecs({ weight: 22 }),
       } as any,
       externalId: 'sku-123',
       sourceUrl: 'https://speedbike.hu/product-1',
@@ -85,7 +87,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
-  it('re-writes the row when productLevelDeterministicSpecs differs from what is stored, even if scrapedProduct is present', async () => {
+  it('re-writes the row when the caller supplies a new productSpecsHash, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
@@ -101,11 +103,30 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         model: 'Macina Scarp',
         specs: { weight: 23 },
         productLevelDeterministicSpecs: { weight: 23 },
+        productSpecsHash: hashSpecs({ weight: 23 }),
       } as any,
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
     expect(existingSource.productSpecsHash).toBe(hashSpecs({ weight: 23 }));
+  });
+
+  it('trusts the caller-supplied hash even if it does not match what processSpecs would derive from productLevelDeterministicSpecs, since the hash and the LLM-call decision must agree on the same pre-computed value', async () => {
+    const model = makeModel();
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: {
+        model: 'Macina Scarp',
+        specs: { weight: 22 },
+        productLevelDeterministicSpecs: { weight: 22 },
+        productSpecsHash: 'caller-computed-hash',
+      } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(result?.productSpecsHash).toBe('caller-computed-hash');
   });
 
   it('always processes when scrapedProduct is provided even without a prior source row', async () => {

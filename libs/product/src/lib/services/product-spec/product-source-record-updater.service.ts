@@ -7,8 +7,7 @@ import {
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
-import { chain, isBoolean, isEmpty, isNumber } from 'lodash';
-import { hashSpecs, normalizeUrl } from '@fittkereso-backend/utils';
+import { filterDefinedSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
@@ -148,18 +147,25 @@ export class ProductSourceRecordUpdaterService {
             : scrapedProduct.productLevelDeterministicSpecs,
         }
       : source.scrapedProduct;
-    // Hashed straight off the already-split canonical objects
-    // ProductDetailsPageScraperService.extractProduct computed — see
-    // hashSpecs. `scrapedProduct` being defined but these two fields being
-    // absent (e.g. a manual admin-entered specs edit with no re-scrape) is
-    // treated the same as "no rawSpecs at all": no meaningful hash to store.
+    // Persisted as given, not recomputed — ProductDetailsPageScraperService.
+    // extractProduct already hashed these exact (filtered) objects once, and
+    // that same hash is what it compares against on the next scrape to
+    // decide whether to skip the post-process call. Hashing again here from
+    // a value that's been through this service's own processSpecs() risked
+    // (and, before this, actually caused) the two hashes silently diverging
+    // whenever processSpecs's filtering differed even slightly from
+    // whatever the scraper's own hash input was — defeating both the
+    // same-record skip and the cross-sibling reuse lookup. `scrapedProduct`
+    // being defined but these two fields being absent (e.g. a manual
+    // admin-entered specs edit with no re-scrape) is treated the same as "no
+    // rawSpecs at all": no meaningful hash to store.
     if (scrapedProduct?.offerLevelDeterministicSpecs !== undefined) {
-      source.offerSpecsHash = hashSpecs(source.scrapedProduct?.offerLevelDeterministicSpecs);
+      source.offerSpecsHash = scrapedProduct.offerSpecsHash;
     } else if (scrapedProduct) {
       source.offerSpecsHash = undefined;
     }
     if (scrapedProduct?.productLevelDeterministicSpecs !== undefined) {
-      source.productSpecsHash = hashSpecs(source.scrapedProduct?.productLevelDeterministicSpecs);
+      source.productSpecsHash = scrapedProduct.productSpecsHash;
     } else if (scrapedProduct) {
       source.productSpecsHash = undefined;
     }
@@ -180,15 +186,6 @@ export class ProductSourceRecordUpdaterService {
   private processSpecs(
     specs: NonNullable<ScrapedProduct['specs']>,
   ): NonNullable<ScrapedProduct['specs']> {
-    return chain(specs)
-      .toPairs()
-      .filter(([_, value]) => this.isValueDefined(value))
-      .sortBy(0)
-      .fromPairs()
-      .value();
-  }
-
-  private isValueDefined(value: any): boolean {
-    return isBoolean(value) || isNumber(value) || !isEmpty(value);
+    return filterDefinedSpecs(specs);
   }
 }

@@ -16,7 +16,7 @@ import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { hashSpecs, normalizeUrl } from '@fittkereso-backend/utils';
+import { filterDefinedSpecs, hashSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import {
   DeterministicProductData,
   MergedProductData,
@@ -308,15 +308,31 @@ export class ProductDetailsPageScraperService {
           translator,
         })
       : {};
-    const offerLevelDeterministicSpecs = pick(deterministicSpecs, offerLevelKeys);
-    const productLevelDeterministicSpecs = omit(deterministicSpecs, offerLevelKeys);
+    // Filtered once, here, via filterDefinedSpecs — dropping keys a
+    // normalization pass mapped but couldn't type-convert (e.g.
+    // ProductSpecNormalizationService assigning `undefined` for a value that
+    // doesn't fit the schema's declared type) — so hashing, the LLM calls'
+    // input, and persistence (ProductSourceRecordUpdaterService) all agree on
+    // exactly the same object instead of each deriving a slightly different
+    // "cleaned" view of it. Without this, a phantom undefined-valued key
+    // present only at hash time made two byte-identical specs objects hash
+    // differently depending on when in the pipeline they were hashed.
+    const offerLevelDeterministicSpecs = filterDefinedSpecs(
+      pick(deterministicSpecs, offerLevelKeys),
+    );
+    const productLevelDeterministicSpecs = filterDefinedSpecs(
+      omit(deterministicSpecs, offerLevelKeys),
+    );
 
     // Two independent hashes, one per post-process call's own input,
-    // computed from the already-split canonical objects above (not raw
-    // scraped rows) — see hashSpecs. Disjoint by construction, so an
-    // offer-level-only difference between sibling variant pages (e.g. a
-    // different frameSize) never invalidates the (expensive, shared)
-    // product-identity half.
+    // computed once here from the already-split, already-filtered canonical
+    // objects above (not raw scraped rows) — see hashSpecs. Disjoint by
+    // construction, so an offer-level-only difference between sibling
+    // variant pages (e.g. a different frameSize) never invalidates the
+    // (expensive, shared) product-identity half. Passed through on
+    // ScrapedProduct (below) rather than recomputed later — see
+    // ProductSourceRecordUpdaterService.upsertSourceRecord, which persists
+    // these values as given instead of hashing again.
     const offerSpecsHash = hashSpecs(offerLevelDeterministicSpecs);
     const productSpecsHash = hashSpecs(productLevelDeterministicSpecs);
 
@@ -430,6 +446,8 @@ export class ProductDetailsPageScraperService {
         extractedSpecs: deterministicSpecs,
         offerLevelDeterministicSpecs,
         productLevelDeterministicSpecs,
+        offerSpecsHash,
+        productSpecsHash,
         rawSpecs: detail.rawSpecs,
         externalId: detail.externalId,
         aliases: detail.aliases,

@@ -8,7 +8,8 @@ import {
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { chain, isBoolean, isEmpty, isNumber, orderBy } from 'lodash';
+import { isSpecValueDefined } from '@fittkereso-backend/utils';
+import { chain, orderBy } from 'lodash';
 
 type SpecValue = string | number | boolean | string[];
 
@@ -96,7 +97,7 @@ export class ProductSpecMergeService {
       for (const [key, value] of Object.entries(
         record.scrapedProduct?.specs ?? {},
       )) {
-        if (!this.isValueDefined(value)) continue;
+        if (!isSpecValueDefined(value)) continue;
 
         const list = byKey.get(key) ?? [];
         list.push({
@@ -110,10 +111,6 @@ export class ProductSpecMergeService {
     }
 
     return byKey;
-  }
-
-  private isValueDefined(value: unknown): boolean {
-    return isBoolean(value) || isNumber(value) || !isEmpty(value);
   }
 
   // ─── Per-key resolution (Tiers 1-4) ─────────────────────────────────────

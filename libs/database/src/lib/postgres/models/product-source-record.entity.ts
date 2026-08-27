@@ -49,11 +49,13 @@ export class ProductSourceRecord extends BasePostgresEntity {
   scrapedProduct?: Partial<ScrapedProduct>;
 
   /**
-   * Digest of exactly the raw spec rows (+ raw title) fed to the
-   * offer/identity post-process call (see hashOfferSpecs in
-   * @fittkereso-backend/utils) — the source's offerLevelSpecsInputs-selected
-   * rows plus the raw model/title text. Lets a re-scrape of the same listing
-   * skip that call when unchanged — see ProductDetailsPageScraperService.
+   * Digest of the offer-level subset of the deterministic spec mapping fed
+   * to the offer-identity post-process call (see hashSpecs/
+   * filterDefinedSpecs in @fittkereso-backend/utils) — computed once in
+   * ProductDetailsPageScraperService.extractProduct and persisted here as
+   * given, not recomputed, so the hash used to decide "unchanged since last
+   * scrape" and the hash stored here can never silently diverge. Lets a
+   * re-scrape of the same listing skip that call when unchanged.
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })
@@ -61,14 +63,15 @@ export class ProductSourceRecord extends BasePostgresEntity {
   offerSpecsHash?: string;
 
   /**
-   * Digest of the raw spec rows fed to the model-spec (product-identity)
-   * post-process call — the full raw spec table minus whatever
-   * offerSpecsHash already covers (see hashProductSpecs). Deliberately
+   * Digest of the product-identity subset of the deterministic spec mapping
+   * fed to the model-spec post-process call — the complement of whatever
+   * offerSpecsHash covers (see hashSpecs/filterDefinedSpecs). Deliberately
    * disjoint from offerSpecsHash's input so an offer-level-only difference
    * between sibling variant pages never invalidates this half of the cache.
-   * Also the key used to find a SIBLING ProductSourceRecord (same source,
-   * different URL/listing) whose already-unified product-identity specs can
-   * be reused outright — see
+   * Computed once alongside offerSpecsHash and persisted as given — see its
+   * doc comment. Also the key used to find a SIBLING ProductSourceRecord
+   * (same source, different URL/listing) whose already-unified
+   * product-identity specs can be reused outright — see
    * ProductSourceRecordRepository.findBySourceAndProductSpecsHash.
    */
   @Index()

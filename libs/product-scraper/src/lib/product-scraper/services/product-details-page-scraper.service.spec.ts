@@ -523,6 +523,48 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     expect(result.scrapedProduct.productLevelDeterministicSpecs).toEqual({ weight: 17 });
   });
 
+  // Regression: a normalization pass (e.g. ProductSpecNormalizationService)
+  // can map a key it can't type-convert as `result[key] = undefined` rather
+  // than omitting it outright. Before offerLevelDeterministicSpecs/
+  // productLevelDeterministicSpecs were filtered at the point they're built
+  // (and hashed), that phantom key rode along into the hash but was later
+  // stripped by ProductSourceRecordUpdaterService.processSpecs before
+  // persistence — so two source records with byte-identical real specs could
+  // get different offerSpecsHash/productSpecsHash values purely depending on
+  // whether this noise key happened to be present, permanently defeating the
+  // same-record skip and the cross-sibling reuse lookup.
+  it('filters undefined-valued keys out of offerLevelDeterministicSpecs/productLevelDeterministicSpecs before hashing, so a phantom key does not change the hash', async () => {
+    const task = buildTask();
+    task.source.config.detailPage.specMapping = { ebikes: { mappings: [] } };
+    const deterministicSpecsWithPhantomKey = {
+      weight: 17,
+      frameSize: 43,
+      display: undefined,
+    };
+    const deterministicSpecsWithoutPhantomKey = { weight: 17, frameSize: 43 };
+    categoryConfigService.getConfig.mockReturnValue({ offerLevelSpecs: ['frameSize'] });
+
+    (service as any).specExtraction = {
+      extractSpecs: jest.fn().mockReturnValue(deterministicSpecsWithPhantomKey),
+    };
+    const resultWithPhantomKey = await callExtractProduct(task);
+
+    (service as any).specExtraction = {
+      extractSpecs: jest.fn().mockReturnValue(deterministicSpecsWithoutPhantomKey),
+    };
+    const resultWithoutPhantomKey = await callExtractProduct(task);
+
+    expect(resultWithPhantomKey.scrapedProduct.productLevelDeterministicSpecs).toEqual({
+      weight: 17,
+    });
+    expect(resultWithPhantomKey.scrapedProduct.offerSpecsHash).toBe(
+      resultWithoutPhantomKey.scrapedProduct.offerSpecsHash,
+    );
+    expect(resultWithPhantomKey.scrapedProduct.productSpecsHash).toBe(
+      resultWithoutPhantomKey.scrapedProduct.productSpecsHash,
+    );
+  });
+
   it('leaves extractedSpecs undefined on the both-hashes-unchanged fast path', async () => {
     const task = buildTask();
     sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({

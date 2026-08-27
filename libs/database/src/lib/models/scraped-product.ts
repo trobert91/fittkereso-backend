@@ -45,23 +45,42 @@ export interface ScrapedProduct {
    */
   extractedSpecs?: ProductSpecs;
   /**
-   * `pick(extractedSpecs, offerLevelSpecs)` — the offer-level subset of the
-   * deterministic mapping, computed once in
+   * `filterDefinedSpecs(pick(extractedSpecs, offerLevelSpecs))` — the
+   * offer-level subset of the deterministic mapping, computed once in
    * ProductDetailsPageScraperService.extractProduct and reused for: (a) the
-   * offer-identity post-process call's input, (b) offerSpecsHash (see
-   * hashSpecs in @fittkereso-backend/utils). Persisted here rather than
-   * recomputed at each read site, so hashing/LLM-input/persistence all agree
-   * on exactly the same object. Undefined under the same conditions as
-   * `extractedSpecs`.
+   * offer-identity post-process call's input, (b) offerSpecsHash below (see
+   * hashSpecs/filterDefinedSpecs in @fittkereso-backend/utils). Persisted
+   * here rather than recomputed at each read site, so hashing/LLM-input/
+   * persistence all agree on exactly the same, already-filtered object.
+   * Undefined under the same conditions as `extractedSpecs`.
    */
   offerLevelDeterministicSpecs?: ProductSpecs;
   /**
-   * `omit(extractedSpecs, offerLevelSpecs)` — the complement of
-   * `offerLevelDeterministicSpecs`. Feeds the model-spec post-process call's
-   * input and productSpecsHash. See offerLevelDeterministicSpecs for why
-   * this is computed once and persisted rather than re-derived per read.
+   * `filterDefinedSpecs(omit(extractedSpecs, offerLevelSpecs))` — the
+   * complement of `offerLevelDeterministicSpecs`. Feeds the model-spec
+   * post-process call's input and productSpecsHash below. See
+   * offerLevelDeterministicSpecs for why this is computed once and
+   * persisted rather than re-derived per read.
    */
   productLevelDeterministicSpecs?: ProductSpecs;
+  /**
+   * `hashSpecs(offerLevelDeterministicSpecs)`, computed once alongside it in
+   * ProductDetailsPageScraperService.extractProduct.
+   * ProductSourceRecordUpdaterService persists this value as given rather
+   * than re-hashing, so the hash used for the same-record skip decision and
+   * the hash actually stored on ProductSourceRecord.offerSpecsHash are
+   * always identical by construction.
+   */
+  offerSpecsHash?: string;
+  /**
+   * `hashSpecs(productLevelDeterministicSpecs)` — see offerSpecsHash. Also
+   * the value ultimately compared against sibling records by
+   * ProductSourceRecordRepository.findBySourceAndProductSpecsHash, so a
+   * mismatch between the hash used to decide vs. the hash persisted would
+   * silently defeat that cache — see productSpecsHash's history for why this
+   * must be computed exactly once and threaded through unchanged.
+   */
+  productSpecsHash?: string;
   rawSpecs?: ScrapedProductSpec[];
   externalId?: string;
   imageUrls?: string[];
