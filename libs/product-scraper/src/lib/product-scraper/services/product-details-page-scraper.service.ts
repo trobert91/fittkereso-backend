@@ -16,10 +16,12 @@ import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { hashRawSpecs, normalizeUrl } from '@fittkereso-backend/utils';
+import { hashSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import {
   DeterministicProductData,
   MergedProductData,
+  ModelSpecContribution,
+  OfferIdentityContribution,
   ProductSourcePostProcessMergeService,
   ProductSourcePostProcessService,
   ScrapedOffer,
@@ -45,6 +47,12 @@ interface ExtractedPage {
   offerLevelSpecs: ProductSpecs;
   offerLinks: DetailPageResult['offerLinks'];
 }
+
+// Guards the cross-sibling productSpecsHash lookup against two unrelated
+// listings on the same source coincidentally sharing a sparse/near-empty
+// (or fully empty) product-level deterministic specs object and wrongly
+// sharing product-identity specs.
+const MIN_PRODUCT_SPEC_KEYS_FOR_SIBLING_REUSE = 3;
 
 @Injectable()
 export class ProductDetailsPageScraperService {
@@ -278,46 +286,87 @@ export class ProductDetailsPageScraperService {
       return null;
     }
 
-    const rawSpecsHash = hashRawSpecs(detail.rawSpecs);
-
-    // Skip re-extraction (deterministic mapping + optional LLM post-process)
-    // when this exact listing was already scraped with an identical raw spec
-    // table. `specs`/`rawSpecs` stay undefined on the returned ScrapedProduct
-    // in that case — ProductSpecUpdaterService leaves the existing
-    // ProductSourceRecord row's specs/rawSpecs untouched when both are absent.
-    // The model name is also reused from the already-persisted ProductModel
-    // rather than re-derived from the raw title, so a skipped re-scrape never
-    // needs an LLM call either.
     const offerLevelKeys =
       this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ??
       [];
+    const sourceConfig = config.detailPage.specMapping[category.slug];
+
+    // Deterministic mapping runs unconditionally and unconditionally cheap
+    // (no LLM) — its output is the canonical object both hashes and both
+    // post-process calls are built from, split once by offerLevelKeys.
+    const translator = await this.buildTranslator(
+      task,
+      detail.rawSpecs,
+      sourceConfig,
+      category.name,
+    );
+    const deterministicSpecs = sourceConfig
+      ? this.specExtraction.extractSpecs({
+          scrapedSpecs: detail.rawSpecs,
+          schema: jsonSchema,
+          sourceConfig,
+          translator,
+        })
+      : {};
+    const offerLevelDeterministicSpecs = pick(deterministicSpecs, offerLevelKeys);
+    const productLevelDeterministicSpecs = omit(deterministicSpecs, offerLevelKeys);
+
+    // Two independent hashes, one per post-process call's own input,
+    // computed from the already-split canonical objects above (not raw
+    // scraped rows) — see hashSpecs. Disjoint by construction, so an
+    // offer-level-only difference between sibling variant pages (e.g. a
+    // different frameSize) never invalidates the (expensive, shared)
+    // product-identity half.
+    const offerSpecsHash = hashSpecs(offerLevelDeterministicSpecs);
+    const productSpecsHash = hashSpecs(productLevelDeterministicSpecs);
 
     const existingSource = await this.findExistingSource(task, detail.externalId);
-    if (!task.force && existingSource?.rawSpecsHash === rawSpecsHash) {
-      const model = existingSource.model?.model ?? detail.model;
-      this.logger.debug('Raw specs unchanged since last scrape, skipping extraction', {
-        taskId: task.id,
-        url: task.url,
-        externalId: detail.externalId,
-      });
+
+    // No fresh specs extracted for whichever half is unchanged, so
+    // offer-level keys (e.g. frameSize) must come from somewhere other than
+    // existingSource.scrapedProduct.specs — that field structurally never
+    // carries them (they're omit()'d before being persisted there; see
+    // pageOfferLevelSpecs/strippedSpecs below). The only place they still
+    // live across scrapes is the previously-persisted Offer row(s) on this
+    // same record, so read them back from there instead — otherwise a
+    // re-scrape hitting the offer-identity skip would overwrite each offer's
+    // specs with {}, silently wiping out frameSize/color on every subsequent
+    // scrape after the first.
+    const existingOfferForSpecs =
+      existingSource?.offers?.find((o) => o.externalId === detail.externalId) ??
+      existingSource?.offers?.[0];
+
+    const offerIdentitySameRecordHit =
+      !task.force && existingSource?.offerSpecsHash === offerSpecsHash;
+    const productSpecsSameRecordHit =
+      !task.force && existingSource?.productSpecsHash === productSpecsHash;
+
+    if (offerIdentitySameRecordHit) {
+      this.logger.debug(
+        'Offer specs unchanged since last scrape, skipping offer-identity call',
+        { taskId: task.id, url: task.url, externalId: detail.externalId, offerSpecsHash },
+      );
       this.scrapingMetrics.recordExtractionSkipReason(
         task.source.name,
-        'raw_specs_unchanged',
+        'offer_specs_unchanged',
       );
-      // No fresh specs extracted this pass (rawSpecsHash unchanged), so
-      // offer-level keys (e.g. frameSize) must come from somewhere other
-      // than existingSource.scrapedProduct.specs — that field structurally
-      // never carries them (they're omit()'d before being persisted there;
-      // see the non-fast-path branch below, pageOfferLevelSpecs/
-      // strippedSpecs). The only place they still live across scrapes is
-      // the previously-persisted Offer row(s) on this same record, so read
-      // them back from there instead — otherwise every re-scrape that hits
-      // this skip path would overwrite each offer's specs with {}, silently
-      // wiping out frameSize/color on every subsequent scrape after the
-      // first.
-      const existingOfferForSpecs =
-        existingSource.offers?.find((o) => o.externalId === detail.externalId) ??
-        existingSource.offers?.[0];
+    }
+    if (productSpecsSameRecordHit) {
+      this.logger.debug(
+        'Product specs unchanged since last scrape, skipping model-spec call',
+        { taskId: task.id, url: task.url, externalId: detail.externalId, productSpecsHash },
+      );
+      this.scrapingMetrics.recordExtractionSkipReason(
+        task.source.name,
+        'product_specs_unchanged',
+      );
+    }
+
+    // Both halves unchanged — full skip, same shape as the old single-hash
+    // fast path: no fresh LLM work at all, reuse the persisted model name
+    // and this record's own offer-level specs.
+    if (offerIdentitySameRecordHit && productSpecsSameRecordHit) {
+      const model = existingSource!.model?.model ?? detail.model;
       const existingPageOfferLevelSpecs = pick(
         existingOfferForSpecs?.specs,
         offerLevelKeys,
@@ -340,23 +389,6 @@ export class ProductDetailsPageScraperService {
       };
     }
 
-    const sourceConfig = config.detailPage.specMapping[category.slug];
-    const translator = await this.buildTranslator(
-      task,
-      detail.rawSpecs,
-      sourceConfig,
-      category.name,
-    );
-
-    const deterministicSpecs = sourceConfig
-      ? this.specExtraction.extractSpecs({
-          scrapedSpecs: detail.rawSpecs,
-          schema: jsonSchema,
-          sourceConfig,
-          translator,
-        })
-      : {};
-
     const deterministicData: DeterministicProductData = {
       brand: detail.brand,
       model: detail.model,
@@ -367,9 +399,16 @@ export class ProductDetailsPageScraperService {
     const { brand, model, specs, releaseYear } = await this.maybePostProcess({
       task,
       data: deterministicData,
+      offerLevelDeterministicSpecs,
+      productLevelDeterministicSpecs,
       rawSpecs: detail.rawSpecs,
+      productSpecsHash,
       jsonSchema,
       categorySlug: category.slug,
+      offerIdentitySameRecordHit,
+      existingSource: existingSource ?? undefined,
+      existingOfferForSpecs,
+      offerLevelKeys,
     });
 
     // Offer-level keys (e.g. frameSize) never reach the shared
@@ -389,6 +428,8 @@ export class ProductDetailsPageScraperService {
         category,
         specs: strippedSpecs,
         extractedSpecs: deterministicSpecs,
+        offerLevelDeterministicSpecs,
+        productLevelDeterministicSpecs,
         rawSpecs: detail.rawSpecs,
         externalId: detail.externalId,
         aliases: detail.aliases,
@@ -425,15 +466,35 @@ export class ProductDetailsPageScraperService {
   private async maybePostProcess(params: {
     task: ScrapeTask;
     data: DeterministicProductData;
+    offerLevelDeterministicSpecs: ProductSpecs;
+    productLevelDeterministicSpecs: ProductSpecs;
     rawSpecs: ScrapedProductSpec[];
+    productSpecsHash: string;
     jsonSchema: SpecDefinitionJsonSchema;
     categorySlug: string;
+    offerIdentitySameRecordHit: boolean;
+    existingSource: ProductSourceRecord | undefined;
+    existingOfferForSpecs: { specs?: ProductSpecs } | undefined;
+    offerLevelKeys: string[];
   }): Promise<MergedProductData> {
-    const { task, data, rawSpecs, jsonSchema, categorySlug } = params;
+    const {
+      task,
+      data,
+      offerLevelDeterministicSpecs,
+      productLevelDeterministicSpecs,
+      rawSpecs,
+      productSpecsHash,
+      jsonSchema,
+      categorySlug,
+      offerIdentitySameRecordHit,
+      existingSource,
+      existingOfferForSpecs,
+      offerLevelKeys,
+    } = params;
     const postProcessConfig = task.source.config.detailPage.postProcess;
 
     if (postProcessConfig?.enabled === false) {
-      return this.postProcessMerge.merge(data, undefined);
+      return this.postProcessMerge.merge(data, undefined, undefined);
     }
 
     const goldenSample = this.categoryConfigService.getGoldenSample(categorySlug);
@@ -442,25 +503,194 @@ export class ProductDetailsPageScraperService {
         `Post-processing enabled for source '${task.source.name}' but category '${categorySlug}' has no golden sample, skipping`,
         { taskId: task.id, url: task.url },
       );
-      return this.postProcessMerge.merge(data, undefined);
+      return this.postProcessMerge.merge(data, undefined, undefined);
     }
 
-    const offerLevelSpecs =
-      this.categoryConfigService.getConfig(categorySlug)?.offerLevelSpecs;
-
-    const llmContribution = await this.postProcess.process({
-      data,
-      rawSpecs,
-      schema: jsonSchema,
-      goldenSample,
+    const llmOptions = {
       model: postProcessConfig?.model,
       thinking: postProcessConfig?.thinking,
       effort: postProcessConfig?.effort,
       maxTokens: postProcessConfig?.maxTokens,
-      offerLevelSpecs,
+    };
+
+    const offerIdentity = await this.getOfferIdentity({
+      task,
+      data,
+      offerLevelDeterministicSpecs,
+      schema: jsonSchema,
+      goldenSample,
+      offerLevelSpecs: offerLevelKeys,
+      sameRecordHit: offerIdentitySameRecordHit,
+      existingOfferForSpecs,
+      llmOptions,
     });
 
-    return this.postProcessMerge.merge(data, llmContribution);
+    const modelSpecs = await this.getModelSpecs({
+      task,
+      data,
+      productLevelDeterministicSpecs,
+      rawSpecs,
+      productSpecsHash,
+      schema: jsonSchema,
+      goldenSample,
+      offerLevelSpecs: offerLevelKeys,
+      existingSource,
+      llmOptions,
+    });
+
+    return this.postProcessMerge.merge(data, offerIdentity, modelSpecs);
+  }
+
+  // Always resolves to *something* usable — either a same-record reuse (no
+  // LLM call) or a fresh processOfferIdentity call. This half's output is
+  // inherently page-specific (a listing's own title/size/color) and is never
+  // looked up from a sibling the way getModelSpecs's product-identity half
+  // is; the only reuse this half supports is the same listing re-scraped
+  // unchanged. No raw spec rows are sent to this call at all — its input is
+  // just the raw title/model text plus offerLevelDeterministicSpecs, the
+  // already-mapped offer-level subset of the deterministic pass.
+  private async getOfferIdentity(params: {
+    task: ScrapeTask;
+    data: DeterministicProductData;
+    offerLevelDeterministicSpecs: ProductSpecs;
+    schema: SpecDefinitionJsonSchema;
+    goldenSample: ProductSpecs;
+    offerLevelSpecs: string[];
+    sameRecordHit: boolean;
+    existingOfferForSpecs: { specs?: ProductSpecs } | undefined;
+    llmOptions: {
+      model?: string;
+      thinking?: boolean;
+      effort?: string;
+      maxTokens?: number;
+    };
+  }): Promise<OfferIdentityContribution | undefined> {
+    const {
+      task,
+      data,
+      offerLevelDeterministicSpecs,
+      schema,
+      goldenSample,
+      offerLevelSpecs,
+      sameRecordHit,
+      existingOfferForSpecs,
+      llmOptions,
+    } = params;
+
+    if (sameRecordHit) {
+      // No fresh offer-identity contribution this pass — the persisted
+      // listing's own offer-level specs (recovered from its Offer row, since
+      // they're stripped before landing on scrapedProduct.specs) are the
+      // closest equivalent to "what processOfferIdentity would have said."
+      return { specs: pick(existingOfferForSpecs?.specs, offerLevelSpecs) };
+    }
+
+    this.logger.debug('Running offer-identity LLM call', {
+      taskId: task.id,
+      url: task.url,
+      offerLevelKeyCount: Object.keys(offerLevelDeterministicSpecs).length,
+    });
+
+    return this.postProcess.processOfferIdentity({
+      data: {
+        brand: data.brand,
+        model: data.model,
+        releaseYear: data.releaseYear,
+        specs: offerLevelDeterministicSpecs,
+      },
+      schema,
+      goldenSample,
+      offerLevelSpecs,
+      ...llmOptions,
+    });
+  }
+
+  // The expensive, reasoning-heavy half. Checks (in order): same-record hash
+  // match (data already in hand from extractProduct, no extra query), then a
+  // cross-sibling productSpecsHash match (a different ProductSourceRecord on
+  // the same source whose product-identity deterministic specs were
+  // identical), and only calls the LLM when both miss.
+  private async getModelSpecs(params: {
+    task: ScrapeTask;
+    data: DeterministicProductData;
+    productLevelDeterministicSpecs: ProductSpecs;
+    rawSpecs: ScrapedProductSpec[];
+    productSpecsHash: string;
+    schema: SpecDefinitionJsonSchema;
+    goldenSample: ProductSpecs;
+    offerLevelSpecs: string[];
+    existingSource: ProductSourceRecord | undefined;
+    llmOptions: {
+      model?: string;
+      thinking?: boolean;
+      effort?: string;
+      maxTokens?: number;
+    };
+  }): Promise<ModelSpecContribution | undefined> {
+    const {
+      task,
+      data,
+      productLevelDeterministicSpecs,
+      rawSpecs,
+      productSpecsHash,
+      schema,
+      goldenSample,
+      offerLevelSpecs,
+      existingSource,
+      llmOptions,
+    } = params;
+
+    if (existingSource?.productSpecsHash === productSpecsHash && !task.force) {
+      // Same-record hit — already logged/metered by the caller
+      // (extractProduct), which computed this comparison first. Reuse this
+      // record's own already-persisted product-identity specs.
+      return { specs: existingSource.scrapedProduct?.productLevelDeterministicSpecs ?? {} };
+    }
+
+    if (
+      !task.force &&
+      Object.keys(productLevelDeterministicSpecs).length >=
+        MIN_PRODUCT_SPEC_KEYS_FOR_SIBLING_REUSE
+    ) {
+      const sibling = await this.sourceRecordRepo.findBySourceAndProductSpecsHash(
+        task.source.id,
+        productSpecsHash,
+      );
+      if (sibling?.scrapedProduct?.productLevelDeterministicSpecs !== undefined) {
+        this.logger.debug(
+          'Product specs match a sibling source record, reusing its unified model-level specs',
+          {
+            taskId: task.id,
+            url: task.url,
+            productSpecsHash,
+            siblingSourceId: sibling.id,
+            siblingUrl: sibling.url,
+            siblingLastUpdated: sibling.lastUpdated,
+          },
+        );
+        this.scrapingMetrics.recordExtractionSkipReason(
+          task.source.name,
+          'product_specs_matched_sibling',
+        );
+        return { specs: sibling.scrapedProduct.productLevelDeterministicSpecs };
+      }
+    }
+
+    this.logger.debug('Running model-spec LLM call', {
+      taskId: task.id,
+      url: task.url,
+      productSpecsHash,
+      productLevelKeyCount: Object.keys(productLevelDeterministicSpecs).length,
+    });
+
+    return this.postProcess.processModelSpecs({
+      data: { ...data, specs: productLevelDeterministicSpecs },
+      rawSpecs,
+      schema,
+      goldenSample,
+      offerLevelSpecs,
+      ...llmOptions,
+    });
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before

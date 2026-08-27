@@ -40,10 +40,28 @@ export interface ScrapedProduct {
    * ProductSourcePostProcessService.buildUserMessage), kept here so a source
    * record shows both what was deterministically extracted and what the LLM
    * changed, without needing a re-scrape to compare. Undefined whenever
-   * `specs` is undefined (rawSpecsHash-unchanged skip, or no specMapping
-   * configured for the category).
+   * `specs` is undefined (offerSpecsHash/productSpecsHash-unchanged skip, or
+   * no specMapping configured for the category).
    */
   extractedSpecs?: ProductSpecs;
+  /**
+   * `pick(extractedSpecs, offerLevelSpecs)` — the offer-level subset of the
+   * deterministic mapping, computed once in
+   * ProductDetailsPageScraperService.extractProduct and reused for: (a) the
+   * offer-identity post-process call's input, (b) offerSpecsHash (see
+   * hashSpecs in @fittkereso-backend/utils). Persisted here rather than
+   * recomputed at each read site, so hashing/LLM-input/persistence all agree
+   * on exactly the same object. Undefined under the same conditions as
+   * `extractedSpecs`.
+   */
+  offerLevelDeterministicSpecs?: ProductSpecs;
+  /**
+   * `omit(extractedSpecs, offerLevelSpecs)` — the complement of
+   * `offerLevelDeterministicSpecs`. Feeds the model-spec post-process call's
+   * input and productSpecsHash. See offerLevelDeterministicSpecs for why
+   * this is computed once and persisted rather than re-derived per read.
+   */
+  productLevelDeterministicSpecs?: ProductSpecs;
   rawSpecs?: ScrapedProductSpec[];
   externalId?: string;
   imageUrls?: string[];

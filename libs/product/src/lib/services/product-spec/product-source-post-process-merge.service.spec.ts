@@ -1,7 +1,8 @@
 import { ProductSourcePostProcessMergeService } from './product-source-post-process-merge.service';
 import type {
   DeterministicProductData,
-  LlmProductContribution,
+  ModelSpecContribution,
+  OfferIdentityContribution,
 } from './product-source-post-process.service';
 
 describe('ProductSourcePostProcessMergeService', () => {
@@ -18,12 +19,12 @@ describe('ProductSourcePostProcessMergeService', () => {
     service = new ProductSourcePostProcessMergeService();
   });
 
-  it('lets the LLM specs win per-key while deterministic fills the rest', () => {
-    const llm: LlmProductContribution = {
+  it('lets the model-spec contribution win per-key while deterministic fills the rest', () => {
+    const modelSpecs: ModelSpecContribution = {
       specs: { motorPosition: 'Középmotor' },
     };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, undefined, modelSpecs);
 
     expect(result.specs).toEqual({
       weight: 17,
@@ -32,12 +33,30 @@ describe('ProductSourcePostProcessMergeService', () => {
     });
   });
 
-  it('lets falsy-but-defined LLM spec values ("", 0, false) win over deterministic', () => {
-    const llm: LlmProductContribution = {
+  it('combines offer-identity and model-spec contributions into one merged specs object', () => {
+    const offerIdentity: OfferIdentityContribution = {
+      specs: { frameSize: 43 },
+    };
+    const modelSpecs: ModelSpecContribution = {
+      specs: { motorPosition: 'Középmotor' },
+    };
+
+    const result = service.merge(deterministic, offerIdentity, modelSpecs);
+
+    expect(result.specs).toEqual({
+      weight: 17,
+      batteryCapacity: 400,
+      frameSize: 43,
+      motorPosition: 'Középmotor',
+    });
+  });
+
+  it('lets falsy-but-defined spec values ("", 0, false) win over deterministic', () => {
+    const modelSpecs: ModelSpecContribution = {
       specs: { weight: 0, display: false, waterResistance: '' },
     };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, undefined, modelSpecs);
 
     expect(result.specs['weight']).toBe(0);
     expect(result.specs['display']).toBe(false);
@@ -50,17 +69,17 @@ describe('ProductSourcePostProcessMergeService', () => {
       ...deterministic,
       specs: { ...deterministic.specs, smartConnectivity: ['GPS', 'App', 'Bluetooth'] },
     };
-    const llm: LlmProductContribution = {
+    const modelSpecs: ModelSpecContribution = {
       specs: { smartConnectivity: ['App'] },
     };
 
-    const result = service.merge(withArray, llm);
+    const result = service.merge(withArray, undefined, modelSpecs);
 
     expect(result.specs['smartConnectivity']).toEqual(['App']);
   });
 
-  it('degrades to an exact deterministic pass-through when llm is undefined, returning a fresh specs object', () => {
-    const result = service.merge(deterministic, undefined);
+  it('degrades to an exact deterministic pass-through when both contributions are undefined, returning a fresh specs object', () => {
+    const result = service.merge(deterministic, undefined, undefined);
 
     expect(result).toEqual({
       brand: 'KTM',
@@ -71,28 +90,28 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.specs).not.toBe(deterministic.specs);
   });
 
-  it('falls specs through to deterministic entirely when llm.specs is undefined but llm.model is set', () => {
-    const llm: LlmProductContribution = { model: 'MACINA SCARP SX PRESTIGE Di2' };
+  it('falls specs through to deterministic entirely when offerIdentity.specs is undefined but offerIdentity.model is set', () => {
+    const offerIdentity: OfferIdentityContribution = { model: 'MACINA SCARP SX PRESTIGE Di2' };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, offerIdentity, undefined);
 
     expect(result.specs).toEqual(deterministic.specs);
     expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
   });
 
-  it('falls model through to deterministic when llm.model is absent but llm.specs is set', () => {
-    const llm: LlmProductContribution = { specs: { weight: 17.9 } };
+  it('falls model through to deterministic when offerIdentity.model is absent but modelSpecs.specs is set', () => {
+    const modelSpecs: ModelSpecContribution = { specs: { weight: 17.9 } };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, undefined, modelSpecs);
 
     expect(result.model).toBe(deterministic.model);
     expect(result.specs['weight']).toBe(17.9);
   });
 
-  it('overrides brand alone, leaving specs/model/releaseYear to fall through', () => {
-    const llm: LlmProductContribution = { brand: 'KTM AG' };
+  it('overrides brand alone (only offerIdentity carries it), leaving specs/model/releaseYear to fall through', () => {
+    const offerIdentity: OfferIdentityContribution = { brand: 'KTM AG' };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, offerIdentity, undefined);
 
     expect(result.brand).toBe('KTM AG');
     expect(result.model).toBe(deterministic.model);
@@ -100,10 +119,10 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.releaseYear).toBe(2024);
   });
 
-  it('overrides releaseYear alone, leaving the rest to fall through', () => {
-    const llm: LlmProductContribution = { releaseYear: 2025 };
+  it('overrides releaseYear alone (only offerIdentity carries it), leaving the rest to fall through', () => {
+    const offerIdentity: OfferIdentityContribution = { releaseYear: 2025 };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, offerIdentity, undefined);
 
     expect(result.releaseYear).toBe(2025);
     expect(result.brand).toBe(deterministic.brand);
@@ -111,10 +130,10 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.specs).toEqual(deterministic.specs);
   });
 
-  it('preserves a deterministic-only spec key the LLM schema never mentioned', () => {
-    const llm: LlmProductContribution = { specs: { motorPosition: 'Középmotor' } };
+  it('preserves a deterministic-only spec key neither contribution mentioned', () => {
+    const modelSpecs: ModelSpecContribution = { specs: { motorPosition: 'Középmotor' } };
 
-    const result = service.merge(deterministic, llm);
+    const result = service.merge(deterministic, undefined, modelSpecs);
 
     expect(result.specs['batteryCapacity']).toBe(400);
   });

@@ -1,5 +1,5 @@
 import { ProductSourceRecordUpdaterService } from './product-source-record-updater.service';
-import { hashRawSpecs } from '@fittkereso-backend/utils';
+import { hashSpecs } from '@fittkereso-backend/utils';
 import type { ProductModel, ProductSourceRecord } from '@fittkereso-backend/database';
 
 describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
@@ -10,8 +10,8 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
   };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
 
-  const source = { id: 'source-1', name: 'speedbike' } as any;
   const category = { slug: 'ebikes' } as any;
+  const source = { id: 'source-1', name: 'speedbike', config: {} } as any;
 
   function makeModel(existingSource?: Partial<ProductSourceRecord>): ProductModel {
     return {
@@ -43,7 +43,8 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     const existingSource: Partial<ProductSourceRecord> = {
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
-      rawSpecsHash: 'abc123',
+      offerSpecsHash: 'abc123',
+      productSpecsHash: 'def456',
       lastUpdated: new Date('2026-01-01'),
     };
     const model = makeModel(existingSource);
@@ -59,16 +60,17 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
   });
 
-  it('creates/updates the source row when scrapedProduct is provided, storing specs/rawSpecs and the rawSpecs hash', async () => {
+  it('creates/updates the source row when scrapedProduct is provided, storing specs and both spec hashes from the already-split deterministic objects', async () => {
     const model = makeModel();
-    const rawSpecs = [{ name: 'Súly', values: ['22 kg'] }];
 
     const result = await service.upsertSourceRecord({
       model,
       source,
       scrapedProduct: {
+        model: 'Macina Scarp',
         specs: { weight: 22 },
-        rawSpecs,
+        offerLevelDeterministicSpecs: { frameSize: 43 },
+        productLevelDeterministicSpecs: { weight: 22 },
       } as any,
       externalId: 'sku-123',
       sourceUrl: 'https://speedbike.hu/product-1',
@@ -77,30 +79,33 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
 
     expect(result).toBeDefined();
     expect(result?.scrapedProduct?.specs).toEqual({ weight: 22 });
-    expect(result?.scrapedProduct?.rawSpecs).toBe(rawSpecs);
-    expect(result?.rawSpecsHash).toBe(hashRawSpecs(rawSpecs));
+    expect(result?.offerSpecsHash).toBe(hashSpecs({ frameSize: 43 }));
+    expect(result?.productSpecsHash).toBe(hashSpecs({ weight: 22 }));
     expect(result?.externalId).toBe('sku-123');
     expect(model.sources).toHaveLength(1);
   });
 
-  it('re-writes the row when rawSpecs differs from what is stored, even if scrapedProduct is present', async () => {
+  it('re-writes the row when productLevelDeterministicSpecs differs from what is stored, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
-      rawSpecsHash: hashRawSpecs([{ name: 'Súly', values: ['22 kg'] }]),
+      productSpecsHash: hashSpecs({ weight: 22 }),
       lastUpdated: new Date('2026-01-01'),
     };
     const model = makeModel(existingSource);
-    const newRawSpecs = [{ name: 'Súly', values: ['23 kg'] }];
 
     await service.upsertSourceRecord({
       model,
       source,
-      scrapedProduct: { specs: { weight: 23 }, rawSpecs: newRawSpecs } as any,
+      scrapedProduct: {
+        model: 'Macina Scarp',
+        specs: { weight: 23 },
+        productLevelDeterministicSpecs: { weight: 23 },
+      } as any,
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
-    expect(existingSource.rawSpecsHash).toBe(hashRawSpecs(newRawSpecs));
+    expect(existingSource.productSpecsHash).toBe(hashSpecs({ weight: 23 }));
   });
 
   it('always processes when scrapedProduct is provided even without a prior source row', async () => {
@@ -132,16 +137,17 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
-  it('skips extraction when scrapedProduct is defined but specs is undefined (rawSpecsHash-unchanged rescrape) and a matching source row already exists', async () => {
+  it('skips extraction when scrapedProduct is defined but specs is undefined (both hashes unchanged rescrape) and a matching source row already exists', async () => {
     // Mirrors ProductDetailsPageScraperService.extractProduct's
-    // rawSpecsHash-unchanged branch: it returns a full ScrapedProduct
+    // both-hashes-unchanged branch: it returns a full ScrapedProduct
     // (brand/model/displayName/offers/...) but omits specs/rawSpecs — it must
     // not be treated as "new data to write", or it wipes the existing row's
     // specs with {}.
     const existingSource: Partial<ProductSourceRecord> = {
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
-      rawSpecsHash: 'abc123',
+      offerSpecsHash: 'abc123',
+      productSpecsHash: 'def456',
       lastUpdated: new Date('2026-01-01'),
     };
     const model = makeModel(existingSource);
@@ -160,5 +166,38 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(result).toBe(existingSource);
     expect(existingSource.scrapedProduct?.specs).toEqual({ weight: 22 });
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
+  });
+
+  it('sets both hashes to undefined when scrapedProduct has no offerLevelDeterministicSpecs/productLevelDeterministicSpecs', async () => {
+    const model = makeModel();
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: { model: 'Macina Scarp', specs: { weight: 22 } } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(result?.offerSpecsHash).toBeUndefined();
+    expect(result?.productSpecsHash).toBeUndefined();
+  });
+
+  it('persists offerLevelDeterministicSpecs/productLevelDeterministicSpecs on the row, sorted/filtered like other spec fields', async () => {
+    const model = makeModel();
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: {
+        model: 'Macina Scarp',
+        specs: { weight: 22 },
+        offerLevelDeterministicSpecs: { frameSize: 43, color: undefined },
+        productLevelDeterministicSpecs: { weight: 22, torque: '' },
+      } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(result?.scrapedProduct?.offerLevelDeterministicSpecs).toEqual({ frameSize: 43 });
+    expect(result?.scrapedProduct?.productLevelDeterministicSpecs).toEqual({ weight: 22 });
   });
 });

@@ -6,6 +6,7 @@ import type {
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { isEmpty, omit, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
 
 const DEFAULT_MODEL = 'deepseek-v4-flash';
@@ -41,44 +42,76 @@ export interface DeterministicProductData {
 }
 
 /**
- * What the LLM may confidently contribute — same shape as
- * DeterministicProductData, every field optional. Fields the LLM isn't
- * confident about are omitted rather than guessed.
+ * What the offer-identity LLM call may confidently contribute — brand/model/
+ * releaseYear plus only offer-level spec keys (frameSize, color, etc.).
+ * Fields the LLM isn't confident about are omitted rather than guessed.
  */
-export interface LlmProductContribution {
+export interface OfferIdentityContribution {
+  brand?: string;
+  model?: string;
+  releaseYear?: number;
+  specs?: ProductSpecs;
+}
+
+/**
+ * What the model-spec (product-identity) LLM call may confidently
+ * contribute — only non-offer-level spec keys. This call never touches
+ * brand/model/releaseYear.
+ */
+export interface ModelSpecContribution {
+  specs?: ProductSpecs;
+}
+
+interface RawLlmResponse {
   brand?: string;
   model?: string;
   specs?: ProductSpecs;
   releaseYear?: number;
 }
 
-export type ProductSourcePostProcessResult = LlmProductContribution;
+interface ContributionCallParams {
+  systemPrompt: string;
+  userMessage: string;
+  responseSchema: unknown;
+  model?: string;
+  thinking?: boolean;
+  effort?: string;
+  maxTokens?: number;
+}
 
 /**
- * Post-processes a source's deterministically-extracted data via a single
- * LLM call, guided by the category's JSON Schema plus one hand-picked
- * "golden sample" product:
- *  - re-shapes ProductSpecs into the category's canonical key/value format
- *  - cleans the source's raw product title down to just the model name,
- *    stripping brand/marketing/color/gender/category boilerplate that some
- *    sources (e.g. speedbike.hu, whose ShopRenter.product.name is the full
- *    listing title) bake into the same field
- *  - optionally corrects brand/releaseYear when confidently derivable from
- *    the input
+ * Post-processes a source's deterministically-extracted data via two
+ * independently-scoped LLM calls, guided by the category's JSON Schema plus
+ * one hand-picked "golden sample" product:
+ *  - `processOfferIdentity`: cleans the source's raw product title down to
+ *    just the model name (stripping brand/marketing/color/gender/category
+ *    boilerplate some sources bake into the same field), optionally corrects
+ *    brand/releaseYear, and extracts only offer-level spec keys (frameSize,
+ *    color, etc.) — values that vary per purchasable listing, not per
+ *    product model. Always runs, for every scraped listing, since this
+ *    output is inherently page-specific and can never be reused from a
+ *    sibling listing of the same product.
+ *  - `processModelSpecs`: unifies only the non-offer-level (product-
+ *    identity) spec keys — weight, motor power, frame material, etc. This is
+ *    the expensive, reasoning-heavy half of the original single call, and
+ *    the one callers can skip when a sibling ProductSourceRecord (same
+ *    source, different listing) already produced an identical raw spec
+ *    table for this half — see ProductDetailsPageScraperService.
  *
- * Runs AFTER SpecExtractionService, not instead of it — the deterministic
- * pass already did unit stripping/number extraction/value remapping; this
- * pass only re-keys/re-shapes into the canonical field set for sources whose
+ * Both run AFTER SpecExtractionService, not instead of it — the deterministic
+ * pass already did unit stripping/number extraction/value remapping; these
+ * calls only re-key/re-shape into the canonical field set for sources whose
  * raw labels don't line up with the category's SourceSpecMapping[] entries.
  *
- * Returns only what the LLM confidently contributed (or `undefined` on any
- * failure) — never a value pre-merged with deterministic data. Merging is
+ * Each returns only what the LLM confidently contributed (or `undefined` on
+ * any failure) — never a value pre-merged with deterministic data. Merging is
  * ProductSourcePostProcessMergeService's job, so "no LLM contribution" has
  * exactly one shape (`undefined`) regardless of why: disabled, no golden
  * sample, thrown error, or an empty parsed response. Mirrors
  * TranslationService's degrade-on-failure contract: any internal error (LLM
  * call failure, schema validation failure) is caught and never thrown — a
- * failed post-process pass should not fail the whole scrape.
+ * failed post-process pass should not fail the whole scrape. The two calls
+ * fail independently of one another.
  */
 @Injectable()
 export class ProductSourcePostProcessService {
@@ -91,28 +124,147 @@ export class ProductSourcePostProcessService {
     private readonly specNormalizer: ProductSpecNormalizationService,
   ) {}
 
-  async process(params: {
-    data: DeterministicProductData;
-    rawSpecs?: ScrapedProductSpec[];
+  /**
+   * Always runs, for every listing. `data.specs` is expected to already be
+   * restricted to the offer-level subset of the deterministic mapping by the
+   * caller (`pick(deterministicSpecs, offerLevelSpecs)`) — this method does
+   * not re-filter, it only restricts what it asks the LLM to *output* via
+   * the response schema/prompt. No raw spec rows are sent to this call at
+   * all — its only inputs are the raw title/model text and the already-
+   * mapped offer-level specs; a value that lives only in unmapped raw text
+   * (no SourceSpecMapping pointing at it) is out of scope for this call.
+   */
+  async processOfferIdentity(params: {
+    data: Pick<DeterministicProductData, 'brand' | 'model' | 'releaseYear'> & {
+      specs: ProductSpecs;
+    };
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
+    offerLevelSpecs: string[];
     model?: string;
     thinking?: boolean;
     effort?: string;
     maxTokens?: number;
-    offerLevelSpecs?: string[];
-  }): Promise<ProductSourcePostProcessResult | undefined> {
-    const {
-      data,
-      rawSpecs,
-      schema,
-      goldenSample,
-      model,
-      thinking,
-      effort,
-      maxTokens,
-      offerLevelSpecs,
-    } = params;
+  }): Promise<OfferIdentityContribution | undefined> {
+    const { data, schema, goldenSample, offerLevelSpecs } = params;
+
+    const response = await this.runContributionCall({
+      systemPrompt: this.buildOfferIdentitySystemPrompt(
+        schema,
+        goldenSample,
+        offerLevelSpecs,
+      ),
+      userMessage: this.buildUserMessage(data),
+      responseSchema: this.buildOfferIdentityResponseSchema(
+        schema,
+        offerLevelSpecs,
+      ),
+      model: params.model,
+      thinking: params.thinking,
+      effort: params.effort,
+      maxTokens: params.maxTokens,
+    });
+    if (!response) return undefined;
+
+    const sanitized: OfferIdentityContribution = {
+      brand: response.brand?.trim() || undefined,
+      model: response.model?.trim() || undefined,
+      specs: response.specs
+        ? this.specNormalizer.normalize(response.specs, schema)
+        : undefined,
+      releaseYear: response.releaseYear,
+    };
+
+    if (this.isEmptyContribution(sanitized)) {
+      this.logger.warn(
+        'Offer-identity post-process contributed nothing usable after sanitization, degrading to deterministic-only',
+      );
+      return undefined;
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * The expensive, reasoning-heavy half — unifies only non-offer-level
+   * (product-identity) spec keys. `data.specs` is expected to already be
+   * restricted to the product-level subset (`omit(deterministicSpecs,
+   * offerLevelSpecs)`) by the caller; `offerLevelDeterministicSpecs` is
+   * passed separately, purely as read-only prompt context (per
+   * buildModelSpecSystemPrompt's own instructions), since it lives outside
+   * `data.specs` now. Gets the full rawSpecs for complete context (unlike
+   * processOfferIdentity's restricted input), but its response schema never
+   * includes brand/model/releaseYear or offer-level keys.
+   */
+  async processModelSpecs(params: {
+    data: DeterministicProductData;
+    offerLevelDeterministicSpecs?: ProductSpecs;
+    rawSpecs?: ScrapedProductSpec[];
+    schema: SpecDefinitionJsonSchema;
+    goldenSample: ProductSpecs;
+    offerLevelSpecs: string[];
+    model?: string;
+    thinking?: boolean;
+    effort?: string;
+    maxTokens?: number;
+  }): Promise<ModelSpecContribution | undefined> {
+    const { data, offerLevelDeterministicSpecs, rawSpecs, schema, goldenSample, offerLevelSpecs } =
+      params;
+
+    const response = await this.runContributionCall({
+      systemPrompt: this.buildModelSpecSystemPrompt(
+        schema,
+        goldenSample,
+        offerLevelSpecs,
+      ),
+      userMessage: this.buildUserMessage(data, rawSpecs, offerLevelDeterministicSpecs),
+      responseSchema: this.buildModelSpecResponseSchema(schema, offerLevelSpecs),
+      model: params.model,
+      thinking: params.thinking,
+      effort: params.effort,
+      maxTokens: params.maxTokens,
+    });
+    if (!response) return undefined;
+
+    const sanitized: ModelSpecContribution = {
+      specs: response.specs
+        ? this.specNormalizer.normalize(response.specs, schema)
+        : undefined,
+    };
+
+    if (sanitized.specs === undefined) {
+      this.logger.warn(
+        'Model-spec post-process contributed nothing usable after sanitization, degrading to deterministic-only',
+      );
+      return undefined;
+    }
+
+    return sanitized;
+  }
+
+  private isEmptyContribution(c: OfferIdentityContribution): boolean {
+    return (
+      c.brand === undefined &&
+      c.model === undefined &&
+      c.specs === undefined &&
+      c.releaseYear === undefined
+    );
+  }
+
+  /**
+   * Shared request/response plumbing for both LLM calls: builds the chat
+   * request, applies the reasoning-effort default, guards against
+   * truncation, and degrades to `undefined` on any failure. Each public
+   * method supplies its own prompt/schema and interprets `response.parsed`
+   * itself, since the two calls sanitize/validate slightly differently
+   * (offer-identity checks brand/model/releaseYear/specs; model-spec only
+   * checks specs).
+   */
+  private async runContributionCall(
+    params: ContributionCallParams,
+  ): Promise<RawLlmResponse | undefined> {
+    const { systemPrompt, userMessage, responseSchema, model, thinking, effort, maxTokens } =
+      params;
 
     // `effort` implies reasoning is enabled, so only default it in when the
     // caller hasn't explicitly turned reasoning off.
@@ -122,25 +274,15 @@ export class ProductSourcePostProcessService {
     try {
       const response = await this.aiChat.createChat({
         costLabel: 'product-source-post-process',
-        schema: this.buildResponseSchema(schema),
+        schema: responseSchema,
         schemaName: 'post_processed_product',
         model: model ?? DEFAULT_MODEL,
         ...(thinking !== undefined && { thinking }),
         ...(resolvedEffort !== undefined && { effort: resolvedEffort }),
         maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
         messages: [
-          {
-            role: 'system',
-            content: this.buildSystemPrompt(
-              schema,
-              goldenSample,
-              offerLevelSpecs ?? [],
-            ),
-          },
-          {
-            role: 'user',
-            content: this.buildUserMessage(data, rawSpecs),
-          },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
         ],
         temperature: 1,
       });
@@ -159,7 +301,7 @@ export class ProductSourcePostProcessService {
         return undefined;
       }
 
-      const parsed = response.parsed as LlmProductContribution | undefined;
+      const parsed = response.parsed as RawLlmResponse | undefined;
       if (!parsed) {
         this.logger.warn(
           'Post-process returned no usable output, degrading to deterministic-only',
@@ -168,29 +310,7 @@ export class ProductSourcePostProcessService {
         return undefined;
       }
 
-      const sanitized: LlmProductContribution = {
-        brand: parsed.brand?.trim() || undefined,
-        model: parsed.model?.trim() || undefined,
-        specs: parsed.specs
-          ? this.specNormalizer.normalize(parsed.specs, schema)
-          : undefined,
-        releaseYear: parsed.releaseYear,
-      };
-
-      if (
-        sanitized.brand === undefined &&
-        sanitized.model === undefined &&
-        sanitized.specs === undefined &&
-        sanitized.releaseYear === undefined
-      ) {
-        this.logger.warn(
-          'Post-process contributed nothing usable after sanitization, degrading to deterministic-only',
-          { preview: response.content?.slice(0, 200) },
-        );
-        return undefined;
-      }
-
-      return sanitized;
+      return parsed;
     } catch (error: unknown) {
       this.logger.warn(
         'Post-process LLM call failed, degrading to deterministic-only',
@@ -200,13 +320,16 @@ export class ProductSourcePostProcessService {
     }
   }
 
-  private buildSystemPrompt(
+  // ─── Shared prompt fragments ────────────────────────────────────────────
+
+  private buildFieldDescriptions(
     schema: SpecDefinitionJsonSchema,
-    goldenSample: ProductSpecs,
-    offerLevelSpecs: string[],
+    keys: string[],
   ): string {
-    const fieldDescriptions = Object.entries(schema.properties)
-      .map(([key, prop]) => {
+    return keys
+      .map((key) => {
+        const prop = schema.properties[key];
+        if (!prop) return undefined;
         const unit = prop.meta?.unit ? `, unit: ${prop.meta.unit}` : '';
         const options = prop.enum?.length
           ? `, allowed values (pick exactly one of these, verbatim): ${prop.enum.join(' | ')}`
@@ -217,7 +340,23 @@ export class ProductSourcePostProcessService {
             : '';
         return `- ${key} (${prop.type}${unit}${options}${examples}): ${prop.title}`;
       })
+      .filter((line): line is string => Boolean(line))
       .join('\n');
+  }
+
+  private buildTranslationPreamble(schema: SpecDefinitionJsonSchema): string {
+    return `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below. For string spec VALUES: translate genuine descriptive/category words into Hungarian (e.g. "black" -> "fekete", "front suspension" -> "első felfüggesztés"). Do NOT translate or otherwise alter proper nouns, brand/component/part names, or model-style designations embedded in a value (e.g. "KTM aluminium 34T Direct Mount", "Shimano Deore", "FOX Transfer") — copy these verbatim, character-for-character, including spelling, casing, and any words that happen to look like an untranslated Hungarian/English/German term. Never "correct" the spelling of a value copied from the source — if unsure whether a token is a translatable word or a proper noun/part name, leave it exactly as given rather than guessing.`;
+  }
+
+  // ─── Offer-identity prompt/schema ───────────────────────────────────────
+
+  private buildOfferIdentitySystemPrompt(
+    schema: SpecDefinitionJsonSchema,
+    goldenSample: ProductSpecs,
+    offerLevelSpecs: string[],
+  ): string {
+    const fieldDescriptions = this.buildFieldDescriptions(schema, offerLevelSpecs);
+    const goldenSubset = pick(goldenSample, offerLevelSpecs);
 
     const offerLevelTitles = offerLevelSpecs
       .map((key) => schema.properties[key]?.title)
@@ -231,30 +370,102 @@ export class ProductSourcePostProcessService {
       : '';
 
     return (
-      `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below. For string spec VALUES: translate genuine descriptive/category words into Hungarian (e.g. "black" -> "fekete", "front suspension" -> "első felfüggesztés"). Do NOT translate or otherwise alter proper nouns, brand/component/part names, or model-style designations embedded in a value (e.g. "KTM aluminium 34T Direct Mount", "Shimano Deore", "FOX Transfer") — copy these verbatim, character-for-character, including spelling, casing, and any words that happen to look like an untranslated Hungarian/English/German term. Never "correct" the spelling of a value copied from the source — if unsure whether a token is a translatable word or a proper noun/part name, leave it exactly as given rather than guessing. The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
-      `Canonical spec fields:\n${fieldDescriptions}\n\n` +
-      `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSample, null, 2)}\n\n` +
-      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
+      `${this.buildTranslationPreamble(schema)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
+      `Canonical spec fields (offer-level only — this call never touches product-identity fields):\n${fieldDescriptions}\n\n` +
+      `Worked example — correctly unified offer-level values for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped offer-level fields only), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
       `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
-      `- "releaseYear": only return this if a release/model year is explicitly stated somewhere in the input (deterministicSpecs or rawSpecs) — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context (e.g. don't infer it from a model name).\n` +
-      `- "specs": see the rules below.\n\n` +
+      `- "releaseYear": only return this if a release/model year is explicitly stated in "rawModel" or already present in "specs" — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context.\n` +
+      `- "specs": see the rules below — offer-level keys only.\n\n` +
       `Rules:\n` +
-      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string (the same raw title referenced above), and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
+      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass, offer-level keys only) and a "rawModel" string (the same raw title referenced above). There is no raw spec table in this call's input — a value that only exists as unmapped raw text is out of scope here.\n` +
+      `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawModel gives a more precise value for the same field.\n` +
+      `- Then look through rawModel for offer-level canonical fields deterministicSpecs is missing.${offerLevelHint} Extract from it when the value is clearly and unambiguously present.\n` +
+      `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
+      `- Convert spec units/formats to match the golden example's style.\n` +
+      `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
+      `- Return a single JSON object with a "specs" key (offer-level canonical field names only, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model"/"releaseYear" keys per the field-specific guidance above.`
+    );
+  }
+
+  private buildOfferIdentityResponseSchema(
+    schema: SpecDefinitionJsonSchema,
+    offerLevelSpecs: string[],
+  ): unknown {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        brand: { type: 'string' },
+        model: { type: 'string' },
+        releaseYear: { type: 'number' },
+        specs: {
+          type: 'object',
+          additionalProperties: false,
+          properties: this.buildSchemaProperties(schema, offerLevelSpecs),
+        },
+      },
+    };
+  }
+
+  // ─── Model-spec prompt/schema ────────────────────────────────────────────
+
+  private buildModelSpecSystemPrompt(
+    schema: SpecDefinitionJsonSchema,
+    goldenSample: ProductSpecs,
+    offerLevelSpecs: string[],
+  ): string {
+    const modelLevelKeys = Object.keys(schema.properties).filter(
+      (key) => !offerLevelSpecs.includes(key),
+    );
+    const fieldDescriptions = this.buildFieldDescriptions(schema, modelLevelKeys);
+    const goldenSubset = omit(goldenSample, offerLevelSpecs);
+
+    return (
+      `${this.buildTranslationPreamble(schema)}\n\n` +
+      `Canonical spec fields (product-identity only — this call never touches brand/model/releaseYear or offer-level fields like size/color, which are handled by a separate pass):\n${fieldDescriptions}\n\n` +
+      `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), an optional "releaseYear", and an "offerLevelSpecs" object of already-known offer-level values (size/color/etc.) — read-only context to help disambiguate product-identity fields, never something to output yourself. Return only the product-identity fields you can confidently produce; omit any field entirely rather than guessing.\n\n` +
+      `Rules:\n` +
+      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
       `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs or rawModel gives a more precise value for the same field.\n` +
-      `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension) or inside the raw title itself (e.g. a size code or color word mixed into the product name).${offerLevelHint} Extract from either source when the value is clearly and unambiguously present.\n` +
+      `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
       `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
-      `- Return a single JSON object with a "specs" key (canonical field names, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model"/"releaseYear" keys per the field-specific guidance above.`
+      `- Return a single JSON object with a "specs" key only (canonical field names, confidently-known ones only — omit fields you're unsure of). Never return "brand"/"model"/"releaseYear" — those are not part of this response.`
     );
   }
 
+  private buildModelSpecResponseSchema(
+    schema: SpecDefinitionJsonSchema,
+    offerLevelSpecs: string[],
+  ): unknown {
+    const modelLevelKeys = Object.keys(schema.properties).filter(
+      (key) => !offerLevelSpecs.includes(key),
+    );
+    return {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        specs: {
+          type: 'object',
+          additionalProperties: false,
+          properties: this.buildSchemaProperties(schema, modelLevelKeys),
+        },
+      },
+    };
+  }
+
+  // ─── Shared user-message + response-schema-property builders ───────────
+
   private buildUserMessage(
-    data: DeterministicProductData,
-    rawSpecs: ScrapedProductSpec[] | undefined,
+    data: { brand: string; model: string; specs: ProductSpecs; releaseYear?: number },
+    rawSpecs?: ScrapedProductSpec[],
+    offerLevelContextSpecs?: ProductSpecs,
   ): string {
     const payload: Record<string, unknown> = {
       deterministicSpecs: data.specs,
@@ -262,6 +473,16 @@ export class ProductSourcePostProcessService {
       brand: data.brand,
       releaseYear: data.releaseYear,
     };
+
+    // Only the model-spec call receives this — read-only context on the
+    // listing's already-known offer-level values, per
+    // buildModelSpecSystemPrompt's own instructions. Passed in directly
+    // rather than picked from `data.specs`, since `data.specs` here is
+    // already the product-level-only object (disjoint from offer-level keys
+    // by construction) — picking from it would always yield {}.
+    if (offerLevelContextSpecs && !isEmpty(offerLevelContextSpecs)) {
+      payload['offerLevelSpecs'] = offerLevelContextSpecs;
+    }
 
     if (rawSpecs?.length) {
       payload['rawSpecs'] = rawSpecs.map((spec) => ({
@@ -276,23 +497,26 @@ export class ProductSourcePostProcessService {
   }
 
   /**
-   * Builds a strict-mode-valid JSON Schema for the response — a "specs"
-   * object (derived from the category's SpecDefinitionJsonSchema properties)
-   * plus optional "brand"/"model"/"releaseYear" fields. No `required` array
-   * anywhere (top level or inside "specs") — the LLM should only populate
-   * fields it's confident about; every field is optional.
+   * Builds strict-mode-valid JSON Schema properties for a "specs" object,
+   * restricted to `keys` — derived from the category's
+   * SpecDefinitionJsonSchema properties.
    *
    * Cannot pass `schema.properties` straight through: SpecDefinitionProperty
    * carries a `meta` key (unit/examples/order — our own convention, read by
-   * buildSystemPrompt) and a `title`, neither of which are schema keywords.
-   * Ajv's `strict: true` mode (used by AiSchemaValidatorService) rejects
-   * unknown keywords outright, so passing them through fails
+   * the system-prompt builders) and a `title`, neither of which are schema
+   * keywords. Ajv's `strict: true` mode (used by AiSchemaValidatorService)
+   * rejects unknown keywords outright, so passing them through fails
    * `ajv.compile(schema)` before the LLM call is even validated. `enum` is a
    * real schema keyword, so it passes through as-is.
    */
-  private buildResponseSchema(schema: SpecDefinitionJsonSchema): unknown {
+  private buildSchemaProperties(
+    schema: SpecDefinitionJsonSchema,
+    keys: string[],
+  ): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
-    for (const [key, prop] of Object.entries(schema.properties)) {
+    for (const key of keys) {
+      const prop = schema.properties[key];
+      if (!prop) continue;
       if (prop.type === 'array') {
         properties[key] = { type: 'array', items: { type: 'string' } };
       } else if (prop.type === 'string' && prop.enum?.length) {
@@ -301,20 +525,6 @@ export class ProductSourcePostProcessService {
         properties[key] = { type: prop.type };
       }
     }
-
-    return {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        brand: { type: 'string' },
-        model: { type: 'string' },
-        releaseYear: { type: 'number' },
-        specs: {
-          type: 'object',
-          additionalProperties: false,
-          properties,
-        },
-      },
-    };
+    return properties;
   }
 }

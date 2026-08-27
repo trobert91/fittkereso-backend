@@ -10,7 +10,7 @@ export class EntityTools {
   @Tool({
     name: 'get_product_detail',
     description:
-      'Get detailed product information — display name, brand, model, specs, aliases, category, plus every ProductSourceRecord (one per scraped URL, with its own externalId/rawSpecsHash/spec validity) and every Offer (price, availability, seller, externalId, and which source record it belongs to). Use to investigate product resolution accuracy, verify if the correct product was matched, or debug why a scrape did or did not produce a new/updated offer.',
+      'Get detailed product information — display name, brand, model, specs, aliases, category, plus every ProductSourceRecord (one per scraped URL, with its own externalId/offerSpecsHash/productSpecsHash/spec validity) and every Offer (price, availability, seller, externalId, and which source record it belongs to). Use to investigate product resolution accuracy, verify if the correct product was matched, or debug why a scrape did or did not produce a new/updated offer.',
     parameters: z.object({
       productId: z.string().optional().describe('Product model UUID'),
       slug: z
@@ -112,7 +112,8 @@ export class EntityTools {
         L.push(`- **ID**: ${record.id}`);
         if (record.externalId) L.push(`- **External ID**: ${record.externalId}`);
         L.push(`- **Last Updated**: ${record.lastUpdated?.toISOString?.() ?? record.lastUpdated}`);
-        L.push(`- **Raw Specs Hash**: ${record.rawSpecsHash ?? '(none)'}`);
+        L.push(`- **Offer Specs Hash**: ${record.offerSpecsHash ?? '(none)'}`);
+        L.push(`- **Product Specs Hash**: ${record.productSpecsHash ?? '(none)'}`);
         L.push(`- **Spec Valid**: ${record.specValid}`);
         if (record.specErrors && Object.keys(record.specErrors).length > 0) {
           L.push(`- **Spec Errors**: ${JSON.stringify(record.specErrors)}`);

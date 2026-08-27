@@ -26,11 +26,12 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    * Cheap identity lookup by (source, externalId) — the source-native SKU/
    * model code/slug, stable across URL changes. Used ahead of full identity
    * resolution to recognize an already-known listing so extraction/LLM
-   * unification can be skipped when its rawSpecsHash is unchanged.
+   * unification can be skipped when its offerSpecsHash/productSpecsHash is
+   * unchanged.
    *
    * Loads `offers` too — offer-level specs (e.g. frameSize/color) are
    * deliberately stripped out of ProductSourceRecord.scrapedProduct.specs
-   * (they vary per offer, not per record), so the rawSpecsHash-unchanged
+   * (they vary per offer, not per record), so the offerSpecsHash-unchanged
    * fast path in ProductDetailsPageScraperService.extractProduct must read
    * them back off the previously-persisted Offer row instead.
    */
@@ -69,6 +70,27 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
           (relation) => `${nameOf<ProductSourceRecord>('model')}.${relation}`,
         ),
       ],
+    });
+  }
+
+  /**
+   * Finds any other ProductSourceRecord from the same source whose
+   * productSpecsHash matches — used to reuse an already-unified product-
+   * identity specs contribution for a brand-new listing (e.g. a not-yet-seen
+   * size/color variant) without a second model-spec LLM call. Picks the most
+   * recently updated match. No `relations` needed — only
+   * `scrapedProduct.specs` (a plain jsonb column) is read from the result.
+   */
+  async findBySourceAndProductSpecsHash(
+    sourceId: string,
+    productSpecsHash: string,
+  ): Promise<ProductSourceRecord | null> {
+    return this.repo.findOne({
+      where: {
+        source: { id: sourceId },
+        productSpecsHash,
+      },
+      order: { lastUpdated: 'DESC' },
     });
   }
 

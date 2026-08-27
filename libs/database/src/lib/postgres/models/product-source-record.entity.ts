@@ -9,6 +9,7 @@ import { Offer } from './offer.entity';
 
 @Entity()
 @Index(['model', 'source'])
+@Index(['source', 'productSpecsHash'])
 export class ProductSourceRecord extends BasePostgresEntity {
   @ManyToOne(() => ProductModel, (model) => model.sources, {
     nullable: false,
@@ -48,15 +49,32 @@ export class ProductSourceRecord extends BasePostgresEntity {
   scrapedProduct?: Partial<ScrapedProduct>;
 
   /**
-   * Digest of scrapedProduct.rawSpecs, computed via hashRawSpecs. Kept as
-   * its own column (not read out of scrapedProduct) so a re-scrape can
-   * cheaply detect an unchanged spec table and skip re-extraction —
-   * see ProductDetailsPageScraperService.
+   * Digest of exactly the raw spec rows (+ raw title) fed to the
+   * offer/identity post-process call (see hashOfferSpecs in
+   * @fittkereso-backend/utils) — the source's offerLevelSpecsInputs-selected
+   * rows plus the raw model/title text. Lets a re-scrape of the same listing
+   * skip that call when unchanged — see ProductDetailsPageScraperService.
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  rawSpecsHash?: string;
+  offerSpecsHash?: string;
+
+  /**
+   * Digest of the raw spec rows fed to the model-spec (product-identity)
+   * post-process call — the full raw spec table minus whatever
+   * offerSpecsHash already covers (see hashProductSpecs). Deliberately
+   * disjoint from offerSpecsHash's input so an offer-level-only difference
+   * between sibling variant pages never invalidates this half of the cache.
+   * Also the key used to find a SIBLING ProductSourceRecord (same source,
+   * different URL/listing) whose already-unified product-identity specs can
+   * be reused outright — see
+   * ProductSourceRecordRepository.findBySourceAndProductSpecsHash.
+   */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  productSpecsHash?: string;
 
   /**
    * Source-native listing identifier (SKU/model code/slug), stable across URL

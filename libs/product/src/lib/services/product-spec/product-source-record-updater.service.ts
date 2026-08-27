@@ -8,7 +8,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { chain, isBoolean, isEmpty, isNumber } from 'lodash';
-import { hashRawSpecs, normalizeUrl } from '@fittkereso-backend/utils';
+import { hashSpecs, normalizeUrl } from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
@@ -65,9 +65,9 @@ export class ProductSourceRecordUpdaterService {
     // `scrapedProduct.specs` is absent (whether `scrapedProduct` itself is
     // undefined, e.g. a manual edit with no re-scrape, or defined without
     // `specs`, e.g. ProductDetailsPageScraperService.extractProduct's
-    // rawSpecsHash-unchanged branch) when the caller determined there is
-    // nothing new to re-extract. Report the existing row as-is rather than
-    // overwriting its specs with `{}`.
+    // offerSpecsHash/productSpecsHash-both-unchanged branch) when the caller
+    // determined there is nothing new to re-extract. Report the existing row
+    // as-is rather than overwriting its specs with `{}`.
     if (scrapedProduct?.specs === undefined && source) {
       return source;
     }
@@ -140,11 +140,29 @@ export class ProductSourceRecordUpdaterService {
           extractedSpecs: scrapedProduct.extractedSpecs
             ? this.processSpecs(scrapedProduct.extractedSpecs)
             : scrapedProduct.extractedSpecs,
+          offerLevelDeterministicSpecs: scrapedProduct.offerLevelDeterministicSpecs
+            ? this.processSpecs(scrapedProduct.offerLevelDeterministicSpecs)
+            : scrapedProduct.offerLevelDeterministicSpecs,
+          productLevelDeterministicSpecs: scrapedProduct.productLevelDeterministicSpecs
+            ? this.processSpecs(scrapedProduct.productLevelDeterministicSpecs)
+            : scrapedProduct.productLevelDeterministicSpecs,
         }
       : source.scrapedProduct;
-    source.rawSpecsHash = scrapedProduct?.rawSpecs
-      ? hashRawSpecs(scrapedProduct.rawSpecs)
-      : undefined;
+    // Hashed straight off the already-split canonical objects
+    // ProductDetailsPageScraperService.extractProduct computed — see
+    // hashSpecs. `scrapedProduct` being defined but these two fields being
+    // absent (e.g. a manual admin-entered specs edit with no re-scrape) is
+    // treated the same as "no rawSpecs at all": no meaningful hash to store.
+    if (scrapedProduct?.offerLevelDeterministicSpecs !== undefined) {
+      source.offerSpecsHash = hashSpecs(source.scrapedProduct?.offerLevelDeterministicSpecs);
+    } else if (scrapedProduct) {
+      source.offerSpecsHash = undefined;
+    }
+    if (scrapedProduct?.productLevelDeterministicSpecs !== undefined) {
+      source.productSpecsHash = hashSpecs(source.scrapedProduct?.productLevelDeterministicSpecs);
+    } else if (scrapedProduct) {
+      source.productSpecsHash = undefined;
+    }
     source.externalId = externalId;
     source.specValid = validation.isValid;
     source.specErrors = validation.isValid ? {} : validation.errors;

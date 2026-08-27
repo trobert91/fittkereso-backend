@@ -8,5 +8,5 @@ export * from './lib/url-utils';
 export * from './lib/transform';
 export * from './lib/slug.util';
 export * from './lib/edit-distance';
-export * from './lib/raw-specs-hash';
+export * from './lib/spec-hash';
 export * from './lib/retry';

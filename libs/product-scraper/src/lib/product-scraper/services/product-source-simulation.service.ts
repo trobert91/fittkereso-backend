@@ -25,6 +25,7 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
+import { pick, omit } from 'lodash';
 
 export interface SimulatedBrandResolution {
   queriedName: string | undefined;
@@ -71,7 +72,11 @@ export interface ProductSourceSimulationResult {
   };
   specs?: {
     deterministic: Record<string, unknown>;
+    // Combined view of both LLM calls' contributions, kept for backwards
+    // compatibility with anything reading the old single-call shape.
     llmContribution?: Record<string, unknown>;
+    offerIdentityContribution?: Record<string, unknown>;
+    modelSpecsContribution?: Record<string, unknown>;
     merged: Record<string, unknown>;
   };
   brandResolution?: SimulatedBrandResolution;
@@ -210,7 +215,8 @@ export class ProductSourceSimulationService {
     };
 
     const postProcessConfig = config.detailPage.postProcess;
-    let llmContribution: Record<string, unknown> | undefined;
+    let offerIdentityContribution: Record<string, unknown> | undefined;
+    let modelSpecsContribution: Record<string, unknown> | undefined;
     let merged = deterministicData;
 
     if (postProcessConfig?.enabled !== false) {
@@ -219,33 +225,67 @@ export class ProductSourceSimulationService {
         warnings.push(
           `Post-processing is enabled but category "${category.slug}" has no golden sample — the real pipeline would silently skip post-processing and use deterministic specs only.`,
         );
-        merged = this.postProcessMerge.merge(deterministicData, undefined);
+        merged = this.postProcessMerge.merge(deterministicData, undefined, undefined);
       } else {
-        const offerLevelSpecs = this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs;
-        const llmResult = await this.postProcess.process({
-          data: deterministicData,
-          rawSpecs: detail.rawSpecs,
+        const offerLevelSpecs =
+          this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
+        const offerLevelDeterministicSpecs = pick(deterministicSpecs, offerLevelSpecs);
+        const productLevelDeterministicSpecs = omit(deterministicSpecs, offerLevelSpecs);
+        // Simulation always runs BOTH calls, unconditionally — the point of
+        // a simulation run is to preview the full, non-cached extraction
+        // result for the sampled page, not the cost-optimized real pipeline
+        // (which can skip the model-spec call on a sibling/same-record hash
+        // match — see ProductDetailsPageScraperService).
+        const offerIdentityResult = await this.postProcess.processOfferIdentity({
+          data: {
+            brand: deterministicData.brand,
+            model: deterministicData.model,
+            releaseYear: deterministicData.releaseYear,
+            specs: offerLevelDeterministicSpecs,
+          },
           schema: jsonSchema,
           goldenSample,
+          offerLevelSpecs,
           model: postProcessConfig?.model,
           thinking: postProcessConfig?.thinking,
           effort: postProcessConfig?.effort,
           maxTokens: postProcessConfig?.maxTokens,
-          offerLevelSpecs,
         });
-        if (!llmResult) {
+        if (!offerIdentityResult) {
           warnings.push(
-            'Post-processing ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned no confident fields) — degraded to deterministic specs only.',
+            'Offer-identity post-processing ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned no confident fields) — degraded to deterministic specs only for that half.',
           );
         }
-        llmContribution = llmResult as Record<string, unknown> | undefined;
-        merged = this.postProcessMerge.merge(deterministicData, llmResult);
+        offerIdentityContribution = offerIdentityResult as Record<string, unknown> | undefined;
+
+        const modelSpecsResult = await this.postProcess.processModelSpecs({
+          data: { ...deterministicData, specs: productLevelDeterministicSpecs },
+          offerLevelDeterministicSpecs,
+          rawSpecs: detail.rawSpecs,
+          schema: jsonSchema,
+          goldenSample,
+          offerLevelSpecs,
+          model: postProcessConfig?.model,
+          thinking: postProcessConfig?.thinking,
+          effort: postProcessConfig?.effort,
+          maxTokens: postProcessConfig?.maxTokens,
+        });
+        if (!modelSpecsResult) {
+          warnings.push(
+            'Model-spec post-processing ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned no confident fields) — degraded to deterministic specs only for that half.',
+          );
+        }
+        modelSpecsContribution = modelSpecsResult as Record<string, unknown> | undefined;
+
+        merged = this.postProcessMerge.merge(deterministicData, offerIdentityResult, modelSpecsResult);
       }
     }
 
     result.specs = {
       deterministic: deterministicSpecs,
-      llmContribution,
+      llmContribution: { ...modelSpecsContribution, ...offerIdentityContribution },
+      offerIdentityContribution,
+      modelSpecsContribution,
       merged: merged.specs,
     };
 
