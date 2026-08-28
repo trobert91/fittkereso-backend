@@ -33,7 +33,7 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * via scrapedProduct.specs/scrapedProduct.rawSpecs — there are no
    * separate top-level columns for those, to avoid two divergent copies of
    * "what did this source actually say"), brand/model/displayName/aliases/
-   * releaseYear/imageUrls/offers. ProductModel/ProductImage/Offer hold the
+   * releaseYear/images/offers. ProductModel/ProductImage/Offer hold the
    * resolved, deduped, cross-source-merged results (brand FK lookup,
    * CDN-uploaded images, offers keyed by (seller, externalId)); this
    * column is the pre-resolution source claim those were built from, kept
@@ -101,10 +101,6 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Column({ type: 'timestamptz', nullable: false })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   lastUpdated: Date;
-
-  @Column({ type: 'boolean', nullable: false, default: false })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  deduplicated: boolean;
 
   /**
    * Normalized identity key derived from scrapedProduct.{brand,model,

@@ -219,7 +219,7 @@ export class ProductMergeService {
       await manager
         .createQueryBuilder()
         .update(ProductSourceRecord)
-        .set({ model: { id: target.id }, deduplicated: true })
+        .set({ model: { id: target.id } })
         .where('id IN (:...ids)', { ids: toMove })
         .execute();
     }

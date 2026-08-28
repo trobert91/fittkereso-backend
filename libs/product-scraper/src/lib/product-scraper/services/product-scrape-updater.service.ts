@@ -371,23 +371,30 @@ export class ProductScrapeUpdaterService {
       );
     }
 
-    const newImages = await this.imageCopyService.copyImagesFromSource(
-      model,
-      task.source,
-      scrapedProduct.imageUrls ?? [],
-    );
-    model.images = [...(model.images ?? []), ...newImages];
+    // Only the first source scraped for a product supplies its image — once
+    // model.images is non-empty, later sources' images are never copied or
+    // considered, by design (single main image per product, not a
+    // multi-source gallery).
+    if (isEmpty(model.images)) {
+      const firstImage = minBy(scrapedProduct.images ?? [], (img) => img.order);
+      const newImages = firstImage
+        ? await this.imageCopyService.copyImagesFromSource(model, task.source, [
+            firstImage.url,
+          ])
+        : [];
+      model.images = [...(model.images ?? []), ...newImages];
 
-    if (!model.mainImage) {
-      const mainImage = minBy(model.images ?? [], (img) => img.order);
-      if (mainImage) {
-        model.mainImage = mainImage;
-        await this.productRepo.save(model);
+      if (!model.mainImage) {
+        const mainImage = minBy(model.images ?? [], (img) => img.order);
+        if (mainImage) {
+          model.mainImage = mainImage;
+          await this.productRepo.save(model);
 
-        this.productMetricsService.productImagesCreated(
-          task.source.name,
-          newImages.length,
-        );
+          this.productMetricsService.productImagesCreated(
+            task.source.name,
+            newImages.length,
+          );
+        }
       }
     }
 

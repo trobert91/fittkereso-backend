@@ -84,7 +84,7 @@ function makeScrapedProduct(
     model: 'MX Keys',
     category: makeCategory(),
     specs: { layout: 'UK' },
-    imageUrls: [],
+    images: [],
     ...overrides,
   } as ScrapedProduct;
 }

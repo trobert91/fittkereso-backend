@@ -8,6 +8,7 @@ export type {
   ScrapedProduct,
   ScrapedOffer,
   ScrapedProductSpec,
+  ProductSourceImage,
 } from '@fittkereso-backend/database';
 
 export interface ProcessedProductSpec {

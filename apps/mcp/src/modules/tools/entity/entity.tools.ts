@@ -118,7 +118,6 @@ export class EntityTools {
         if (record.specErrors && Object.keys(record.specErrors).length > 0) {
           L.push(`- **Spec Errors**: ${JSON.stringify(record.specErrors)}`);
         }
-        L.push(`- **Deduplicated**: ${record.deduplicated}`);
         if (record.normalizedSourceName)
           L.push(`- **Normalized Source Name**: ${record.normalizedSourceName}`);
 

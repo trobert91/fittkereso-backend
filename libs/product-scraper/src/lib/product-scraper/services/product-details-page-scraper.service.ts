@@ -22,6 +22,7 @@ import {
   MergedProductData,
   ModelSpecContribution,
   OfferIdentityContribution,
+  ProductSourceImage,
   ProductSourcePostProcessMergeService,
   ProductSourcePostProcessService,
   ScrapedOffer,
@@ -397,7 +398,7 @@ export class ProductDetailsPageScraperService {
           aliases: detail.aliases,
           releaseYear: detail.releaseYear,
           externalId: detail.externalId,
-          imageUrls: detail.imageUrls,
+          images: this.toScrapedImages(detail.imageUrls),
           offers: this.toScrapedOffers(detail.rawOffers, existingPageOfferLevelSpecs),
         },
         offerLevelSpecs: existingPageOfferLevelSpecs,
@@ -452,7 +453,7 @@ export class ProductDetailsPageScraperService {
         externalId: detail.externalId,
         aliases: detail.aliases,
         releaseYear,
-        imageUrls: detail.imageUrls,
+        images: this.toScrapedImages(detail.imageUrls),
         offers: this.toScrapedOffers(detail.rawOffers, pageOfferLevelSpecs),
       },
       offerLevelSpecs: pageOfferLevelSpecs,
@@ -737,6 +738,13 @@ export class ProductDetailsPageScraperService {
         locations: offer.locations,
         specs: offer.specs ?? pageOfferLevelSpecs,
       }));
+  }
+
+  // The interpreter pipeline only ever produces a flat, ordered string[]
+  // (no per-image metadata) — array position is the only ordering signal a
+  // source config can express, so it's what order is derived from here.
+  private toScrapedImages(imageUrls: string[]): ProductSourceImage[] {
+    return imageUrls.map((url, order) => ({ url, order }));
   }
 
   private parseAvailability(

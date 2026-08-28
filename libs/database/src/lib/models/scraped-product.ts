@@ -5,7 +5,7 @@ import { OfferAvailability } from '../postgres/types/offer-availability';
  * The complete result of scraping one product listing from one source,
  * before persistence. Stored verbatim on ProductSourceRecord.scrapedProduct
  * (see that entity) as the pre-resolution source claim, so
- * brand/model/displayName/aliases/releaseYear/imageUrls/offers/specs/
+ * brand/model/displayName/aliases/releaseYear/images/offers/specs/
  * rawSpecs can all be reprocessed without a re-scrape. Lives in
  * @fittkereso-backend/database (not @fittkereso-backend/product, which
  * re-exports it) for the same reason as ScrapedProductSpec: database cannot
@@ -83,8 +83,15 @@ export interface ScrapedProduct {
   productSpecsHash?: string;
   rawSpecs?: ScrapedProductSpec[];
   externalId?: string;
-  imageUrls?: string[];
+  images?: ProductSourceImage[];
   offers?: ScrapedOffer[];
+}
+
+// A single scraped image URL with its position in the source listing's
+// gallery/pipeline output order — order 0 is the listing's primary image.
+export interface ProductSourceImage {
+  url: string;
+  order: number;
 }
 
 // Seller-listing data (price/availability/etc.) captured alongside a scraped
