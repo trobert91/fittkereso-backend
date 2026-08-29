@@ -82,10 +82,40 @@ export interface ProductSourcePostProcessConfig {
    * degrades the whole pass to deterministic-only.
    */
   maxTokens?: number;
+  /**
+   * Whether `detailPage.description` (when the source configures it) is
+   * forwarded to the offer-identity call. Defaults to false — that call
+   * reconciles brand/model/offer-level fields (size, color) from rawModel,
+   * and a marketing blurb is unlikely to state those more precisely than the
+   * title already does, so most sources gain nothing from paying to send it.
+   * Enable per-source if a listing's title omits a color/size that its
+   * description does state clearly.
+   */
+  includeDescriptionInOfferIdentity?: boolean;
+  /**
+   * Whether `detailPage.description` (when the source configures it) is
+   * forwarded to the model-spec call. Defaults to true, matching this call's
+   * original behavior before the toggle existed — every source that
+   * configures a description has historically had it reach this call
+   * unconditionally. Set false for a source whose description is pure sales
+   * copy with no reliable spec content, to skip the extra input tokens.
+   */
+  includeDescriptionInModelSpecs?: boolean;
 }
 
 export interface ProductSourceDetailPageConfig {
   rawSpecs: ScrapeOperation[];
+  /**
+   * Free-text marketing/description copy from the listing (e.g. a
+   * "Specifikáció"/"Részletek" prose block). Optional — absent/empty for
+   * sources whose spec table is already fully structured. Lower-confidence
+   * than rawSpecs by nature (prose, not a labeled table), but some sources
+   * only state certain values here (see ProductSourcePostProcessService's
+   * model-spec prompt, which treats it accordingly) — e.g. berguson.hu's
+   * component list lives entirely in a description `<li>` list, not a
+   * structured spec table.
+   */
+  description?: ScrapeOperation[];
   category: {
     breadcrumbOrSource: ScrapeOperation[];
     slugLookup: CategoryLookupRule[];

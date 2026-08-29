@@ -55,10 +55,6 @@
       "filterType": "multiselect"
     },
     {
-      "key": "gender",
-      "filterType": "multiselect"
-    },
-    {
       "key": "frameMaterial",
       "filterType": "multiselect"
     },
@@ -241,14 +237,11 @@
     }
   ],
   "primarySpecs": [
-    "frameType",
     "batteryCapacity",
-    "motorModel",
     "wheelSize",
     "torque",
     "modelYear",
-    "usageType",
-    "frameMaterial"
+    "usageType"
   ],
   "matcherSpecs": [
     "motorPower",
@@ -257,7 +250,9 @@
     "forkTravel",
     "frameMaterial",
     "gearCount",
-    "topSpeed"
+    "topSpeed",
+    "frameType",
+    "motorModel"
   ],
   "matchingConfig": {
     "maxMatcherSpecMismatches": 2

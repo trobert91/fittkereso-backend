@@ -11,9 +11,6 @@
   "usageType": {
     "ui:widget": "select"
   },
-  "gender": {
-    "ui:widget": "select"
-  },
   "color": {
     "ui:widget": "text"
   },
@@ -335,7 +332,6 @@
     "torque",
     "modelYear",
     "usageType",
-    "gender",
     "frameMaterial",
     "weight",
     "suspension",

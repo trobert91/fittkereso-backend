@@ -81,23 +81,18 @@ export class SpecComparisonService {
         continue;
       }
 
-      comparableCount++;
       const isPrimary = primarySpecSet.has(key);
       const isMatcher = !isPrimary && matcherSpecSet.has(key);
 
+      // Missing value on either side isn't a contradiction — webshops rarely
+      // publish every spec field, so we can't assume an absent value means
+      // "different." Skip the key entirely rather than counting it as a
+      // mismatch (primary or matcher).
       if (isNil(valueB)) {
-        matcherSpecMismatches++;
-        details.push({
-          key,
-          isPrimary,
-          isMatcher,
-          valueA,
-          valueB: undefined,
-          match: 'mismatch',
-        });
         continue;
       }
 
+      comparableCount++;
       const specHierarchy = matcherSpecHierarchies?.[key];
       const matchResult = this.compareValues(valueA, valueB, specHierarchy);
 
@@ -165,11 +160,10 @@ export class SpecComparisonService {
       const valueB = specsB[key];
       if (isNil(valueA)) continue;
 
-      if (isNil(valueB)) {
-        contradictions++;
-        weightedContradictions += MATCHER_CONTRADICTION_WEIGHT;
-        continue;
-      }
+      // Missing value on the other side isn't a contradiction — webshops
+      // rarely publish every spec field, so an absent value shouldn't be
+      // penalized as a mismatch. Skip the key rather than counting it.
+      if (isNil(valueB)) continue;
 
       const specHierarchy = matcherSpecHierarchies?.[key];
       const result = this.compareValues(valueA, valueB, specHierarchy);

@@ -31,6 +31,7 @@ export interface RawOfferRecord {
 
 export interface DetailPageResult {
   rawSpecs: ScrapedProductSpec[];
+  description?: string;
   categorySlug: string | undefined;
   brand: string | undefined;
   model: string | undefined;
@@ -114,6 +115,15 @@ export class ScrapeInterpreterService {
     )) as string | undefined;
     ctx.vars['categoryName'] = rawCategoryLabel;
 
+    // Free-text marketing description, only run when configured — see
+    // ProductSourceDetailPageConfig.description's doc comment.
+    const description = config.detailPage.description
+      ? ((await this.runner.run(
+          config.detailPage.description,
+          ctx,
+        )) as string | undefined)
+      : undefined;
+
     // 3. resolve category slug via declarative lookup rules, first match wins.
     const categorySlug = this.resolveCategorySlug(
       config.detailPage.category.slugLookup,
@@ -176,6 +186,7 @@ export class ScrapeInterpreterService {
 
     return {
       rawSpecs,
+      description,
       categorySlug,
       brand,
       model,

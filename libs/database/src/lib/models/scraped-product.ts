@@ -81,6 +81,13 @@ export interface ScrapedProduct {
    */
   productSpecsHash?: string;
   rawSpecs?: ScrapedProductSpec[];
+  /**
+   * Free-text marketing/description copy from the listing, when the
+   * source's config extracts one — see ProductSourceDetailPageConfig.
+   * Persisted alongside rawSpecs for the same reason: lets the model-spec
+   * LLM contribution be inspected/reprocessed without a re-scrape.
+   */
+  description?: string;
   externalId?: string;
   images?: ProductSourceImage[];
   offers?: ScrapedOffer[];

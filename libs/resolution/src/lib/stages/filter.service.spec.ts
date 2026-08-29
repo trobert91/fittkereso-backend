@@ -120,17 +120,15 @@ describe('FilterService', () => {
     expect(result.qualifyingCandidates).toHaveLength(1);
   });
 
-  it('drops candidates with no specs when effectiveMatchSpecs is set', () => {
+  it('keeps candidates with no specs when effectiveMatchSpecs is set — cannot contradict what is not there', () => {
     const candidate = makeCandidate({ id: 'none', specs: undefined });
     const context = makeTestContext({
       candidates: [candidate],
       effectiveMatchSpecs: { screenSize: '34"' },
     });
     const result = service.filter(context);
-    expect(result.qualifyingCandidates).toHaveLength(0);
-    const [rejection] = result.outcome.filteredCandidates;
-    expect(rejection.reason).toBe('match_specs');
-    expect(rejection.detail).toContain('screenSize');
+    expect(result.qualifyingCandidates).toHaveLength(1);
+    expect(result.outcome.filteredCandidates).toHaveLength(0);
   });
 
   it('keeps candidates with no specs when effectiveMatchSpecs is also empty', () => {

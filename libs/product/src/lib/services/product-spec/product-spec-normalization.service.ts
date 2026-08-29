@@ -31,9 +31,21 @@ export class ProductSpecNormalizationService {
           result[key] = this.toBoolean(rawValue);
           break;
 
-        case 'string':
-          result[key] = this.toStringValue(rawValue);
+        case 'string': {
+          const stringValue = this.toStringValue(rawValue);
+          // Enum fields: a raw/LLM value that doesn't name one of the
+          // allowed options is dropped rather than persisted verbatim —
+          // same "can't confirm, so omit" rule applied elsewhere to missing
+          // spec values, extended to values that are present but invalid.
+          // Without this, a source's raw label sails through untouched
+          // whenever nothing (deterministic mapping or LLM) rewrites it,
+          // even though it was never a member of the field's own enum.
+          if (prop.enum?.length && !this.isEnumMember(stringValue, prop.enum)) {
+            break;
+          }
+          result[key] = stringValue;
           break;
+        }
 
         case 'array':
           result[key] = this.toArray(rawValue, prop);
@@ -92,6 +104,13 @@ export class ProductSpecNormalizationService {
     }
 
     return undefined;
+  }
+
+  /** Case/whitespace-insensitive enum membership check — mirrors
+   *  ProductSpecMergeService's own enum-matching convention. */
+  private isEnumMember(value: string, enumValues: string[]): boolean {
+    const normalized = value.trim().toLowerCase();
+    return enumValues.some((option) => option.trim().toLowerCase() === normalized);
   }
 
   private toStringValue(value: any): string {

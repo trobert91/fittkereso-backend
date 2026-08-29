@@ -36,10 +36,10 @@ export const selectFirst: OpHandler<SelectFirstOp> = (ctx, _input, op) => {
   return found;
 };
 
-export const selectText: OpHandler<SelectTextOp> = (ctx, _input, op) => {
-  const selection = op.first
-    ? ctx.$(op.selector).first()
-    : ctx.$(op.selector);
+export const selectText: OpHandler<SelectTextOp> = (ctx, input, op) => {
+  const selection = op.selector
+    ? (op.first ? ctx.$(op.selector).first() : ctx.$(op.selector))
+    : (input as CheerioSelection);
   const text = selection.text();
   return op.trim === false ? text : text.trim();
 };

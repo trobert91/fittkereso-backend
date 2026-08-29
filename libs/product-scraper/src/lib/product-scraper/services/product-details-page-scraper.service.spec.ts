@@ -27,7 +27,12 @@ describe('ProductDetailsPageScraperService.maybePostProcess', () => {
   };
 
   function buildTask(
-    postProcessConfig?: { enabled: boolean; model?: string },
+    postProcessConfig?: {
+      enabled: boolean;
+      model?: string;
+      includeDescriptionInOfferIdentity?: boolean;
+      includeDescriptionInModelSpecs?: boolean;
+    },
     force = false,
   ): ScrapeTask {
     return {
@@ -180,6 +185,54 @@ describe('ProductDetailsPageScraperService.maybePostProcess', () => {
     expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
       expect.objectContaining({ offerLevelSpecs: ['frameSize', 'color'] }),
     );
+  });
+
+  describe('description toggles', () => {
+    beforeEach(() => {
+      categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
+      postProcess.processOfferIdentity.mockResolvedValue(undefined);
+      postProcess.processModelSpecs.mockResolvedValue(undefined);
+      postProcessMerge.merge.mockReturnValue(data);
+    });
+
+    it('withholds description from offer-identity but forwards it to model-spec by default', async () => {
+      const task = buildTask({ enabled: true });
+
+      await callMaybePostProcess(task, { description: 'Marketing blurb' });
+
+      expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ description: undefined }),
+      );
+      expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Marketing blurb' }),
+      );
+    });
+
+    it('forwards description to offer-identity when includeDescriptionInOfferIdentity is true', async () => {
+      const task = buildTask({
+        enabled: true,
+        includeDescriptionInOfferIdentity: true,
+      });
+
+      await callMaybePostProcess(task, { description: 'Marketing blurb' });
+
+      expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Marketing blurb' }),
+      );
+    });
+
+    it('withholds description from model-spec when includeDescriptionInModelSpecs is false', async () => {
+      const task = buildTask({
+        enabled: true,
+        includeDescriptionInModelSpecs: false,
+      });
+
+      await callMaybePostProcess(task, { description: 'Marketing blurb' });
+
+      expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
+        expect.objectContaining({ description: undefined }),
+      );
+    });
   });
 
   it('reuses offer-level specs from the existing offer instead of calling processOfferIdentity on a same-record hit', async () => {

@@ -125,17 +125,6 @@ export class FilterService {
     if (isEmpty(matchSpecs)) return undefined;
 
     const primarySpecs = Object.keys(matchSpecs);
-    const missingKey = primarySpecs.find((key) =>
-      isNil(candidate.specs?.[key]),
-    );
-    if (missingKey) {
-      return {
-        candidateId: candidate.productId,
-        candidateName: candidateLabel(candidate),
-        reason: 'match_specs',
-        detail: `${missingKey} (unset) ≠ ${formatSpecValue(matchSpecs[missingKey])}`,
-      };
-    }
 
     const result = this.specComparison.compareSpecs({
       specsA: matchSpecs,

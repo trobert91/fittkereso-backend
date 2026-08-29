@@ -33,7 +33,10 @@ export interface SelectFirstOp extends OpBase {
 
 export interface SelectTextOp extends OpBase {
   op: 'selectText';
-  selector: string;
+  // Omit to read the text of the pipeline's current value itself (e.g. the
+  // current item inside a forEachItem sub-pipeline) instead of querying the
+  // page.
+  selector?: string;
   first?: boolean;
   trim?: boolean;
 }

@@ -425,6 +425,7 @@ export class ProductDetailsPageScraperService {
       offerLevelDeterministicSpecs,
       productLevelDeterministicSpecs,
       rawSpecs: detail.rawSpecs,
+      description: detail.description,
       productSpecsHash,
       jsonSchema,
       categorySlug: category.slug,
@@ -456,6 +457,7 @@ export class ProductDetailsPageScraperService {
         offerSpecsHash,
         productSpecsHash,
         rawSpecs: detail.rawSpecs,
+        description: detail.description,
         externalId: detail.externalId,
         aliases: detail.aliases,
         images: this.toScrapedImages(detail.imageUrls),
@@ -493,6 +495,7 @@ export class ProductDetailsPageScraperService {
     offerLevelDeterministicSpecs: ProductSpecs;
     productLevelDeterministicSpecs: ProductSpecs;
     rawSpecs: ScrapedProductSpec[];
+    description?: string;
     productSpecsHash: string;
     jsonSchema: SpecDefinitionJsonSchema;
     categorySlug: string;
@@ -507,6 +510,7 @@ export class ProductDetailsPageScraperService {
       offerLevelDeterministicSpecs,
       productLevelDeterministicSpecs,
       rawSpecs,
+      description,
       productSpecsHash,
       jsonSchema,
       categorySlug,
@@ -541,6 +545,9 @@ export class ProductDetailsPageScraperService {
       task,
       data,
       offerLevelDeterministicSpecs,
+      description: postProcessConfig?.includeDescriptionInOfferIdentity
+        ? description
+        : undefined,
       schema: jsonSchema,
       goldenSample,
       offerLevelSpecs: offerLevelKeys,
@@ -554,6 +561,10 @@ export class ProductDetailsPageScraperService {
       data,
       productLevelDeterministicSpecs,
       rawSpecs,
+      description:
+        postProcessConfig?.includeDescriptionInModelSpecs === false
+          ? undefined
+          : description,
       productSpecsHash,
       schema: jsonSchema,
       goldenSample,
@@ -577,6 +588,7 @@ export class ProductDetailsPageScraperService {
     task: ScrapeTask;
     data: DeterministicProductData;
     offerLevelDeterministicSpecs: ProductSpecs;
+    description?: string;
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     offerLevelSpecs: string[];
@@ -593,6 +605,7 @@ export class ProductDetailsPageScraperService {
       task,
       data,
       offerLevelDeterministicSpecs,
+      description,
       schema,
       goldenSample,
       offerLevelSpecs,
@@ -621,6 +634,7 @@ export class ProductDetailsPageScraperService {
         model: data.model,
         specs: offerLevelDeterministicSpecs,
       },
+      description,
       schema,
       goldenSample,
       offerLevelSpecs,
@@ -638,6 +652,7 @@ export class ProductDetailsPageScraperService {
     data: DeterministicProductData;
     productLevelDeterministicSpecs: ProductSpecs;
     rawSpecs: ScrapedProductSpec[];
+    description?: string;
     productSpecsHash: string;
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
@@ -655,6 +670,7 @@ export class ProductDetailsPageScraperService {
       data,
       productLevelDeterministicSpecs,
       rawSpecs,
+      description,
       productSpecsHash,
       schema,
       goldenSample,
@@ -709,6 +725,7 @@ export class ProductDetailsPageScraperService {
     return this.postProcess.processModelSpecs({
       data: { ...data, specs: productLevelDeterministicSpecs },
       rawSpecs,
+      description,
       schema,
       goldenSample,
       offerLevelSpecs,

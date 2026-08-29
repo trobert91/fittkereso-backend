@@ -141,15 +141,15 @@ describe('SpecComparisonService', () => {
       expect(result.matchingCount).toBe(1);
     });
 
-    it('treats missing candidate matcherSpecs values as matcher mismatch', () => {
+    it('treats missing candidate value as neutral, not a mismatch', () => {
       const result = service.compareSpecs({
         specsA: { screenSize: 27, brightness: 1000 },
         specsB: { screenSize: 27 },
         primarySpecs: ['screenSize'],
         matcherSpecs: ['brightness'],
       });
-      expect(result.comparableCount).toBe(2);
-      expect(result.matcherSpecMismatches).toBe(1);
+      expect(result.comparableCount).toBe(1);
+      expect(result.matcherSpecMismatches).toBe(0);
       expect(result.primaryMismatches).toBe(0);
     });
 
@@ -248,13 +248,13 @@ describe('SpecComparisonService', () => {
       ).toBe(-0.5); // (1 - 2*1) / 2
     });
 
-    it('counts missing candidate specs as matcher-level contradiction', () => {
+    it('treats missing candidate specs as neutral, not a contradiction', () => {
       expect(
         service.computeSpecSimilarityScore(
           { screenSize: '27', refreshRate: '240' },
           { screenSize: 27 },
         ),
-      ).toBe(0); // screenSize matches, refreshRate nil → matcher contradiction → (1-1)/2=0
+      ).toBe(1); // screenSize matches, refreshRate nil → skipped → 1/1=1
     });
 
     it('treats hierarchy compatible as confirmed', () => {

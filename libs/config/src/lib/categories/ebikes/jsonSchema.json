@@ -32,53 +32,42 @@
     },
     "frameType": {
       "meta": {
-        "order": 1,
-        "examples": [
-          "All Mountain",
-          "Merev MTB",
-          "Országúti",
-          "Magas vázú",
-          "Trapéz",
-          "Alacsony vázú",
-          "Összteleszkópos",
-          "Cross",
-          "Összecsukható",
-          "Kompakt"
-        ]
+        "order": 1
       },
+      "enum": [
+        "Női",
+        "Férfi",
+        "Gyermek",
+        "Alacsony",
+        "Összecsukható",
+        "Cargo"
+      ],
       "type": "string",
       "title": "Frame type",
       "translation": "Váztípus"
     },
     "usageType": {
       "meta": {
-        "order": 7,
-        "examples": [
-          "Trekking",
-          "MTB",
-          "Cross",
-          "Cross-Trekking",
-          "Városi",
-          "Kompakt városi",
-          "Országúti"
-        ]
+        "order": 7
       },
+      "enum": [
+        "Speed",
+        "Trekking",
+        "Cross Trekking",
+        "MTB",
+        "Összteleszkópos MTB",
+        "Országúti",
+        "Gravel",
+        "City",
+        "Gyerek",
+        "Fitness",
+        "Cargo",
+        "Fat",
+        "Összecsukható"
+      ],
       "type": "string",
       "title": "Usage type",
       "translation": "Felhasználás módja"
-    },
-    "gender": {
-      "meta": {
-        "order": 8
-      },
-      "enum": [
-        "Férfi",
-        "Női",
-        "Unisex"
-      ],
-      "type": "string",
-      "title": "Gender",
-      "translation": "Nem"
     },
     "color": {
       "meta": {

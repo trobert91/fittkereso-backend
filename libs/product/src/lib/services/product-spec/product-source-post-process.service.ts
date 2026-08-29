@@ -36,16 +36,21 @@ const DEFAULT_MODEL = 'gpt-5.6-luna';
  * suppresses `effort` (see runContributionCall) since DeepSeek has no
  * "disabled reasoning at a specific effort" state.
  *
- * The two calls default to different effort levels: offer-identity has at
- * most a handful of fields to reconcile (brand/model/one or two offer-level
- * keys), so medium is plenty. model-spec reconciles the full non-offer-level
- * field set (~50-90 fields) against deterministicSpecs/rawSpecs, and a
- * medium-effort run measurably regressed on real data — e.g. a KTM source
- * with a clearly-present display module coming back `display: false`, which
- * low/medium runs got right previously (2026-08-29). Bumped to high for
- * this call specifically until accuracy at medium is re-verified.
+ * Both calls default to high effort. model-spec reconciles the full
+ * non-offer-level field set (~50-90 fields) against deterministicSpecs/
+ * rawSpecs, and a medium-effort run measurably regressed on real data — e.g.
+ * a KTM source with a clearly-present display module coming back
+ * `display: false`, which low/medium runs got right previously
+ * (2026-08-29). offer-identity was originally left at medium on the
+ * assumption that reconciling a handful of fields (brand/model/one or two
+ * offer-level keys) doesn't need much reasoning, but it missed a colorway
+ * name embedded in the raw title — "Space Galaxy Matt (Grey+Black)" was
+ * kept in `model` instead of extracted to `color` (2026-08-29, product
+ * a0517278-d003-42e3-9826-1c0b35daa019). Bumped to high alongside a prompt
+ * fix for that specific case; revisit if high doesn't clear misses like it
+ * either.
  */
-const DEFAULT_OFFER_IDENTITY_EFFORT = 'medium';
+const DEFAULT_OFFER_IDENTITY_EFFORT = 'high';
 const DEFAULT_MODEL_SPECS_EFFORT = 'high';
 
 /** Deterministic, pre-LLM view of a scraped product. */
@@ -142,14 +147,18 @@ export class ProductSourcePostProcessService {
    * caller (`pick(deterministicSpecs, offerLevelSpecs)`) — this method does
    * not re-filter, it only restricts what it asks the LLM to *output* via
    * the response schema/prompt. No raw spec rows are sent to this call at
-   * all — its only inputs are the raw title/model text and the already-
-   * mapped offer-level specs; a value that lives only in unmapped raw text
-   * (no SourceSpecMapping pointing at it) is out of scope for this call.
+   * all — its inputs are the raw title/model text, the already-mapped
+   * offer-level specs, and (only when the caller opts in via
+   * ProductSourcePostProcessConfig.includeDescriptionInOfferIdentity) the
+   * source's free-text description; a value that lives only in unmapped raw
+   * text (no SourceSpecMapping pointing at it) is out of scope for this
+   * call.
    */
   async processOfferIdentity(params: {
     data: Pick<DeterministicProductData, 'brand' | 'model'> & {
       specs: ProductSpecs;
     };
+    description?: string;
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     offerLevelSpecs: string[];
@@ -158,7 +167,7 @@ export class ProductSourcePostProcessService {
     effort?: string;
     maxTokens?: number;
   }): Promise<OfferIdentityContribution | undefined> {
-    const { data, schema, goldenSample, offerLevelSpecs } = params;
+    const { data, description, schema, goldenSample, offerLevelSpecs } = params;
 
     const response = await this.runContributionCall({
       systemPrompt: this.buildOfferIdentitySystemPrompt(
@@ -166,7 +175,7 @@ export class ProductSourcePostProcessService {
         goldenSample,
         offerLevelSpecs,
       ),
-      userMessage: this.buildUserMessage(data),
+      userMessage: this.buildUserMessage(data, undefined, undefined, description),
       responseSchema: this.buildOfferIdentityResponseSchema(
         schema,
         offerLevelSpecs,
@@ -211,6 +220,7 @@ export class ProductSourcePostProcessService {
     data: DeterministicProductData;
     offerLevelDeterministicSpecs?: ProductSpecs;
     rawSpecs?: ScrapedProductSpec[];
+    description?: string;
     schema: SpecDefinitionJsonSchema;
     goldenSample: ProductSpecs;
     offerLevelSpecs: string[];
@@ -219,8 +229,15 @@ export class ProductSourcePostProcessService {
     effort?: string;
     maxTokens?: number;
   }): Promise<ModelSpecContribution | undefined> {
-    const { data, offerLevelDeterministicSpecs, rawSpecs, schema, goldenSample, offerLevelSpecs } =
-      params;
+    const {
+      data,
+      offerLevelDeterministicSpecs,
+      rawSpecs,
+      description,
+      schema,
+      goldenSample,
+      offerLevelSpecs,
+    } = params;
 
     const response = await this.runContributionCall({
       systemPrompt: this.buildModelSpecSystemPrompt(
@@ -228,7 +245,12 @@ export class ProductSourcePostProcessService {
         goldenSample,
         offerLevelSpecs,
       ),
-      userMessage: this.buildUserMessage(data, rawSpecs, offerLevelDeterministicSpecs),
+      userMessage: this.buildUserMessage(
+        data,
+        rawSpecs,
+        offerLevelDeterministicSpecs,
+        description,
+      ),
       responseSchema: this.buildModelSpecResponseSchema(schema, offerLevelSpecs),
       model: params.model,
       thinking: params.thinking,
@@ -377,8 +399,11 @@ export class ProductSourcePostProcessService {
       .map((key) => schema.properties[key]?.title)
       .filter((title): title is string => Boolean(title));
     const offerLevelList = offerLevelTitles.join(', ');
+    const colorNamingHint = offerLevelSpecs.includes('color')
+      ? ` Manufacturers often give a color a stylized marketing name instead of a plain color word (e.g. "Space Galaxy Matt", "Olive Pearl") — sometimes followed by a literal breakdown in parentheses right after it (e.g. "Space Galaxy Matt (Grey+Black)"). Treat the stylized name together with any such parenthetical as one "color" value — never leave the stylized name in "model" while dropping the parenthetical, and never leave either part unextracted just because it isn't a plain color word.`
+      : '';
     const offerLevelHint = offerLevelTitles.length
-      ? ` Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title/model text (e.g. a size code like "M/43" or a color name) rather than the structured spec table, and must be extracted from there if present.`
+      ? ` Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title/model text (e.g. a size code like "M/43" or a color name) rather than the structured spec table, and must be extracted from there if present.${colorNamingHint}`
       : '';
     const offerLevelModelHint = offerLevelTitles.length
       ? ` ${offerLevelList} are offer-level fields — they describe a specific purchasable variant/listing (this exact size, this exact color), not the product model's identity — so they must never remain in "model" once extracted.`
@@ -397,7 +422,8 @@ export class ProductSourcePostProcessService {
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass, offer-level keys only) and a "rawModel" string (the same raw title referenced above). There is no raw spec table in this call's input — a value that only exists as unmapped raw text is out of scope here.\n` +
       `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawModel gives a more precise value for the same field.\n` +
       `- Then look through rawModel for offer-level canonical fields deterministicSpecs is missing.${offerLevelHint} Extract from it when the value is clearly and unambiguously present.\n` +
-      `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
+      `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose. Treat it as LOWER confidence than rawModel: it's unstructured sales copy, not a title, so it can restate a value correctly, omit it, or describe it only vaguely/figuratively. Only extract an offer-level value from it when clearly, specifically, and unambiguously stated — never from general marketing tone alone. When deterministicSpecs/rawModel already has a value for a field, prefer it over anything implied by description.\n` +
+      `- For a spec field with "allowed values" listed above: if the source gives a value for that field, you MUST translate/normalize it to one of those exact Hungarian strings (never invent a new label, never leave it untranslated) — but only when the source value genuinely describes that field's own concept. A source value describing a *different* concept (e.g. a riding-discipline/category term like "All Mountain" when the field asks for frame geometry, or a gendered variant like "Cross férfi" when a category-only enum value like "Cross Trekking" fits better) must be routed to whichever field it actually matches, or dropped if no field fits — never force it into an enum value it doesn't really mean just because the field has no other value to offer. If nothing in the input specifically describes what the field is asking about, omit the key.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Return a single JSON object with a "specs" key (offer-level canonical field names only, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model" keys per the field-specific guidance above.`
@@ -440,10 +466,11 @@ export class ProductSourcePostProcessService {
       `Worked example — a correctly unified specs output for this category, showing value/format conventions (real responses are usually much smaller — see the "specs" rule below):\n${JSON.stringify(goldenSubset)}\n\n` +
       `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an "offerLevelSpecs" object of already-known offer-level values (size/color/etc.) — read-only context to help disambiguate product-identity fields, never something to output yourself. Return only the product-identity fields you can confidently produce; omit any field entirely rather than guessing.\n\n` +
       `Rules:\n` +
-      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
+      `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes carrying their own per-row free-text "description" instead of a single value).\n` +
       `- deterministicSpecs is already merged in automatically after your response — you never need to repeat a value that's already correct there. Only include a key in your "specs" output when your value is NEW (the field is missing or empty in deterministicSpecs) or a CORRECTION (rawSpecs/rawModel clearly gives a more precise/different value than what deterministicSpecs has). If deterministicSpecs already has the right value for a field, omit that key entirely — do not echo it back.\n` +
       `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
-      `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
+      `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated (e.g. "a váz felső csövéből egyszerűen eltávolítható akkumulátor" clearly states batteryRemovable=true) — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
+      `- For a spec field with "allowed values" listed above: if the source gives a value for that field, you MUST translate/normalize it to one of those exact Hungarian strings (never invent a new label, never leave it untranslated) — but only when the source value genuinely describes that field's own concept. A source value describing a *different* concept (e.g. a riding-discipline/category term like "All Mountain" when the field asks for frame geometry, or a gendered variant like "Cross férfi" when a category-only enum value like "Cross Trekking" fits better) must be routed to whichever field it actually matches, or dropped if no field fits — never force it into an enum value it doesn't really mean just because the field has no other value to offer. If nothing in the input specifically describes what the field is asking about, omit the key.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
@@ -484,6 +511,7 @@ export class ProductSourcePostProcessService {
     data: { brand: string; model: string; specs: ProductSpecs },
     rawSpecs?: ScrapedProductSpec[],
     offerLevelContextSpecs?: ProductSpecs,
+    description?: string,
   ): string {
     const payload: Record<string, unknown> = {
       deterministicSpecs: data.specs,
@@ -508,6 +536,17 @@ export class ProductSourcePostProcessService {
         ...(spec.description ? { description: spec.description } : {}),
         ...(spec.values ? { values: spec.values } : {}),
       }));
+    }
+
+    // Free-text marketing description. Only the source's own config
+    // populates it (most sources have none), and only when the caller opts
+    // this call into receiving it (ProductSourcePostProcessConfig's
+    // includeDescriptionInOfferIdentity/includeDescriptionInModelSpecs —
+    // see ProductDetailsPageScraperService.maybePostProcess). Both prompts
+    // that can request it treat it as lower confidence than rawModel/
+    // rawSpecs, per their own "description" rule below.
+    if (description?.trim()) {
+      payload['description'] = description.trim();
     }
 
     return JSON.stringify(payload);

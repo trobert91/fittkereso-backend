@@ -173,10 +173,18 @@ export class ProductSourceTools {
   }): Promise<string> {
     try {
       const { productSourceId, ...params } = args;
-      const source = await this.updateService.updateProductSource(
+      const updated = await this.updateService.updateProductSource(
         productSourceId,
         params as never,
       );
+
+      // updateService's own findOne doesn't load `seller` (it never needs
+      // the relation to apply the update) — re-fetch with it here so
+      // formatSource doesn't misreport a real seller link as "_none_".
+      const source = await this.productSourceRepo.findOneOrFail({
+        where: { id: updated.id },
+        relations: ['seller'],
+      });
 
       return `Product source "${source.name}" (${source.id}) updated.\n\n${this.formatSource(source)}`;
     } catch (error: unknown) {

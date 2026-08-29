@@ -424,7 +424,7 @@ describe('ProductSourcePostProcessService', () => {
   });
 
   describe('processOfferIdentity', () => {
-    it('defaults to medium effort, without asserting thinking or maxTokens explicitly', async () => {
+    it('defaults to high effort, without asserting thinking or maxTokens explicitly', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processOfferIdentity({
@@ -436,7 +436,7 @@ describe('ProductSourcePostProcessService', () => {
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
       expect(callArgs.thinking).toBeUndefined();
-      expect(callArgs.effort).toBe('medium');
+      expect(callArgs.effort).toBe('high');
       expect(callArgs.maxTokens).toBeUndefined();
     });
 
@@ -490,6 +490,40 @@ describe('ProductSourcePostProcessService', () => {
           ],
         }),
       );
+    });
+
+    it('forwards a given description into the user message and documents it as lower-confidence in the system prompt', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processOfferIdentity({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        description: 'Stabil karbonvázával és kiváló minőségű komponenseivel.',
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const callArgs = aiChat.createChat.mock.calls[0][0];
+      const [systemMessage, userMessage] = callArgs.messages;
+      expect(userMessage.content).toContain(
+        '"description":"Stabil karbonvázával és kiváló minőségű komponenseivel."',
+      );
+      expect(systemMessage.content).toMatch(/description.*LOWER confidence/);
+    });
+
+    it('omits description from the user message when none is given', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processOfferIdentity({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const callArgs = aiChat.createChat.mock.calls[0][0];
+      const [, userMessage] = callArgs.messages;
+      expect(userMessage.content).not.toContain('"description"');
     });
 
     it('trims a whitespace-only LLM model to undefined rather than passing it through', async () => {
