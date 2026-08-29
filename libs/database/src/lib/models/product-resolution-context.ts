@@ -139,7 +139,6 @@ export interface ProductData {
   aliases?: string[];
   specs?: ProductSpecs;
   category?: ProductCategory;
-  releaseYear?: number;
 }
 
 export interface EvaluatedProduct extends ProductData {

@@ -142,7 +142,7 @@ describe('CandidateScoringService', () => {
     const candidates = [makeCandidate({ id: 'p1', specs: { size: 27 } })];
 
     service.scoreAllCandidates(
-      { model: 'G27Q', brand: 'Gigabyte', releaseYear: 2024 },
+      { model: 'G27Q', brand: 'Gigabyte' },
       candidates,
       { size: '27' },
       'monitors',
@@ -153,7 +153,6 @@ describe('CandidateScoringService', () => {
         query: expect.objectContaining({
           model: 'G27Q',
           specs: { size: '27' },
-          year: 2024,
         }),
         candidate: expect.objectContaining({
           model: 'TestModel',

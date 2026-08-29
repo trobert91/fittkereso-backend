@@ -78,6 +78,27 @@ export class ProductSpecSortService {
   }
 
   /**
+   * List-view variant of sortSpecs — restricts the result to the category's
+   * `displayedSpecsInList` (in that order), for contexts where space is
+   * limited (storefront cards). Falls back to sortSpecs's full output when
+   * the category has no `displayedSpecsInList` configured.
+   */
+  public sortSpecsForList(
+    categorySlug: string | undefined,
+    specs: ProductSpecs,
+  ): OrderedSpec[] {
+    const displayedKeys =
+      this.categoryConfigService.getConfig(categorySlug)?.displayedSpecsInList;
+    const all = this.sortSpecs(categorySlug, specs);
+    if (!displayedKeys?.length) return all;
+
+    const byKey = new Map(all.map((spec) => [spec.key, spec]));
+    return displayedKeys
+      .map((key) => byKey.get(key))
+      .filter((spec): spec is OrderedSpec => spec !== undefined);
+  }
+
+  /**
    * Format spec value with unit (e.g., "100 MHz").
    */
   private formatSpecValue(

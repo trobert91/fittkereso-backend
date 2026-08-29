@@ -26,7 +26,6 @@ export interface ProductResolutionInput {
   modelClues?: string[];
   variantClues?: string[];
   searchBefore?: Date;
-  releaseYear?: number;
   contentQuality?: 'high' | 'medium' | 'low';
 }
 

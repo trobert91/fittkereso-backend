@@ -1,13 +1,11 @@
 import {
   IsBoolean,
-  IsInt,
   IsObject,
   IsOptional,
   IsString,
   IsArray,
 } from 'class-validator';
 import { ProductSpecs } from '@fittkereso-backend/database';
-import { Transform } from 'class-transformer';
 
 export class ProductModelUpdateDto {
   @IsOptional()
@@ -41,11 +39,6 @@ export class ProductModelUpdateDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
-
-  @IsOptional()
-  @IsInt()
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  releaseYear?: number;
 
   @IsOptional()
   @IsString()

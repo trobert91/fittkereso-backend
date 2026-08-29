@@ -6,7 +6,6 @@ import {
   ManyToOne,
   OneToMany,
   OneToOne,
-  Unique,
 } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductCategory } from './product-category.entity';
@@ -24,14 +23,13 @@ import { Expose, Transform } from 'class-transformer';
 
 @Entity()
 @Index(['productCategory', 'enabled'])
-@Unique('UQ_product_brand_normalized_name', ['brand', 'normalizedName'])
 export class ProductModel extends BasePostgresEntity {
   @ManyToOne(() => Brand, (brand) => brand.models, { nullable: false })
   @Expose({ groups: [SerializeGroup.list] })
   brand: Brand;
 
   @Index()
-  @Column({ nullable: false, unique: true })
+  @Column({ nullable: false })
   @Expose({ groups: [SerializeGroup.list] })
   displayName: string;
 
@@ -122,10 +120,6 @@ export class ProductModel extends BasePostgresEntity {
   @Column({ nullable: false, default: true })
   @Expose({ groups: [SerializeGroup.adminList] })
   enabled: boolean;
-
-  @Column({ type: 'int', nullable: true })
-  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.details] })
-  releaseYear?: number;
 
   @OneToOne(() => ProductEmbedding, {
     onDelete: 'SET NULL',

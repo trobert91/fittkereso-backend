@@ -303,7 +303,6 @@ export class ProductDuplicateEvaluationService {
         displayName: candidate.displayName,
         aliases: candidateAliases,
         specs: candidate.specs,
-        releaseYear: candidate.releaseYear,
       },
       brandName: query.brandName || candidate.brandName,
       categorySlug,
@@ -345,17 +344,6 @@ export class ProductDuplicateEvaluationService {
     ) {
       pendingReasons.push(
         `${specMatchDetails.nonPrimaryMismatches} non-primary mismatches > ${config.maxNonPrimaryMismatches}`,
-      );
-    }
-
-    // 6. Release year divergence
-    if (
-      !isNil(productA.releaseYear) &&
-      !isNil(productB.releaseYear) &&
-      productA.releaseYear !== productB.releaseYear
-    ) {
-      pendingReasons.push(
-        `release year mismatch: ${productA.releaseYear} vs ${productB.releaseYear}`,
       );
     }
 

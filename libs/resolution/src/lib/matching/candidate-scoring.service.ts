@@ -15,7 +15,6 @@ export interface CandidateScoringInput {
   model?: string;
   displayName?: string;
   brand?: string;
-  releaseYear?: number;
 }
 
 /**
@@ -46,14 +45,12 @@ export class CandidateScoringService {
           model: input.model ?? '',
           displayName: input.displayName,
           specs: isEmpty(inputSpecs) ? undefined : inputSpecs,
-          year: input.releaseYear,
         },
         candidate: {
           model: candidate.model ?? '',
           displayName: candidate.displayName,
           aliases: candidate.aliases,
           specs: candidate.specs,
-          releaseYear: candidate.releaseYear,
         },
         brandName: input.brand,
         categorySlug,

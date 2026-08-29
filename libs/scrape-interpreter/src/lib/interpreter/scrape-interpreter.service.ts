@@ -122,6 +122,9 @@ export class ScrapeInterpreterService {
     );
 
     // 4. brand/model/aliases/releaseYear/images — may reference vars.categoryName.
+    // releaseYear here is a raw deterministic extraction, distinct from the
+    // ProductModel.specs.modelYear it ultimately feeds — see
+    // ProductDetailsPageScraperService, which folds it into deterministicSpecs.
     const brand = (await this.runner.run(
       config.detailPage.brand,
       ctx,

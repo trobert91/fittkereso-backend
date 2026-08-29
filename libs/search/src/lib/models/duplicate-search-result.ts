@@ -29,9 +29,6 @@ export class DuplicatePairItem {
   model?: string;
 
   @Expose({ groups: [SerializeGroup.list] })
-  releaseYear?: number;
-
-  @Expose({ groups: [SerializeGroup.list] })
   createdAt?: Date;
 }
 

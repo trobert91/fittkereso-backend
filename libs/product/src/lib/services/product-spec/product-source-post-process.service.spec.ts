@@ -82,7 +82,6 @@ describe('ProductSourcePostProcessService', () => {
                 deterministicSpecs: { weight: 22 },
                 rawModel: 'Macina Scarp',
                 brand: 'KTM',
-                releaseYear: undefined,
               }),
             }),
           ],
@@ -114,7 +113,6 @@ describe('ProductSourcePostProcessService', () => {
                 deterministicSpecs: { weight: 22 },
                 rawModel: 'Macina Scarp',
                 brand: 'KTM',
-                releaseYear: undefined,
                 rawSpecs: [
                   { name: 'Motor', description: 'Bosch PERFORMANCE SX BDU3144' },
                   { name: 'Váz', section: 'Alváz', values: ['Macina Scarp Prem'] },
@@ -170,7 +168,7 @@ describe('ProductSourcePostProcessService', () => {
       );
     });
 
-    it('never includes brand/model/releaseYear in the response schema', async () => {
+    it('never includes brand/model in the response schema', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
@@ -183,7 +181,6 @@ describe('ProductSourcePostProcessService', () => {
       const callArgs = aiChat.createChat.mock.calls[0][0];
       expect(callArgs.schema.properties.brand).toBeUndefined();
       expect(callArgs.schema.properties.model).toBeUndefined();
-      expect(callArgs.schema.properties.releaseYear).toBeUndefined();
       expect(callArgs.schema.required).toBeUndefined();
       expect(callArgs.schema.properties.specs.required).toBeUndefined();
     });
@@ -224,7 +221,7 @@ describe('ProductSourcePostProcessService', () => {
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
       expect(systemPrompt).not.toMatch(/strip the brand/);
-      expect(systemPrompt).toContain('Never return "brand"/"model"/"releaseYear"');
+      expect(systemPrompt).toContain('Never return "brand"/"model"');
     });
 
     it('includes current offer-level values as read-only context in the user message', async () => {
@@ -495,23 +492,6 @@ describe('ProductSourcePostProcessService', () => {
       expect(result?.model).toBe('Macina Scarp');
     });
 
-    it('passes a plain-undefined LLM releaseYear through untouched', async () => {
-      aiChat.createChat.mockResolvedValueOnce({
-        content: JSON.stringify({ model: 'Macina Scarp' }),
-        parsed: { model: 'Macina Scarp' },
-      });
-
-      const result = await service.processOfferIdentity({
-        data: { brand: 'KTM', model: 'raw title', specs: {}, releaseYear: 2024 },
-        schema,
-        goldenSample,
-        offerLevelSpecs: [],
-      });
-
-      expect(result?.releaseYear).toBeUndefined();
-      expect(result?.model).toBe('Macina Scarp');
-    });
-
     it('returns undefined when parsed output contributes nothing on any field', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
@@ -579,7 +559,6 @@ describe('ProductSourcePostProcessService', () => {
       expect(callArgs.schema.properties.specs.properties.frameSize).toBeDefined();
       expect(callArgs.schema.properties.brand).toBeDefined();
       expect(callArgs.schema.properties.model).toBeDefined();
-      expect(callArgs.schema.properties.releaseYear).toBeDefined();
     });
 
     describe('offerLevelSpecs extraction guidance', () => {

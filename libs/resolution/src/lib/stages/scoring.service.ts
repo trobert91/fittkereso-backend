@@ -52,7 +52,6 @@ export class ScoringService {
         model: this.resolveMatcherQueryModel(context),
         displayName: context.input.displayName,
         brand: context.brand?.name ?? context.input.brand,
-        releaseYear: context.input.releaseYear,
       },
       evaluatedCandidates,
       inputSpecsMap,

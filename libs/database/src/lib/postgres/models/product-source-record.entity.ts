@@ -33,7 +33,7 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * via scrapedProduct.specs/scrapedProduct.rawSpecs — there are no
    * separate top-level columns for those, to avoid two divergent copies of
    * "what did this source actually say"), brand/model/displayName/aliases/
-   * releaseYear/images/offers. ProductModel/ProductImage/Offer hold the
+   * images/offers. ProductModel/ProductImage/Offer hold the
    * resolved, deduped, cross-source-merged results (brand FK lookup,
    * CDN-uploaded images, offers keyed by (seller, externalId)); this
    * column is the pre-resolution source claim those were built from, kept

@@ -42,7 +42,6 @@ export interface SimulatedProductPreview {
   categorySlug: string;
   categoryName: string;
   aliases?: string[];
-  releaseYear?: number;
   specs: Record<string, unknown>;
   externalId?: string;
   imageUrls: string[];
@@ -206,12 +205,17 @@ export class ProductSourceSimulationService {
           translator,
         })
       : {};
+    // Mirrors ProductDetailsPageScraperService: detailPage.releaseYear is a
+    // dedicated deterministic scrape-op, folded into modelYear so this
+    // preview matches what the real pipeline would persist to specs.
+    if (deterministicSpecs['modelYear'] === undefined && detail.releaseYear !== undefined) {
+      deterministicSpecs['modelYear'] = detail.releaseYear;
+    }
 
     const deterministicData: DeterministicProductData = {
       brand: detail.brand,
       model: detail.model,
       specs: deterministicSpecs,
-      releaseYear: detail.releaseYear,
     };
 
     const postProcessConfig = config.detailPage.postProcess;
@@ -240,7 +244,6 @@ export class ProductSourceSimulationService {
           data: {
             brand: deterministicData.brand,
             model: deterministicData.model,
-            releaseYear: deterministicData.releaseYear,
             specs: offerLevelDeterministicSpecs,
           },
           schema: jsonSchema,
@@ -310,7 +313,6 @@ export class ProductSourceSimulationService {
       categorySlug: category.slug,
       categoryName: category.name,
       aliases: detail.aliases,
-      releaseYear: merged.releaseYear,
       specs: merged.specs,
       externalId: detail.externalId,
       imageUrls: detail.imageUrls,

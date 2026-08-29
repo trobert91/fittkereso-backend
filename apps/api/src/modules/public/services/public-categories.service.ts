@@ -27,7 +27,10 @@ import { BrandDto } from '../dto/brand.dto';
 import { MainImageDto } from '../dto/main-image.dto';
 import { PaginatedProductResult } from '../dto/paginated-result.dto';
 import { ProductQueryDto, SortBy } from '../dto/product-query.dto';
-import { ProductImageDtoService } from '@fittkereso-backend/product';
+import {
+  ProductImageDtoService,
+  ProductSpecSortService,
+} from '@fittkereso-backend/product';
 
 interface FilterWhereSql {
   conditions: string[];
@@ -41,6 +44,7 @@ export class PublicCategoriesService {
     private readonly productModelRepo: ProductModelRepository,
     private readonly productImageDtoService: ProductImageDtoService,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly productSpecSortService: ProductSpecSortService,
   ) {}
 
   async getCategories(): Promise<CategoryListDto[]> {
@@ -292,8 +296,11 @@ export class PublicCategoriesService {
     const direction = sortDir.toUpperCase() as 'ASC' | 'DESC';
     switch (sortBy) {
       case SortBy.releaseYear:
+        // modelYear lives in the specs JSONB column, not a mapped entity
+        // property, so this can't go through nameOf<ProductModel>() like the
+        // other sort field below — it's a genuine raw expression.
         qb.orderBy(
-          `product.${nameOf<ProductModel>('releaseYear')}`,
+          `(product.specs->>'modelYear')::numeric`,
           direction,
           'NULLS LAST',
         );
@@ -865,8 +872,11 @@ export class PublicCategoriesService {
     dto.slug = product.slug ?? '';
     dto.displayName = product.displayName;
     dto.model = product.model;
-    dto.releaseYear = product.releaseYear;
-    dto.orderedSpecs = product.orderedSpecs;
+    dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
+    dto.orderedSpecs = this.productSpecSortService.sortSpecsForList(
+      product.productCategory?.slug,
+      product.specs ?? {},
+    );
 
     if (product.brand) {
       const brandDto = new BrandDto();

@@ -5,7 +5,7 @@ import { OfferAvailability } from '../postgres/types/offer-availability';
  * The complete result of scraping one product listing from one source,
  * before persistence. Stored verbatim on ProductSourceRecord.scrapedProduct
  * (see that entity) as the pre-resolution source claim, so
- * brand/model/displayName/aliases/releaseYear/images/offers/specs/
+ * brand/model/displayName/aliases/images/offers/specs/
  * rawSpecs can all be reprocessed without a re-scrape. Lives in
  * @fittkereso-backend/database (not @fittkereso-backend/product, which
  * re-exports it) for the same reason as ScrapedProductSpec: database cannot
@@ -30,7 +30,6 @@ export interface ScrapedProduct {
    */
   originalName?: string;
   aliases?: string[];
-  releaseYear?: number;
   specs?: ProductSpecs;
   /**
    * Output of SpecExtractionService.extractSpecs — the deterministic,

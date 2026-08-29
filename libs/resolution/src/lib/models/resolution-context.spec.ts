@@ -25,7 +25,6 @@ describe('ResolutionContext shape', () => {
         modelClues: ['G85SD'],
         variantClues: [],
         searchBefore: new Date('2025-11-11T10:53:43Z'),
-        releaseYear: 2024,
         contentQuality: 'high',
       },
       options: {

@@ -58,8 +58,6 @@ export class EntityTools {
     );
     L.push(`- **Enabled**: ${product.enabled}`);
     if (product.slug) L.push(`- **Slug**: ${product.slug}`);
-    if (product.releaseYear)
-      L.push(`- **Release Year**: ${product.releaseYear}`);
     L.push('');
 
     // Brand

@@ -309,6 +309,14 @@ export class ProductDetailsPageScraperService {
           translator,
         })
       : {};
+    // detailPage.releaseYear is a dedicated deterministic scrape-op some
+    // sources use when the release/model year isn't part of the labeled spec
+    // table — folded into the same modelYear key the label-based mapping
+    // would otherwise populate, so downstream code has exactly one place to
+    // look regardless of which extraction path produced it.
+    if (deterministicSpecs['modelYear'] === undefined && detail.releaseYear !== undefined) {
+      deterministicSpecs['modelYear'] = detail.releaseYear;
+    }
     // Filtered once, here, via filterDefinedSpecs — dropping keys a
     // normalization pass mapped but couldn't type-convert (e.g.
     // ProductSpecNormalizationService assigning `undefined` for a value that
@@ -396,7 +404,6 @@ export class ProductDetailsPageScraperService {
           originalName: detail.model,
           category,
           aliases: detail.aliases,
-          releaseYear: detail.releaseYear,
           externalId: detail.externalId,
           images: this.toScrapedImages(detail.imageUrls),
           offers: this.toScrapedOffers(detail.rawOffers, existingPageOfferLevelSpecs),
@@ -410,10 +417,9 @@ export class ProductDetailsPageScraperService {
       brand: detail.brand,
       model: detail.model,
       specs: deterministicSpecs,
-      releaseYear: detail.releaseYear,
     };
 
-    const { brand, model, specs, releaseYear } = await this.maybePostProcess({
+    const { brand, model, specs } = await this.maybePostProcess({
       task,
       data: deterministicData,
       offerLevelDeterministicSpecs,
@@ -452,7 +458,6 @@ export class ProductDetailsPageScraperService {
         rawSpecs: detail.rawSpecs,
         externalId: detail.externalId,
         aliases: detail.aliases,
-        releaseYear,
         images: this.toScrapedImages(detail.imageUrls),
         offers: this.toScrapedOffers(detail.rawOffers, pageOfferLevelSpecs),
       },
@@ -614,7 +619,6 @@ export class ProductDetailsPageScraperService {
       data: {
         brand: data.brand,
         model: data.model,
-        releaseYear: data.releaseYear,
         specs: offerLevelDeterministicSpecs,
       },
       schema,

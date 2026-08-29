@@ -11,12 +11,11 @@ export interface MergedProductData {
   brand: string;
   model: string;
   specs: ProductSpecs;
-  releaseYear?: number;
 }
 
 /**
  * Merges a source's deterministic extraction (SpecExtractionService +
- * dedicated brand/model/releaseYear scrape-op pipelines) with the two
+ * dedicated brand/model scrape-op pipelines) with the two
  * optional LLM post-process contributions
  * (ProductSourcePostProcessService.processOfferIdentity/processModelSpecs),
  * per field: an LLM's value wins wherever it provided one, deterministic
@@ -46,7 +45,6 @@ export class ProductSourcePostProcessMergeService {
       // is a shallow, whole-value-wins merge: array-type spec values are
       // replaced wholesale, never element-merged (unlike defaultsDeep).
       specs: defaults({}, llmSpecs, deterministic.specs),
-      releaseYear: offerIdentity?.releaseYear ?? deterministic.releaseYear,
     };
   }
 }

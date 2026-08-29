@@ -268,5 +268,12 @@
     "frameSizeLabel",
     "color",
     "mileage"
+  ],
+  "displayedSpecsInList": [
+    "modelYear",
+    "frameType",
+    "batteryCapacity",
+    "motorModel",
+    "wheelSize"
   ]
 }

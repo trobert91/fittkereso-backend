@@ -28,14 +28,12 @@ export interface ProductSimilarityInput {
     displayName?: string;
     aliases?: string[];
     specs?: ProductSpecs;
-    year?: number;
   };
   candidate: {
     model: string;
     displayName?: string;
     aliases?: string[];
     specs?: ProductSpecs;
-    releaseYear?: number;
   };
   brandName?: string;
   categorySlug?: string;
@@ -103,21 +101,6 @@ export class ProductSimilarityService {
       aliasMatch: false,
       specSimilarity: 0,
     };
-
-    // Year gate: candidate released after query year → impossible match
-    if (
-      input.query.year !== undefined &&
-      input.candidate.releaseYear !== undefined &&
-      input.candidate.releaseYear > input.query.year
-    ) {
-      this.logger.debug('Year gate: candidate released after query year', {
-        queryModel: input.query.model,
-        candidateModel: input.candidate.model,
-        queryYear: input.query.year,
-        candidateReleaseYear: input.candidate.releaseYear,
-      });
-      return { score: 0, components: emptyComponents, bestMatchName: '' };
-    }
 
     // Build normalized name lists
     const nameLists = this.inputNormalization.buildNameLists({
@@ -293,14 +276,12 @@ export class ProductSimilarityService {
               displayName: input.query.displayName,
               aliasCount: input.query.aliases?.length ?? 0,
               hasSpecs: !isEmpty(input.query.specs),
-              year: input.query.year,
             },
             candidate: {
               model: input.candidate.model,
               displayName: input.candidate.displayName,
               aliasCount: input.candidate.aliases?.length ?? 0,
               hasSpecs: !isEmpty(input.candidate.specs),
-              releaseYear: input.candidate.releaseYear,
             },
             brandName: input.brandName,
             categorySlug: input.categorySlug,

@@ -72,8 +72,6 @@ interface PersistResult {
 @Injectable()
 export class ProductScrapeUpdaterService {
   private readonly logger = new CustomLogger(ProductScrapeUpdaterService.name);
-  private readonly normalizedNameConstraint =
-    'UQ_product_brand_normalized_name';
 
   constructor(
     private readonly productSearch: ResolutionService,
@@ -310,12 +308,7 @@ export class ProductScrapeUpdaterService {
     // from ScrapedProduct.category, which is always fully populated.
     await this.mergeService.mergeSources(model, scrapedProduct.category.slug);
 
-    const saveOutcome = await this.saveProductModel({
-      model,
-      normalizedSourceName,
-      scrapedProduct,
-      task,
-    });
+    const saveOutcome = await this.saveProductModel({ model });
     saveOutcome.sourceRecord ??= sourceRecord;
 
     if (saveOutcome.created) {
@@ -663,7 +656,6 @@ export class ProductScrapeUpdaterService {
         model: scrapedProduct.model,
         displayName: scrapedProduct.displayName,
         specs: productSpecsToStructuredSpecs(scrapedProduct.specs),
-        releaseYear: scrapedProduct.releaseYear,
         category: scrapedProduct.category
           ? {
               id: scrapedProduct.category.id,
@@ -704,82 +696,22 @@ export class ProductScrapeUpdaterService {
     return { context: resolution.context, confidence: resolution.confidence };
   }
 
-  private async findExistingProductModelByNormalizedName(
-    normalizedName: string,
-    brandId: string,
-  ): Promise<ProductModel | undefined> {
-    return (
-      (await this.productRepo.findOne({
-        where: { normalizedName, brand: { id: brandId } },
-        relations: this.getProductRelations(),
-      })) ?? undefined
-    );
-  }
-
   private async saveProductModel(params: {
     model: ProductModel;
-    normalizedSourceName: string;
-    scrapedProduct: ScrapedProduct;
-    task: ScrapeTask;
   }): Promise<PersistResult> {
-    const { model, normalizedSourceName, scrapedProduct, task } = params;
+    const { model } = params;
     const isNewModel = !model.id;
 
-    try {
-      return {
-        model: await this.productRepo.save(model),
-        created: isNewModel,
-      };
-    } catch (error) {
-      if (!isNewModel || !this.isNormalizedNameConflict(error)) {
-        throw error;
-      }
-
-      const existingModel = await this.findExistingProductModelByNormalizedName(
-        normalizedSourceName,
-        model.brand.id,
-      );
-      if (!existingModel) {
-        throw error;
-      }
-
-      this.logger.debug(
-        'Reusing product created by concurrent worker after normalizedName conflict',
-        {
-          taskId: task.id,
-          productId: existingModel.id,
-          normalizedSourceName,
-          url: task.url,
-        },
-      );
-
-      this.applyScrapedProductDetails(existingModel, scrapedProduct);
-      const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
-        model: existingModel,
-        scrapedProduct,
-        externalId: scrapedProduct.externalId,
-        source: task.source,
-        sourceUrl: task.url,
-        normalizedSourceName,
-      });
-      await this.mergeService.mergeSources(existingModel, scrapedProduct.category.slug);
-
-      return {
-        model: await this.productRepo.save(existingModel),
-        created: false,
-        sourceRecord,
-      };
-    }
+    return {
+      model: await this.productRepo.save(model),
+      created: isNewModel,
+    };
   }
 
   private applyScrapedProductDetails(
     model: ProductModel,
     scrapedProduct: ScrapedProduct,
   ): void {
-    if (!model.releaseYear && scrapedProduct.releaseYear) {
-      model.releaseYear = scrapedProduct.releaseYear;
-    }
-
     if (scrapedProduct.displayName) {
       model.displayName = scrapedProduct.displayName;
     }
@@ -806,14 +738,6 @@ export class ProductScrapeUpdaterService {
       nameOf<ProductModel>('sources'),
       `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
     ];
-  }
-
-  private isNormalizedNameConflict(error: unknown): boolean {
-    return (
-      error instanceof Error &&
-      error.message.includes('duplicate key value') &&
-      error.message.includes(this.normalizedNameConstraint)
-    );
   }
 
   private async generateProductSlug(entity: ProductModel): Promise<void> {

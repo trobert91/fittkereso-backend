@@ -332,33 +332,6 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
-  it('recovers from a normalizedName insert race by loading the existing product', async () => {
-    const task = makeTask();
-    const scrapedProduct = makeScrapedProduct();
-    const existingModel = makeExistingModel();
-
-    mockProductRepo.findOne.mockResolvedValue(existingModel);
-    mockProductRepo.save
-      .mockRejectedValueOnce(
-        new Error(
-          'duplicate key value violates unique constraint "UQ_product_brand_normalized_name"',
-        ),
-      )
-      .mockResolvedValue(existingModel);
-
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
-
-    expect(result).toBe(existingModel);
-    expect(mockBrandResolution.resolve).toHaveBeenCalledTimes(1);
-    expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledTimes(
-      2,
-    );
-    expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
-    expect(mockMetricsService.productUpdated).toHaveBeenCalledWith('arukereso');
-    expect(mockTaskRepo.save).toHaveBeenCalledWith(task);
-    expect(task.product).toBe(existingModel);
-  });
-
   it('uses strict matching for scrape-time resolution', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({

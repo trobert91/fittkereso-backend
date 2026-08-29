@@ -29,34 +29,33 @@ const DEFAULT_EFFORT = 'low';
  * object with room to spare (the ebikes golden sample is 92 fields, ~1.2k
  * output tokens) plus a bounded reasoning trace. Truncation fails JSON parsing
  * and degrades the whole pass to deterministic-only, so this must never bind
- * on a well-behaved call.
+ * on a well-behaved call. Raised from 20000 after a source's reasoning trace
+ * alone consumed the full previous ceiling (2026-08-28).
  */
-const DEFAULT_MAX_TOKENS = 20000;
+const DEFAULT_MAX_TOKENS = 40000;
 
 /** Deterministic, pre-LLM view of a scraped product. */
 export interface DeterministicProductData {
   brand: string;
   model: string;
   specs: ProductSpecs;
-  releaseYear?: number;
 }
 
 /**
- * What the offer-identity LLM call may confidently contribute — brand/model/
- * releaseYear plus only offer-level spec keys (frameSize, color, etc.).
- * Fields the LLM isn't confident about are omitted rather than guessed.
+ * What the offer-identity LLM call may confidently contribute — brand/model
+ * plus only offer-level spec keys (frameSize, color, etc.). Fields the LLM
+ * isn't confident about are omitted rather than guessed.
  */
 export interface OfferIdentityContribution {
   brand?: string;
   model?: string;
-  releaseYear?: number;
   specs?: ProductSpecs;
 }
 
 /**
  * What the model-spec (product-identity) LLM call may confidently
  * contribute — only non-offer-level spec keys. This call never touches
- * brand/model/releaseYear.
+ * brand/model.
  */
 export interface ModelSpecContribution {
   specs?: ProductSpecs;
@@ -66,7 +65,6 @@ interface RawLlmResponse {
   brand?: string;
   model?: string;
   specs?: ProductSpecs;
-  releaseYear?: number;
 }
 
 interface ContributionCallParams {
@@ -86,7 +84,7 @@ interface ContributionCallParams {
  *  - `processOfferIdentity`: cleans the source's raw product title down to
  *    just the model name (stripping brand/marketing/color/gender/category
  *    boilerplate some sources bake into the same field), optionally corrects
- *    brand/releaseYear, and extracts only offer-level spec keys (frameSize,
+ *    brand, and extracts only offer-level spec keys (frameSize,
  *    color, etc.) — values that vary per purchasable listing, not per
  *    product model. Always runs, for every scraped listing, since this
  *    output is inherently page-specific and can never be reused from a
@@ -135,7 +133,7 @@ export class ProductSourcePostProcessService {
    * (no SourceSpecMapping pointing at it) is out of scope for this call.
    */
   async processOfferIdentity(params: {
-    data: Pick<DeterministicProductData, 'brand' | 'model' | 'releaseYear'> & {
+    data: Pick<DeterministicProductData, 'brand' | 'model'> & {
       specs: ProductSpecs;
     };
     schema: SpecDefinitionJsonSchema;
@@ -172,7 +170,6 @@ export class ProductSourcePostProcessService {
       specs: response.specs
         ? this.specNormalizer.normalize(response.specs, schema)
         : undefined,
-      releaseYear: response.releaseYear,
     };
 
     if (this.isEmptyContribution(sanitized)) {
@@ -194,7 +191,7 @@ export class ProductSourcePostProcessService {
    * buildModelSpecSystemPrompt's own instructions), since it lives outside
    * `data.specs` now. Gets the full rawSpecs for complete context (unlike
    * processOfferIdentity's restricted input), but its response schema never
-   * includes brand/model/releaseYear or offer-level keys.
+   * includes brand/model or offer-level keys.
    */
   async processModelSpecs(params: {
     data: DeterministicProductData;
@@ -246,8 +243,7 @@ export class ProductSourcePostProcessService {
     return (
       c.brand === undefined &&
       c.model === undefined &&
-      c.specs === undefined &&
-      c.releaseYear === undefined
+      c.specs === undefined
     );
   }
 
@@ -257,8 +253,7 @@ export class ProductSourcePostProcessService {
    * truncation, and degrades to `undefined` on any failure. Each public
    * method supplies its own prompt/schema and interprets `response.parsed`
    * itself, since the two calls sanitize/validate slightly differently
-   * (offer-identity checks brand/model/releaseYear/specs; model-spec only
-   * checks specs).
+   * (offer-identity checks brand/model/specs; model-spec only checks specs).
    */
   private async runContributionCall(
     params: ContributionCallParams,
@@ -373,11 +368,10 @@ export class ProductSourcePostProcessService {
       `${this.buildTranslationPreamble(schema)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
       `Canonical spec fields (offer-level only — this call never touches product-identity fields):\n${fieldDescriptions}\n\n` +
       `Worked example — correctly unified offer-level values for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
-      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped offer-level fields only), and an optional "releaseYear". You may return any of "brand", "model", "specs", "releaseYear" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), and "specs" (already deterministically mapped offer-level fields only). You may return any of "brand", "model", "specs" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
       `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
-      `- "releaseYear": only return this if a release/model year is explicitly stated in "rawModel" or already present in "specs" — the given deterministic value, if any, is often already reliable, so do not recompute or guess one from unrelated context.\n` +
       `- "specs": see the rules below — offer-level keys only.\n\n` +
       `Rules:\n` +
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass, offer-level keys only) and a "rawModel" string (the same raw title referenced above). There is no raw spec table in this call's input — a value that only exists as unmapped raw text is out of scope here.\n` +
@@ -386,7 +380,7 @@ export class ProductSourcePostProcessService {
       `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
-      `- Return a single JSON object with a "specs" key (offer-level canonical field names only, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model"/"releaseYear" keys per the field-specific guidance above.`
+      `- Return a single JSON object with a "specs" key (offer-level canonical field names only, confidently-known ones only — omit fields you're unsure of) and optional "brand"/"model" keys per the field-specific guidance above.`
     );
   }
 
@@ -400,7 +394,6 @@ export class ProductSourcePostProcessService {
       properties: {
         brand: { type: 'string' },
         model: { type: 'string' },
-        releaseYear: { type: 'number' },
         specs: {
           type: 'object',
           additionalProperties: false,
@@ -425,9 +418,9 @@ export class ProductSourcePostProcessService {
 
     return (
       `${this.buildTranslationPreamble(schema)}\n\n` +
-      `Canonical spec fields (product-identity only — this call never touches brand/model/releaseYear or offer-level fields like size/color, which are handled by a separate pass):\n${fieldDescriptions}\n\n` +
+      `Canonical spec fields (product-identity only — this call never touches brand/model or offer-level fields like size/color, which are handled by a separate pass):\n${fieldDescriptions}\n\n` +
       `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
-      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), an optional "releaseYear", and an "offerLevelSpecs" object of already-known offer-level values (size/color/etc.) — read-only context to help disambiguate product-identity fields, never something to output yourself. Return only the product-identity fields you can confidently produce; omit any field entirely rather than guessing.\n\n` +
+      `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an "offerLevelSpecs" object of already-known offer-level values (size/color/etc.) — read-only context to help disambiguate product-identity fields, never something to output yourself. Return only the product-identity fields you can confidently produce; omit any field entirely rather than guessing.\n\n` +
       `Rules:\n` +
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
       `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs or rawModel gives a more precise value for the same field.\n` +
@@ -436,7 +429,7 @@ export class ProductSourcePostProcessService {
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
-      `- Return a single JSON object with a "specs" key only (canonical field names, confidently-known ones only — omit fields you're unsure of). Never return "brand"/"model"/"releaseYear" — those are not part of this response.`
+      `- Return a single JSON object with a "specs" key only (canonical field names, confidently-known ones only — omit fields you're unsure of). Never return "brand"/"model" — those are not part of this response.`
     );
   }
 
@@ -463,7 +456,7 @@ export class ProductSourcePostProcessService {
   // ─── Shared user-message + response-schema-property builders ───────────
 
   private buildUserMessage(
-    data: { brand: string; model: string; specs: ProductSpecs; releaseYear?: number },
+    data: { brand: string; model: string; specs: ProductSpecs },
     rawSpecs?: ScrapedProductSpec[],
     offerLevelContextSpecs?: ProductSpecs,
   ): string {
@@ -471,7 +464,6 @@ export class ProductSourcePostProcessService {
       deterministicSpecs: data.specs,
       rawModel: data.model,
       brand: data.brand,
-      releaseYear: data.releaseYear,
     };
 
     // Only the model-spec call receives this — read-only context on the

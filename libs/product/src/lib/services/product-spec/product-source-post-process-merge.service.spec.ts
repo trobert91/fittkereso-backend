@@ -12,7 +12,6 @@ describe('ProductSourcePostProcessMergeService', () => {
     brand: 'KTM',
     model: 'MACINA SCARP SX PRESTIGE Di2 M/43 electric bike',
     specs: { weight: 17, batteryCapacity: 400 },
-    releaseYear: 2024,
   };
 
   beforeEach(() => {
@@ -85,7 +84,6 @@ describe('ProductSourcePostProcessMergeService', () => {
       brand: 'KTM',
       model: deterministic.model,
       specs: { weight: 17, batteryCapacity: 400 },
-      releaseYear: 2024,
     });
     expect(result.specs).not.toBe(deterministic.specs);
   });
@@ -108,24 +106,12 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.specs['weight']).toBe(17.9);
   });
 
-  it('overrides brand alone (only offerIdentity carries it), leaving specs/model/releaseYear to fall through', () => {
+  it('overrides brand alone (only offerIdentity carries it), leaving specs/model to fall through', () => {
     const offerIdentity: OfferIdentityContribution = { brand: 'KTM AG' };
 
     const result = service.merge(deterministic, offerIdentity, undefined);
 
     expect(result.brand).toBe('KTM AG');
-    expect(result.model).toBe(deterministic.model);
-    expect(result.specs).toEqual(deterministic.specs);
-    expect(result.releaseYear).toBe(2024);
-  });
-
-  it('overrides releaseYear alone (only offerIdentity carries it), leaving the rest to fall through', () => {
-    const offerIdentity: OfferIdentityContribution = { releaseYear: 2025 };
-
-    const result = service.merge(deterministic, offerIdentity, undefined);
-
-    expect(result.releaseYear).toBe(2025);
-    expect(result.brand).toBe(deterministic.brand);
     expect(result.model).toBe(deterministic.model);
     expect(result.specs).toEqual(deterministic.specs);
   });

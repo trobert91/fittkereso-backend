@@ -182,4 +182,11 @@ export interface ProductCategoryConfig {
    *  stage. Always optional per-listing — absence of a value is normal, not
    *  an error. */
   offerLevelSpecs?: string[];
+  /** Ordered subset of spec keys (must exist in the category's
+   *  jsonSchema.json) to surface on the storefront list/card view, where
+   *  space is limited — e.g. ["modelYear", "frameType", "batteryCapacity"].
+   *  Distinct from primarySpecs/filterSpecs, which drive matching and
+   *  filtering rather than list-view display. Unset or empty means no
+   *  curated list-view subset (callers fall back to their own default). */
+  displayedSpecsInList?: string[];
 }

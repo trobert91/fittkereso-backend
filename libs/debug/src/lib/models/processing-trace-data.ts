@@ -19,14 +19,12 @@ export interface ProductSimilarityTraceData extends BaseTraceData {
       displayName?: string;
       aliasCount: number;
       hasSpecs: boolean;
-      year?: number;
     };
     candidate: {
       model: string;
       displayName?: string;
       aliasCount: number;
       hasSpecs: boolean;
-      releaseYear?: number;
     };
     brandName?: string;
     categorySlug?: string;

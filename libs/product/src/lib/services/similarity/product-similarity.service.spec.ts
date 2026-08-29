@@ -243,38 +243,6 @@ describe('ProductSimilarityService', () => {
     expect(result.score).toBeGreaterThanOrEqual(70);
   });
 
-  // ─── Year Gate ───────────────────────────────────────────────────────────
-
-  it('returns score 0 when candidate released after query year', () => {
-    const result = score({
-      query: { model: 'Odyssey G7', year: 2022 },
-      candidate: { model: 'Odyssey G7', releaseYear: 2024 },
-      brandName: 'Samsung',
-      categorySlug: 'monitors',
-    });
-
-    expect(result.score).toBe(0);
-    expect(result.bestMatchName).toBe('');
-  });
-
-  it('year proximity adds to score when product is recent', () => {
-    const service = createService();
-
-    const withYear = service.score({
-      query: { model: 'G27Q', year: 2024 },
-      candidate: { model: 'G27Q', releaseYear: 2023 },
-      categorySlug: 'monitors',
-    });
-
-    const noYear = service.score({
-      query: { model: 'G27Q' },
-      candidate: { model: 'G27Q' },
-      categorySlug: 'monitors',
-    });
-
-    expect(withYear.score).toBeGreaterThanOrEqual(noYear.score);
-  });
-
   // ─── No Category Slug ────────────────────────────────────────────────────
 
   it('falls back to default token config when no categorySlug', () => {

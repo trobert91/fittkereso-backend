@@ -23,8 +23,7 @@ describe('ProductDetailsPageScraperService.maybePostProcess', () => {
   const data: DeterministicProductData = {
     brand: 'KTM',
     model: 'Macina Scarp',
-    specs: { weight: 17 },
-    releaseYear: 2024,
+    specs: { weight: 17, modelYear: 2024 },
   };
 
   function buildTask(

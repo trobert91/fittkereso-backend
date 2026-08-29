@@ -21,7 +21,7 @@ interface ValueGroup {
 
 /**
  * Recomputes ProductModel's identity fields (brand/model/displayName/
- * releaseYear/aliases) from its ProductSourceRecords — the identity-field
+ * aliases) from its ProductSourceRecords — the identity-field
  * counterpart to ProductSpecMergeService, called from
  * ProductMergeService.mergeSources alongside the spec merge. Uses the same
  * corroboration-then-recency/priority tiebreak shape as
@@ -55,10 +55,6 @@ export class ProductIdentityMergeService {
       latestPerSource,
       (r) => r.scrapedProduct?.displayName,
     );
-    const releaseYearWinner = this.resolveField(
-      latestPerSource,
-      (r) => r.scrapedProduct?.releaseYear,
-    );
 
     if (brandWinner !== undefined) {
       const resolved = await this.brandResolution.resolve(
@@ -74,9 +70,6 @@ export class ProductIdentityMergeService {
     }
     if (displayNameWinner !== undefined) {
       model.displayName = String(displayNameWinner);
-    }
-    if (releaseYearWinner !== undefined) {
-      model.releaseYear = Number(releaseYearWinner);
     }
 
     await this.mergeAliases(model, latestPerSource, manager);

@@ -142,7 +142,6 @@ export class ProductEmbeddingMatchService {
       category: candidate.entity.productCategory,
       specs: candidate.entity.specs,
       aliases: candidate.entity.aliases?.map((alias) => alias.alias),
-      releaseYear: candidate.entity.releaseYear,
       source: 'embedding',
     };
   }

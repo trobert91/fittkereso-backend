@@ -5,7 +5,10 @@ import {
   ProductModel,
 } from '@fittkereso-backend/database';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
-import { ProductImageDtoService } from '@fittkereso-backend/product';
+import {
+  ProductImageDtoService,
+  ProductSpecSortService,
+} from '@fittkereso-backend/product';
 import { nameOf } from '@fittkereso-backend/utils';
 
 import { ProductListDto } from '../dto/product-list.dto';
@@ -24,6 +27,7 @@ export class PublicProductsService {
     private readonly productModelRepo: ProductModelRepository,
     private readonly dynamicConfigService: DynamicConfigService,
     private readonly productImageDtoService: ProductImageDtoService,
+    private readonly productSpecSortService: ProductSpecSortService,
   ) {}
 
   async getTopProducts(): Promise<ProductListDto[]> {
@@ -81,7 +85,7 @@ export class PublicProductsService {
     dto.slug = product.slug ?? '';
     dto.displayName = product.displayName;
     dto.model = product.model;
-    dto.releaseYear = product.releaseYear;
+    dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
     dto.description = product.description;
     dto.specs = product.specs;
     dto.orderedSpecs = product.orderedSpecs;
@@ -182,8 +186,11 @@ export class PublicProductsService {
     dto.slug = product.slug ?? '';
     dto.displayName = product.displayName;
     dto.model = product.model;
-    dto.releaseYear = product.releaseYear;
-    dto.orderedSpecs = product.orderedSpecs;
+    dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
+    dto.orderedSpecs = this.productSpecSortService.sortSpecsForList(
+      product.productCategory?.slug,
+      product.specs ?? {},
+    );
 
     if (product.brand) {
       const brandDto = new BrandDto();

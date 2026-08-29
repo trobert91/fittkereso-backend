@@ -56,12 +56,6 @@ export class ProductUpdateMapperService {
       entity.enabled = dto.enabled;
     }
 
-    if (!isUndefined(dto.releaseYear)) {
-      entity.releaseYear = dto.releaseYear;
-    } else if (dto.releaseYear === '') {
-      entity.releaseYear = undefined;
-    }
-
     if (!isUndefined(dto.manualSpecs)) {
       this.mapManualSpecs(entity, dto.manualSpecs);
     }

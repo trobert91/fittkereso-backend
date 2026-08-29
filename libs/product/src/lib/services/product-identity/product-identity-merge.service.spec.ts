@@ -12,7 +12,6 @@ describe('ProductIdentityMergeService.mergeIdentity', () => {
       brand?: string;
       model?: string;
       displayName?: string;
-      releaseYear?: number;
       aliases?: string[];
     },
     opts: { lastUpdated?: string; priority?: number } = {},
@@ -142,19 +141,6 @@ describe('ProductIdentityMergeService.mergeIdentity', () => {
     await service.mergeIdentity(model, sources);
 
     expect(model.brand).toBe(existingBrand);
-  });
-
-  it('recomputes releaseYear via corroboration, not "first non-empty wins"', async () => {
-    const model = makeModel({ releaseYear: 2020 });
-    const sources = [
-      makeSource('a', { releaseYear: 2024 }),
-      makeSource('b', { releaseYear: 2024 }),
-      makeSource('c', { releaseYear: 2023 }),
-    ];
-
-    await service.mergeIdentity(model, sources);
-
-    expect(model.releaseYear).toBe(2024);
   });
 
   it('unions aliases from all sources without corroboration-gating', async () => {
