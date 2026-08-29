@@ -14,7 +14,6 @@ export interface DeepSeekResponseFormat {
 
 export interface DeepSeekThinkingConfig {
   type: 'enabled' | 'disabled';
-  reasoning_effort?: string;
 }
 
 export interface DeepSeekChatRequestBody {
@@ -24,6 +23,8 @@ export interface DeepSeekChatRequestBody {
   max_tokens?: number;
   response_format?: DeepSeekResponseFormat;
   thinking?: DeepSeekThinkingConfig;
+  /** Sibling of `thinking`, not nested inside it — DeepSeek's OpenAI-compatible API takes this as a top-level field. */
+  reasoning_effort?: string;
 }
 
 export interface DeepSeekUsage {

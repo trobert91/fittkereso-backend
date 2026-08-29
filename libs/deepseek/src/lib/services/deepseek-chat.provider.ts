@@ -108,7 +108,13 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
       }
     }
 
-    const thinking = this.buildThinking(request.thinking, request.effort);
+    const thinking = this.buildThinking(request.thinking);
+    // `reasoning_effort` is a top-level sibling of `thinking`, not nested
+    // inside it (api-docs.deepseek.com/guides/thinking_mode) — DeepSeek only
+    // honors it while thinking is enabled, so omit it when thinking is
+    // explicitly disabled even if a caller passed both.
+    const reasoningEffort =
+      thinking?.type === 'disabled' ? undefined : request.effort;
 
     const body: DeepSeekChatRequestBody = {
       model: request.model,
@@ -119,6 +125,7 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
       ...(request.maxTokens !== undefined && { max_tokens: request.maxTokens }),
       ...(responseFormat && { response_format: responseFormat }),
       ...(thinking && { thinking }),
+      ...(reasoningEffort !== undefined && { reasoning_effort: reasoningEffort }),
     };
 
     const response = await this.client.createChatCompletion(body);
@@ -147,13 +154,8 @@ export class DeepSeekChatProvider implements AiChatProvider, OnModuleInit {
 
   private buildThinking(
     thinking: boolean | undefined,
-    effort: string | undefined,
   ): DeepSeekThinkingConfig | undefined {
-    if (thinking === undefined && effort === undefined) return undefined;
-    if (thinking === false) return { type: 'disabled' };
-    return {
-      type: 'enabled',
-      ...(effort !== undefined && { reasoning_effort: effort }),
-    };
+    if (thinking === undefined) return undefined;
+    return { type: thinking ? 'enabled' : 'disabled' };
   }
 }

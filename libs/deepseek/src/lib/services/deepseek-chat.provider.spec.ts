@@ -108,5 +108,43 @@ describe('DeepSeekChatProvider', () => {
         'Respond as JSON with one field.',
       );
     });
+
+    // reasoning_effort is a top-level field, sibling to `thinking`, per
+    // api-docs.deepseek.com/guides/thinking_mode — NOT nested inside the
+    // thinking object. A prior version of this provider nested it, which
+    // meant DeepSeek's API silently never received the effort setting.
+    it('sends thinking and reasoning_effort as sibling top-level fields when both are set', async () => {
+      await provider.executeChat(
+        baseRequest({ thinking: true, effort: 'medium' }),
+      );
+
+      expect(captured?.thinking).toEqual({ type: 'enabled' });
+      expect(captured?.reasoning_effort).toBe('medium');
+      // reasoning_effort must not be nested inside thinking.
+      expect(captured?.thinking).not.toHaveProperty('reasoning_effort');
+    });
+
+    it('omits reasoning_effort when thinking is explicitly disabled, even if effort is also passed', async () => {
+      await provider.executeChat(
+        baseRequest({ thinking: false, effort: 'medium' }),
+      );
+
+      expect(captured?.thinking).toEqual({ type: 'disabled' });
+      expect(captured?.reasoning_effort).toBeUndefined();
+    });
+
+    it('sends reasoning_effort without a thinking field when only effort is given', async () => {
+      await provider.executeChat(baseRequest({ effort: 'high' }));
+
+      expect(captured?.thinking).toBeUndefined();
+      expect(captured?.reasoning_effort).toBe('high');
+    });
+
+    it('sends a thinking field without reasoning_effort when only thinking is given', async () => {
+      await provider.executeChat(baseRequest({ thinking: true }));
+
+      expect(captured?.thinking).toEqual({ type: 'enabled' });
+      expect(captured?.reasoning_effort).toBeUndefined();
+    });
   });
 });

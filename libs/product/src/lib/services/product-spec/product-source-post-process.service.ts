@@ -9,30 +9,44 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { isEmpty, omit, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
 
-const DEFAULT_MODEL = 'deepseek-v4-flash';
+/**
+ * TEMPORARY EXPERIMENT (2026-08-29): swapped from 'deepseek-v4-flash' to
+ * OpenAI's gpt-5.6-luna, to compare cost/accuracy against the DeepSeek
+ * baseline established earlier this session on the same two sources
+ * (ebikeshop, speedbike). Revert to 'deepseek-v4-flash' once compared.
+ */
+const DEFAULT_MODEL = 'gpt-5.6-luna';
 
 /**
  * Reasoning is left ON by default because the pass genuinely depends on it:
  * most sources publish a free-text OEM component list, and canonical fields
  * (motorPosition from a Bosch `BDU*` code, seatpostType from "FOX Transfer",
  * tubeless from a `TLE`/`TLR` token, equipment booleans from blank rows) exist
- * only as inferences over that text. It is capped at 'low' rather than left at
- * the provider default: a measured call spent 3052 output tokens on a response
- * whose JSON payload was ~200, nearly all of it internal reasoning
- * (docs/SpecUnificationAnalysis.md §5). Sources with an already-normalized
- * spec table should set `thinking: false` per-source instead.
+ * only as inferences over that text. Not sent explicitly — DeepSeek's
+ * reasoning models already default to thinking enabled
+ * (api-docs.deepseek.com/guides/thinking_mode), so omitting the field relies
+ * on that default rather than re-asserting it. Confirmed necessary by a
+ * direct `thinking: false` experiment (2026-08-29): cost dropped ~85%, but
+ * the model-spec call fabricated data — e.g. copying the motor model string
+ * verbatim into unrelated forkModel/rearShockModel/seatpost fields with a
+ * fabricated `forkTravel: 0`/`rearTravel: 0`, and silently dropping a
+ * weight correction (25 -> 25.9) that every reasoning-on run got right.
+ * Sources with an already-normalized spec table (no free-text inference
+ * needed) should set `thinking: false` per-source instead, which also
+ * suppresses `effort` (see runContributionCall) since DeepSeek has no
+ * "disabled reasoning at a specific effort" state.
+ *
+ * The two calls default to different effort levels: offer-identity has at
+ * most a handful of fields to reconcile (brand/model/one or two offer-level
+ * keys), so medium is plenty. model-spec reconciles the full non-offer-level
+ * field set (~50-90 fields) against deterministicSpecs/rawSpecs, and a
+ * medium-effort run measurably regressed on real data — e.g. a KTM source
+ * with a clearly-present display module coming back `display: false`, which
+ * low/medium runs got right previously (2026-08-29). Bumped to high for
+ * this call specifically until accuracy at medium is re-verified.
  */
-const DEFAULT_EFFORT = 'low';
-
-/**
- * Safety ceiling, not a tuning knob — sized to clear a fully-populated specs
- * object with room to spare (the ebikes golden sample is 92 fields, ~1.2k
- * output tokens) plus a bounded reasoning trace. Truncation fails JSON parsing
- * and degrades the whole pass to deterministic-only, so this must never bind
- * on a well-behaved call. Raised from 20000 after a source's reasoning trace
- * alone consumed the full previous ceiling (2026-08-28).
- */
-const DEFAULT_MAX_TOKENS = 40000;
+const DEFAULT_OFFER_IDENTITY_EFFORT = 'medium';
+const DEFAULT_MODEL_SPECS_EFFORT = 'high';
 
 /** Deterministic, pre-LLM view of a scraped product. */
 export interface DeterministicProductData {
@@ -159,7 +173,7 @@ export class ProductSourcePostProcessService {
       ),
       model: params.model,
       thinking: params.thinking,
-      effort: params.effort,
+      effort: params.effort ?? DEFAULT_OFFER_IDENTITY_EFFORT,
       maxTokens: params.maxTokens,
     });
     if (!response) return undefined;
@@ -218,7 +232,7 @@ export class ProductSourcePostProcessService {
       responseSchema: this.buildModelSpecResponseSchema(schema, offerLevelSpecs),
       model: params.model,
       thinking: params.thinking,
-      effort: params.effort,
+      effort: params.effort ?? DEFAULT_MODEL_SPECS_EFFORT,
       maxTokens: params.maxTokens,
     });
     if (!response) return undefined;
@@ -249,11 +263,13 @@ export class ProductSourcePostProcessService {
 
   /**
    * Shared request/response plumbing for both LLM calls: builds the chat
-   * request, applies the reasoning-effort default, guards against
-   * truncation, and degrades to `undefined` on any failure. Each public
-   * method supplies its own prompt/schema and interprets `response.parsed`
-   * itself, since the two calls sanitize/validate slightly differently
-   * (offer-identity checks brand/model/specs; model-spec only checks specs).
+   * request, guards against truncation, and degrades to `undefined` on any
+   * failure. Each public method resolves its own effort default
+   * (DEFAULT_OFFER_IDENTITY_EFFORT/DEFAULT_MODEL_SPECS_EFFORT) before
+   * calling in, and supplies its own prompt/schema and interprets
+   * `response.parsed` itself, since the two calls sanitize/validate
+   * slightly differently (offer-identity checks brand/model/specs;
+   * model-spec only checks specs).
    */
   private async runContributionCall(
     params: ContributionCallParams,
@@ -261,10 +277,13 @@ export class ProductSourcePostProcessService {
     const { systemPrompt, userMessage, responseSchema, model, thinking, effort, maxTokens } =
       params;
 
-    // `effort` implies reasoning is enabled, so only default it in when the
-    // caller hasn't explicitly turned reasoning off.
-    const resolvedEffort =
-      thinking === false ? undefined : (effort ?? DEFAULT_EFFORT);
+    // `thinking` is only forwarded when a caller explicitly sets it —
+    // DeepSeek's reasoning models already default to enabled, so leaving it
+    // unset relies on that default rather than re-asserting it. `effort`
+    // only takes effect while thinking is (implicitly or explicitly)
+    // enabled, so it's dropped when the caller has explicitly turned
+    // reasoning off, even if a per-call default was resolved upstream.
+    const resolvedEffort = thinking === false ? undefined : effort;
 
     try {
       const response = await this.aiChat.createChat({
@@ -274,7 +293,7 @@ export class ProductSourcePostProcessService {
         model: model ?? DEFAULT_MODEL,
         ...(thinking !== undefined && { thinking }),
         ...(resolvedEffort !== undefined && { effort: resolvedEffort }),
-        maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
+        ...(maxTokens !== undefined && { maxTokens }),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
@@ -282,14 +301,15 @@ export class ProductSourcePostProcessService {
         temperature: 1,
       });
 
-      // A response cut off by the token ceiling fails JSON parsing and would
+      // A response cut off by the provider's own token ceiling (or an
+      // explicit per-source maxTokens override) fails JSON parsing and would
       // otherwise be indistinguishable from a model that simply answered
       // badly — call it out so the cap is diagnosable rather than mysterious.
       if (response.finishReason === 'length') {
         this.logger.warn(
-          'Post-process response hit the token ceiling and was truncated, degrading to deterministic-only — consider raising maxTokens or lowering effort for this source',
+          'Post-process response hit the token ceiling and was truncated, degrading to deterministic-only — consider setting maxTokens or lowering effort for this source',
           {
-            maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
+            maxTokens,
             completionTokens: response.usage.completionTokens,
           },
         );
@@ -367,7 +387,7 @@ export class ProductSourcePostProcessService {
     return (
       `${this.buildTranslationPreamble(schema)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
       `Canonical spec fields (offer-level only — this call never touches product-identity fields):\n${fieldDescriptions}\n\n` +
-      `Worked example — correctly unified offer-level values for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
+      `Worked example — correctly unified offer-level values for this category:\n${JSON.stringify(goldenSubset)}\n\n` +
       `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), and "specs" (already deterministically mapped offer-level fields only). You may return any of "brand", "model", "specs" in your response — but only the ones you can confidently produce. Omit any field entirely rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
       `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and year — but first check whether any of these values are new information not already captured in "specs" (e.g. a frame size or color that only appears in the raw title). If so, add them to "specs" under the matching canonical field BEFORE removing them from "model" — the raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given model text is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
@@ -410,26 +430,24 @@ export class ProductSourcePostProcessService {
     goldenSample: ProductSpecs,
     offerLevelSpecs: string[],
   ): string {
-    const modelLevelKeys = Object.keys(schema.properties).filter(
-      (key) => !offerLevelSpecs.includes(key),
-    );
+    const modelLevelKeys = this.getModelLevelKeys(schema, offerLevelSpecs);
     const fieldDescriptions = this.buildFieldDescriptions(schema, modelLevelKeys);
     const goldenSubset = omit(goldenSample, offerLevelSpecs);
 
     return (
       `${this.buildTranslationPreamble(schema)}\n\n` +
       `Canonical spec fields (product-identity only — this call never touches brand/model or offer-level fields like size/color, which are handled by a separate pass):\n${fieldDescriptions}\n\n` +
-      `Worked example — a correctly unified specs output for this category:\n${JSON.stringify(goldenSubset, null, 2)}\n\n` +
+      `Worked example — a correctly unified specs output for this category, showing value/format conventions (real responses are usually much smaller — see the "specs" rule below):\n${JSON.stringify(goldenSubset)}\n\n` +
       `The user message has a "data" object with the already-known "brand", a "model" field (the source's raw, uncleaned model/title text — also referred to below as "rawModel"), "specs" (already deterministically mapped), and an "offerLevelSpecs" object of already-known offer-level values (size/color/etc.) — read-only context to help disambiguate product-identity fields, never something to output yourself. Return only the product-identity fields you can confidently produce; omit any field entirely rather than guessing.\n\n` +
       `Rules:\n` +
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes a free-text "description" instead of a single value).\n` +
-      `- Start from deterministicSpecs — those values are already correct (though possibly not yet translated to Hungarian — translate them), keep them unless rawSpecs or rawModel gives a more precise value for the same field.\n` +
+      `- deterministicSpecs is already merged in automatically after your response — you never need to repeat a value that's already correct there. Only include a key in your "specs" output when your value is NEW (the field is missing or empty in deterministicSpecs) or a CORRECTION (rawSpecs/rawModel clearly gives a more precise/different value than what deterministicSpecs has). If deterministicSpecs already has the right value for a field, omit that key entirely — do not echo it back.\n` +
       `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
       `- For a spec field with "allowed values" listed above, you MUST output one of those exact Hungarian strings — pick the closest semantic match to the source value, never invent a new label or leave the source-language value untranslated.\n` +
       `- Convert spec units/formats to match the golden example's style.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
       `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
-      `- Return a single JSON object with a "specs" key only (canonical field names, confidently-known ones only — omit fields you're unsure of). Never return "brand"/"model" — those are not part of this response.`
+      `- Return a single JSON object with a "specs" key only — new/corrected canonical fields only, never values already matching deterministicSpecs. Never return "brand"/"model" — those are not part of this response.`
     );
   }
 
@@ -437,9 +455,7 @@ export class ProductSourcePostProcessService {
     schema: SpecDefinitionJsonSchema,
     offerLevelSpecs: string[],
   ): unknown {
-    const modelLevelKeys = Object.keys(schema.properties).filter(
-      (key) => !offerLevelSpecs.includes(key),
-    );
+    const modelLevelKeys = this.getModelLevelKeys(schema, offerLevelSpecs);
     return {
       type: 'object',
       additionalProperties: false,
@@ -451,6 +467,15 @@ export class ProductSourcePostProcessService {
         },
       },
     };
+  }
+
+  private getModelLevelKeys(
+    schema: SpecDefinitionJsonSchema,
+    offerLevelSpecs: string[],
+  ): string[] {
+    return Object.keys(schema.properties).filter(
+      (key) => !offerLevelSpecs.includes(key),
+    );
   }
 
   // ─── Shared user-message + response-schema-property builders ───────────

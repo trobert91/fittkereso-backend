@@ -44,8 +44,9 @@ export class AiChatService {
         typeof firstMessageContent === 'string'
           ? firstMessageContent.slice(0, 200)
           : '[multimodal content]';
+      const paramsPreview = this.formatParamsPreview(request);
       this.logger.debug(
-        `Creating AI chat [${provider.name}:${request.model}]: ${preview}`,
+        `Creating AI chat [${provider.name}:${request.model}]${paramsPreview}: ${preview}`,
         {
           messages: request.messages,
           ...debugContext,
@@ -102,7 +103,7 @@ export class AiChatService {
 
       if (config.debug) {
         this.logger.debug(
-          `AI chat response received [${provider.name}:${request.model}]`,
+          `AI chat response received [${provider.name}:${request.model}]${this.formatParamsPreview(request)}`,
           {
             response: content,
             messages: request.messages,
@@ -199,6 +200,24 @@ export class AiChatService {
 
       throw error;
     }
+  }
+
+  /**
+   * Short `[key=value, ...]` suffix for the debug log message, surfacing the
+   * params that most affect cost/behavior (thinking, effort, maxTokens,
+   * temperature) directly in the message text — not just in the structured
+   * metadata object — so they're visible even when a log viewer only shows
+   * the message string at a glance. Omits a param entirely when unset,
+   * rather than printing `undefined`, since "not sent" is itself meaningful
+   * (e.g. thinking/maxTokens rely on the provider's own default).
+   */
+  private formatParamsPreview(request: AiChatRequest): string {
+    const parts: string[] = [];
+    if (request.thinking !== undefined) parts.push(`thinking=${request.thinking}`);
+    if (request.effort !== undefined) parts.push(`effort=${request.effort}`);
+    if (request.maxTokens !== undefined) parts.push(`maxTokens=${request.maxTokens}`);
+    if (request.temperature !== undefined) parts.push(`temperature=${request.temperature}`);
+    return parts.length ? ` [${parts.join(', ')}]` : '';
   }
 
   private buildResponse(params: {

@@ -209,6 +209,23 @@ describe('ProductSourcePostProcessService', () => {
       expect(callArgs.messages[0].content).not.toContain('Frame size');
     });
 
+    it('instructs the LLM to omit specs that already match deterministicSpecs, to keep responses diff-only', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processModelSpecs({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain(
+        'deterministicSpecs is already merged in automatically after your response',
+      );
+      expect(systemPrompt).toMatch(/omit that key entirely — do not echo it back/);
+    });
+
     it('never mentions brand/model cleanup instructions in the system prompt', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
@@ -253,7 +270,7 @@ describe('ProductSourcePostProcessService', () => {
       expect(userMessage.offerLevelSpecs).toBeUndefined();
     });
 
-    it('defaults to deepseek-v4-flash when no model override is given', async () => {
+    it('defaults to gpt-5.6-luna when no model override is given', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
@@ -264,11 +281,11 @@ describe('ProductSourcePostProcessService', () => {
       });
 
       expect(aiChat.createChat).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'deepseek-v4-flash' }),
+        expect.objectContaining({ model: 'gpt-5.6-luna' }),
       );
     });
 
-    it('caps reasoning at low effort and applies a token ceiling by default', async () => {
+    it('defaults to high effort, without asserting thinking or maxTokens explicitly', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
@@ -278,9 +295,10 @@ describe('ProductSourcePostProcessService', () => {
         offerLevelSpecs: [],
       });
 
-      expect(aiChat.createChat).toHaveBeenCalledWith(
-        expect.objectContaining({ effort: 'low', maxTokens: 20000 }),
-      );
+      const callArgs = aiChat.createChat.mock.calls[0][0];
+      expect(callArgs.thinking).toBeUndefined();
+      expect(callArgs.effort).toBe('high');
+      expect(callArgs.maxTokens).toBeUndefined();
     });
 
     it('forwards per-source reasoning overrides', async () => {
@@ -406,6 +424,22 @@ describe('ProductSourcePostProcessService', () => {
   });
 
   describe('processOfferIdentity', () => {
+    it('defaults to medium effort, without asserting thinking or maxTokens explicitly', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processOfferIdentity({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const callArgs = aiChat.createChat.mock.calls[0][0];
+      expect(callArgs.thinking).toBeUndefined();
+      expect(callArgs.effort).toBe('medium');
+      expect(callArgs.maxTokens).toBeUndefined();
+    });
+
     it('returns a corrected brand when the LLM confidently provides one', async () => {
       aiChat.createChat.mockResolvedValueOnce({
         content: JSON.stringify({ brand: 'KTM' }),
@@ -534,6 +568,32 @@ describe('ProductSourcePostProcessService', () => {
       });
 
       expect(result).toBeUndefined();
+    });
+
+    // Offer-identity has at most a couple of fields to output, so the
+    // diff-only "only include NEW/CORRECTED fields" contract used by
+    // processModelSpecs isn't applied here — it added reasoning overhead
+    // with no payload-size benefit on a call this small (measured
+    // 2026-08-29: completion tokens roughly tripled on real traffic with no
+    // offsetting savings, since there was rarely more than one field to
+    // omit in the first place).
+    it('does not use the diff-only contract — keeps the original "start from deterministicSpecs" instruction', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processOfferIdentity({
+        data: { brand: 'KTM', model: 'raw title', specs: {} },
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain(
+        'Start from deterministicSpecs — those values are already correct',
+      );
+      expect(systemPrompt).not.toContain(
+        'deterministicSpecs is already merged in automatically after your response',
+      );
     });
 
     it('never includes non-offer-level keys in the response schema', async () => {
