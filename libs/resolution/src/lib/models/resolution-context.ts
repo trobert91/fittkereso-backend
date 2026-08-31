@@ -1,4 +1,5 @@
 import type { MatchResult, ProductSpecs } from '@fittkereso-backend/database';
+import type { CandidateGateResult } from '../matching/quality-gates.service';
 import type { ProductResolutionInput } from './resolution-input';
 import type { ResolutionOptions } from './resolution-options';
 import type { ResolutionStatus } from './resolution-status';
@@ -205,6 +206,12 @@ export interface ResolutionContext {
    *  decision service reads them with `as` casts. */
   scoringInputParsed?: unknown;
   scoringMatchConfig?: unknown;
+  /** Full per-candidate gate pass/fail breakdown, populated by
+   *  `DecisionService.runMatcherFilter` via `QualityGatesService.evaluateAllCandidates`.
+   *  Transient — never persisted onto `ScrapeTask.resolutionContext` (the
+   *  resolution-flow recorder reads it directly to build each candidate's
+   *  persisted `gates` field on the `ProductResolution` row). */
+  candidateGateResults?: CandidateGateResult[];
 
   // ── Decision (Stage 6 output) ──────────────────────────────────────────────
   decision?: FinalDecision;

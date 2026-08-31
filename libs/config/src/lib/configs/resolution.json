@@ -2,6 +2,7 @@
   "embeddingSimilarityThreshold": 0.4,
   "embeddingResultLimit": 5,
   "webSearchRelevanceGate": 70,
+  "minScoreToRecord": 60,
   "matching": {
     "acceptThreshold": 70,
     "acceptThresholdStrict": 80,

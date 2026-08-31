@@ -6,9 +6,9 @@ import {
   ProductAliasRepository,
   ProductAliasSource,
   ProductCategory,
-  ProductDuplicateDecision,
-  ProductDuplicateOrigin,
-  ProductDuplicateRepository,
+  ProductResolutionDecision,
+  ProductResolutionFlow,
+  ProductResolutionOrigin,
   ProductEmbedding,
   ProductModel,
   ProductModelRepository,
@@ -17,6 +17,10 @@ import {
   ScrapeTask,
   ScrapeTaskRepository,
   Seller,
+} from '@fittkereso-backend/database';
+import type {
+  ProductResolutionCandidateRecord,
+  ProductDuplicateDetectionInputSnapshot,
 } from '@fittkereso-backend/database';
 import {
   ResolutionContext,
@@ -39,6 +43,7 @@ import {
   ProductImageCopyService,
   ProductMergeService,
   ProductNormalizerService,
+  ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
   SpecComparisonService,
 } from '@fittkereso-backend/product';
@@ -89,7 +94,7 @@ export class ProductScrapeUpdaterService {
     private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
-    private readonly duplicateRepo: ProductDuplicateRepository,
+    private readonly resolutionRecorder: ProductResolutionRecorderService,
     private readonly specComparison: SpecComparisonService,
   ) {}
 
@@ -577,10 +582,14 @@ export class ProductScrapeUpdaterService {
   // scrape-merge LLM decision considered a near-miss candidate but wasn't
   // confident enough to merge, the scraper still creates a new product (the
   // safe default — see extractPendingDuplicate) but also writes a
-  // ProductDuplicate row so a human can later confirm or reject a merge.
-  // Reuses the exact entity/repo/admin-UI the nightly dedup job already uses
-  // (ProductDuplicate has no scrape-specific shape) — the only addition is
-  // the `origin` tag distinguishing this from the nightly job's own pairs.
+  // ProductResolution row (flow=duplicate_detection) so a human can later
+  // confirm or reject a merge. Reuses the exact entity/repo/admin-UI the
+  // nightly dedup job already uses — the only addition is the `origin` tag
+  // distinguishing this from the nightly job's own pairs. Independently,
+  // `ResolutionService.search()`'s own automatic recording will also produce a
+  // passive flow=product_resolution row for this same llm_unresolved event —
+  // both are actionable, with deliberately different approve semantics (this
+  // one merges; the resolution-flow one is confirmation-only).
   private async writeScrapeAmbiguousDuplicate(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
@@ -590,7 +599,7 @@ export class ProductScrapeUpdaterService {
     try {
       const candidateModel = await this.productRepo.findOne({
         where: { id: pendingDuplicate.candidateProductId },
-        select: ['id', 'specs'],
+        select: ['id', 'specs', 'model', 'displayName'],
       });
       if (!candidateModel) {
         this.logger.warn(
@@ -617,14 +626,46 @@ export class ProductScrapeUpdaterService {
         ...(pendingDuplicate.reason ? [pendingDuplicate.reason] : []),
       ];
 
-      await this.duplicateRepo.upsertPair({
+      const candidates: ProductResolutionCandidateRecord[] = [
+        {
+          candidateId: candidateModel.id,
+          model: candidateModel.model,
+          displayName: candidateModel.displayName,
+          source: 'duplicate_detection_pair',
+          matchScore: pendingDuplicate.confidence,
+          gates: { passed: false, failedGates: ['llm_unresolved'] },
+          specMatchDetails,
+        },
+      ];
+      const inputSnapshot: ProductDuplicateDetectionInputSnapshot = {
+        kind: 'duplicate_detection',
+        query: {
+          model: newModel.model ?? '',
+          displayName: newModel.displayName,
+          aliases: [],
+          specs: newModel.specs,
+        },
+        candidate: {
+          model: candidateModel.model ?? '',
+          displayName: candidateModel.displayName,
+          aliases: [],
+          specs: candidateModel.specs,
+        },
+        categorySlug: scrapedProduct.category?.slug,
+        trigramScore: pendingDuplicate.confidence,
+      };
+
+      await this.resolutionRecorder.recordDuplicatePair({
+        flow: ProductResolutionFlow.duplicate_detection,
         productAId: newModel.id,
         productBId: candidateModel.id,
-        decision: ProductDuplicateDecision.pending_review,
+        decision: ProductResolutionDecision.pending_review,
         similarityScore: pendingDuplicate.confidence,
         specMatchDetails,
         pendingReasons: reasons,
-        origin: ProductDuplicateOrigin.scrape_time,
+        origin: ProductResolutionOrigin.scrape_time,
+        candidates,
+        inputSnapshot,
       });
 
       this.productMetricsService.scrapeResolutionOutcome(

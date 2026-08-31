@@ -11,7 +11,7 @@ export * from './product-source.entity';
 export * from './scrape-task.entity';
 export * from './task.entity';
 export * from './with-similarity';
-export * from './product-duplicate.entity';
+export * from './product-resolution.entity';
 export * from './translation-cache.entity';
 export * from './seller.entity';
 export * from './billing-info.entity';

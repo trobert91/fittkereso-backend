@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import {
   BrandSearchService,
   ProductDuplicationSearchService,
-  ProductDuplicateSearchService,
+  ProductResolutionSearchService,
   ProductSourceSearchService,
   ProductCategorySearchService,
   ProductSearchService,
@@ -19,7 +19,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
   providers: [
     BrandSearchService,
     ProductDuplicationSearchService,
-    ProductDuplicateSearchService,
+    ProductResolutionSearchService,
     ProductSourceSearchService,
     ProductCategorySearchService,
     ProductSearchService,
@@ -31,7 +31,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
   exports: [
     BrandSearchService,
     ProductDuplicationSearchService,
-    ProductDuplicateSearchService,
+    ProductResolutionSearchService,
     ProductSourceSearchService,
     ProductCategorySearchService,
     ProductSearchService,

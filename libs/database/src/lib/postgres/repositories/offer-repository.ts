@@ -43,7 +43,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   // Manual fetch-then-save (not repo.upsert()) because condition defaults
   // only on create, and lastSeenAt/active need business logic (always bumped
   // on every successful scrape sighting), not a blind column overwrite.
-  // Mirrors ProductDuplicateRepository.upsertPair's manual-fetch style.
+  // Mirrors ProductResolutionRepository.upsertPair's manual-fetch style.
   // `existing` is pre-resolved by the caller (OfferMatchingService, run
   // against a batch preload) rather than looked up here — see
   // ProductScrapeUpdaterService.createOrUpdateOffers.

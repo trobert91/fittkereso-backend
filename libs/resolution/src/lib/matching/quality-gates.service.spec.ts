@@ -841,6 +841,148 @@ describe('QualityGatesService', () => {
     });
   });
 
+  // ─── evaluateAllCandidates (full per-candidate gate breakdown) ─────────────
+
+  describe('evaluateAllCandidates', () => {
+    it('returns one result per candidate, not just survivors', () => {
+      const inputParsed = inputNormalization.parseModelCode(
+        'abc123',
+        DEFAULT_CONFIG,
+      );
+      const c1 = makeMatchResult({ candidateId: 'a', score: 95 });
+      const c2 = makeMatchResult({ candidateId: 'b', score: 91 });
+      const c3 = makeMatchResult({ candidateId: 'c', score: 75 }); // below top-gap floor (90)
+
+      const results = service.evaluateAllCandidates(
+        [c1, c2, c3],
+        inputParsed,
+        LOOSE_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+
+      expect(results).toHaveLength(3);
+      expect(results.find((r) => r.candidateId === 'a')?.passed).toBe(true);
+      expect(results.find((r) => r.candidateId === 'b')?.passed).toBe(true);
+      const rejected = results.find((r) => r.candidateId === 'c');
+      expect(rejected?.passed).toBe(false);
+      expect(rejected?.failedGates).toContain('low_confidence');
+    });
+
+    it('agrees with filterAcceptable on which candidates survive', () => {
+      const inputParsed = inputNormalization.parseModelCode(
+        'abc123',
+        DEFAULT_CONFIG,
+      );
+      const mismatchSpecs: SpecMatchDetails = {
+        ...CONFIRMED_SPECS,
+        primaryMismatches: 1,
+      };
+      const c1 = makeMatchResult({
+        candidateId: 'a',
+        score: 90,
+        specMatchDetails: mismatchSpecs,
+      });
+      const c2 = makeMatchResult({
+        candidateId: 'b',
+        score: 88,
+        specMatchDetails: CONFIRMED_SPECS,
+      });
+
+      const survivors = service.filterAcceptable(
+        [c1, c2],
+        inputParsed,
+        STRICT_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+      const results = service.evaluateAllCandidates(
+        [c1, c2],
+        inputParsed,
+        STRICT_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+
+      expect(survivors.map((s) => s.candidateId)).toEqual(
+        results.filter((r) => r.passed).map((r) => r.candidateId),
+      );
+      expect(results.find((r) => r.candidateId === 'a')?.failedGates).toEqual([
+        'primary_spec_mismatch',
+      ]);
+      expect(results.find((r) => r.candidateId === 'b')?.passed).toBe(true);
+    });
+
+    it('accumulates every failing gate for a candidate that trips more than one check', () => {
+      const inputParsed = inputNormalization.parseModelCode(
+        'abc123',
+        DEFAULT_CONFIG,
+      );
+      const mismatchSpecs: SpecMatchDetails = {
+        ...CONFIRMED_SPECS,
+        primaryMismatches: 1,
+      };
+      // Below the strict effective floor AND has a primary spec mismatch —
+      // filterAcceptable would just drop this candidate; evaluateAllCandidates
+      // must report BOTH reasons, not just the first one checked.
+      const c1 = makeMatchResult({
+        candidateId: 'a',
+        score: 50,
+        specMatchDetails: mismatchSpecs,
+      });
+
+      const results = service.evaluateAllCandidates(
+        [c1],
+        inputParsed,
+        STRICT_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+
+      expect(results[0].passed).toBe(false);
+      expect(results[0].failedGates).toEqual(
+        expect.arrayContaining(['low_confidence', 'primary_spec_mismatch']),
+      );
+    });
+
+    it('treats an exact alias match as passed regardless of score, matching filterAcceptable', () => {
+      const inputParsed = inputNormalization.parseModelCode(
+        'abc123',
+        DEFAULT_CONFIG,
+      );
+      const c1 = makeMatchResult({
+        candidateId: 'a',
+        score: 20,
+        components: {
+          stringSimilarity: 1.0,
+          tokenOverlap: 1.0,
+          alphaMatch: 1.0,
+        },
+      });
+
+      const results = service.evaluateAllCandidates(
+        [c1],
+        inputParsed,
+        LOOSE_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+
+      expect(results).toEqual([
+        { candidateId: 'a', passed: true, failedGates: [] },
+      ]);
+    });
+
+    it('returns empty for an empty input', () => {
+      const inputParsed = inputNormalization.parseModelCode(
+        'abc123',
+        DEFAULT_CONFIG,
+      );
+      const results = service.evaluateAllCandidates(
+        [],
+        inputParsed,
+        LOOSE_OPTIONS,
+        DEFAULT_CONFIG,
+      );
+      expect(results).toEqual([]);
+    });
+  });
+
   // ─── Reference-product variant resolution ──────────────────────────────────
 
   describe('evaluateAnchored', () => {

@@ -59,11 +59,23 @@ function makeStrategy(
   };
 }
 
-/** Build a fake QualityGatesService whose `filterAcceptable` returns a
- *  predetermined list. The decision service does no other interaction. */
+/** Build a fake QualityGatesService whose `filterAcceptable`/`evaluateAllCandidates`
+ *  agree on a predetermined "passed" set (`filtered`). `runMatcherFilter` calls
+ *  `evaluateAllCandidates`, not `filterAcceptable`, so that's the one that
+ *  actually drives behavior here. */
 function makeGates(filtered: MatchResult[]): QualityGatesService {
+  const passedIds = new Set(filtered.map((m) => m.candidateId));
   return {
     filterAcceptable: jest.fn().mockReturnValue(filtered),
+    evaluateAllCandidates: jest
+      .fn()
+      .mockImplementation((matches: MatchResult[]) =>
+        matches.map((m) => ({
+          candidateId: m.candidateId,
+          passed: passedIds.has(m.candidateId),
+          failedGates: passedIds.has(m.candidateId) ? [] : ['low_confidence'],
+        })),
+      ),
   } as unknown as QualityGatesService;
 }
 

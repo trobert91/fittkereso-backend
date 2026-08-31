@@ -154,7 +154,10 @@ export class DecisionService {
 
   /** Run the per-candidate accept filter. Falls back to an empty array when the
    *  scoring stage didn't run (no matches recorded) — callers treat that the
-   *  same as "no candidates above threshold". */
+   *  same as "no candidates above threshold". Also stashes the full
+   *  per-candidate gate breakdown onto `context.candidateGateResults` so the
+   *  resolution-flow recorder (`ProductResolutionRecorderService`, via
+   *  `ResolutionService`) can persist which gates each candidate passed/failed. */
   private runMatcherFilter(context: ResolutionContext) {
     const matches = context.scoringMatches;
     if (!matches || matches.length === 0) return [];
@@ -165,11 +168,21 @@ export class DecisionService {
       | CategoryMatchConfig
       | undefined;
     if (!inputParsed || !matchConfig) return [];
-    return this.qualityGates.filterAcceptable(
+
+    const gateResults = this.qualityGates.evaluateAllCandidates(
       matches,
       inputParsed,
       context.options,
       matchConfig,
     );
+    context.candidateGateResults = gateResults;
+
+    const passedIds = new Set(
+      gateResults.filter((result) => result.passed).map((result) => result.candidateId),
+    );
+    // `matches` is already in descending-score order (see its doc comment on
+    // `ResolutionContext`), same as `evaluateAllCandidates`'s internal sort —
+    // filtering it directly preserves that order without re-sorting.
+    return matches.filter((match) => passedIds.has(match.candidateId));
   }
 }

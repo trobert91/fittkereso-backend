@@ -15,6 +15,12 @@ export interface QualityGateResult {
   failedGates: string[];
 }
 
+export interface CandidateGateResult {
+  candidateId: string;
+  passed: boolean;
+  failedGates: string[];
+}
+
 /**
  * Quality gates the matcher applies to the best candidate before accepting it.
  *
@@ -160,88 +166,168 @@ export class QualityGatesService {
   ): MatchResult[] {
     if (candidates.length === 0) return [];
 
+    const { sorted, effectiveFloor } = this.prepareCandidates(
+      candidates,
+      options,
+    );
+    const candidateSuffixCache = new Map<string, ParsedModelCode>();
+
+    return sorted.filter(
+      (candidate) =>
+        this.evaluateCandidateGates(
+          candidate,
+          effectiveFloor,
+          inputParsed,
+          options,
+          config,
+          candidateSuffixCache,
+        ).passed,
+    );
+  }
+
+  /**
+   * Full per-candidate gate breakdown for the multi-candidate path — every
+   * gate a candidate tripped (not just the first blocking one, unlike
+   * `filterAcceptable`'s early-return filter), so a persisted record can show
+   * the complete picture. Shares the same gate logic as `filterAcceptable`
+   * via `evaluateCandidateGates`; only the accumulation behavior differs.
+   */
+  evaluateAllCandidates(
+    candidates: ReadonlyArray<MatchResult>,
+    inputParsed: ParsedModelCode,
+    options: ResolutionOptions,
+    config: CategoryMatchConfig,
+  ): CandidateGateResult[] {
+    if (candidates.length === 0) return [];
+
+    const { sorted, effectiveFloor } = this.prepareCandidates(
+      candidates,
+      options,
+    );
+    const candidateSuffixCache = new Map<string, ParsedModelCode>();
+
+    return sorted.map((candidate) =>
+      this.evaluateCandidateGates(
+        candidate,
+        effectiveFloor,
+        inputParsed,
+        options,
+        config,
+        candidateSuffixCache,
+      ),
+    );
+  }
+
+  /** Shared setup for the multi-candidate gate methods: sort by score
+   *  descending and compute the effective accept floor (mode-aware threshold,
+   *  widened by the ambiguity gap below the top score). */
+  private prepareCandidates(
+    candidates: ReadonlyArray<MatchResult>,
+    options: ResolutionOptions,
+  ): { sorted: MatchResult[]; effectiveFloor: number } {
     const cfg = this.matchingConfig.config;
     const threshold =
       options.mode === 'strict'
         ? cfg.acceptThresholdStrict
         : cfg.acceptThreshold;
-    const ambiguityGap = cfg.ambiguityGap;
 
     const sorted = sortBy(candidates, (c) => -c.score);
     const topScore = sorted[0].score;
-    const effectiveFloor = Math.max(threshold, topScore - ambiguityGap);
+    const effectiveFloor = Math.max(threshold, topScore - cfg.ambiguityGap);
+    return { sorted, effectiveFloor };
+  }
+
+  /** Runs every per-candidate side condition `filterAcceptable`/
+   *  `evaluateAllCandidates` apply, accumulating ALL failing gate names rather
+   *  than stopping at the first one — the shared logic behind both public
+   *  methods; only what each does with the result differs (filter vs report). */
+  private evaluateCandidateGates(
+    candidate: MatchResult,
+    effectiveFloor: number,
+    inputParsed: ParsedModelCode,
+    options: ResolutionOptions,
+    config: CategoryMatchConfig,
+    candidateSuffixCache: Map<string, ParsedModelCode>,
+  ): CandidateGateResult {
+    // Exact alias match → keep unless strict mode + spec mismatch (matches
+    // `evaluate` rule 1's behavior, applied per-candidate).
+    if (candidate.components.stringSimilarity === 1.0) {
+      const hasSpecMismatch =
+        candidate.specMatchDetails &&
+        candidate.specMatchDetails.primaryMismatches > 0;
+      if (!hasSpecMismatch || options.mode !== 'strict') {
+        return { candidateId: candidate.candidateId, passed: true, failedGates: [] };
+      }
+      return {
+        candidateId: candidate.candidateId,
+        passed: false,
+        failedGates: ['primary_spec_mismatch'],
+      };
+    }
+
+    const failedGates: string[] = [];
+
+    // (a) + (b): combined floor.
+    if (candidate.score < effectiveFloor) {
+      failedGates.push('low_confidence');
+    }
+
+    // Strict-mode per-candidate side conditions.
     const maxMatcherMismatches = config.maxMatcherSpecMismatches ?? 2;
-    const candidateSuffixCache = new Map<string, ParsedModelCode>();
-
-    return sorted.filter((candidate) => {
-      // Exact alias match → keep unless strict mode + spec mismatch (matches
-      // `evaluate` rule 1's behavior, applied per-candidate).
-      if (candidate.components.stringSimilarity === 1.0) {
-        const hasSpecMismatch =
-          candidate.specMatchDetails &&
-          candidate.specMatchDetails.primaryMismatches > 0;
-        if (!hasSpecMismatch || options.mode !== 'strict') {
-          return true;
-        }
-        return false;
-      }
-
-      // (a) + (b): combined floor.
-      if (candidate.score < effectiveFloor) return false;
-
-      // Strict-mode per-candidate side conditions.
-      if (options.mode === 'strict') {
-        if (
-          candidate.specMatchDetails &&
-          candidate.specMatchDetails.primaryMismatches > 0
-        ) {
-          return false;
-        }
-        if (
-          candidate.specMatchDetails &&
-          candidate.specMatchDetails.matcherSpecMismatches >
-            maxMatcherMismatches
-        ) {
-          return false;
-        }
-      }
-
-      // Critical numeric gate — applies in both modes, with spec confirmation
-      // override (matches `evaluate` rule 5).
-      if (!isEmpty(inputParsed.criticalNumericTokens)) {
-        const candidateParsed = this.parseCandidate(
-          candidate.alias,
-          config,
-          candidateSuffixCache,
-        );
-        const hitRatio = this.calculateCriticalNumericHitRatio(
-          inputParsed,
-          candidateParsed,
-        );
-        if (hitRatio < 1.0 && !this.hasSpecConfirmation(candidate, undefined)) {
-          return false;
-        }
-      }
-
-      // Strict-mode suffix-alpha gate (matches `evaluate` rule 6).
+    if (options.mode === 'strict') {
       if (
-        options.mode === 'strict' &&
-        !isEmpty(inputParsed.suffixAlphaTokens)
+        candidate.specMatchDetails &&
+        candidate.specMatchDetails.primaryMismatches > 0
       ) {
-        const candidateParsed = this.parseCandidate(
-          candidate.alias,
-          config,
-          candidateSuffixCache,
-        );
-        const candidateSuffixSet = new Set(candidateParsed.suffixAlphaTokens);
-        const allSuffixAlphasMatch = inputParsed.suffixAlphaTokens.every(
-          (token) => candidateSuffixSet.has(token),
-        );
-        if (!allSuffixAlphasMatch) return false;
+        failedGates.push('primary_spec_mismatch');
       }
+      if (
+        candidate.specMatchDetails &&
+        candidate.specMatchDetails.matcherSpecMismatches >
+          maxMatcherMismatches
+      ) {
+        failedGates.push('matcher_spec_mismatch');
+      }
+    }
 
-      return true;
-    });
+    // Critical numeric gate — applies in both modes, with spec confirmation
+    // override (matches `evaluate` rule 5).
+    if (!isEmpty(inputParsed.criticalNumericTokens)) {
+      const candidateParsed = this.parseCandidate(
+        candidate.alias,
+        config,
+        candidateSuffixCache,
+      );
+      const hitRatio = this.calculateCriticalNumericHitRatio(
+        inputParsed,
+        candidateParsed,
+      );
+      if (hitRatio < 1.0 && !this.hasSpecConfirmation(candidate, undefined)) {
+        failedGates.push('critical_numeric_mismatch');
+      }
+    }
+
+    // Strict-mode suffix-alpha gate (matches `evaluate` rule 6).
+    if (options.mode === 'strict' && !isEmpty(inputParsed.suffixAlphaTokens)) {
+      const candidateParsed = this.parseCandidate(
+        candidate.alias,
+        config,
+        candidateSuffixCache,
+      );
+      const candidateSuffixSet = new Set(candidateParsed.suffixAlphaTokens);
+      const allSuffixAlphasMatch = inputParsed.suffixAlphaTokens.every(
+        (token) => candidateSuffixSet.has(token),
+      );
+      if (!allSuffixAlphasMatch) {
+        failedGates.push('suffix_alpha_mismatch');
+      }
+    }
+
+    return {
+      candidateId: candidate.candidateId,
+      passed: isEmpty(failedGates),
+      failedGates,
+    };
   }
 
   /** Parse + cache a candidate's alias once per filterAcceptable call, since

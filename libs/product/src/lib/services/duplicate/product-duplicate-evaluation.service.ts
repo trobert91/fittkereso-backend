@@ -3,13 +3,18 @@ import {
   ProductAlias,
   ProductAliasSource,
   ProductCategoryRepository,
-  ProductDuplicateDecision,
-  ProductDuplicateOrigin,
-  ProductDuplicateRepository,
+  ProductResolutionDecision,
+  ProductResolutionFlow,
+  ProductResolutionOrigin,
+  ProductResolutionRepository,
   ProductModelRepository,
   ProductAliasRepository,
 } from '@fittkereso-backend/database';
-import type { SpecMatchDetails } from '@fittkereso-backend/database';
+import type {
+  SpecMatchDetails,
+  ProductResolutionCandidateRecord,
+  ProductDuplicateDetectionInputSnapshot,
+} from '@fittkereso-backend/database';
 import { SCHEDULING_DEFAULTS } from '@fittkereso-backend/config';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { DuplicateDetectionMetricsService } from '@fittkereso-backend/metrics';
@@ -19,6 +24,7 @@ import { normalize } from '@fittkereso-backend/utils';
 import { isEmpty, isNil } from 'lodash';
 import { ProductSimilarityService } from '../similarity/product-similarity.service';
 import { ProductMergeService } from '../merge/product-merge.service';
+import { ProductResolutionRecorderService } from '../resolution/product-resolution-recorder.service';
 import type { DuplicatePairItem } from '@fittkereso-backend/search';
 
 const MIN_SIMILARITY_FLOOR = 40;
@@ -34,9 +40,11 @@ interface DuplicateDetectionConfig {
 }
 
 interface PairEvaluation {
-  decision: ProductDuplicateDecision | 'skip';
+  decision: ProductResolutionDecision | 'skip';
   reasons: string[];
   specMatchDetails?: SpecMatchDetails;
+  candidates?: ProductResolutionCandidateRecord[];
+  inputSnapshot?: ProductDuplicateDetectionInputSnapshot;
 }
 
 export interface DuplicateDetectionRunSummary {
@@ -56,7 +64,7 @@ export class ProductDuplicateEvaluationService {
 
   constructor(
     private readonly duplicationSearchService: ProductDuplicationSearchService,
-    private readonly duplicateRepo: ProductDuplicateRepository,
+    private readonly duplicateRepo: ProductResolutionRepository,
     private readonly mergeService: ProductMergeService,
     private readonly categoryRepo: ProductCategoryRepository,
     private readonly productRepo: ProductModelRepository,
@@ -64,6 +72,7 @@ export class ProductDuplicateEvaluationService {
     private readonly dynamicConfigService: DynamicConfigService,
     private readonly metricsService: DuplicateDetectionMetricsService,
     private readonly productSimilarity: ProductSimilarityService,
+    private readonly resolutionRecorder: ProductResolutionRecorderService,
   ) {}
 
   public async processAllCategories(
@@ -206,15 +215,20 @@ export class ProductDuplicateEvaluationService {
         pair.similarityScore,
       );
 
-      // Record the decision — use in-process score as similarityScore
-      const saved = await this.duplicateRepo.upsertPair({
+      // Record the decision — use in-process score as similarityScore. Routed
+      // through the shared recorder so this write passes through the same
+      // `resolution.minScoreToRecord` gate the resolution flow uses.
+      const saved = await this.resolutionRecorder.recordDuplicatePair({
+        flow: ProductResolutionFlow.duplicate_detection,
         productAId: pair.productA.id,
         productBId: pair.productB.id,
         decision: evaluation.decision,
         similarityScore: evaluation.inProcessScore ?? pair.similarityScore,
         specMatchDetails: evaluation.specMatchDetails,
         pendingReasons: evaluation.reasons,
-        origin: ProductDuplicateOrigin.nightly_detection,
+        origin: ProductResolutionOrigin.nightly_detection,
+        candidates: evaluation.candidates,
+        inputSnapshot: evaluation.inputSnapshot,
       });
 
       if (!saved) {
@@ -224,7 +238,7 @@ export class ProductDuplicateEvaluationService {
       }
 
       if (
-        evaluation.decision === ProductDuplicateDecision.auto_merged &&
+        evaluation.decision === ProductResolutionDecision.auto_accepted &&
         mergesRemaining > 0
       ) {
         const merged = await this.executeMerge(
@@ -238,7 +252,7 @@ export class ProductDuplicateEvaluationService {
           this.metricsService.autoMerged(categoryName);
         }
       } else if (
-        evaluation.decision === ProductDuplicateDecision.pending_review
+        evaluation.decision === ProductResolutionDecision.pending_review
       ) {
         pendingReview++;
         this.metricsService.pendingReview(categoryName);
@@ -263,10 +277,10 @@ export class ProductDuplicateEvaluationService {
       productB.id,
     );
     if (existing) {
-      const terminalDecisions: ProductDuplicateDecision[] = [
-        ProductDuplicateDecision.rejected,
-        ProductDuplicateDecision.auto_merged,
-        ProductDuplicateDecision.approved,
+      const terminalDecisions: ProductResolutionDecision[] = [
+        ProductResolutionDecision.rejected,
+        ProductResolutionDecision.auto_accepted,
+        ProductResolutionDecision.approved,
       ];
       if (terminalDecisions.includes(existing.decision)) {
         return { decision: 'skip', reasons: ['already_processed'] };
@@ -329,12 +343,14 @@ export class ProductDuplicateEvaluationService {
     const belowThreshold = inProcessScore < config.autoMergeThreshold;
 
     const pendingReasons: string[] = [];
+    const failedGates: string[] = [];
 
     // 4. Primary spec mismatch
     if (specMatchDetails && specMatchDetails.primaryMismatches > 0) {
       pendingReasons.push(
         `${specMatchDetails.primaryMismatches} primary spec mismatch(es)`,
       );
+      failedGates.push('primary_spec_mismatch');
     }
 
     // 5. Too many non-primary mismatches
@@ -345,13 +361,53 @@ export class ProductDuplicateEvaluationService {
       pendingReasons.push(
         `${specMatchDetails.nonPrimaryMismatches} non-primary mismatches > ${config.maxNonPrimaryMismatches}`,
       );
+      failedGates.push('non_primary_mismatch_limit_exceeded');
+    }
+
+    if (belowThreshold) {
+      failedGates.push('below_auto_merge_threshold');
     }
 
     const needsReview = belowThreshold || !isEmpty(pendingReasons);
 
+    // Normalized single-candidate + input shape shared with the resolution
+    // flow's own `candidates`/`gates`/`inputSnapshot` vocabulary — this is what
+    // makes duplicate-detection rows genuinely comparable to resolution rows.
+    const candidates: ProductResolutionCandidateRecord[] = [
+      {
+        candidateId: candidate.id,
+        brand: candidate.brandName,
+        model: candidate.model,
+        displayName: candidate.displayName,
+        source: 'duplicate_detection_pair',
+        matchScore: inProcessScore,
+        matchComponents: similarityResult.components,
+        gates: { passed: !needsReview, failedGates },
+        specMatchDetails,
+      },
+    ];
+    const inputSnapshot: ProductDuplicateDetectionInputSnapshot = {
+      kind: 'duplicate_detection',
+      query: {
+        model: query.model ?? '',
+        displayName: query.displayName,
+        aliases: queryAliases,
+        specs: query.specs,
+      },
+      candidate: {
+        model: candidate.model ?? '',
+        displayName: candidate.displayName,
+        aliases: candidateAliases,
+        specs: candidate.specs,
+      },
+      brandName: query.brandName || candidate.brandName,
+      categorySlug,
+      trigramScore,
+    };
+
     if (needsReview) {
       return {
-        decision: ProductDuplicateDecision.pending_review,
+        decision: ProductResolutionDecision.pending_review,
         reasons: belowThreshold
           ? [
               `in-process score ${inProcessScore} below threshold ${config.autoMergeThreshold}`,
@@ -360,15 +416,19 @@ export class ProductDuplicateEvaluationService {
           : pendingReasons,
         specMatchDetails,
         inProcessScore,
+        candidates,
+        inputSnapshot,
       };
     }
 
     // All checks pass
     return {
-      decision: ProductDuplicateDecision.auto_merged,
+      decision: ProductResolutionDecision.auto_accepted,
       reasons: ['all_checks_passed'],
       specMatchDetails,
       inProcessScore,
+      candidates,
+      inputSnapshot,
     };
   }
 

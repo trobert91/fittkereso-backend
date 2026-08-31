@@ -3,7 +3,6 @@ import {
   OfferRepository,
   ProductAliasRepository,
   ProductCategory,
-  ProductDuplicateRepository,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecordRepository,
@@ -20,6 +19,7 @@ import type {
   ProductImageCopyService,
   ProductMergeService,
   ProductNormalizerService,
+  ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
   SpecComparisonService,
@@ -121,7 +121,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
-  let mockDuplicateRepo: jest.Mocked<ProductDuplicateRepository>;
+  let mockResolutionRecorder: jest.Mocked<ProductResolutionRecorderService>;
   let mockSpecComparison: jest.Mocked<SpecComparisonService>;
 
   beforeEach(() => {
@@ -207,9 +207,10 @@ describe('ProductScrapeUpdaterService', () => {
       getConfig: jest.fn().mockReturnValue(undefined),
     } as unknown as jest.Mocked<CategoryConfigService>;
 
-    mockDuplicateRepo = {
-      upsertPair: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<ProductDuplicateRepository>;
+    mockResolutionRecorder = {
+      recordDuplicatePair: jest.fn().mockResolvedValue(undefined),
+      recordResolution: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<ProductResolutionRecorderService>;
 
     mockSpecComparison = {
       compareSpecs: jest.fn().mockReturnValue({
@@ -238,7 +239,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
-      mockDuplicateRepo,
+      mockResolutionRecorder,
       mockSpecComparison,
     );
   });

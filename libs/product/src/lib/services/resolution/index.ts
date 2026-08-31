@@ -5,5 +5,6 @@ export * from './offer-matching.service';
 export * from './product-alias-auto-create.service';
 export * from './product-embedding-match.service';
 export * from './product-fuzzy-search.service';
+export * from './product-resolution-recorder.service';
 export * from './product-web-search.service';
 export * from './seller-resolution.service';

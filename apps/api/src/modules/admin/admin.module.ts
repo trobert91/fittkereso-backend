@@ -11,7 +11,7 @@ import { AdminTaskController } from './controllers/admin-task.controller';
 import { AdminTestController } from './controllers/admin-test.controller';
 import { AdminProductSourceController } from './controllers/admin-product-source.controller';
 import { AdminScrapeTaskController } from './controllers/admin-scrape-task.controller';
-import { AdminDuplicateController } from './controllers/admin-duplicate.controller';
+import { AdminResolutionController } from './controllers/admin-resolution.controller';
 import { AdminSellerController } from './controllers/admin-seller.controller';
 
 @Module({
@@ -31,7 +31,7 @@ import { AdminSellerController } from './controllers/admin-seller.controller';
     AdminSellerController,
     AdminTaskController,
     AdminTestController,
-    AdminDuplicateController,
+    AdminResolutionController,
   ],
 })
 export class AdminModule {}

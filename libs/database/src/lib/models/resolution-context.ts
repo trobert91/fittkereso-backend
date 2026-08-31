@@ -33,6 +33,11 @@ export interface ResolutionOptions {
   useEmbedding: boolean;
   webSearchEnabled: boolean;
   mode: 'strict' | 'loose';
+  /** Mirrors `libs/resolution`'s runtime `ResolutionOptions` (which has this
+   *  field); added here so a persisted `inputSnapshot.options` can capture the
+   *  actual options a call used, e.g. scrape-time's LLM merge-decision fallback. */
+  llmDecisionEnabled?: boolean;
+  decisionStrategy?: 'comment' | 'scrape-merge';
 }
 
 // ─── Phase outcomes ──────────────────────────────────────────────────────────

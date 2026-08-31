@@ -33,8 +33,8 @@ export type ScrapeResolutionOutcome =
    *  not confident enough to merge — falls through to `new_product`, and also
    *  produces a `scrape_ambiguous_pending_review` duplicate-record write. */
   | 'llm_merge_reject'
-  /** A `ProductDuplicate` row was written for human review after an
-   *  `llm_merge_reject` outcome. */
+  /** A `ProductResolution` row (flow=duplicate_detection) was written for
+   *  human review after an `llm_merge_reject` outcome. */
   | 'scrape_ambiguous_pending_review';
 
 @Injectable()

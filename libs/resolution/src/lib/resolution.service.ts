@@ -1,6 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import type { ChatTraceData } from '@fittkereso-backend/debug';
+import {
+  ProductResolutionDecision,
+  ProductResolutionFlow,
+} from '@fittkereso-backend/database';
+import type {
+  CreateProductResolutionParams,
+  ProductResolutionCandidateRecord,
+  ProductResolutionInputSnapshot,
+  ProductResolutionDecisionSnapshot,
+} from '@fittkereso-backend/database';
+import { ProductResolutionRecorderService } from '@fittkereso-backend/product';
 import type { ResolutionContext } from './models/resolution-context';
 import type { ProductResolutionInput } from './models/resolution-input';
 import type { ResolutionOptions } from './models/resolution-options';
@@ -56,6 +67,7 @@ export class ResolutionService {
     private readonly scoringService: ScoringService,
     private readonly decisionService: DecisionService,
     private readonly finalizeService: FinalizeService,
+    private readonly resolutionRecorder: ProductResolutionRecorderService,
   ) {}
 
   async search(
@@ -90,11 +102,13 @@ export class ResolutionService {
       context.status = ResolutionStatus.RESOLVED;
       context.totals.durationMs = Date.now() - startedAt;
       this.logResolutionSummary(context, logContext);
-      return {
+      const earlyResult: ResolutionResult = {
         resolvedModel: product,
         context,
         confidence: referenceResult.confidence,
       };
+      await this.recordResolution(context, earlyResult, logContext);
+      return earlyResult;
     }
 
     // ── Stage 2 — brand + category (skipped when stage 1 populated them) ────
@@ -141,7 +155,107 @@ export class ResolutionService {
 
     context.totals.durationMs = Date.now() - startedAt;
     this.logResolutionSummary(context, logContext);
+    await this.recordResolution(context, result, logContext);
     return result;
+  }
+
+  /**
+   * Persists a `ProductResolution` row (flow=product_resolution) for this
+   * decision via the shared `ProductResolutionRecorderService`, gated by
+   * `resolution.minScoreToRecord` inside the recorder. Called from both
+   * return paths (Stage-1 reference short-circuit and the normal 7-stage
+   * path) so every caller of `search()` — scrape-time resolution, the ad-hoc
+   * admin test endpoint, anything else — is covered automatically. Never
+   * throws: a recording failure must not fail the resolution call itself.
+   */
+  private async recordResolution(
+    context: ResolutionContext,
+    result: ResolutionResult,
+    logContext?: Record<string, string>,
+  ): Promise<void> {
+    try {
+      const params = this.buildResolutionRecordParams(context, result);
+      await this.resolutionRecorder.recordResolution(params);
+    } catch (error: unknown) {
+      this.logger.warn('Failed to record ProductResolution, continuing', {
+        error: error instanceof Error ? error.message : String(error),
+        ...logContext,
+      });
+    }
+  }
+
+  private buildResolutionRecordParams(
+    context: ResolutionContext,
+    result: ResolutionResult,
+  ): CreateProductResolutionParams {
+    const gatingScore =
+      context.scoring?.bestCandidate?.score ?? context.decision?.confidence ?? 0;
+
+    const decision =
+      context.decision?.kind === 'matcher_accept' ||
+      context.decision?.kind === 'llm_resolved'
+        ? ProductResolutionDecision.auto_accepted
+        : ProductResolutionDecision.pending_review;
+
+    const gatesByCandidateId = new Map(
+      (context.candidateGateResults ?? []).map((gate) => [
+        gate.candidateId,
+        gate,
+      ]),
+    );
+    const specMatchByCandidateId = new Map(
+      (context.scoringMatches ?? []).map((match) => [
+        match.candidateId,
+        match.specMatchDetails,
+      ]),
+    );
+
+    const candidates: ProductResolutionCandidateRecord[] = context.candidates.map(
+      (candidate) => ({
+        candidateId: candidate.productId,
+        brand: candidate.brand,
+        model: candidate.model,
+        displayName: candidate.displayName,
+        source: candidate.source,
+        matchScore: candidate.matchScore,
+        matchComponents: candidate.matchComponents,
+        gates: gatesByCandidateId.get(candidate.productId) ?? {
+          passed: false,
+          failedGates: [],
+        },
+        specMatchDetails: specMatchByCandidateId.get(candidate.productId),
+      }),
+    );
+
+    const inputSnapshot: ProductResolutionInputSnapshot = {
+      kind: 'product_resolution',
+      input: context.input,
+      options: context.options,
+      referenceProduct: context.referenceProduct,
+      effectiveMatchSpecs: context.effectiveMatchSpecs,
+      brand: context.brand,
+      category: context.category,
+    };
+
+    const decisionSnapshot: ProductResolutionDecisionSnapshot | undefined =
+      context.decision && {
+        kind: context.decision.kind,
+        confidence: context.decision.confidence,
+        reason: context.decision.reason,
+        selectedCandidates: context.decision.selectedCandidates,
+        evidenceSummary: context.decision.evidenceSummary,
+      };
+
+    return {
+      flow: ProductResolutionFlow.product_resolution,
+      decision,
+      similarityScore: gatingScore,
+      resolvedProductId: result.resolvedModel?.id,
+      specMatchDetails: candidates[0]?.specMatchDetails,
+      candidates,
+      inputSnapshot,
+      decisionSnapshot,
+    };
   }
 
   /**

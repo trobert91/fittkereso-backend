@@ -136,6 +136,13 @@ export interface DynamicConfigData {
     embeddingResultLimit?: number;
     /** Minimum reference relevance to trigger a web search during product resolution */
     webSearchRelevanceGate?: number;
+    /** Minimum decision score (0-100) a resolution OR duplicate-detection
+     *  decision must clear before a `ProductResolution` row is persisted at
+     *  all — shared by both flows via `ProductResolutionRecorderService`.
+     *  Orthogonal to `matching.acceptThreshold`/`scheduling.duplicateDetection`
+     *  thresholds, which decide the underlying business outcome; this only
+     *  decides whether an already-made decision gets logged. Default: 60 */
+    minScoreToRecord?: number;
     matching?: {
       acceptThreshold?: number;
       acceptThresholdStrict?: number;
@@ -435,6 +442,14 @@ export const dynamicConfigSchema = {
           description:
             'Minimum reference relevance to trigger a web search during product resolution. Default: 70',
           default: 70,
+        },
+        minScoreToRecord: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description:
+            'Minimum decision score (0-100) to persist a ProductResolution row, shared by both the resolution and duplicate-detection flows. Default: 60',
+          default: 60,
         },
         search: {
           type: 'object',

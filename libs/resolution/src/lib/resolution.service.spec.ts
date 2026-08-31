@@ -17,6 +17,13 @@ import type {
   FinalDecision,
 } from './models/resolution-context';
 import type { ResolutionResult } from './models/resolution-result';
+import type { ProductResolutionRecorderService } from '@fittkereso-backend/product';
+
+function makeResolutionRecorder(): ProductResolutionRecorderService {
+  return {
+    recordResolution: jest.fn().mockResolvedValue(null),
+  } as unknown as ProductResolutionRecorderService;
+}
 
 function makeReferenceResolver(
   result: ReferenceResult | null,
@@ -98,6 +105,7 @@ describe('ResolutionService.search()', () => {
       scoringService,
       decisionService,
       finalizeService,
+      makeResolutionRecorder(),
     );
 
     const result = await service.search(
@@ -166,6 +174,7 @@ describe('ResolutionService.search()', () => {
       scoringService,
       decisionService,
       finalizeService,
+      makeResolutionRecorder(),
     );
 
     const result = await service.search(
@@ -224,6 +233,7 @@ describe('ResolutionService.search()', () => {
       scoringService,
       decisionService,
       finalizeService,
+      makeResolutionRecorder(),
     );
 
     const result = await service.search(
@@ -335,6 +345,7 @@ describe('ResolutionService.search()', () => {
         { score: scoreMock } as unknown as ScoringService,
         { decide: decideMock } as unknown as DecisionService,
         makeFinalize(finalResult),
+        makeResolutionRecorder(),
       );
 
       return { service, recallMock, filterMock, scoreMock, decideMock };
@@ -463,6 +474,7 @@ describe('ResolutionService.search()', () => {
           context: {} as ResolutionContext,
           confidence: 0,
         }),
+        makeResolutionRecorder(),
       );
 
       await service.search(
@@ -511,6 +523,7 @@ describe('ResolutionService.search()', () => {
           context: {} as ResolutionContext,
           confidence: 0,
         }),
+        makeResolutionRecorder(),
       );
 
       const result = await service.search(
@@ -544,6 +557,7 @@ describe('ResolutionService.search()', () => {
       makeStage<ScoringService>('score'),
       makeStage<DecisionService>('decide'),
       makeStage<FinalizeService>('finalize'),
+      makeResolutionRecorder(),
     );
 
     const result = await service.search(
