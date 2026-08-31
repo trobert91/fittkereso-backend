@@ -66,13 +66,31 @@ describe('resolution list serialization', () => {
       },
     ];
 
+    resolution.sourceRecord = makeSourceRecord();
+
+    return resolution;
+  };
+
+  const makeSourceRecord = (): ProductSourceRecord => {
     const sourceRecord = new ProductSourceRecord();
     sourceRecord.id = 'record-1';
     sourceRecord.url = 'https://example.test/listing/9';
     sourceRecord.model = makeProduct('product-1', 'Sony WH-1000XM5');
-    resolution.sourceRecord = sourceRecord;
-
-    return resolution;
+    sourceRecord.scrapedProduct = {
+      brand: 'Sony',
+      model: 'WH-1000XM5',
+      displayName: 'Sony WH-1000XM5',
+      originalName: 'Sony WH-1000XM5 Vezeték nélküli fejhallgató, fekete',
+      images: [
+        { url: 'https://cdn.test/second.jpg', order: 1 },
+        { url: 'https://cdn.test/primary.jpg', order: 0 },
+      ],
+      offers: [
+        { price: 119990, priceWithoutDiscount: 139990, currency: 'HUF' },
+        { price: 99990, priceWithoutDiscount: 129990, currency: 'HUF' },
+      ],
+    } as never;
+    return sourceRecord;
   };
 
   const makeState = (): ProductResolutionState => ({
@@ -131,6 +149,53 @@ describe('resolution list serialization', () => {
     expect(plain.resolution.sourceRecord.model.displayName).toBe(
       'Sony WH-1000XM5',
     );
+  });
+
+  describe('the scraped listing summary', () => {
+    const summaryOf = (record?: ProductSourceRecord) => {
+      const resolution = makeResolution();
+      resolution.sourceRecord = record;
+      const plain = instanceToPlain(
+        ResolutionListItem.of(resolution, makeState()),
+        listOptions,
+      ) as Record<string, any>;
+      return plain.listing;
+    };
+
+    it('projects what a reviewer compares against the matched product', () => {
+      expect(summaryOf(makeSourceRecord())).toMatchObject({
+        brand: 'Sony',
+        originalName:
+          'Sony WH-1000XM5 Vezeték nélküli fejhallgató, fekete',
+        url: 'https://example.test/listing/9',
+      });
+    });
+
+    it('takes the primary image by order, not by array position', () => {
+      expect(summaryOf(makeSourceRecord()).imageUrl).toBe(
+        'https://cdn.test/primary.jpg',
+      );
+    });
+
+    it('prices from the cheapest offer, matching how the product denormalizes its own', () => {
+      // ProductMergeService.recomputePrice sets ProductModel.price from the
+      // cheapest active offer. Using any other offer here would put two
+      // differently-derived numbers side by side and invite a wrong call.
+      const summary = summaryOf(makeSourceRecord());
+
+      expect(summary.price).toBe(99990);
+      expect(summary.priceWithoutDiscount).toBe(129990);
+      expect(summary.currency).toBe('HUF');
+      expect(summary.offerCount).toBe(2);
+    });
+
+    it('is absent when no listing was scraped, rather than an empty shell', () => {
+      expect(summaryOf(undefined)).toBeUndefined();
+
+      const recordWithoutSnapshot = new ProductSourceRecord();
+      recordWithoutSnapshot.id = 'record-2';
+      expect(summaryOf(recordWithoutSnapshot)).toBeUndefined();
+    });
   });
 
   it('carries the derived state, which is a plain object and needs exposeAll', () => {

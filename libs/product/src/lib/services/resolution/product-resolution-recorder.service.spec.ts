@@ -35,18 +35,23 @@ describe('ProductResolutionRecorderService', () => {
   });
 
   describe('threshold resolution', () => {
+    // The threshold only applies to resolutions that matched an existing
+    // product, so these carry a `resolvedProductId` — without one the row is
+    // recorded regardless (see the exemption tests below).
     it('falls back to the static default when no dynamic override is set', async () => {
       mockDynamicConfig.resolution = undefined;
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
         similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord - 1,
+        resolvedProductId: 'product-1',
       });
       expect(mockRepo.insert).not.toHaveBeenCalled();
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
         similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord,
+        resolvedProductId: 'product-1',
       });
       expect(mockRepo.insert).toHaveBeenCalledTimes(1);
     });
@@ -57,14 +62,71 @@ describe('ProductResolutionRecorderService', () => {
       await service.recordResolution({
         flow: 'product_resolution' as never,
         similarityScore: 85,
+        resolvedProductId: 'product-1',
       });
       expect(mockRepo.insert).not.toHaveBeenCalled();
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
         similarityScore: 90,
+        resolvedProductId: 'product-1',
       });
       expect(mockRepo.insert).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies the threshold to duplicate pairs with no exemption', async () => {
+      // Both products already exist, so a low score really does mean the pair
+      // is not worth reviewing — nothing was created as a result.
+      const result = await service.recordDuplicatePair({
+        flow: 'duplicate_detection' as never,
+        productAId: 'a',
+        productBId: 'b',
+        similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord - 1,
+      });
+
+      expect(result).toBeNull();
+      expect(mockRepo.upsertPair).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the created-product exemption', () => {
+    // A listing the system could not place still gets a product of its own, and
+    // that product is how duplicates enter the catalog. Suppressing the row
+    // because an unresolved decision reports confidence 0 would hide exactly
+    // the decisions most worth reviewing.
+    it('records a resolution that matched nothing, however low it scored', async () => {
+      const result = await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 0,
+      });
+
+      expect(mockRepo.insert).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ id: 'resolution-1' });
+    });
+
+    it('still routes an exempted row through the anchored upsert', async () => {
+      await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 0,
+        anchorKey: 'source-1:sku-9',
+      });
+
+      // Idempotency must not be bypassed by the exemption: a repeat scrape of
+      // an unplaceable listing still must not queue a second row for it.
+      expect(mockRepo.upsertByAnchor).toHaveBeenCalledTimes(1);
+      expect(mockRepo.insert).not.toHaveBeenCalled();
+    });
+
+    it('does not exempt a low-scoring match to an existing product', async () => {
+      const result = await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 0,
+        resolvedProductId: 'product-1',
+      });
+
+      expect(result).toBeNull();
+      expect(mockRepo.insert).not.toHaveBeenCalled();
+      expect(mockRepo.upsertByAnchor).not.toHaveBeenCalled();
     });
   });
 
@@ -137,16 +199,8 @@ describe('ProductResolutionRecorderService', () => {
       expect(seed.action.kind).toBe(ResolutionActionKind.create);
     });
 
-    it('returns null and never calls the repository when below threshold', async () => {
-      const result = await service.recordResolution({
-        flow: 'product_resolution' as never,
-        similarityScore: 0,
-      });
-
-      expect(result).toBeNull();
-      expect(mockRepo.insert).not.toHaveBeenCalled();
-      expect(mockRepo.upsertByAnchor).not.toHaveBeenCalled();
-    });
+    // Below-threshold behaviour now depends on whether a product was matched —
+    // see "the created-product exemption" above.
   });
 
   describe('recordDuplicatePair', () => {

@@ -1,7 +1,86 @@
 import { ProductResolution } from '@fittkereso-backend/database';
-import type { ProductResolutionState } from '@fittkereso-backend/database';
+import type {
+  ProductResolutionState,
+  ProductSourceRecord,
+  ScrapedOffer,
+} from '@fittkereso-backend/database';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Expose, Transform, Type } from 'class-transformer';
+import { minBy } from 'lodash';
+
+/**
+ * The scraped listing, reduced to what a reviewer compares against the product
+ * it was matched to.
+ *
+ * A projection rather than the raw `ScrapedProduct`: that blob carries every
+ * spec variant, `rawSpecs` and the marketing description, which is far too much
+ * to ship for every row of a paginated queue — and it is exposed only to
+ * `adminDetails`, so the list view cannot see it at all.
+ */
+export class ResolutionListingSummary {
+  @Expose({ groups: [SerializeGroup.adminList] })
+  brand?: string;
+
+  /** The raw listing title, before brand/marketing boilerplate was stripped
+   *  into `model`. Only some sources expose one. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  originalName?: string;
+
+  /** The cleaned name, so the card still has something to show when the source
+   *  has no `originalName`. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  displayName?: string;
+
+  @Expose({ groups: [SerializeGroup.adminList] })
+  url?: string;
+
+  /** Order 0 is the listing's primary image. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  imageUrl?: string;
+
+  /** From the cheapest scraped offer — the same rule `recomputePrice` uses to
+   *  denormalize `ProductModel.price`, so the two are comparable. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  price?: number;
+
+  /** That same offer's pre-discount price; absent when it is not discounted. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  priceWithoutDiscount?: number;
+
+  @Expose({ groups: [SerializeGroup.adminList] })
+  currency?: string;
+
+  /** How many offers the listing carried, so a single price is not mistaken
+   *  for the whole picture on a multi-variant page. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  offerCount?: number;
+
+  static from(
+    record?: ProductSourceRecord | null,
+  ): ResolutionListingSummary | undefined {
+    const scraped = record?.scrapedProduct;
+    if (!record || !scraped) return undefined;
+
+    const offers = scraped.offers ?? [];
+    // Match ProductModel.price's rule — cheapest offer wins — so a reviewer
+    // comparing the two numbers is comparing like with like.
+    const cheapest = minBy(offers, (offer: ScrapedOffer) => offer.price);
+    const primaryImage = minBy(scraped.images ?? [], (image) => image.order);
+
+    const summary = new ResolutionListingSummary();
+    summary.brand = scraped.brand;
+    summary.originalName = scraped.originalName;
+    summary.displayName = scraped.displayName;
+    summary.url = record.url ?? cheapest?.url;
+    summary.imageUrl = primaryImage?.url;
+    summary.price = cheapest?.price;
+    summary.priceWithoutDiscount = cheapest?.priceWithoutDiscount;
+    summary.currency = cheapest?.currency;
+    summary.offerCount = offers.length;
+
+    return summary;
+  }
+}
 
 /**
  * One review-queue row plus what can be done to it, so the client never has to
@@ -24,6 +103,12 @@ export class ResolutionListItem {
   @Transform(transfromExposeAll())
   state: ProductResolutionState;
 
+  /** The scraped listing side of the comparison, projected out of the
+   *  `scrapedProduct` blob so the queue can render it without carrying it. */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  @Type(() => ResolutionListingSummary)
+  listing?: ResolutionListingSummary;
+
   static of(
     resolution: ProductResolution,
     state: ProductResolutionState,
@@ -31,6 +116,7 @@ export class ResolutionListItem {
     const item = new ResolutionListItem();
     item.resolution = resolution;
     item.state = state;
+    item.listing = ResolutionListingSummary.from(resolution.sourceRecord);
     return item;
   }
 }

@@ -31,11 +31,14 @@ export class ProductDetailService {
         `sources.${nameOf<ProductSourceRecord>('source')}`,
         `sources.${nameOf<ProductSourceRecord>('offers')}`,
         `sources.${nameOf<ProductSourceRecord>('offers')}.${nameOf<Offer>('seller')}`,
+        nameOf<ProductModel>('offers'),
+        `${nameOf<ProductModel>('offers')}.${nameOf<Offer>('seller')}`,
         nameOf<ProductModel>('scrapeTasks'),
         `scrapeTasks.${nameOf<ScrapeTask>('source')}`,
       ],
       order: {
         scrapeTasks: { createdAt: 'DESC' },
+        offers: { lastSeenAt: 'DESC' },
       },
     });
 

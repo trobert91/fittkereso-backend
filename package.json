@@ -7,7 +7,6 @@
     "start:products": "nx run product-collector:serve",
     "build:mcp": "nx run mcp:build",
     "start:mcp": "nx run mcp:serve --skip-nx-cache",
-    "start:benchmark": "nx run benchmark:run --",
     "bench": "nx build benchmark && node dist/apps/benchmark/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

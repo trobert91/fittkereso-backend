@@ -50,7 +50,7 @@ export class ProductResolutionRecorderService {
   async recordResolution(
     params: CreateProductResolutionParams,
   ): Promise<ProductResolution | null> {
-    if (!this.clearsThreshold(params.similarityScore)) return null;
+    if (!this.shouldRecordResolution(params)) return null;
 
     const seedDecision = this.buildResolutionSeed(params);
 
@@ -89,7 +89,17 @@ export class ProductResolutionRecorderService {
   async recordDuplicatePair(
     params: UpsertProductResolutionPairParams,
   ): Promise<ProductResolution | null> {
-    if (!this.clearsThreshold(params.similarityScore)) return null;
+    // No exemption here: a duplicate pair is a proposal about two products that
+    // already exist, so a low score means the pair genuinely is not worth
+    // reviewing — unlike the resolution flow, nothing was created as a result.
+    if (!this.clearsThreshold(params.similarityScore)) {
+      this.logSuppressed(params.similarityScore, {
+        flow: params.flow,
+        productAId: params.productAId,
+        productBId: params.productBId,
+      });
+      return null;
+    }
 
     const anchorKey = this.fingerprintService.pairAnchor(
       params.productAId,
@@ -165,10 +175,74 @@ export class ProductResolutionRecorderService {
     };
   }
 
+  /**
+   * Whether a resolution is worth queueing for review.
+   *
+   * The score gate exists to keep noise out: a listing that resembled nothing in
+   * the catalog is not a decision anyone needs to check. But `similarityScore`
+   * falls back to `decision.confidence` when scoring produced no best candidate,
+   * and an unresolved decision reports `confidence: 0` by construction — it has
+   * no selected candidate to take a max over. Gating on that number would
+   * silently discard exactly the rows most worth seeing: a listing the system
+   * could not place, which therefore got a brand-new product of its own. Those
+   * are how duplicate products enter the catalog.
+   *
+   * So an outcome that created a product is always recorded, however low it
+   * scored. The threshold still applies to resolutions that matched an existing
+   * product, where a low score really does mean "nothing interesting happened".
+   */
+  private shouldRecordResolution(
+    params: CreateProductResolutionParams,
+  ): boolean {
+    if (this.clearsThreshold(params.similarityScore)) return true;
+
+    if (!params.resolvedProductId) {
+      this.logger.debug(
+        'Recording low-scoring resolution: no product was matched, so this created a new one',
+        {
+          anchorKey: params.anchorKey,
+          similarityScore: params.similarityScore,
+          threshold: this.recordThreshold(),
+          decisionKind: params.decisionSnapshot?.kind,
+          decisionReason: params.decisionSnapshot?.reason,
+        },
+      );
+      return true;
+    }
+
+    this.logSuppressed(params.similarityScore, {
+      flow: params.flow,
+      anchorKey: params.anchorKey,
+      resolvedProductId: params.resolvedProductId,
+      decisionKind: params.decisionSnapshot?.kind,
+    });
+    return false;
+  }
+
   private clearsThreshold(score: number): boolean {
-    const threshold =
+    return score >= this.recordThreshold();
+  }
+
+  private recordThreshold(): number {
+    return (
       this.dynamicConfigService.resolution?.minScoreToRecord ??
-      RESOLUTION_DEFAULTS.minScoreToRecord;
-    return score >= threshold;
+      RESOLUTION_DEFAULTS.minScoreToRecord
+    );
+  }
+
+  /**
+   * A suppressed row leaves no trace anywhere else — not in the queue, not in
+   * the log — which makes "why is there no record for this listing?" impossible
+   * to answer without reading this file. So say so.
+   */
+  private logSuppressed(
+    score: number,
+    context: Record<string, unknown>,
+  ): void {
+    this.logger.debug('Resolution not recorded: below minScoreToRecord', {
+      similarityScore: score,
+      threshold: this.recordThreshold(),
+      ...context,
+    });
   }
 }
