@@ -11,20 +11,24 @@ import { Offer } from './offer.entity';
 @Index(['model', 'source'])
 @Index(['source', 'productSpecsHash'])
 export class ProductSourceRecord extends BasePostgresEntity {
+  /** The product this listing currently sits on. Exposed to `adminList` because
+   *  the resolution review queue's whole job is showing where a listing ended
+   *  up — a merge can move it after the decision was recorded. */
+  @Expose({ groups: [SerializeGroup.adminList] })
   @ManyToOne(() => ProductModel, (model) => model.sources, {
     nullable: false,
     onDelete: 'CASCADE',
   })
   model: ProductModel;
 
-  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
   @Index()
   source?: ProductSource | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', nullable: true, unique: true })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   url?: string;
 
   /**

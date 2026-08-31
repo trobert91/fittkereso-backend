@@ -6,10 +6,10 @@ import {
   ProductAliasRepository,
   ProductAliasSource,
   ProductCategory,
-  ProductResolutionDecision,
+  ProductResolution,
   ProductResolutionFlow,
   ProductResolutionOrigin,
-  ProductEmbedding,
+  ProductResolutionRepository,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
@@ -37,12 +37,13 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
-  BrandResolutionService,
+  BRAND_NOT_IDENTIFIED,
   OfferMatchingService,
-  ProductEmbeddingService,
   ProductImageCopyService,
   ProductMergeService,
+  ProductModelFactoryService,
   ProductNormalizerService,
+  ProductResolutionFingerprintService,
   ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
   SpecComparisonService,
@@ -66,6 +67,10 @@ interface ResolvedIdentity {
    *  create a new product (the safe default), but also flags this candidate
    *  pair for human review — see `writeScrapeAmbiguousDuplicate`. */
   pendingDuplicate?: PendingScrapeDuplicate;
+  /** The `ProductResolution` row this decision was logged to, when Path 4 ran
+   *  and cleared the recording threshold. Used to link the row back to the
+   *  listing once it is persisted — see `linkResolutionToListing`. */
+  resolutionRecordId?: string;
 }
 
 interface PersistResult {
@@ -80,8 +85,7 @@ export class ProductScrapeUpdaterService {
 
   constructor(
     private readonly productSearch: ResolutionService,
-    private readonly brandResolution: BrandResolutionService,
-    private readonly embeddingService: ProductEmbeddingService,
+    private readonly modelFactory: ProductModelFactoryService,
     private readonly productRepo: ProductModelRepository,
     private readonly taskRepo: ScrapeTaskRepository,
     private readonly aliasRepo: ProductAliasRepository,
@@ -95,6 +99,8 @@ export class ProductScrapeUpdaterService {
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly resolutionRecorder: ProductResolutionRecorderService,
+    private readonly resolutionFingerprint: ProductResolutionFingerprintService,
+    private readonly resolutionRepo: ProductResolutionRepository,
     private readonly specComparison: SpecComparisonService,
   ) {}
 
@@ -242,9 +248,22 @@ export class ProductScrapeUpdaterService {
     // with brand/category/spec gates, so trusting it here is no weaker than
     // trusting it for cross-source matches.
     // Agent already filters candidates to category C via preResolvedCategories.
-    const resolved = await this.findExistingProductModel(scrapedProduct, {
-      taskId: task.id,
-    });
+    //
+    // Look up the listing's own record first (Paths 2/3 above only return early
+    // when it is already linked to a product; an orphaned or freshly-relinked
+    // record still lands here). Passing its id lets the recorder attach the
+    // review row to the listing immediately rather than waiting for the
+    // post-persist backfill.
+    const existingSourceRecord = await this.findExistingSourceRecord(
+      task,
+      scrapedProduct,
+    );
+    const resolved = await this.findExistingProductModel(
+      task,
+      scrapedProduct,
+      existingSourceRecord?.id,
+      { taskId: task.id },
+    );
     const candidate = resolved.resolvedModel;
     const resolutionContext = resolved.context;
 
@@ -255,7 +274,12 @@ export class ProductScrapeUpdaterService {
         isLlmMerge ? 'llm_merge_accept' : 'cross_source_merge',
       );
       this.productMetricsService.productMatched(task.source.name);
-      return { model: candidate, isExistingMatch: true, resolutionContext };
+      return {
+        model: candidate,
+        isExistingMatch: true,
+        resolutionContext,
+        resolutionRecordId: resolved.resolutionRecordId,
+      };
     }
 
     // No accepted match. If the scrape-merge LLM decision actually ran and
@@ -270,10 +294,72 @@ export class ProductScrapeUpdaterService {
         task.source.name,
         'llm_merge_reject',
       );
-      return { isExistingMatch: false, resolutionContext, pendingDuplicate };
+      return {
+        isExistingMatch: false,
+        resolutionContext,
+        pendingDuplicate,
+        resolutionRecordId: resolved.resolutionRecordId,
+      };
     }
 
-    return { isExistingMatch: false, resolutionContext };
+    return {
+      isExistingMatch: false,
+      resolutionContext,
+      resolutionRecordId: resolved.resolutionRecordId,
+    };
+  }
+
+  /**
+   * Links the review row back to the listing and product the decision produced.
+   *
+   * Resolution runs *before* the listing is persisted, so at record time there
+   * is no `ProductSourceRecord` yet — and for a newly created product, no
+   * product id either. This closes both gaps once they exist, which is what
+   * makes the row actionable: split needs to know which listing to carve out,
+   * and the next scrape of this URL needs the link to recognize the situation
+   * as already-decided. Never fatal — a missing link degrades review options,
+   * it must not fail the scrape.
+   */
+  private async linkResolutionToListing(
+    identity: ResolvedIdentity,
+    saveOutcome: PersistResult,
+  ): Promise<void> {
+    if (!identity.resolutionRecordId) {
+      return;
+    }
+
+    try {
+      await this.resolutionRepo.save({
+        id: identity.resolutionRecordId,
+        sourceRecord: saveOutcome.sourceRecord,
+        resolvedProduct: saveOutcome.model,
+      } as Partial<ProductResolution> as ProductResolution);
+    } catch (error: unknown) {
+      this.logger.warn('Failed to link ProductResolution to its listing', {
+        resolutionId: identity.resolutionRecordId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /** The `ProductSourceRecord` for this listing if it has been scraped before,
+   *  by the same (source, externalId) then URL identity the scraper already uses
+   *  to recognize a known listing. */
+  private async findExistingSourceRecord(
+    task: ScrapeTask,
+    scrapedProduct: ScrapedProduct,
+  ): Promise<ProductSourceRecord | null> {
+    if (scrapedProduct.externalId) {
+      const byExternalId = await this.sourceRecordRepo.findBySourceAndExternalId(
+        task.source.id,
+        scrapedProduct.externalId,
+      );
+      if (byExternalId) {
+        return byExternalId;
+      }
+    }
+
+    return task.url ? this.sourceRecordRepo.findByUrl(normalizeUrl(task.url)) : null;
   }
 
   private async persistProduct(params: {
@@ -330,6 +416,8 @@ export class ProductScrapeUpdaterService {
         identity.pendingDuplicate,
       );
     }
+
+    await this.linkResolutionToListing(identity, saveOutcome);
 
     task.product = saveOutcome.model;
     if (identity.resolutionContext) {
@@ -659,7 +747,6 @@ export class ProductScrapeUpdaterService {
         flow: ProductResolutionFlow.duplicate_detection,
         productAId: newModel.id,
         productBId: candidateModel.id,
-        decision: ProductResolutionDecision.pending_review,
         similarityScore: pendingDuplicate.confidence,
         specMatchDetails,
         pendingReasons: reasons,
@@ -688,7 +775,9 @@ export class ProductScrapeUpdaterService {
   }
 
   private async findExistingProductModel(
+    task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
+    existingSourceRecordId: string | undefined,
     logContext?: Record<string, string>,
   ): Promise<ResolutionResult> {
     const resolution = await this.productSearch.search(
@@ -720,6 +809,17 @@ export class ProductScrapeUpdaterService {
       },
       undefined,
       logContext,
+      {
+        // Anchors the decision to this physical listing, so re-scraping it
+        // updates the existing review row instead of queueing the same
+        // question again. externalId is preferred: it survives URL changes.
+        anchorKey: this.resolutionFingerprint.listingAnchor({
+          sourceId: task.source.id,
+          externalId: scrapedProduct.externalId,
+          url: task.url,
+        }),
+        sourceRecordId: existingSourceRecordId,
+      },
     );
 
     if (resolution.resolvedModel?.id) {
@@ -731,10 +831,15 @@ export class ProductScrapeUpdaterService {
         resolvedModel,
         context: resolution.context,
         confidence: resolution.confidence,
+        resolutionRecordId: resolution.resolutionRecordId,
       };
     }
 
-    return { context: resolution.context, confidence: resolution.confidence };
+    return {
+      context: resolution.context,
+      confidence: resolution.confidence,
+      resolutionRecordId: resolution.resolutionRecordId,
+    };
   }
 
   private async saveProductModel(params: {
@@ -803,42 +908,27 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct,
     normalizedSourceName: string,
   ): Promise<ProductModel> {
-    const brand = await this.brandResolution.resolve(
-      scrapedProduct.brand,
-      scrapedProduct.displayName,
-    );
-
-    if (!brand?.entity) {
-      this.logger.warn(
-        'Brand could not be identified, skipping product creation',
-        {
-          taskId: task.id,
-          url: task.url,
-          displayName: scrapedProduct.displayName,
-        },
-      );
-
-      throw new Error('Brand could not be identified');
-    }
-
-    const model = new ProductModel();
-    model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
-
-    model.brand = brand.entity;
-    model.displayName = scrapedProduct.displayName;
-    model.model = scrapedProduct.model;
-    model.normalizedName = normalizedSourceName;
-    model.enabled = true;
-
-    model.embedding = new ProductEmbedding();
-    model.embedding.embedding =
-      await this.embeddingService.createProductEmbedding({
-        brand: model.brand.name,
-        model: model.model,
-        displayName: model.displayName,
-        category: scrapedProduct.category.name,
+    try {
+      return await this.modelFactory.createShell({
+        brandName: scrapedProduct.brand,
+        displayName: scrapedProduct.displayName,
+        model: scrapedProduct.model,
+        categoryId: scrapedProduct.category.id,
+        categoryName: scrapedProduct.category.name,
+        normalizedName: normalizedSourceName,
       });
-
-    return model;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === BRAND_NOT_IDENTIFIED) {
+        this.logger.warn(
+          'Brand could not be identified, skipping product creation',
+          {
+            taskId: task.id,
+            url: task.url,
+            displayName: scrapedProduct.displayName,
+          },
+        );
+      }
+      throw error;
+    }
   }
 }

@@ -97,7 +97,6 @@ export const LIST_PAGE_DETAIL_TASKS_CREATED_TOTAL =
 
 // Duplicate detection metrics
 export const DUPLICATE_PAIRS_DETECTED_TOTAL = 'duplicate_pairs_detected_total';
-export const DUPLICATE_AUTO_MERGED_TOTAL = 'duplicate_auto_merged_total';
 export const DUPLICATE_PENDING_REVIEW_TOTAL = 'duplicate_pending_review_total';
 export const DUPLICATE_SKIPPED_TOTAL = 'duplicate_skipped_total';
 export const DUPLICATE_DETECTION_DURATION_SECONDS =

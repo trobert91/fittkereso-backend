@@ -6,6 +6,7 @@ import {
 import {
   Offer,
   OfferRepository,
+  PriceHistory,
   ProductAlias,
   ProductAliasSource,
   ProductImage,
@@ -31,6 +32,15 @@ import { ProductDetailService } from '../product-detail.service';
 interface MergeProductsParams {
   sourceId: string;
   targetId: string;
+}
+
+export interface MergeProductsResult {
+  product: ProductModel;
+  /** Every `ProductSourceRecord` this merge moved onto the target. Splitting
+   *  these back out is what reverses the merge — the records carry their own
+   *  `scrapedProduct` provenance, so the deleted product can be rebuilt from
+   *  live data rather than a snapshot that would go stale. */
+  movedSourceRecordIds: string[];
 }
 
 const SOURCES_RELATION = nameOf<ProductModel>('sources');
@@ -126,7 +136,7 @@ export class ProductMergeService {
 
   public async mergeProducts(
     params: MergeProductsParams,
-  ): Promise<ProductModel> {
+  ): Promise<MergeProductsResult> {
     const { sourceId, targetId } = params;
 
     if (sourceId === targetId) {
@@ -134,6 +144,8 @@ export class ProductMergeService {
         'Source and target product cannot be the same',
       );
     }
+
+    let movedSourceRecordIds: string[] = [];
 
     await this.productRepo.repo.manager.connection.transaction(
       async (manager) => {
@@ -154,24 +166,33 @@ export class ProductMergeService {
           targetDisplayName: target.displayName,
         });
 
-        await this.moveProductSourceRecords(manager, source, target);
+        movedSourceRecordIds = await this.moveProductSourceRecords(
+          manager,
+          source,
+          target,
+        );
         await this.moveProductImages(manager, source, target);
         await this.moveOffers(manager, sourceId, targetId);
         await this.createAliasesFromSource(manager, source, target);
         await this.moveProductAliases(manager, sourceId, targetId);
         await this.moveScrapeTasks(manager, sourceId, targetId);
+        await this.movePriceHistory(manager, sourceId, targetId);
         await this.deleteSourceProduct(manager, sourceId);
 
         this.logger.log('Product merge transaction completed', {
           sourceId,
           targetId,
+          movedSourceRecords: movedSourceRecordIds.length,
         });
       },
     );
 
     await this.postMergeUpdates(targetId);
 
-    return this.detailService.getProductById(targetId);
+    return {
+      product: await this.detailService.getProductById(targetId),
+      movedSourceRecordIds,
+    };
   }
 
   private async loadProductForMerge(
@@ -190,53 +211,63 @@ export class ProductMergeService {
     });
   }
 
+  /**
+   * Moves EVERY source record to the target — none are dropped.
+   *
+   * There is no unique constraint on (model, source); only `url` is unique. A
+   * source legitimately accumulates several records on one product (one per
+   * variant URL — see ProductScrapeUpdaterService's Path 4), so two records from
+   * the same source are two different listings, not a duplicate. Deleting one
+   * would destroy a real listing along with its `scrapedProduct` provenance.
+   *
+   * Keeping them all is also what makes a merge reversible: the returned ids are
+   * the complete set to split back out, and `mergeSources` reduces per-source
+   * via getLatestSourcePerSource anyway, so spec merging is unaffected.
+   */
   private async moveProductSourceRecords(
     manager: EntityManager,
     source: ProductModel,
     target: ProductModel,
-  ): Promise<void> {
+  ): Promise<string[]> {
     const sourceSources = source.sources ?? [];
     if (isEmpty(sourceSources)) {
-      return;
+      return [];
     }
 
-    const targetSourceIds = new Set(
-      (target.sources ?? []).map((s) => s.source?.id ?? 'manual'),
-    );
+    const movedIds = sourceSources.map((sourceRecord) => sourceRecord.id);
 
-    const toMove: string[] = [];
-    const toDelete: string[] = [];
-
-    for (const sourceRecord of sourceSources) {
-      if (targetSourceIds.has(sourceRecord.source?.id ?? 'manual')) {
-        toDelete.push(sourceRecord.id);
-      } else {
-        toMove.push(sourceRecord.id);
-      }
-    }
-
-    if (!isEmpty(toMove)) {
-      await manager
-        .createQueryBuilder()
-        .update(ProductSourceRecord)
-        .set({ model: { id: target.id } })
-        .where('id IN (:...ids)', { ids: toMove })
-        .execute();
-    }
-
-    if (!isEmpty(toDelete)) {
-      await manager
-        .createQueryBuilder()
-        .delete()
-        .from(ProductSourceRecord)
-        .where('id IN (:...ids)', { ids: toDelete })
-        .execute();
-    }
+    await manager
+      .createQueryBuilder()
+      .update(ProductSourceRecord)
+      .set({ model: { id: target.id } })
+      .where('id IN (:...ids)', { ids: movedIds })
+      .execute();
 
     this.logger.debug('Moved product model sources', {
-      moved: toMove.length,
-      skipped: toDelete.length,
+      moved: movedIds.length,
     });
+
+    return movedIds;
+  }
+
+  // PriceHistory.model is onDelete: 'CASCADE', so any row still pointing at the
+  // source product when deleteSourceProduct runs is silently destroyed by
+  // Postgres. Reassign first, same requirement as moveOffers. No collision
+  // handling needed: price history is an append-only observation log with no
+  // uniqueness constraint, so the two products' histories simply coexist.
+  private async movePriceHistory(
+    manager: EntityManager,
+    sourceId: string,
+    targetId: string,
+  ): Promise<void> {
+    const result = await manager
+      .createQueryBuilder()
+      .update(PriceHistory)
+      .set({ model: { id: targetId } })
+      .where('"modelId" = :sourceId', { sourceId })
+      .execute();
+
+    this.logger.debug('Moved price history', { count: result.affected });
   }
 
   // Offer.model has onDelete: 'CASCADE' — any Offer still pointing at the

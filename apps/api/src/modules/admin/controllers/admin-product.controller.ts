@@ -257,10 +257,11 @@ export class AdminProductController {
     @Param('id') sourceId: string,
     @Body() body: ProductMergeDto,
   ): Promise<ProductModel> {
-    return this.mergeService.mergeProducts({
+    const { product } = await this.mergeService.mergeProducts({
       sourceId,
       targetId: body.targetProductId,
     });
+    return product;
   }
 
   // Recomputes this product's specs and identity fields (brand/model/

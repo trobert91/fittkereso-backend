@@ -3,7 +3,6 @@ import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
   DUPLICATE_PAIRS_DETECTED_TOTAL,
-  DUPLICATE_AUTO_MERGED_TOTAL,
   DUPLICATE_PENDING_REVIEW_TOTAL,
   DUPLICATE_SKIPPED_TOTAL,
   DUPLICATE_DETECTION_DURATION_SECONDS,
@@ -13,7 +12,6 @@ import {
 @Injectable()
 export class DuplicateDetectionMetricsService {
   private readonly pairsDetectedCounter: client.Counter<string>;
-  private readonly autoMergedCounter: client.Counter<string>;
   private readonly pendingReviewCounter: client.Counter<string>;
   private readonly skippedCounter: client.Counter<string>;
   private readonly detectionDurationHistogram: client.Histogram<string>;
@@ -23,13 +21,6 @@ export class DuplicateDetectionMetricsService {
     this.pairsDetectedCounter = new client.Counter({
       name: DUPLICATE_PAIRS_DETECTED_TOTAL,
       help: 'Total duplicate pairs detected',
-      labelNames: ['category'],
-      registers: [this.prometheusService.register],
-    });
-
-    this.autoMergedCounter = new client.Counter({
-      name: DUPLICATE_AUTO_MERGED_TOTAL,
-      help: 'Total duplicate pairs auto-merged',
       labelNames: ['category'],
       registers: [this.prometheusService.register],
     });
@@ -67,10 +58,6 @@ export class DuplicateDetectionMetricsService {
 
   public pairDetected(category: string): void {
     this.pairsDetectedCounter.inc({ category });
-  }
-
-  public autoMerged(category: string): void {
-    this.autoMergedCounter.inc({ category });
   }
 
   public pendingReview(category: string): void {

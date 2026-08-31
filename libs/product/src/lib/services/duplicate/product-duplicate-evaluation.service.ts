@@ -1,12 +1,10 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import {
-  ProductAlias,
-  ProductAliasSource,
   ProductCategoryRepository,
-  ProductResolutionDecision,
   ProductResolutionFlow,
   ProductResolutionOrigin,
   ProductResolutionRepository,
+  ProductResolutionStatus,
   ProductModelRepository,
   ProductAliasRepository,
 } from '@fittkereso-backend/database';
@@ -25,6 +23,10 @@ import { isEmpty, isNil } from 'lodash';
 import { ProductSimilarityService } from '../similarity/product-similarity.service';
 import { ProductMergeService } from '../merge/product-merge.service';
 import { ProductResolutionRecorderService } from '../resolution/product-resolution-recorder.service';
+import {
+  selectMergeTarget,
+  type MergeTargetCandidate,
+} from './select-merge-target';
 import type { DuplicatePairItem } from '@fittkereso-backend/search';
 
 const MIN_SIMILARITY_FLOOR = 40;
@@ -36,11 +38,15 @@ interface DuplicateDetectionConfig {
   minPendingReviewThreshold: number;
   maxNonPrimaryMismatches: number;
   batchSize: number;
-  maxMergesPerRun: number;
 }
 
 interface PairEvaluation {
-  decision: ProductResolutionDecision | 'skip';
+  /** Whether this pair is worth putting in front of a reviewer at all. */
+  outcome: 'record' | 'skip';
+  /** True when the pair cleared every check — the system would have merged it
+   *  automatically under the old behavior. It no longer does; this is now only
+   *  a confidence signal for the reviewer and the metrics label. */
+  confident: boolean;
   reasons: string[];
   specMatchDetails?: SpecMatchDetails;
   candidates?: ProductResolutionCandidateRecord[];
@@ -50,8 +56,9 @@ interface PairEvaluation {
 export interface DuplicateDetectionRunSummary {
   categoriesProcessed: number;
   totalPairsEvaluated: number;
-  autoMerged: number;
-  pendingReview: number;
+  /** Pairs written to the review queue. Detection never merges — every merge
+   *  goes through a human accepting the row. */
+  recorded: number;
   skipped: number;
   durationMs: number;
 }
@@ -65,9 +72,7 @@ export class ProductDuplicateEvaluationService {
   constructor(
     private readonly duplicationSearchService: ProductDuplicationSearchService,
     private readonly duplicateRepo: ProductResolutionRepository,
-    private readonly mergeService: ProductMergeService,
     private readonly categoryRepo: ProductCategoryRepository,
-    private readonly productRepo: ProductModelRepository,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly dynamicConfigService: DynamicConfigService,
     private readonly metricsService: DuplicateDetectionMetricsService,
@@ -95,13 +100,10 @@ export class ProductDuplicateEvaluationService {
     const summary: DuplicateDetectionRunSummary = {
       categoriesProcessed: 0,
       totalPairsEvaluated: 0,
-      autoMerged: 0,
-      pendingReview: 0,
+      recorded: 0,
       skipped: 0,
       durationMs: 0,
     };
-
-    let totalMergesThisRun = 0;
 
     for (const category of categories) {
       const categoryStart = Date.now();
@@ -112,15 +114,12 @@ export class ProductDuplicateEvaluationService {
           categoryName: category.name,
           categorySlug: category.slug ?? undefined,
           config,
-          remainingMerges: config.maxMergesPerRun - totalMergesThisRun,
         });
 
         summary.categoriesProcessed++;
         summary.totalPairsEvaluated += result.evaluated;
-        summary.autoMerged += result.autoMerged;
-        summary.pendingReview += result.pendingReview;
+        summary.recorded += result.recorded;
         summary.skipped += result.skipped;
-        totalMergesThisRun += result.autoMerged;
 
         const durationSeconds = (Date.now() - categoryStart) / 1000;
         this.metricsService.observeDetectionDuration(
@@ -131,8 +130,7 @@ export class ProductDuplicateEvaluationService {
         this.logger.log('Category duplicate detection completed', {
           category: category.name,
           evaluated: result.evaluated,
-          autoMerged: result.autoMerged,
-          pendingReview: result.pendingReview,
+          recorded: result.recorded,
           skipped: result.skipped,
           durationSeconds,
         });
@@ -149,15 +147,10 @@ export class ProductDuplicateEvaluationService {
   }
 
   public selectMergeTarget(
-    pairItemA: { id: string; createdAt?: Date },
-    pairItemB: { id: string; createdAt?: Date },
+    pairItemA: MergeTargetCandidate,
+    pairItemB: MergeTargetCandidate,
   ): { sourceId: string; targetId: string } {
-    // Oldest product wins (target)
-    const createdAtA = pairItemA.createdAt ?? new Date();
-    const createdAtB = pairItemB.createdAt ?? new Date();
-    return createdAtA <= createdAtB
-      ? { sourceId: pairItemB.id, targetId: pairItemA.id }
-      : { sourceId: pairItemA.id, targetId: pairItemB.id };
+    return selectMergeTarget(pairItemA, pairItemB);
   }
 
   private async processCategory(params: {
@@ -165,15 +158,12 @@ export class ProductDuplicateEvaluationService {
     categoryName: string;
     categorySlug: string | undefined;
     config: DuplicateDetectionConfig;
-    remainingMerges: number;
   }): Promise<{
     evaluated: number;
-    autoMerged: number;
-    pendingReview: number;
+    recorded: number;
     skipped: number;
   }> {
-    const { categoryId, categoryName, categorySlug, config, remainingMerges } =
-      params;
+    const { categoryId, categoryName, categorySlug, config } = params;
 
     const searchResult = await this.duplicationSearchService.findDuplicates({
       categoryId,
@@ -183,10 +173,8 @@ export class ProductDuplicateEvaluationService {
 
     const pairs = searchResult.items ?? [];
     let evaluated = 0;
-    let autoMerged = 0;
-    let pendingReview = 0;
+    let recorded = 0;
     let skipped = 0;
-    let mergesRemaining = remainingMerges;
 
     for (const pair of pairs) {
       evaluated++;
@@ -200,7 +188,7 @@ export class ProductDuplicateEvaluationService {
         categorySlug,
       });
 
-      if (evaluation.decision === 'skip') {
+      if (evaluation.outcome === 'skip') {
         skipped++;
         this.metricsService.skipped(
           categoryName,
@@ -211,24 +199,28 @@ export class ProductDuplicateEvaluationService {
 
       this.metricsService.observeSimilarityScore(
         categoryName,
-        evaluation.decision,
+        evaluation.confident ? 'confident' : 'needs_review',
         pair.similarityScore,
       );
 
-      // Record the decision — use in-process score as similarityScore. Routed
-      // through the shared recorder so this write passes through the same
+      // Record the pair for review — use in-process score as similarityScore.
+      // Routed through the shared recorder so this write passes through the same
       // `resolution.minScoreToRecord` gate the resolution flow uses.
+      //
+      // Detection never merges, however confident it is. A duplicate pair is a
+      // proposal; the merge happens when a human accepts the row, which is what
+      // keeps every merge attributable and reversible.
       const saved = await this.resolutionRecorder.recordDuplicatePair({
         flow: ProductResolutionFlow.duplicate_detection,
         productAId: pair.productA.id,
         productBId: pair.productB.id,
-        decision: evaluation.decision,
         similarityScore: evaluation.inProcessScore ?? pair.similarityScore,
         specMatchDetails: evaluation.specMatchDetails,
         pendingReasons: evaluation.reasons,
         origin: ProductResolutionOrigin.nightly_detection,
         candidates: evaluation.candidates,
         inputSnapshot: evaluation.inputSnapshot,
+        decisionConfidence: evaluation.inProcessScore,
       });
 
       if (!saved) {
@@ -237,29 +229,11 @@ export class ProductDuplicateEvaluationService {
         continue;
       }
 
-      if (
-        evaluation.decision === ProductResolutionDecision.auto_accepted &&
-        mergesRemaining > 0
-      ) {
-        const merged = await this.executeMerge(
-          pair.productA,
-          pair.productB,
-          categoryName,
-        );
-        if (merged) {
-          autoMerged++;
-          mergesRemaining--;
-          this.metricsService.autoMerged(categoryName);
-        }
-      } else if (
-        evaluation.decision === ProductResolutionDecision.pending_review
-      ) {
-        pendingReview++;
-        this.metricsService.pendingReview(categoryName);
-      }
+      recorded++;
+      this.metricsService.pendingReview(categoryName);
     }
 
-    return { evaluated, autoMerged, pendingReview, skipped };
+    return { evaluated, recorded, skipped };
   }
 
   private async evaluatePair(params: {
@@ -271,25 +245,23 @@ export class ProductDuplicateEvaluationService {
   }): Promise<PairEvaluation & { inProcessScore?: number }> {
     const { productA, productB, trigramScore, config, categorySlug } = params;
 
-    // 1. Check if pair already has a terminal decision
+    // 1. A human already settled this pair — don't re-surface it. An open row is
+    // fair game: re-evaluating refreshes its scores while it waits for review.
     const existing = await this.duplicateRepo.findExistingPair(
       productA.id,
       productB.id,
     );
-    if (existing) {
-      const terminalDecisions: ProductResolutionDecision[] = [
-        ProductResolutionDecision.rejected,
-        ProductResolutionDecision.auto_accepted,
-        ProductResolutionDecision.approved,
-      ];
-      if (terminalDecisions.includes(existing.decision)) {
-        return { decision: 'skip', reasons: ['already_processed'] };
-      }
+    if (
+      existing &&
+      (existing.status === ProductResolutionStatus.done ||
+        existing.status === ProductResolutionStatus.superseded)
+    ) {
+      return { outcome: 'skip', confident: false, reasons: ['already_reviewed'] };
     }
 
     // 1b. Trigram similarity floor — too low to even consider
     if (trigramScore < MIN_SIMILARITY_FLOOR) {
-      return { decision: 'skip', reasons: ['below_similarity_floor'] };
+      return { outcome: 'skip', confident: false, reasons: ['below_similarity_floor'] };
     }
 
     // 2. Compute in-process similarity score via ProductSimilarityService
@@ -326,7 +298,7 @@ export class ProductDuplicateEvaluationService {
     const inProcessScore = similarityResult.score;
 
     if (inProcessScore < config.minPendingReviewThreshold) {
-      return { decision: 'skip', reasons: ['below_pending_review_threshold'] };
+      return { outcome: 'skip', confident: false, reasons: ['below_pending_review_threshold'] };
     }
 
     const specMatchDetails = similarityResult.specMatchDetails;
@@ -407,7 +379,8 @@ export class ProductDuplicateEvaluationService {
 
     if (needsReview) {
       return {
-        decision: ProductResolutionDecision.pending_review,
+        outcome: 'record',
+        confident: false,
         reasons: belowThreshold
           ? [
               `in-process score ${inProcessScore} below threshold ${config.autoMergeThreshold}`,
@@ -421,135 +394,17 @@ export class ProductDuplicateEvaluationService {
       };
     }
 
-    // All checks pass
+    // All checks pass. Still only recorded, never merged — a confident pair is
+    // just one that should sort to the top of the queue.
     return {
-      decision: ProductResolutionDecision.auto_accepted,
+      outcome: 'record',
+      confident: true,
       reasons: ['all_checks_passed'],
       specMatchDetails,
       inProcessScore,
       candidates,
       inputSnapshot,
     };
-  }
-
-  private async executeMerge(
-    productA: DuplicatePairItem,
-    productB: DuplicatePairItem,
-    categoryName: string,
-  ): Promise<boolean> {
-    try {
-      const { sourceId, targetId } = this.selectMergeTarget(
-        productA,
-        productB,
-      );
-
-      this.logger.log('Auto-merging duplicate pair', {
-        sourceId,
-        targetId,
-        category: categoryName,
-        sourceDisplayName:
-          sourceId === productA.id
-            ? productA.displayName
-            : productB.displayName,
-        targetDisplayName:
-          targetId === productA.id
-            ? productA.displayName
-            : productB.displayName,
-      });
-
-      await this.mergeService.mergeProducts({ sourceId, targetId });
-
-      // Auto-create alias from source model name on the target product
-      const source = sourceId === productA.id ? productA : productB;
-      const target = targetId === productA.id ? productA : productB;
-      await this.maybeAutoCreateAlias(source, target);
-
-      // Update the duplicate record with merge timestamp
-      const duplicate = await this.duplicateRepo.findExistingPair(
-        productA.id,
-        productB.id,
-      );
-      if (duplicate) {
-        duplicate.mergedAt = new Date();
-        await this.duplicateRepo.save(duplicate);
-      }
-
-      return true;
-    } catch (error: unknown) {
-      this.logger.error('Auto-merge failed', {
-        productAId: productA.id,
-        productBId: productB.id,
-        category: categoryName,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return false;
-    }
-  }
-
-  /**
-   * Auto-create alias from the source product's model name on the target product.
-   * Inlined validation guards (numeric overlap) since ProductAliasAutoCreateService
-   * lives in libs/product-resolution and can't be imported here.
-   */
-  private async maybeAutoCreateAlias(
-    source: DuplicatePairItem,
-    target: DuplicatePairItem,
-  ): Promise<void> {
-    const sourceModel = source.model;
-    if (!sourceModel) return;
-
-    const normalizedAlias = normalize(sourceModel);
-    const targetModel = normalize(target.model ?? '');
-
-    if (normalizedAlias.length < 2) return;
-    if (normalizedAlias === targetModel) return;
-
-    // Numeric token overlap guard
-    const aliasNumbers = normalizedAlias.match(/\d+/g) ?? [];
-    const modelNumbers = targetModel.match(/\d+/g) ?? [];
-    if (aliasNumbers.length > 0 && modelNumbers.length > 0) {
-      const modelNumberSet = new Set(modelNumbers);
-      if (!aliasNumbers.some((num) => modelNumberSet.has(num))) return;
-    } else if (aliasNumbers.length !== modelNumbers.length) {
-      return; // One side has numbers, other doesn't
-    }
-
-    try {
-      const existing = await this.aliasRepo.findOne({
-        where: { alias: normalizedAlias },
-      });
-      if (existing) return;
-
-      const targetProduct = await this.productRepo.findOne({
-        where: { id: target.id },
-      });
-      if (!targetProduct) return;
-
-      const alias = new ProductAlias();
-      alias.alias = normalizedAlias;
-      alias.model = targetProduct;
-      alias.source = ProductAliasSource.auto_generated;
-
-      await this.aliasRepo.save(alias);
-
-      this.logger.debug('Auto-created alias from dedup merge', {
-        alias: normalizedAlias,
-        targetId: target.id,
-        sourceId: source.id,
-      });
-    } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        error.message?.includes('unique constraint')
-      ) {
-        return;
-      }
-      this.logger.warn('Auto-create alias from dedup failed', {
-        alias: normalizedAlias,
-        targetId: target.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
   }
 
   private async getAliasesForPair(
@@ -586,8 +441,6 @@ export class ProductDuplicateEvaluationService {
         dynamicConfig?.maxNonPrimaryMismatches ??
         defaults.maxNonPrimaryMismatches,
       batchSize: dynamicConfig?.batchSize ?? defaults.batchSize,
-      maxMergesPerRun:
-        dynamicConfig?.maxMergesPerRun ?? defaults.maxMergesPerRun,
     };
   }
 }

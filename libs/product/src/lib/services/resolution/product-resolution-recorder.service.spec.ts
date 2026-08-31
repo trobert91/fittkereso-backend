@@ -1,10 +1,20 @@
 import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
 import type { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import type { ProductResolutionRepository } from '@fittkereso-backend/database';
+import {
+  ResolutionActionKind,
+  ResolutionActor,
+  ResolutionVerdict,
+} from '@fittkereso-backend/database';
 import { ProductResolutionRecorderService } from './product-resolution-recorder.service';
+import { ProductResolutionFingerprintService } from './product-resolution-fingerprint.service';
 
 describe('ProductResolutionRecorderService', () => {
-  let mockRepo: { insert: jest.Mock; upsertPair: jest.Mock };
+  let mockRepo: {
+    insert: jest.Mock;
+    upsertPair: jest.Mock;
+    upsertByAnchor: jest.Mock;
+  };
   let mockDynamicConfig: { resolution: { minScoreToRecord?: number } | undefined };
   let service: ProductResolutionRecorderService;
 
@@ -12,11 +22,15 @@ describe('ProductResolutionRecorderService', () => {
     mockRepo = {
       insert: jest.fn().mockResolvedValue({ id: 'resolution-1' }),
       upsertPair: jest.fn().mockResolvedValue({ id: 'resolution-2' }),
+      upsertByAnchor: jest
+        .fn()
+        .mockResolvedValue({ resolution: { id: 'resolution-3' }, outcome: 'created' }),
     };
     mockDynamicConfig = { resolution: undefined };
     service = new ProductResolutionRecorderService(
       mockRepo as unknown as ProductResolutionRepository,
       mockDynamicConfig as unknown as DynamicConfigService,
+      new ProductResolutionFingerprintService(),
     );
   });
 
@@ -26,14 +40,12 @@ describe('ProductResolutionRecorderService', () => {
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'auto_accepted' as never,
         similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord - 1,
       });
       expect(mockRepo.insert).not.toHaveBeenCalled();
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'auto_accepted' as never,
         similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord,
       });
       expect(mockRepo.insert).toHaveBeenCalledTimes(1);
@@ -44,14 +56,12 @@ describe('ProductResolutionRecorderService', () => {
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'auto_accepted' as never,
         similarityScore: 85,
       });
       expect(mockRepo.insert).not.toHaveBeenCalled();
 
       await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'auto_accepted' as never,
         similarityScore: 90,
       });
       expect(mockRepo.insert).toHaveBeenCalledTimes(1);
@@ -59,55 +69,130 @@ describe('ProductResolutionRecorderService', () => {
   });
 
   describe('recordResolution', () => {
-    it('calls repo.insert (not upsertPair) when the score clears the threshold', async () => {
-      const params = {
+    it('appends-only when there is no anchor to key on', async () => {
+      const result = await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'auto_accepted' as never,
         similarityScore: 100,
-      };
+      });
 
-      const result = await service.recordResolution(params);
-
-      expect(mockRepo.insert).toHaveBeenCalledWith(params);
-      expect(mockRepo.upsertPair).not.toHaveBeenCalled();
+      expect(mockRepo.insert).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertByAnchor).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'resolution-1' });
+    });
+
+    it('routes through the anchored upsert when an anchor is given, so a repeat scrape cannot queue the same decision twice', async () => {
+      const result = await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 100,
+        anchorKey: 'source-1:sku-9',
+      });
+
+      expect(mockRepo.insert).not.toHaveBeenCalled();
+      expect(mockRepo.upsertByAnchor).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ id: 'resolution-3' });
+
+      const params = mockRepo.upsertByAnchor.mock.calls[0][0];
+      expect(params.anchorKey).toBe('source-1:sku-9');
+      expect(params.fingerprint).toEqual(expect.any(String));
+    });
+
+    it('denormalizes the decision confidence so the queue can sort on it', async () => {
+      await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 100,
+        anchorKey: 'source-1:sku-9',
+        decisionSnapshot: { confidence: 82 } as never,
+      });
+
+      expect(mockRepo.upsertByAnchor.mock.calls[0][0].decisionConfidence).toBe(82);
+    });
+
+    it('seeds the log with an already-performed match when a product was resolved', async () => {
+      await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 100,
+        resolvedProductId: 'product-1',
+      });
+
+      const seed = mockRepo.insert.mock.calls[0][0].seedDecision;
+      expect(seed).toMatchObject({
+        actor: ResolutionActor.system,
+        verdict: ResolutionVerdict.matched_existing,
+        actionPerformed: true,
+      });
+      expect(seed.action).toMatchObject({
+        kind: ResolutionActionKind.match,
+        productId: 'product-1',
+      });
+    });
+
+    it('seeds a create verdict when no product was matched', async () => {
+      await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 100,
+      });
+
+      const seed = mockRepo.insert.mock.calls[0][0].seedDecision;
+      expect(seed.verdict).toBe(ResolutionVerdict.created_new);
+      expect(seed.action.kind).toBe(ResolutionActionKind.create);
     });
 
     it('returns null and never calls the repository when below threshold', async () => {
       const result = await service.recordResolution({
         flow: 'product_resolution' as never,
-        decision: 'pending_review' as never,
         similarityScore: 0,
       });
 
       expect(result).toBeNull();
       expect(mockRepo.insert).not.toHaveBeenCalled();
+      expect(mockRepo.upsertByAnchor).not.toHaveBeenCalled();
     });
   });
 
   describe('recordDuplicatePair', () => {
+    const pairParams = {
+      flow: 'duplicate_detection' as never,
+      productAId: 'a',
+      productBId: 'b',
+      similarityScore: 75,
+    };
+
     it('calls repo.upsertPair (not insert) when the score clears the threshold, using the same shared gate', async () => {
-      const params = {
-        flow: 'duplicate_detection' as never,
-        productAId: 'a',
-        productBId: 'b',
-        decision: 'pending_review' as never,
-        similarityScore: 75,
-      };
+      const result = await service.recordDuplicatePair(pairParams);
 
-      const result = await service.recordDuplicatePair(params);
-
-      expect(mockRepo.upsertPair).toHaveBeenCalledWith(params);
+      expect(mockRepo.upsertPair).toHaveBeenCalledTimes(1);
       expect(mockRepo.insert).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'resolution-2' });
     });
 
+    it('anchors the pair on its ordered ids so either argument order dedupes to one row', async () => {
+      await service.recordDuplicatePair(pairParams);
+      await service.recordDuplicatePair({
+        ...pairParams,
+        productAId: 'b',
+        productBId: 'a',
+      });
+
+      const [first, second] = mockRepo.upsertPair.mock.calls;
+      expect(first[0].anchorKey).toBe('a:b');
+      expect(second[0].anchorKey).toBe('a:b');
+    });
+
+    it('seeds an UNPERFORMED merge, because detection proposes but never merges', async () => {
+      await service.recordDuplicatePair(pairParams);
+
+      const seed = mockRepo.upsertPair.mock.calls[0][0].seedDecision;
+      expect(seed).toMatchObject({
+        actor: ResolutionActor.system,
+        verdict: ResolutionVerdict.duplicate_proposed,
+        actionPerformed: false,
+      });
+      expect(seed.action.kind).toBe(ResolutionActionKind.merge);
+    });
+
     it('returns null and never calls the repository when below threshold', async () => {
       const result = await service.recordDuplicatePair({
-        flow: 'duplicate_detection' as never,
-        productAId: 'a',
-        productBId: 'b',
-        decision: 'pending_review' as never,
+        ...pairParams,
         similarityScore: RESOLUTION_DEFAULTS.minScoreToRecord - 1,
       });
 

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import type { ChatTraceData } from '@fittkereso-backend/debug';
 import {
-  ProductResolutionDecision,
   ProductResolutionFlow,
 } from '@fittkereso-backend/database';
 import type {
@@ -15,7 +14,10 @@ import { ProductResolutionRecorderService } from '@fittkereso-backend/product';
 import type { ResolutionContext } from './models/resolution-context';
 import type { ProductResolutionInput } from './models/resolution-input';
 import type { ResolutionOptions } from './models/resolution-options';
-import type { ResolutionResult } from './models/resolution-result';
+import type {
+  ResolutionRecordingContext,
+  ResolutionResult,
+} from './models/resolution-result';
 import { ResolutionStatus } from './models/resolution-status';
 import { ReferenceProductResolver } from './stages/reference-product-resolver';
 import { BrandResolverService } from './stages/brand-resolver.service';
@@ -75,6 +77,7 @@ export class ResolutionService {
     options: ResolutionOptions,
     traceCollector?: (data: ChatTraceData) => void,
     logContext?: Record<string, string>,
+    recordingContext?: ResolutionRecordingContext,
   ): Promise<ResolutionResult> {
     const startedAt = Date.now();
     const context = createInitialContext(input, options);
@@ -107,7 +110,12 @@ export class ResolutionService {
         context,
         confidence: referenceResult.confidence,
       };
-      await this.recordResolution(context, earlyResult, logContext);
+      earlyResult.resolutionRecordId = await this.recordResolution(
+        context,
+        earlyResult,
+        logContext,
+        recordingContext,
+      );
       return earlyResult;
     }
 
@@ -155,7 +163,12 @@ export class ResolutionService {
 
     context.totals.durationMs = Date.now() - startedAt;
     this.logResolutionSummary(context, logContext);
-    await this.recordResolution(context, result, logContext);
+    result.resolutionRecordId = await this.recordResolution(
+      context,
+      result,
+      logContext,
+      recordingContext,
+    );
     return result;
   }
 
@@ -172,30 +185,32 @@ export class ResolutionService {
     context: ResolutionContext,
     result: ResolutionResult,
     logContext?: Record<string, string>,
-  ): Promise<void> {
+    recordingContext?: ResolutionRecordingContext,
+  ): Promise<string | undefined> {
     try {
-      const params = this.buildResolutionRecordParams(context, result);
-      await this.resolutionRecorder.recordResolution(params);
+      const params = this.buildResolutionRecordParams(
+        context,
+        result,
+        recordingContext,
+      );
+      const recorded = await this.resolutionRecorder.recordResolution(params);
+      return recorded?.id;
     } catch (error: unknown) {
       this.logger.warn('Failed to record ProductResolution, continuing', {
         error: error instanceof Error ? error.message : String(error),
         ...logContext,
       });
+      return undefined;
     }
   }
 
   private buildResolutionRecordParams(
     context: ResolutionContext,
     result: ResolutionResult,
+    recordingContext?: ResolutionRecordingContext,
   ): CreateProductResolutionParams {
     const gatingScore =
       context.scoring?.bestCandidate?.score ?? context.decision?.confidence ?? 0;
-
-    const decision =
-      context.decision?.kind === 'matcher_accept' ||
-      context.decision?.kind === 'llm_resolved'
-        ? ProductResolutionDecision.auto_accepted
-        : ProductResolutionDecision.pending_review;
 
     const gatesByCandidateId = new Map(
       (context.candidateGateResults ?? []).map((gate) => [
@@ -248,13 +263,15 @@ export class ResolutionService {
 
     return {
       flow: ProductResolutionFlow.product_resolution,
-      decision,
       similarityScore: gatingScore,
       resolvedProductId: result.resolvedModel?.id,
       specMatchDetails: candidates[0]?.specMatchDetails,
       candidates,
       inputSnapshot,
       decisionSnapshot,
+      anchorKey: recordingContext?.anchorKey,
+      sourceRecordId: recordingContext?.sourceRecordId,
+      decisionConfidence: context.decision?.confidence,
     };
   }
 

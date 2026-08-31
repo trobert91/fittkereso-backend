@@ -9,6 +9,7 @@ export * from './product-category-detail.service';
 export * from './product-detail.service';
 export * from './product-normalizer.service';
 export * from './product-embedding.service';
+export * from './product-model-factory.service';
 export * from './update/product-update.service';
 
 export * from './image';

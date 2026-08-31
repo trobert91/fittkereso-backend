@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,32 +12,46 @@ import {
 import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
 import {
   ProductResolution,
-  ProductResolutionDecision,
-  ProductResolutionFlow,
   ProductResolutionRepository,
   ProductModel,
+  ProductSourceRecord,
+  ResolutionCorrection,
   UserRole,
 } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 import {
   ProductDuplicateEvaluationService,
   ProductImageDtoService,
-  ProductMergeService,
+  ProductResolutionActionService,
+  ProductResolutionStateService,
 } from '@fittkereso-backend/product';
 import {
   ProductResolutionSearchParams,
-  ProductResolutionSearchResult,
   ProductResolutionSearchService,
 } from '@fittkereso-backend/search';
 import { SerializeGroup } from '@fittkereso-backend/utils';
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import type { DuplicateDetectionRunSummary } from '@fittkereso-backend/product';
 import { compact } from 'lodash';
+import {
+  ResolutionListItem,
+  ResolutionListResult,
+} from '../dtos/resolution-list.dto';
 
-class RejectResolutionDto {
+class ReviewNoteDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+class DeclineResolutionDto extends ReviewNoteDto {
+  @IsEnum(ResolutionCorrection)
+  correction: ResolutionCorrection;
+
+  /** Required when `correction` is `merge_into`. */
+  @IsOptional()
+  @IsString()
+  targetProductId?: string;
 }
 
 class TriggerDuplicateDetectionDto {
@@ -47,12 +60,15 @@ class TriggerDuplicateDetectionDto {
   categoryId?: string;
 }
 
-/** Both flow types are actionable via approve/reject, but the side effects
- *  differ: `duplicate_detection` approve triggers a real merge (unchanged
- *  from before this controller covered both flows); `product_resolution`
- *  approve/reject are confirmation-only (decision/reviewedAt/reviewNote), with
- *  no catalog mutation — a record of a human's judgment on the resolution
- *  engine's decision, for tuning thresholds later. */
+/**
+ * The product-resolution review queue.
+ *
+ * Read endpoints return each row together with its derived `state` — which
+ * actions are legal right now and why. Write endpoints delegate every decision
+ * to `ProductResolutionActionService`, which re-derives that same state from
+ * live data before acting, so this controller holds no workflow logic of its
+ * own.
+ */
 @Controller('admin-product/resolutions')
 @UseGuards(AuthGuard, RoleGuard)
 @Roles([UserRole.admin])
@@ -60,7 +76,8 @@ export class AdminResolutionController {
   constructor(
     private readonly resolutionSearchService: ProductResolutionSearchService,
     private readonly resolutionRepo: ProductResolutionRepository,
-    private readonly mergeService: ProductMergeService,
+    private readonly actionService: ProductResolutionActionService,
+    private readonly stateService: ProductResolutionStateService,
     private readonly evaluationService: ProductDuplicateEvaluationService,
     private readonly imageDtoService: ProductImageDtoService,
   ) {}
@@ -71,8 +88,26 @@ export class AdminResolutionController {
   })
   async searchResolutions(
     @Body() params: ProductResolutionSearchParams,
-  ): Promise<ProductResolutionSearchResult> {
-    return this.resolutionSearchService.search(params);
+  ): Promise<ResolutionListResult> {
+    const result = await this.resolutionSearchService.search(params);
+    const items = result.items ?? [];
+
+    this.imageDtoService.updateProductImageUrls(
+      this.resolutionSearchService.collectProducts(items),
+    );
+
+    const page = new ResolutionListResult();
+    // The pure derivation here — one page of rows must not cost a query per
+    // row. The orchestrator re-derives against live data before acting.
+    page.items = items.map((resolution) =>
+      ResolutionListItem.of(resolution, this.stateService.derive(resolution)),
+    );
+    page.page = result.page;
+    page.pageSize = result.pageSize;
+    page.totalItems = result.totalItems;
+    page.totalPages = result.totalPages;
+
+    return page;
   }
 
   @Post('trigger')
@@ -92,94 +127,58 @@ export class AdminResolutionController {
       SerializeGroup.details,
     ],
   })
-  async getResolution(@Param('id') id: string): Promise<ProductResolution> {
-    const productRelations = [
-      nameOf<ProductModel>('brand'),
-      nameOf<ProductModel>('productCategory'),
-      nameOf<ProductModel>('sources'),
-      nameOf<ProductModel>('images'),
-      nameOf<ProductModel>('mainImage'),
-      nameOf<ProductModel>('aliases'),
-    ];
-    const relationsFor = (field: keyof ProductResolution) => [
-      nameOf<ProductResolution>(field),
-      ...productRelations.map(
-        (relation) => `${nameOf<ProductResolution>(field)}.${relation}`,
-      ),
-    ];
-
-    const resolution = await this.resolutionRepo.findOne({
-      where: { id },
-      relations: [
-        ...relationsFor('productA'),
-        ...relationsFor('productB'),
-        ...relationsFor('resolvedProduct'),
-      ],
-    });
-
-    if (!resolution) {
-      throw new NotFoundException(`Resolution ${id} not found`);
-    }
-
-    this.imageDtoService.updateProductImageUrls(
-      compact([
-        resolution.productA,
-        resolution.productB,
-        resolution.resolvedProduct,
-      ]),
-    );
-
-    return resolution;
+  async getResolution(@Param('id') id: string): Promise<ResolutionListItem> {
+    return this.loadItem(id);
   }
 
-  @Post(':id/approve')
+  /** "The system got this right." Executes the proposed merge if one is still
+   *  pending; otherwise records the confirmation. */
+  @Post(':id/accept')
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
-  async approveResolution(@Param('id') id: string): Promise<ProductResolution> {
-    const resolution = await this.resolutionRepo.findOne({
-      where: { id },
-      relations: [
-        nameOf<ProductResolution>('productA'),
-        `${nameOf<ProductResolution>('productA')}.${nameOf<ProductModel>('brand')}`,
-        `${nameOf<ProductResolution>('productA')}.${nameOf<ProductModel>('productCategory')}`,
-        nameOf<ProductResolution>('productB'),
-        `${nameOf<ProductResolution>('productB')}.${nameOf<ProductModel>('brand')}`,
-        `${nameOf<ProductResolution>('productB')}.${nameOf<ProductModel>('productCategory')}`,
-      ],
-    });
+  async acceptResolution(
+    @Param('id') id: string,
+    @Body() body: ReviewNoteDto,
+  ): Promise<ResolutionListItem> {
+    return this.loadItemAfter(this.actionService.accept(id, body));
+  }
 
-    if (!resolution) {
-      throw new NotFoundException(`Resolution ${id} not found`);
-    }
+  /** "The current state is wrong." The legal corrections depend on the last
+   *  performed action — see the row's `state.availableActions`. */
+  @Post(':id/decline')
+  @SerializeOptions({
+    groups: [SerializeGroup.adminList, SerializeGroup.list],
+  })
+  async declineResolution(
+    @Param('id') id: string,
+    @Body() body: DeclineResolutionDto,
+  ): Promise<ResolutionListItem> {
+    return this.loadItemAfter(this.actionService.decline(id, body));
+  }
 
-    if (resolution.decision !== ProductResolutionDecision.pending_review) {
-      throw new BadRequestException(
-        `Cannot approve resolution with decision "${resolution.decision}"`,
-      );
-    }
+  /** Puts a decided row back in the queue. Catalog effects are not undone —
+   *  the reopened row offers the correction that reverses them. */
+  @Post(':id/reopen')
+  @SerializeOptions({
+    groups: [SerializeGroup.adminList, SerializeGroup.list],
+  })
+  async reopenResolution(
+    @Param('id') id: string,
+    @Body() body: ReviewNoteDto,
+  ): Promise<ResolutionListItem> {
+    return this.loadItemAfter(this.actionService.reopen(id, body));
+  }
 
-    if (resolution.flow === ProductResolutionFlow.duplicate_detection) {
-      // productA/productB are guaranteed non-null for this flow.
-      const { sourceId, targetId } = this.evaluationService.selectMergeTarget(
-        {
-          id: resolution.productA!.id,
-          createdAt: resolution.productA!.createdAt,
-        },
-        {
-          id: resolution.productB!.id,
-          createdAt: resolution.productB!.createdAt,
-        },
-      );
-
-      await this.mergeService.mergeProducts({ sourceId, targetId });
-      resolution.mergedAt = new Date();
-    }
-    // product_resolution: confirmation-only, no catalog mutation.
-
-    resolution.decision = ProductResolutionDecision.approved;
-    resolution.reviewedAt = new Date();
-    return this.resolutionRepo.save(resolution);
+  /** Re-runs an action that failed, against freshly derived state. */
+  @Post(':id/retry')
+  @SerializeOptions({
+    groups: [SerializeGroup.adminList, SerializeGroup.list],
+  })
+  async retryResolution(
+    @Param('id') id: string,
+  ): Promise<ResolutionListItem> {
+    return this.loadItemAfter(this.actionService.retry(id));
   }
 
   @Delete(':id')
@@ -193,19 +192,57 @@ export class AdminResolutionController {
     await this.resolutionRepo.deleteById(id);
   }
 
-  @Post(':id/reject')
-  @SerializeOptions({
-    groups: [SerializeGroup.adminList, SerializeGroup.list],
-  })
-  async rejectResolution(
-    @Param('id') id: string,
-    @Body() body: RejectResolutionDto,
-  ): Promise<ProductResolution> {
+  /** Runs an action, then returns the row as the detail endpoint would. The
+   *  client needs the re-derived state to know what is legal next, so handing
+   *  back only the entity would force it into a second round-trip. */
+  private async loadItemAfter(
+    action: Promise<ProductResolution>,
+  ): Promise<ResolutionListItem> {
+    const { id } = await action;
+    return this.loadItem(id);
+  }
+
+  /** One row with every relation the review UI renders, its image URLs
+   *  resolved, and its state derived against live data. */
+  private async loadItem(id: string): Promise<ResolutionListItem> {
+    const fullProduct = [
+      nameOf<ProductModel>('brand'),
+      nameOf<ProductModel>('productCategory'),
+      nameOf<ProductModel>('sources'),
+      nameOf<ProductModel>('images'),
+      nameOf<ProductModel>('mainImage'),
+      nameOf<ProductModel>('aliases'),
+    ];
+    // `ProductSourceRecord.model` and `ProductModel.sources` reference each
+    // other, so the listing's own product is loaded without `sources` — enough
+    // to render it, and it keeps the cycle unpopulated.
+    const listingProduct = [
+      nameOf<ProductModel>('brand'),
+      nameOf<ProductModel>('productCategory'),
+      nameOf<ProductModel>('mainImage'),
+    ];
+    /** A product relation plus everything the UI renders about that product. */
+    const productAt = (path: string, relations = fullProduct) => [
+      path,
+      ...relations.map((relation) => `${path}.${relation}`),
+    ];
+
+    const sourceRecord = nameOf<ProductResolution>('sourceRecord');
+
     const resolution = await this.resolutionRepo.findOne({
       where: { id },
       relations: [
-        nameOf<ProductResolution>('productA'),
-        nameOf<ProductResolution>('productB'),
+        ...productAt(nameOf<ProductResolution>('productA')),
+        ...productAt(nameOf<ProductResolution>('productB')),
+        ...productAt(nameOf<ProductResolution>('resolvedProduct')),
+        // The reviewed listing, its source, and — via `model` — the product it
+        // currently sits on, which is not necessarily `resolvedProduct`.
+        sourceRecord,
+        `${sourceRecord}.${nameOf<ProductSourceRecord>('source')}`,
+        ...productAt(
+          `${sourceRecord}.${nameOf<ProductSourceRecord>('model')}`,
+          listingProduct,
+        ),
       ],
     });
 
@@ -213,22 +250,20 @@ export class AdminResolutionController {
       throw new NotFoundException(`Resolution ${id} not found`);
     }
 
-    // Reject is allowed from pending_review OR auto_accepted (unlike approve,
-    // which only makes sense from pending_review) — a human can override a
-    // confident auto-decision after the fact. approved/rejected stay terminal.
-    const rejectableFrom: ProductResolutionDecision[] = [
-      ProductResolutionDecision.pending_review,
-      ProductResolutionDecision.auto_accepted,
-    ];
-    if (!rejectableFrom.includes(resolution.decision)) {
-      throw new BadRequestException(
-        `Cannot reject resolution with decision "${resolution.decision}"`,
-      );
-    }
+    this.imageDtoService.updateProductImageUrls(
+      compact([
+        resolution.productA,
+        resolution.productB,
+        resolution.resolvedProduct,
+        resolution.sourceRecord?.model,
+      ]),
+    );
 
-    resolution.decision = ProductResolutionDecision.rejected;
-    resolution.reviewedAt = new Date();
-    resolution.reviewNote = body.note ?? null;
-    return this.resolutionRepo.save(resolution);
+    // The verified derivation: a detail view is worth the extra reads, and it
+    // is what tells the reviewer when an action they expect is unavailable.
+    return ResolutionListItem.of(
+      resolution,
+      await this.stateService.deriveVerified(resolution),
+    );
   }
 }

@@ -155,6 +155,118 @@ describe('ProductMergeService.moveOffers', () => {
   });
 });
 
+describe('ProductMergeService.moveProductSourceRecords', () => {
+  let service: ProductMergeService;
+  let manager: jest.Mocked<EntityManager>;
+  let queryBuilder: ReturnType<typeof makeQueryBuilder>;
+
+  beforeEach(() => {
+    queryBuilder = makeQueryBuilder();
+    manager = {
+      find: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+    } as unknown as jest.Mocked<EntityManager>;
+
+    service = new ProductMergeService(
+      {} as any, // productRepo
+      {} as any, // specMergeService
+      {} as any, // specSortService
+      {} as any, // validatorService
+      {} as any, // identityMergeService
+      {} as any, // categoryConfigService
+      {} as any, // embeddingService
+      {} as any, // detailService
+      {} as any, // offerRepo
+    );
+  });
+
+  function callMove(source: any, target: any) {
+    return (service as any).moveProductSourceRecords(manager, source, target);
+  }
+
+  it('returns nothing when the source product has no listings', async () => {
+    const moved = await callMove({ id: 'source-1', sources: [] }, { id: 'target-1' });
+
+    expect(moved).toEqual([]);
+    expect(manager.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  // There is no unique constraint on (model, source) — only url — and the
+  // scraper deliberately creates one record per variant URL. So two records
+  // from the same source are two real listings, and dropping either would
+  // destroy a listing plus its scrapedProduct provenance.
+  it('moves every listing, including one from a source the target already has', async () => {
+    const moved = await callMove(
+      {
+        id: 'source-1',
+        sources: [
+          { id: 'record-1', source: { id: 'shop-a' } },
+          { id: 'record-2', source: { id: 'shop-b' } },
+        ],
+      },
+      {
+        id: 'target-1',
+        sources: [{ id: 'record-existing', source: { id: 'shop-a' } }],
+      },
+    );
+
+    expect(moved).toEqual(['record-1', 'record-2']);
+    expect(queryBuilder.where).toHaveBeenCalledWith('id IN (:...ids)', {
+      ids: ['record-1', 'record-2'],
+    });
+    expect(queryBuilder.delete).not.toHaveBeenCalled();
+  });
+
+  // The returned ids are the whole reversal mechanism: splitting them back out
+  // re-creates the merged-away product from live source data.
+  it('reports the moved ids so the merge can be reversed later', async () => {
+    const moved = await callMove(
+      { id: 'source-1', sources: [{ id: 'record-9', source: null }] },
+      { id: 'target-1', sources: [] },
+    );
+
+    expect(moved).toEqual(['record-9']);
+  });
+});
+
+describe('ProductMergeService.movePriceHistory', () => {
+  let service: ProductMergeService;
+  let manager: jest.Mocked<EntityManager>;
+  let queryBuilder: ReturnType<typeof makeQueryBuilder>;
+
+  beforeEach(() => {
+    queryBuilder = makeQueryBuilder();
+    manager = {
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+    } as unknown as jest.Mocked<EntityManager>;
+
+    service = new ProductMergeService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+  });
+
+  // PriceHistory.model is onDelete: CASCADE, so anything still pointing at the
+  // source product when it is deleted is destroyed with no error and no log.
+  it('reassigns price history to the target instead of letting the cascade eat it', async () => {
+    await (service as any).movePriceHistory(manager, 'source-1', 'target-1');
+
+    expect(queryBuilder.set).toHaveBeenCalledWith({
+      model: { id: 'target-1' },
+    });
+    expect(queryBuilder.where).toHaveBeenCalledWith('"modelId" = :sourceId', {
+      sourceId: 'source-1',
+    });
+  });
+});
+
 describe('ProductMergeService.mergeSources', () => {
   let service: ProductMergeService;
   let specMergeService: { mergeSpecs: jest.Mock };

@@ -43,6 +43,8 @@ import { CategoryUpdateMapperService } from './services/category/category-update
 import { DebugModule } from '@fittkereso-backend/debug';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ProductMergeService } from './services/merge/product-merge.service';
+import { ProductSplitService } from './services/merge/product-split.service';
+import { ProductModelFactoryService } from './services/product-model-factory.service';
 import { SpecComparisonService } from './services/duplicate/spec-comparison.service';
 import { ProductDuplicateEvaluationService } from './services/duplicate/product-duplicate-evaluation.service';
 import { SimilarityInputNormalizationService } from './services/similarity/similarity-input-normalization.service';
@@ -57,6 +59,10 @@ import { ProductWebSearchService } from './services/resolution/product-web-searc
 import { SellerResolutionService } from './services/resolution/seller-resolution.service';
 import { OfferMatchingService } from './services/resolution/offer-matching.service';
 import { ProductResolutionRecorderService } from './services/resolution/product-resolution-recorder.service';
+import { ProductResolutionFingerprintService } from './services/resolution/product-resolution-fingerprint.service';
+import { ProductResolutionCleanupService } from './services/resolution/product-resolution-cleanup.service';
+import { ProductResolutionStateService } from './services/resolution/product-resolution-state.service';
+import { ProductResolutionActionService } from './services/resolution/product-resolution-action.service';
 import { SellerCreateService } from './services/seller/seller-create.service';
 import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
@@ -106,6 +112,8 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductNormalizerService,
     ProductEmbeddingService,
     ProductMergeService,
+    ProductSplitService,
+    ProductModelFactoryService,
     ProductIdentityMergeService,
     ProductSourceRecordUpdaterService,
     SpecExtractionService,
@@ -124,6 +132,10 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     SellerResolutionService,
     OfferMatchingService,
     ProductResolutionRecorderService,
+    ProductResolutionFingerprintService,
+    ProductResolutionCleanupService,
+    ProductResolutionStateService,
+    ProductResolutionActionService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,
@@ -155,6 +167,8 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductNormalizerService,
     ProductEmbeddingService,
     ProductMergeService,
+    ProductSplitService,
+    ProductModelFactoryService,
     ProductIdentityMergeService,
     ProductSourceRecordUpdaterService,
     SpecExtractionService,
@@ -173,6 +187,10 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     SellerResolutionService,
     OfferMatchingService,
     ProductResolutionRecorderService,
+    ProductResolutionFingerprintService,
+    ProductResolutionCleanupService,
+    ProductResolutionStateService,
+    ProductResolutionActionService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,

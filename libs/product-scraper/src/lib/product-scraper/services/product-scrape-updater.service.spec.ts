@@ -5,6 +5,7 @@ import {
   ProductCategory,
   ProductModel,
   ProductModelRepository,
+  ProductResolutionRepository,
   ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
@@ -13,12 +14,12 @@ import type { ProductMetricsService } from '@fittkereso-backend/metrics';
 import type { ResolutionService } from '@fittkereso-backend/resolution';
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
-  BrandResolutionService,
   OfferMatchingService,
-  ProductEmbeddingService,
   ProductImageCopyService,
   ProductMergeService,
+  ProductModelFactoryService,
   ProductNormalizerService,
+  ProductResolutionFingerprintService,
   ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
@@ -107,8 +108,9 @@ function makeAliasInsertBuilder() {
 describe('ProductScrapeUpdaterService', () => {
   let service: ProductScrapeUpdaterService;
   let mockProductSearch: jest.Mocked<ResolutionService>;
-  let mockBrandResolution: jest.Mocked<BrandResolutionService>;
-  let mockEmbeddingService: jest.Mocked<ProductEmbeddingService>;
+  let mockModelFactory: jest.Mocked<ProductModelFactoryService>;
+  let mockResolutionRepo: jest.Mocked<ProductResolutionRepository>;
+  let mockResolutionFingerprint: jest.Mocked<ProductResolutionFingerprintService>;
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
@@ -131,14 +133,6 @@ describe('ProductScrapeUpdaterService', () => {
       search: jest.fn().mockResolvedValue({}),
     } as unknown as jest.Mocked<ResolutionService>;
 
-    mockBrandResolution = {
-      resolve: jest.fn().mockResolvedValue({ entity: makeBrand() }),
-    } as unknown as jest.Mocked<BrandResolutionService>;
-
-    mockEmbeddingService = {
-      createProductEmbedding: jest.fn().mockResolvedValue([0.1, 0.2]),
-    } as unknown as jest.Mocked<ProductEmbeddingService>;
-
     mockProductRepo = {
       findOne: jest.fn(),
       findOneOrFail: jest.fn(),
@@ -159,6 +153,8 @@ describe('ProductScrapeUpdaterService', () => {
       findBySourceAndExternalIdWithModelRelations: jest
         .fn()
         .mockResolvedValue(null),
+      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+      findByUrl: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSourceRecordUpdater = {
@@ -223,10 +219,28 @@ describe('ProductScrapeUpdaterService', () => {
       }),
     } as unknown as jest.Mocked<SpecComparisonService>;
 
+    mockModelFactory = {
+      // Mirrors the real factory: an unsaved shell with no id, which is what
+      // marks the model as newly created downstream.
+      createShell: jest.fn().mockImplementation(async () => {
+        const model = new ProductModel();
+        model.brand = makeBrand();
+        model.enabled = true;
+        return model;
+      }),
+    } as unknown as jest.Mocked<ProductModelFactoryService>;
+
+    mockResolutionRepo = {
+      save: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<ProductResolutionRepository>;
+
+    mockResolutionFingerprint = {
+      listingAnchor: jest.fn().mockReturnValue('source-1:sku-1'),
+    } as unknown as jest.Mocked<ProductResolutionFingerprintService>;
+
     service = new ProductScrapeUpdaterService(
       mockProductSearch,
-      mockBrandResolution,
-      mockEmbeddingService,
+      mockModelFactory,
       mockProductRepo,
       mockTaskRepo,
       mockAliasRepo,
@@ -240,6 +254,8 @@ describe('ProductScrapeUpdaterService', () => {
       mockOfferRepo,
       mockCategoryConfigService,
       mockResolutionRecorder,
+      mockResolutionFingerprint,
+      mockResolutionRepo,
       mockSpecComparison,
     );
   });
@@ -365,6 +381,9 @@ describe('ProductScrapeUpdaterService', () => {
       expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
+      // Anchors the decision to this listing so a re-scrape updates the
+      // existing review row instead of queueing the same question again.
+      expect.objectContaining({ anchorKey: 'source-1:sku-1' }),
     );
   });
 
@@ -391,6 +410,9 @@ describe('ProductScrapeUpdaterService', () => {
       expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
+      // Anchors the decision to this listing so a re-scrape updates the
+      // existing review row instead of queueing the same question again.
+      expect.objectContaining({ anchorKey: 'source-1:sku-1' }),
     );
   });
 

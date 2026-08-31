@@ -4,13 +4,17 @@ import { SchedulerMetricsService } from '@fittkereso-backend/metrics';
 import { BaseScheduler } from '@fittkereso-backend/task';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { SCHEDULING_DEFAULTS } from '@fittkereso-backend/config';
-import { ProductDuplicateEvaluationService } from '@fittkereso-backend/product';
+import {
+  ProductDuplicateEvaluationService,
+  ProductResolutionCleanupService,
+} from '@fittkereso-backend/product';
 
 @Injectable()
 export class DuplicateDetectionScheduler extends BaseScheduler {
   constructor(
     readonly metricsService: SchedulerMetricsService,
     private readonly evaluationService: ProductDuplicateEvaluationService,
+    private readonly cleanupService: ProductResolutionCleanupService,
     private readonly dynamicConfigService: DynamicConfigService,
   ) {
     super(DuplicateDetectionScheduler.name, metricsService);
@@ -36,10 +40,13 @@ export class DuplicateDetectionScheduler extends BaseScheduler {
     this.logger.log('Duplicate detection run completed', {
       categoriesProcessed: summary.categoriesProcessed,
       totalPairsEvaluated: summary.totalPairsEvaluated,
-      autoMerged: summary.autoMerged,
-      pendingReview: summary.pendingReview,
+      recorded: summary.recorded,
       skipped: summary.skipped,
       durationMs: summary.durationMs,
     });
+
+    // Prune here rather than on its own schedule: detection is what grows the
+    // queue, so trimming it in the same pass keeps the two in step.
+    await this.cleanupService.prune();
   }
 }

@@ -125,7 +125,9 @@ export interface DynamicConfigData {
       maxNonPrimaryMismatches?: number;
       /** Pairs to evaluate per category per run. Default: 100 */
       batchSize?: number;
-      /** Safety cap on merges per run. Default: 50 */
+      /** @deprecated Detection no longer merges — every merge goes through a
+       *  human accepting the row in the review queue, so there is nothing to
+       *  cap. Kept so existing config files stay valid. */
       maxMergesPerRun?: number;
     };
   };
@@ -143,6 +145,19 @@ export interface DynamicConfigData {
      *  thresholds, which decide the underlying business outcome; this only
      *  decides whether an already-made decision gets logged. Default: 60 */
     minScoreToRecord?: number;
+    /** Retention for the `ProductResolution` review queue. */
+    review?: {
+      /** Master switch for the retention cleanup job. Default: true */
+      cleanupEnabled?: boolean;
+      /** Days to keep rows replaced by a newer row for the same situation.
+       *  Pure noise once superseded. Default: 60 */
+      supersededRetentionDays?: number;
+      /** Days to keep decided rows, aged by `lastSeenAt` rather than when they
+       *  were decided — a decided row is what stops the same question being
+       *  asked again, so one whose listing is still being scraped is never
+       *  pruned. Default: 60 */
+      doneRetentionDays?: number;
+    };
     matching?: {
       acceptThreshold?: number;
       acceptThresholdStrict?: number;
@@ -450,6 +465,33 @@ export const dynamicConfigSchema = {
           description:
             'Minimum decision score (0-100) to persist a ProductResolution row, shared by both the resolution and duplicate-detection flows. Default: 60',
           default: 60,
+        },
+        review: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Retention for the ProductResolution review queue.',
+          properties: {
+            cleanupEnabled: {
+              type: 'boolean',
+              description:
+                'Master switch for the review-queue retention cleanup job. Default: true',
+              default: true,
+            },
+            supersededRetentionDays: {
+              type: 'number',
+              minimum: 1,
+              description:
+                'Days to keep resolution rows that were superseded by a newer row for the same situation. Default: 60',
+              default: 60,
+            },
+            doneRetentionDays: {
+              type: 'number',
+              minimum: 1,
+              description:
+                'Days to keep decided resolution rows, aged by lastSeenAt so rows for still-scraped listings are never pruned. Default: 60',
+              default: 60,
+            },
+          },
         },
         search: {
           type: 'object',
