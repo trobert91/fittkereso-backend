@@ -567,4 +567,176 @@ describe('ResolutionService.search()', () => {
 
     expect(result.context.totals.durationMs).toBeGreaterThanOrEqual(0);
   });
+  describe('recording the recall pool', () => {
+    /**
+     * Reproduces the KTM Macina Kapoho Elite case: recall finds exactly one
+     * correct candidate, the filter drops it on a primary-spec contradiction,
+     * and the run ends 'no_qualifying_candidates'. The persisted row must still
+     * carry that candidate — recording only the survivors made these rows
+     * indistinguishable from a genuine recall miss.
+     */
+    const CANDIDATE = {
+      productId: 'cand-1',
+      brand: 'KTM',
+      model: 'MACINA KAPOHO ELITE',
+      displayName: 'KTM MACINA KAPOHO ELITE',
+      source: 'fuzzy' as const,
+    };
+    const MISMATCH_DETAIL = 'usageType MTB ≠ Összteleszkópos MTB';
+
+    function makeFilteredRunService(recorder: ProductResolutionRecorderService) {
+      const recallService = {
+        recall: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          if (ctx.strategiesRun.length === 0) {
+            ctx.strategiesRun.push('fuzzy');
+            ctx.candidates = [CANDIDATE];
+          }
+        }),
+      } as unknown as RecallService;
+
+      const filterService = {
+        filter: jest.fn().mockReturnValue({
+          qualifyingCandidates: [],
+          outcome: {
+            qualifyingCandidateIds: [],
+            filteredCandidates: [
+              {
+                candidateId: 'cand-1',
+                candidateName: 'KTM MACINA KAPOHO ELITE',
+                reason: 'match_specs',
+                detail: MISMATCH_DETAIL,
+              },
+            ],
+          },
+        }),
+      } as unknown as FilterService;
+
+      const decisionService = {
+        decide: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          ctx.decision = {
+            kind: 'matcher_reject',
+            confidence: 0,
+            reason: 'no_qualifying_candidates',
+            selectedCandidates: [],
+            evidenceSummary: 'no candidates after recall + filter',
+          } as FinalDecision;
+        }),
+      } as unknown as DecisionService;
+
+      return new ResolutionService(
+        makeReferenceResolver(null),
+        makeStage<BrandResolverService>('resolve'),
+        makeStage<CategoryResolverService>('resolve'),
+        recallService,
+        filterService,
+        makeStage<ScoringService>('score'),
+        decisionService,
+        makeFinalize({} as ResolutionResult),
+        recorder,
+      );
+    }
+
+    const INPUT = { brand: 'KTM', model: 'MACINA KAPOHO ELITE' };
+    const OPTIONS = {
+      useEmbedding: true,
+      webSearchEnabled: false,
+      mode: 'loose' as const,
+    };
+
+    it('persists filter-rejected candidates with the mismatch detail', async () => {
+      const recorder = makeResolutionRecorder();
+      await makeFilteredRunService(recorder).search(INPUT, OPTIONS);
+
+      const params = (recorder.recordResolution as jest.Mock).mock.calls[0][0];
+      expect(params.candidates).toHaveLength(1);
+      expect(params.candidates[0]).toMatchObject({
+        candidateId: 'cand-1',
+        displayName: 'KTM MACINA KAPOHO ELITE',
+        filtered: { reason: 'match_specs', detail: MISMATCH_DETAIL },
+        gates: { passed: false, failedGates: ['filter_match_specs'] },
+      });
+    });
+
+    it('leaves context.candidates narrowed to survivors', async () => {
+      const recorder = makeResolutionRecorder();
+      const result = await makeFilteredRunService(recorder).search(
+        INPUT,
+        OPTIONS,
+      );
+
+      expect(result.context.candidates).toEqual([]);
+      expect(result.context.recallCandidates).toHaveLength(1);
+      expect(result.context.filter?.filteredCandidates).toHaveLength(1);
+    });
+    it('keeps survivors\u2019 matcher scores on the recorded pool', async () => {
+      // Scoring mutates SlimCandidate objects in place *after* the recall pool
+      // is snapshotted, so the snapshot must hold the same object references —
+      // otherwise survivors would record with matchScore undefined and
+      // `ResolutionScoringService.scoringFrom` would lose the persisted margin.
+      const survivor = {
+        productId: 'cand-keep',
+        displayName: 'KTM MACINA KAPOHO ELITE 2023',
+        source: 'fuzzy' as const,
+      };
+      const recorder = makeResolutionRecorder();
+
+      const recallService = {
+        recall: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          if (ctx.strategiesRun.length === 0) {
+            ctx.strategiesRun.push('fuzzy');
+            ctx.candidates = [CANDIDATE, survivor];
+          }
+        }),
+      } as unknown as RecallService;
+
+      const filterService = {
+        filter: jest.fn().mockReturnValue({
+          qualifyingCandidates: [survivor],
+          outcome: {
+            qualifyingCandidateIds: ['cand-keep'],
+            filteredCandidates: [
+              {
+                candidateId: 'cand-1',
+                candidateName: 'KTM MACINA KAPOHO ELITE',
+                reason: 'match_specs',
+                detail: MISMATCH_DETAIL,
+              },
+            ],
+          },
+        }),
+      } as unknown as FilterService;
+
+      // Mimics ScoringService: annotates the surviving SlimCandidate in place.
+      const scoringService = {
+        score: jest.fn().mockImplementation((ctx: ResolutionContext) => {
+          for (const candidate of ctx.candidates) candidate.matchScore = 72;
+        }),
+      } as unknown as ScoringService;
+
+      const service = new ResolutionService(
+        makeReferenceResolver(null),
+        makeStage<BrandResolverService>('resolve'),
+        makeStage<CategoryResolverService>('resolve'),
+        recallService,
+        filterService,
+        scoringService,
+        makeStage<DecisionService>('decide'),
+        makeFinalize({} as ResolutionResult),
+        recorder,
+      );
+
+      await service.search(INPUT, OPTIONS);
+
+      const params = (recorder.recordResolution as jest.Mock).mock.calls[0][0];
+      expect(params.candidates).toHaveLength(2);
+
+      const byId = Object.fromEntries(
+        params.candidates.map((c: { candidateId: string }) => [c.candidateId, c]),
+      );
+      expect(byId['cand-keep'].matchScore).toBe(72);
+      expect(byId['cand-keep'].filtered).toBeUndefined();
+      expect(byId['cand-1'].matchScore).toBeUndefined();
+      expect(byId['cand-1'].filtered.detail).toBe(MISMATCH_DETAIL);
+    });
+  });
 });

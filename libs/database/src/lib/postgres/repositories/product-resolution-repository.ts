@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
-import { isNil, omitBy } from 'lodash';
+import { isEmpty, isNil, omitBy } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { ProductResolution } from '../models/product-resolution.entity';
@@ -21,6 +21,7 @@ import type {
   ProductDuplicateDetectionInputSnapshot,
 } from '../types/product-resolution-input-snapshot';
 import type { ProductResolutionDecisionSnapshot } from '../types/product-resolution-decision-snapshot';
+import type { ResolutionPriorityBreakdown } from '../types/resolution-priority-breakdown';
 
 /** Flow-agnostic params for the single, always-insert write primitive. This is
  *  the literal shared mechanism both the resolution flow and the
@@ -46,8 +47,18 @@ export interface CreateProductResolutionParams {
   fingerprint?: string;
   sourceRecordId?: string;
   decisionConfidence?: number;
+  priority?: number;
+  priorityBreakdown?: ResolutionPriorityBreakdown;
   /** The producing system's own decision — always the first log entry. */
   seedDecision?: ProductResolutionDecisionEntry;
+}
+
+/** One row's rescored values, as written by the nightly sweep. */
+export interface ResolutionScoreUpdate {
+  id: string;
+  decisionConfidence: number;
+  priority: number;
+  priorityBreakdown: ResolutionPriorityBreakdown;
 }
 
 /** What `upsertByAnchor` actually did, so callers can log/meter it without
@@ -82,6 +93,8 @@ export interface UpsertProductResolutionPairParams {
   anchorKey?: string;
   fingerprint?: string;
   decisionConfidence?: number;
+  priority?: number;
+  priorityBreakdown?: ResolutionPriorityBreakdown;
   seedDecision?: ProductResolutionDecisionEntry;
 }
 
@@ -148,9 +161,29 @@ export class ProductResolutionRepository extends BasePostgresRepository<ProductR
     resolution.decisions = params.seedDecision ? [params.seedDecision] : [];
     resolution.anchorKey = params.anchorKey;
     resolution.fingerprint = params.fingerprint;
-    resolution.decisionConfidence = params.decisionConfidence;
     resolution.lastSeenAt = new Date();
+    this.applyScores(resolution, params);
     return this.repo.save(resolution);
+  }
+
+  /**
+   * The denormalized scores, always written together.
+   *
+   * They are all derived from the same decision content, so a path that
+   * refreshed one and not the others would leave a row ranked by evidence it no
+   * longer carries — which is exactly the kind of drift nobody notices.
+   */
+  private applyScores(
+    resolution: ProductResolution,
+    params: Pick<
+      CreateProductResolutionParams,
+      'decisionConfidence' | 'priority' | 'priorityBreakdown'
+    >,
+  ): void {
+    resolution.decisionConfidence = params.decisionConfidence;
+    resolution.priority = params.priority;
+    resolution.priorityBreakdown = params.priorityBreakdown;
+    resolution.priorityComputedAt = isNil(params.priority) ? null : new Date();
   }
 
   /** The one open (still-needs-attention) row for a situation, if any. Decided
@@ -241,10 +274,10 @@ export class ProductResolutionRepository extends BasePostgresRepository<ProductR
     existing.candidates = params.candidates;
     existing.inputSnapshot = params.inputSnapshot;
     existing.decisionSnapshot = params.decisionSnapshot;
-    existing.decisionConfidence = params.decisionConfidence;
     existing.fingerprint = params.fingerprint;
     existing.lastSeenAt = new Date();
     existing.status = ProductResolutionStatus.pending;
+    this.applyScores(existing, params);
     if (params.resolvedProductId) {
       existing.resolvedProduct = {
         id: params.resolvedProductId,
@@ -312,6 +345,100 @@ export class ProductResolutionRepository extends BasePostgresRepository<ProductR
         `${sourceRecord}.${nameOf<ProductSourceRecord>('model')}`,
       ],
     });
+  }
+
+  /**
+   * The next rows due a rescore, oldest first, with only the *ids* of the
+   * products each one touches.
+   *
+   * The joins select `id` and nothing else: the sweep needs to know which
+   * products a row affects so it can count what rides on them, not what those
+   * products contain. Ordering on `priorityComputedAt` is what makes the sweep
+   * self-advancing — every row it writes moves behind the cursor — so it needs
+   * no offset paging and cannot revisit a row within a run.
+   */
+  async findStalePriorityBatch(
+    computedBefore: Date,
+    limit: number,
+  ): Promise<ProductResolution[]> {
+    const computedAt = nameOf<ProductResolution>('priorityComputedAt');
+
+    return this.repo
+      .createQueryBuilder('resolution')
+      .leftJoin(
+        `resolution.${nameOf<ProductResolution>('sourceRecord')}`,
+        'sourceRecord',
+      )
+      .addSelect('sourceRecord.id')
+      .leftJoin(
+        `sourceRecord.${nameOf<ProductSourceRecord>('model')}`,
+        'listingProduct',
+      )
+      .addSelect('listingProduct.id')
+      .leftJoin(
+        `resolution.${nameOf<ProductResolution>('productA')}`,
+        'productA',
+      )
+      .addSelect('productA.id')
+      .leftJoin(
+        `resolution.${nameOf<ProductResolution>('productB')}`,
+        'productB',
+      )
+      .addSelect('productB.id')
+      .leftJoin(
+        `resolution.${nameOf<ProductResolution>('resolvedProduct')}`,
+        'resolvedProduct',
+      )
+      .addSelect('resolvedProduct.id')
+      .where(
+        `(resolution.${computedAt} IS NULL OR resolution.${computedAt} < :computedBefore)`,
+        { computedBefore },
+      )
+      .orderBy(`resolution.${computedAt}`, 'ASC', 'NULLS FIRST')
+      .limit(limit)
+      .getMany();
+  }
+
+  /**
+   * Writes a whole batch's scores in one statement.
+   *
+   * Deliberately raw rather than `save()`: the values differ per row, so the ORM
+   * would issue one UPDATE each, and at thousands of rows a night that is the
+   * cost that decides whether the sweep is viable.
+   *
+   * It also, deliberately, does **not** touch `updatedAt` — a rescore is not a
+   * modification anyone made. `pruneSuperseded` ages rows on `updatedAt`, so a
+   * sweep that bumped it would quietly make superseded rows immortal.
+   */
+  async updateScores(updates: ResolutionScoreUpdate[]): Promise<number> {
+    if (isEmpty(updates)) return 0;
+
+    const params: unknown[] = [];
+    const values = updates
+      .map((update) => {
+        const base = params.length;
+        params.push(
+          update.id,
+          update.decisionConfidence,
+          update.priority,
+          JSON.stringify(update.priorityBreakdown),
+        );
+        return `($${base + 1}::uuid, $${base + 2}::smallint, $${base + 3}::smallint, $${base + 4}::jsonb)`;
+      })
+      .join(', ');
+
+    await this.repo.query(
+      `UPDATE "${this.repo.metadata.tableName}" AS target
+       SET "${nameOf<ProductResolution>('decisionConfidence')}" = source.confidence,
+           "${nameOf<ProductResolution>('priority')}" = source.priority,
+           "${nameOf<ProductResolution>('priorityBreakdown')}" = source.breakdown,
+           "${nameOf<ProductResolution>('priorityComputedAt')}" = now()
+       FROM (VALUES ${values}) AS source(id, confidence, priority, breakdown)
+       WHERE target.id = source.id`,
+      params,
+    );
+
+    return updates.length;
   }
 
   /** Superseded rows are pure noise once a newer row exists — age them on their
@@ -389,6 +516,8 @@ export class ProductResolutionRepository extends BasePostgresRepository<ProductR
       existing.anchorKey = params.anchorKey ?? existing.anchorKey;
       existing.fingerprint = params.fingerprint ?? existing.fingerprint;
       existing.lastSeenAt = new Date();
+      // The pair was re-scored above, so its derived scores must move with it.
+      this.applyScores(existing, params);
       if (params.seedDecision) {
         existing.decisions = [
           ...(existing.decisions ?? []),
@@ -420,6 +549,8 @@ export class ProductResolutionRepository extends BasePostgresRepository<ProductR
       anchorKey: params.anchorKey,
       fingerprint: params.fingerprint,
       decisionConfidence: params.decisionConfidence,
+      priority: params.priority,
+      priorityBreakdown: params.priorityBreakdown,
       seedDecision: params.seedDecision,
     });
   }

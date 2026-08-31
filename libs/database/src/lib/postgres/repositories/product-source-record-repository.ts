@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
+import { countByRelationIds } from './grouped-count';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { isEmpty } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -13,6 +14,15 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     repository: Repository<ProductSourceRecord>,
   ) {
     super(repository, ProductSourceRecord);
+  }
+
+  /** How many listings sit on each of these products, in one query. */
+  async countByModelIds(modelIds: string[]): Promise<Map<string, number>> {
+    return countByRelationIds(
+      this.repo,
+      nameOf<ProductSourceRecord>('model'),
+      modelIds,
+    );
   }
 
   async findByUrl(url: string): Promise<ProductSourceRecord | null> {

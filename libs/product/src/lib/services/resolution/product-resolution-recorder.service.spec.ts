@@ -8,6 +8,9 @@ import {
 } from '@fittkereso-backend/database';
 import { ProductResolutionRecorderService } from './product-resolution-recorder.service';
 import { ProductResolutionFingerprintService } from './product-resolution-fingerprint.service';
+import { ProductResolutionPriorityService } from './product-resolution-priority.service';
+import { ResolutionConfidenceService } from './resolution-confidence.service';
+import { ResolutionScoringService } from './resolution-scoring.service';
 
 describe('ProductResolutionRecorderService', () => {
   let mockRepo: {
@@ -27,10 +30,17 @@ describe('ProductResolutionRecorderService', () => {
         .mockResolvedValue({ resolution: { id: 'resolution-3' }, outcome: 'created' }),
     };
     mockDynamicConfig = { resolution: undefined };
+    // Real scoring collaborators, not mocks: the point of these tests is that a
+    // recorded row carries scores derived from what was actually written, and a
+    // stubbed number would assert nothing about that.
     service = new ProductResolutionRecorderService(
       mockRepo as unknown as ProductResolutionRepository,
       mockDynamicConfig as unknown as DynamicConfigService,
       new ProductResolutionFingerprintService(),
+      new ResolutionScoringService(
+        new ProductResolutionPriorityService(new ResolutionConfidenceService()),
+        mockDynamicConfig as unknown as DynamicConfigService,
+      ),
     );
   });
 
@@ -158,17 +168,6 @@ describe('ProductResolutionRecorderService', () => {
       expect(params.fingerprint).toEqual(expect.any(String));
     });
 
-    it('denormalizes the decision confidence so the queue can sort on it', async () => {
-      await service.recordResolution({
-        flow: 'product_resolution' as never,
-        similarityScore: 100,
-        anchorKey: 'source-1:sku-9',
-        decisionSnapshot: { confidence: 82 } as never,
-      });
-
-      expect(mockRepo.upsertByAnchor.mock.calls[0][0].decisionConfidence).toBe(82);
-    });
-
     it('seeds the log with an already-performed match when a product was resolved', async () => {
       await service.recordResolution({
         flow: 'product_resolution' as never,
@@ -201,6 +200,99 @@ describe('ProductResolutionRecorderService', () => {
 
     // Below-threshold behaviour now depends on whether a product was matched —
     // see "the created-product exemption" above.
+  });
+
+  describe('the scores written with the row', () => {
+    const record = (overrides: Record<string, unknown> = {}) =>
+      service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 95,
+        anchorKey: 'source-1:sku-9',
+        resolvedProductId: 'product-1',
+        ...overrides,
+      });
+
+    const written = () => mockRepo.upsertByAnchor.mock.calls[0][0];
+
+    it('derives the confidence instead of copying the decider self-report', async () => {
+      // The self-report is one weighted input. Adopting it wholesale is the bug
+      // this replaces: it reads 0 for every rejection, because a rejection has
+      // no selected candidate to take a max over.
+      await record({ decisionSnapshot: { confidence: 82 } });
+
+      expect(written().decisionConfidence).toEqual(expect.any(Number));
+      expect(written().decisionConfidence).not.toBe(82);
+    });
+
+    it('writes a priority and the breakdown that accounts for it', async () => {
+      await record();
+
+      const { priority, priorityBreakdown } = written();
+      expect(priority).toBeGreaterThanOrEqual(0);
+      expect(priority).toBeLessThanOrEqual(100);
+      expect(priorityBreakdown.priority).toBe(priority);
+      expect(priorityBreakdown.confidence).toBe(written().decisionConfidence);
+    });
+
+    it('leaves blast radius unmeasured, and says so', async () => {
+      // Counting the listings on the affected product would be a query per
+      // scraped record. The nightly sweep measures it; the flag is how a
+      // reviewer can tell the difference.
+      await record();
+
+      expect(written().priorityBreakdown.blastRadiusMeasured).toBe(false);
+    });
+
+    it('ranks a near-miss creation above an obviously-new listing', async () => {
+      // Both created a product. The one that scored 95 against an existing
+      // product and still got its own is how duplicates enter the catalog; the
+      // one that resembled nothing is simply a new product.
+      await record({ similarityScore: 95, resolvedProductId: undefined });
+      await record({ similarityScore: 5, resolvedProductId: undefined });
+
+      const [nearMiss, obviouslyNew] = mockRepo.upsertByAnchor.mock.calls;
+      expect(nearMiss[0].priority).toBeGreaterThan(obviouslyNew[0].priority);
+    });
+
+    it('writes them on the anchorless path too', async () => {
+      // The ad-hoc admin endpoint has no anchor and goes straight to insert —
+      // it must not produce an unranked row that sorts last forever.
+      await service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 95,
+        resolvedProductId: 'product-1',
+      });
+
+      expect(mockRepo.insert.mock.calls[0][0].priority).toEqual(
+        expect.any(Number),
+      );
+    });
+
+    it('scores a duplicate pair against the recording threshold it cleared', async () => {
+      // Every recorded pair sits above minScoreToRecord, so raw scores bunch up
+      // at the top. A pair barely over the line must not read as a near-certain
+      // duplicate.
+      mockDynamicConfig.resolution = { minScoreToRecord: 60 };
+
+      await service.recordDuplicatePair({
+        flow: 'duplicate_detection' as never,
+        productAId: 'a',
+        productBId: 'b',
+        similarityScore: 62,
+      });
+      await service.recordDuplicatePair({
+        flow: 'duplicate_detection' as never,
+        productAId: 'c',
+        productBId: 'd',
+        similarityScore: 98,
+      });
+
+      const [marginal, nearIdentical] = mockRepo.upsertPair.mock.calls;
+      expect(marginal[0].decisionConfidence).toBeLessThan(
+        nearIdentical[0].decisionConfidence,
+      );
+      expect(marginal[0].priority).toBeGreaterThan(nearIdentical[0].priority);
+    });
   });
 
   describe('recordDuplicatePair', () => {

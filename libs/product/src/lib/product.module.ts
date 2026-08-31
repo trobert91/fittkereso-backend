@@ -60,6 +60,10 @@ import { SellerResolutionService } from './services/resolution/seller-resolution
 import { OfferMatchingService } from './services/resolution/offer-matching.service';
 import { ProductResolutionRecorderService } from './services/resolution/product-resolution-recorder.service';
 import { ProductResolutionFingerprintService } from './services/resolution/product-resolution-fingerprint.service';
+import { ResolutionConfidenceService } from './services/resolution/resolution-confidence.service';
+import { ProductResolutionPriorityService } from './services/resolution/product-resolution-priority.service';
+import { ResolutionScoringService } from './services/resolution/resolution-scoring.service';
+import { ProductResolutionPriorityRecomputeService } from './services/resolution/product-resolution-priority-recompute.service';
 import { ProductResolutionCleanupService } from './services/resolution/product-resolution-cleanup.service';
 import { ProductResolutionStateService } from './services/resolution/product-resolution-state.service';
 import { ProductResolutionActionService } from './services/resolution/product-resolution-action.service';
@@ -133,6 +137,10 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     OfferMatchingService,
     ProductResolutionRecorderService,
     ProductResolutionFingerprintService,
+    ResolutionConfidenceService,
+    ProductResolutionPriorityService,
+    ResolutionScoringService,
+    ProductResolutionPriorityRecomputeService,
     ProductResolutionCleanupService,
     ProductResolutionStateService,
     ProductResolutionActionService,
@@ -188,6 +196,10 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     OfferMatchingService,
     ProductResolutionRecorderService,
     ProductResolutionFingerprintService,
+    ResolutionConfidenceService,
+    ProductResolutionPriorityService,
+    ResolutionScoringService,
+    ProductResolutionPriorityRecomputeService,
     ProductResolutionCleanupService,
     ProductResolutionStateService,
     ProductResolutionActionService,

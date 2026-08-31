@@ -12,7 +12,8 @@ import {
   ResolutionCorrection,
 } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
-import { compact, isEmpty, last, uniq } from 'lodash';
+import { compact, isEmpty, uniq } from 'lodash';
+import { findLastPerformedDecision } from './resolution-decision-log';
 
 /**
  * Answers one question: *what can be done to this row right now?*
@@ -138,9 +139,7 @@ export class ProductResolutionStateService {
   private findLastPerformed(
     resolution: ProductResolution,
   ): ProductResolutionDecisionEntry | undefined {
-    return last(
-      (resolution.decisions ?? []).filter((entry) => entry.actionPerformed),
-    );
+    return findLastPerformedDecision(resolution.decisions);
   }
 
   /** Which listings a split would move, before any liveness filtering. */

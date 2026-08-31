@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
+import { countByRelationIds } from './grouped-count';
 import { Offer } from '../models/offer.entity';
 import { ProductModel } from '../models/product-model.entity';
 import { Seller } from '../models/seller.entity';
@@ -38,6 +39,11 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     repository: Repository<Offer>,
   ) {
     super(repository, Offer);
+  }
+
+  /** How many offers sit on each of these products, in one query. */
+  async countByModelIds(modelIds: string[]): Promise<Map<string, number>> {
+    return countByRelationIds(this.repo, nameOf<Offer>('model'), modelIds);
   }
 
   // Manual fetch-then-save (not repo.upsert()) because condition defaults

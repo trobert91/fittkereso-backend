@@ -11,7 +11,10 @@ import type {
   ProductResolutionDecisionSnapshot,
 } from '@fittkereso-backend/database';
 import { ProductResolutionRecorderService } from '@fittkereso-backend/product';
-import type { ResolutionContext } from './models/resolution-context';
+import type {
+  ResolutionContext,
+  FilterOutcome,
+} from './models/resolution-context';
 import type { ProductResolutionInput } from './models/resolution-input';
 import type { ResolutionOptions } from './models/resolution-options';
 import type {
@@ -28,7 +31,7 @@ import { ScoringService } from './stages/scoring.service';
 import { DecisionService } from './stages/decision.service';
 import { FinalizeService } from './stages/finalize.service';
 import { productSpecsSummary } from './matching/spec-utils';
-import type { SlimResolvedModel } from './models/slim-types';
+import type { SlimCandidate, SlimResolvedModel } from './models/slim-types';
 
 /**
  * Safety net for the recall fixed-point loop. Correct strategies converge
@@ -141,9 +144,18 @@ export class ResolutionService {
       await this.recallService.recall(context);
       if (context.strategiesRun.length === strategiesBefore) break;
 
+      // Snapshot the pre-filter pool before narrowing `context.candidates`,
+      // and merge rather than replace the filter outcome — both accumulate
+      // across iterations so the recorded row reflects the whole run, not just
+      // the last pass. Without this, a filter rejection is indistinguishable
+      // from a recall miss on the persisted record.
       const filterResult = this.filterService.filter(context);
+      context.recallCandidates = mergeCandidatesById(
+        context.recallCandidates,
+        context.candidates,
+      );
       context.candidates = filterResult.qualifyingCandidates;
-      context.filter = filterResult.outcome;
+      context.filter = mergeFilterOutcomes(context.filter, filterResult.outcome);
       this.scoringService.score(context);
 
       if (iteration === MAX_RECALL_ITERATIONS - 1) {
@@ -224,22 +236,43 @@ export class ResolutionService {
         match.specMatchDetails,
       ]),
     );
+    const filteredByCandidateId = new Map(
+      (context.filter?.filteredCandidates ?? []).map((entry) => [
+        entry.candidateId,
+        entry,
+      ]),
+    );
 
-    const candidates: ProductResolutionCandidateRecord[] = context.candidates.map(
-      (candidate) => ({
-        candidateId: candidate.productId,
-        brand: candidate.brand,
-        model: candidate.model,
-        displayName: candidate.displayName,
-        source: candidate.source,
-        matchScore: candidate.matchScore,
-        matchComponents: candidate.matchComponents,
-        gates: gatesByCandidateId.get(candidate.productId) ?? {
-          passed: false,
-          failedGates: [],
-        },
-        specMatchDetails: specMatchByCandidateId.get(candidate.productId),
-      }),
+    // Record the full recall pool, not the post-filter survivors. A candidate
+    // the filter dropped is precisely the near-miss a reviewer needs to see —
+    // recording only survivors renders these rows as "nothing was recalled".
+    const recordable = context.recallCandidates ?? context.candidates;
+
+    const candidates: ProductResolutionCandidateRecord[] = recordable.map(
+      (candidate) => {
+        const filtered = filteredByCandidateId.get(candidate.productId);
+        return {
+          candidateId: candidate.productId,
+          brand: candidate.brand,
+          model: candidate.model,
+          displayName: candidate.displayName,
+          source: candidate.source,
+          matchScore: candidate.matchScore,
+          matchComponents: candidate.matchComponents,
+          // A filtered candidate never reached the quality gates, so it has no
+          // gate result of its own; synthesize one naming the filter reason so
+          // `gates.passed`-based readers still count it as a rejection.
+          gates: gatesByCandidateId.get(candidate.productId) ??
+            (filtered
+              ? { passed: false, failedGates: [`filter_${filtered.reason}`] }
+              : { passed: false, failedGates: [] }),
+          filtered: filtered && {
+            reason: filtered.reason,
+            detail: filtered.detail,
+          },
+          specMatchDetails: specMatchByCandidateId.get(candidate.productId),
+        };
+      },
     );
 
     const inputSnapshot: ProductResolutionInputSnapshot = {
@@ -271,7 +304,10 @@ export class ResolutionService {
       decisionSnapshot,
       anchorKey: recordingContext?.anchorKey,
       sourceRecordId: recordingContext?.sourceRecordId,
-      decisionConfidence: context.decision?.confidence,
+      // `decisionConfidence` is deliberately not passed: the recorder derives it
+      // from all the evidence via `ResolutionConfidenceService`. The decider's
+      // self-reported number reaches it as one weighted input, inside
+      // `decisionSnapshot.confidence`.
     };
   }
 
@@ -319,15 +355,21 @@ export class ResolutionService {
       strategiesRun: context.strategiesRun,
       recallFunnel: context.recallFunnel,
       filter: context.filter,
-      candidates: context.candidates.map((candidate) => ({
-        productId: candidate.productId,
-        brand: candidate.brand,
-        model: candidate.model,
-        displayName: candidate.displayName,
-        source: candidate.source,
-        matchScore: candidate.matchScore,
-        matchComponents: candidate.matchComponents,
-      })),
+      // The full recall pool, matching what gets persisted on the
+      // `ProductResolution` row — `filter.qualifyingCandidateIds` says which of
+      // these survived. Logging the narrowed `context.candidates` here made
+      // filter rejections read as empty-recall in Loki.
+      candidates: (context.recallCandidates ?? context.candidates).map(
+        (candidate) => ({
+          productId: candidate.productId,
+          brand: candidate.brand,
+          model: candidate.model,
+          displayName: candidate.displayName,
+          source: candidate.source,
+          matchScore: candidate.matchScore,
+          matchComponents: candidate.matchComponents,
+        }),
+      ),
       scoring: context.scoring,
       decision: context.decision,
       webResearch: context.webResearch,
@@ -348,6 +390,58 @@ export class ResolutionService {
       this.logger.warn(headline, summary);
     }
   }
+}
+
+/**
+ * Union two candidate pools by productId, preferring the entry that carries a
+ * matcher score (later passes attach one) and otherwise keeping the first
+ * sighting. Order is stable: previously-seen candidates keep their position and
+ * newcomers append.
+ */
+function mergeCandidatesById(
+  existing: SlimCandidate[] | undefined,
+  incoming: SlimCandidate[],
+): SlimCandidate[] {
+  const merged = new Map<string, SlimCandidate>();
+  for (const candidate of existing ?? []) {
+    merged.set(candidate.productId, candidate);
+  }
+  for (const candidate of incoming) {
+    const previous = merged.get(candidate.productId);
+    if (
+      !previous ||
+      (previous.matchScore ?? -Infinity) < (candidate.matchScore ?? -Infinity)
+    ) {
+      merged.set(candidate.productId, candidate);
+    }
+  }
+  return Array.from(merged.values());
+}
+
+/**
+ * Combine filter outcomes across recall iterations. `qualifyingCandidateIds`
+ * reflects the latest pass (it describes the pool the decision stage will see),
+ * while `filteredCandidates` accumulates — a candidate rejected in an early
+ * pass stays on the record even though a later pass no longer sees it. Entries
+ * are deduped by candidateId, keeping the first rejection reason.
+ */
+function mergeFilterOutcomes(
+  existing: FilterOutcome | undefined,
+  incoming: FilterOutcome,
+): FilterOutcome {
+  if (!existing) return incoming;
+  const seen = new Set(
+    existing.filteredCandidates.map((entry) => entry.candidateId),
+  );
+  return {
+    qualifyingCandidateIds: incoming.qualifyingCandidateIds,
+    filteredCandidates: [
+      ...existing.filteredCandidates,
+      ...incoming.filteredCandidates.filter(
+        (entry) => !seen.has(entry.candidateId),
+      ),
+    ],
+  };
 }
 
 function createInitialContext(

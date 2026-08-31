@@ -243,6 +243,12 @@
     "modelYear",
     "usageType"
   ],
+  "matcherSpecHierarchies": {
+    "usageType": {
+      "MTB": ["Összteleszkópos MTB"],
+      "Trekking": ["Cross Trekking"]
+    }
+  },
   "matcherSpecs": [
     "motorPower",
     "modelYear",

@@ -10,10 +10,11 @@ import {
   type ProductResolutionDecisionEntry,
   type UpsertProductResolutionPairParams,
 } from '@fittkereso-backend/database';
-import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductResolutionFingerprintService } from './product-resolution-fingerprint.service';
+import { ResolutionScoringService } from './resolution-scoring.service';
+import { minScoreToRecord } from './resolution-record-threshold';
 
 /**
  * Single shared mechanism both the resolution flow (`libs/resolution`, via
@@ -40,6 +41,7 @@ export class ProductResolutionRecorderService {
     private readonly resolutionRepo: ProductResolutionRepository,
     private readonly dynamicConfigService: DynamicConfigService,
     private readonly fingerprintService: ProductResolutionFingerprintService,
+    private readonly scoringService: ResolutionScoringService,
   ) {}
 
   /**
@@ -53,9 +55,10 @@ export class ProductResolutionRecorderService {
     if (!this.shouldRecordResolution(params)) return null;
 
     const seedDecision = this.buildResolutionSeed(params);
+    const scores = this.scoringService.forRecord({ ...params, seedDecision });
 
     if (!params.anchorKey) {
-      return this.resolutionRepo.insert({ ...params, seedDecision });
+      return this.resolutionRepo.insert({ ...params, ...scores, seedDecision });
     }
 
     const fingerprint = this.fingerprintService.compute({
@@ -68,10 +71,9 @@ export class ProductResolutionRecorderService {
 
     const { resolution, outcome } = await this.resolutionRepo.upsertByAnchor({
       ...params,
+      ...scores,
       anchorKey: params.anchorKey,
       fingerprint,
-      decisionConfidence:
-        params.decisionConfidence ?? params.decisionSnapshot?.confidence,
       seedDecision,
     });
 
@@ -79,6 +81,8 @@ export class ProductResolutionRecorderService {
       resolutionId: resolution.id,
       anchorKey: params.anchorKey,
       outcome,
+      priority: scores.priority,
+      decisionConfidence: scores.decisionConfidence,
     });
 
     return resolution;
@@ -105,16 +109,18 @@ export class ProductResolutionRecorderService {
       params.productAId,
       params.productBId,
     );
+    const seedDecision = this.buildDuplicateSeed(params);
 
     return this.resolutionRepo.upsertPair({
       ...params,
+      ...this.scoringService.forRecord({ ...params, seedDecision }),
       anchorKey,
       fingerprint: this.fingerprintService.compute({
         flow: params.flow,
         anchorKey,
         candidates: params.candidates,
       }),
-      seedDecision: this.buildDuplicateSeed(params),
+      seedDecision,
     });
   }
 
@@ -224,10 +230,7 @@ export class ProductResolutionRecorderService {
   }
 
   private recordThreshold(): number {
-    return (
-      this.dynamicConfigService.resolution?.minScoreToRecord ??
-      RESOLUTION_DEFAULTS.minScoreToRecord
-    );
+    return minScoreToRecord(this.dynamicConfigService);
   }
 
   /**

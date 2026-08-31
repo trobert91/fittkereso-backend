@@ -31,5 +31,14 @@ export interface ProductResolutionCandidateRecord {
   matchScore?: number;
   matchComponents?: MatchResultComponents;
   gates: ProductResolutionCandidateGates;
+  /** Set when the candidate was dropped by the filter stage (brand/category/
+   *  primary-spec contradiction) before scoring ever ran, so a persisted row
+   *  shows near-misses rather than only the survivors. `detail` is the
+   *  human-readable contradiction, e.g. `usageType MTB ≠ Összteleszkópos MTB`.
+   *  Absent for candidates that reached scoring. */
+  filtered?: {
+    reason: 'match_specs' | 'category' | 'brand';
+    detail: string;
+  };
   specMatchDetails?: SpecMatchDetails;
 }

@@ -158,6 +158,44 @@ export interface DynamicConfigData {
        *  pruned. Default: 60 */
       doneRetentionDays?: number;
     };
+    /** The review-queue priority score: how important it is that a human looks
+     *  at a row. */
+    priority?: {
+      /** Master switch for the nightly confidence/priority recompute sweep.
+       *  Default: true */
+      recomputeEnabled?: boolean;
+      /** Rows loaded and rescored per batch. Default: 500 */
+      recomputeBatchSize?: number;
+      /** Upper bound on rows rescored in one nightly run, so a very large
+       *  queue degrades to "takes a few nights" rather than "runs until
+       *  morning". Default: 50000 */
+      maxRowsPerRun?: number;
+      /**
+       * Scoring weights, overridable so tuning needs no deploy.
+       *
+       * These are informed guesses until there is enough review history to fit
+       * them against (see §4.1 of `docs/ResolutionConfidenceScoreAnalysis.md`),
+       * which is exactly why they are the one part of the calculation that can
+       * be changed at runtime. Anything omitted keeps its coded default.
+       */
+      weights?: {
+        /** How much each piece of evidence counts toward `decisionConfidence`. */
+        confidence?: {
+          outcomeAgreement?: number;
+          specAgreement?: number;
+          gateAgreement?: number;
+          corroboration?: number;
+          margin?: number;
+          selfReport?: number;
+        };
+        /** How much each factor counts toward what a wrong decision costs. */
+        impact?: {
+          blastRadius?: number;
+          actionKind?: number;
+          mergeReach?: number;
+        };
+      };
+    };
     matching?: {
       acceptThreshold?: number;
       acceptThresholdStrict?: number;
@@ -490,6 +528,54 @@ export const dynamicConfigSchema = {
               description:
                 'Days to keep decided resolution rows, aged by lastSeenAt so rows for still-scraped listings are never pruned. Default: 60',
               default: 60,
+            },
+          },
+        },
+        priority: {
+          type: 'object',
+          additionalProperties: true,
+          description:
+            'The review-queue priority score — how important it is that a human looks at a row.',
+          properties: {
+            recomputeEnabled: {
+              type: 'boolean',
+              description:
+                'Master switch for the nightly confidence/priority recompute sweep. Default: true',
+              default: true,
+            },
+            recomputeBatchSize: {
+              type: 'number',
+              minimum: 1,
+              maximum: 5000,
+              description: 'Rows loaded and rescored per batch. Default: 500',
+              default: 500,
+            },
+            maxRowsPerRun: {
+              type: 'number',
+              minimum: 1,
+              description:
+                'Upper bound on rows rescored in one nightly run. Default: 50000',
+              default: 50000,
+            },
+            weights: {
+              type: 'object',
+              additionalProperties: true,
+              description:
+                'Scoring weights, overridable so tuning needs no deploy. Anything omitted keeps its coded default.',
+              properties: {
+                confidence: {
+                  type: 'object',
+                  additionalProperties: true,
+                  description:
+                    'How much each piece of evidence counts toward decisionConfidence.',
+                },
+                impact: {
+                  type: 'object',
+                  additionalProperties: true,
+                  description:
+                    'How much each factor counts toward what a wrong decision costs.',
+                },
+              },
             },
           },
         },

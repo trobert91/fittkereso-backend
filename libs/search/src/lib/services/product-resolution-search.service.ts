@@ -16,10 +16,6 @@ import { ProductResolutionSearchResult } from '../models/product-resolution-sear
 
 const DEFAULT_PAGE_SIZE = 50;
 
-/** Alias for the computed review-order rank. Must contain no dot — see
- *  `applyOrder`. */
-const RELEVANCE_RANK_ALIAS = 'resolution_review_rank';
-
 @Injectable()
 export class ProductResolutionSearchService {
   constructor(private readonly resolutionRepo: ProductResolutionRepository) {}
@@ -210,6 +206,13 @@ export class ProductResolutionSearchService {
       );
     }
 
+    if (params.minPriority !== undefined) {
+      query.andWhere(
+        `resolution.${nameOf<ProductResolution>('priority')} >= :minPriority`,
+        { minPriority: params.minPriority },
+      );
+    }
+
     if (params.query) {
       const displayName = nameOf<ProductModel>('displayName');
       query.andWhere(
@@ -219,39 +222,28 @@ export class ProductResolutionSearchService {
     }
   }
 
+  /**
+   * Everything sorts by a real column now.
+   *
+   * The default used to be a `CASE WHEN status = 'pending'` expression plus
+   * similarity — a stand-in for a priority the schema could not express, and one
+   * that ranked a near-identical pair the system obviously got right above an
+   * uncertain decision that quietly created a duplicate. `priority` measures the
+   * thing that sort was reaching for, and being an indexed column it also drops
+   * the expression that broke the paginated path.
+   */
   private applyOrder(
     query: SelectQueryBuilder<ProductResolution>,
     params: ProductResolutionSearchParams,
   ): void {
-    const status = nameOf<ProductResolution>('status');
-    const similarityScore = nameOf<ProductResolution>('similarityScore');
     const createdAt = nameOf<ProductResolution>('createdAt');
-
-    if (!params.sortBy || params.sortBy === 'relevance') {
-      // Review order: things still awaiting a decision first, then the closest
-      // calls — where a wrong automated decision is most likely to be hiding.
-      //
-      // The rank is projected as an aliased column rather than written inline
-      // into ORDER BY. With skip/take, TypeORM rewrites this into a DISTINCT
-      // subquery and parses every order-by term containing a dot as
-      // `alias.property` — so an inline `(resolution.status = 'pending')` is
-      // read as the alias `(resolution` and throws. A dot-free alias is instead
-      // matched against the select list and resolved against the subquery.
-      query
-        .addSelect(
-          `CASE WHEN resolution.${status} = :relevancePendingStatus THEN 0 ELSE 1 END`,
-          RELEVANCE_RANK_ALIAS,
-        )
-        .setParameter('relevancePendingStatus', ProductResolutionStatus.pending)
-        .orderBy(RELEVANCE_RANK_ALIAS, 'ASC')
-        .addOrderBy(`resolution.${similarityScore}`, 'DESC')
-        .addOrderBy(`resolution.${createdAt}`, 'DESC');
-      return;
-    }
+    const sortBy = params.sortBy ?? 'priority';
 
     query.orderBy(
-      `resolution.${params.sortBy}`,
+      `resolution.${sortBy}`,
       params.sortDir ?? 'DESC',
+      // A row the sweep has not reached yet sorts last rather than first — an
+      // unscored row is unknown, not urgent.
       'NULLS LAST',
     );
     query.addOrderBy(`resolution.${createdAt}`, 'DESC');

@@ -11,6 +11,7 @@ export * from './product-resolution-origin';
 export * from './product-resolution-candidate';
 export * from './product-resolution-input-snapshot';
 export * from './product-resolution-decision-snapshot';
+export * from './resolution-priority-breakdown';
 export * from './spec-match-details';
 export * from './seller-type';
 export * from './offer-condition';

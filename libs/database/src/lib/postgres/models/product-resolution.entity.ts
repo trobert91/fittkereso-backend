@@ -16,6 +16,7 @@ import type {
   ProductDuplicateDetectionInputSnapshot,
 } from '../types/product-resolution-input-snapshot';
 import type { ProductResolutionDecisionSnapshot } from '../types/product-resolution-decision-snapshot';
+import type { ResolutionPriorityBreakdown } from '../types/resolution-priority-breakdown';
 
 /**
  * Unified record of a product-resolution decision, from either of two flows
@@ -181,12 +182,42 @@ export class ProductResolution extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   lastSeenAt?: Date | null;
 
-  /** Denormalized from `decisionSnapshot.confidence` so the queue can sort and
-   *  filter on it without a jsonb expression. */
+  /** How sure we are the outcome was correct — **whichever outcome it was**,
+   *  match or create or reject. Computed by `ResolutionConfidenceService` and
+   *  denormalized here so the queue can sort and filter on it without a jsonb
+   *  expression. */
   @Index()
   @Column({ type: 'smallint', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList] })
   decisionConfidence?: number | null;
+
+  /**
+   * 0–100: how important it is that a human reviews this row, and the queue's
+   * default order. `uncertainty × impact × statusWeight` — a decision we are
+   * sure about scores low however much rides on it, and one touching nothing
+   * scores low however unsure we are.
+   *
+   * An indexed `smallint` is what makes ordering thousands of rows cheap; the
+   * same number derived from `priorityBreakdown` at query time would be neither
+   * indexable nor fast.
+   */
+  @Index()
+  @Column({ type: 'smallint', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  priority?: number | null;
+
+  /** The terms that produced `priority`, so a surprising rank can be traced to
+   *  the one that caused it. */
+  @Column({ type: 'jsonb', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  @Transform(transfromExposeAll())
+  priorityBreakdown?: ResolutionPriorityBreakdown | null;
+
+  /** When priority was last computed. Priority goes stale for reasons the row
+   *  itself doesn't record — products gain listings, weights get tuned — so the
+   *  nightly sweep works oldest-first from this. */
+  @Column({ type: 'timestamptz', nullable: true })
+  priorityComputedAt?: Date | null;
 
   /** The scraped listing this decision was about. Populated for
    *  `product_resolution` rows once the record exists (backfilled right after

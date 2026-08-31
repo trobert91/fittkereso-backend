@@ -8,6 +8,26 @@
     "supersededRetentionDays": 60,
     "doneRetentionDays": 60
   },
+  "priority": {
+    "recomputeEnabled": true,
+    "recomputeBatchSize": 500,
+    "maxRowsPerRun": 50000,
+    "weights": {
+      "confidence": {
+        "outcomeAgreement": 0.3,
+        "specAgreement": 0.21,
+        "gateAgreement": 0.17,
+        "corroboration": 0.15,
+        "margin": 0.085,
+        "selfReport": 0.085
+      },
+      "impact": {
+        "blastRadius": 0.5,
+        "actionKind": 0.3,
+        "mergeReach": 0.2
+      }
+    }
+  },
   "matching": {
     "acceptThreshold": 70,
     "acceptThresholdStrict": 80,

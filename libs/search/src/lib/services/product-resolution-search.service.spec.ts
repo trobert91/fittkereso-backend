@@ -77,7 +77,7 @@ describe('ProductResolutionSearchService', () => {
     ).createOrderByCombinedWithSelectExpression('distinctAlias');
 
   describe('ordering', () => {
-    it('resolves the default review order on a paginated query', () => {
+    it('resolves the default priority order on a paginated query', () => {
       const query = buildPaginatedQuery();
 
       expect(() => resolveOrderByForPagination(query)).not.toThrow();
@@ -92,18 +92,26 @@ describe('ProductResolutionSearchService', () => {
       expect(() => resolveOrderByForPagination(query)).not.toThrow();
     });
 
-    it('ranks pending rows ahead of the rest, then by closest call', () => {
-      const query = buildPaginatedQuery();
-      const sql = query.getQuery();
+    it('leads on priority by default', () => {
+      const orderBy = buildPaginatedQuery().expressionMap.allOrderBys;
 
-      // Pending first — as a projected rank, because an inline predicate is
-      // unparseable once TypeORM rewrites the query for pagination.
-      expect(sql).toContain('resolution_review_rank');
-      const orderBy = query.expressionMap.allOrderBys;
-      expect(Object.keys(orderBy)[0]).toBe('resolution_review_rank');
-      expect(orderBy['resolution_review_rank']).toBe('ASC');
-      expect(orderBy['resolution.similarityScore']).toBe('DESC');
+      expect(Object.keys(orderBy)[0]).toBe('resolution.priority');
+      // An unscored row is unknown, not urgent — it sorts last, never first.
+      expect(orderBy['resolution.priority']).toEqual({
+        order: 'DESC',
+        nulls: 'NULLS LAST',
+      });
       expect(orderBy['resolution.createdAt']).toBe('DESC');
+    });
+
+    it('orders on a real column, with no computed rank left', () => {
+      // The old default projected a `CASE WHEN status = 'pending'` rank because
+      // the schema could not express review order. A stored column both sorts
+      // better and removes the expression that broke the paginated path.
+      const sql = buildPaginatedQuery().getQuery();
+
+      expect(sql).not.toContain('resolution_review_rank');
+      expect(sql).not.toContain('CASE WHEN');
     });
 
     it('never emits an order-by term whose alias prefix does not exist', () => {
@@ -111,7 +119,7 @@ describe('ProductResolutionSearchService', () => {
       // everything before the first dot as an alias name.
       for (const params of [
         {},
-        { sortBy: 'relevance' as const },
+        { sortBy: 'priority' as const },
         { sortBy: 'similarityScore' as const },
         { sortBy: 'decisionConfidence' as const },
         { sortBy: 'createdAt' as const },
@@ -167,6 +175,17 @@ describe('ProductResolutionSearchService', () => {
       expect(sql).toContain('sourceRecord');
       expect(sql).toContain('listingSource');
       expect(sql).toContain('listingProduct');
+    });
+
+    it('lets a reviewer work a priority band', () => {
+      const query = buildPaginatedQuery({ minPriority: 60 });
+
+      expect(query.getQuery()).toContain('"resolution"."priority" >= :minPriority');
+      expect(query.getParameters()['minPriority']).toBe(60);
+    });
+
+    it('applies no priority floor unless asked, so nothing vanishes silently', () => {
+      expect(buildPaginatedQuery().getQuery()).not.toContain(':minPriority');
     });
   });
 });

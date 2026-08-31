@@ -15,6 +15,9 @@ import type { SearchEvidence, WebQueryRecord } from './search-evidence';
  *  gates, and which were dropped (with reason). */
 export interface FilterOutcome {
   qualifyingCandidateIds: string[];
+  /** Accumulated across every filter pass in the orchestrator's recall loop —
+   *  a later pass adds to this rather than replacing it, so rejections from an
+   *  earlier iteration aren't lost when a rescue strategy widens the pool. */
   filteredCandidates: Array<{
     candidateId: string;
     /** Human-readable candidate label (brand + model / displayName) for trace
@@ -165,9 +168,27 @@ export interface ResolutionContext {
   searchEvidence: SearchEvidence[];
   /** Funnel counts for the recall phase. */
   recallFunnel?: CandidateFunnel;
-  /** All recall candidates (post-dedupe, post-reference-exclusion). Each entry
-   *  carries the matcher score after Stage 5 runs. */
+  /** The live candidate pool. Starts as everything recall produced
+   *  (post-dedupe, post-reference-exclusion) and is *narrowed in place* by the
+   *  orchestrator after each filter pass, so by the time the decision and
+   *  recording stages read it, it holds survivors only. Each entry carries the
+   *  matcher score after Stage 5 runs.
+   *
+   *  Read `recallCandidates` instead when you need everything recall found —
+   *  in particular for anything audit- or diagnostics-shaped, where reporting
+   *  only the survivors makes a filter rejection look like a recall miss. */
   candidates: SlimCandidate[];
+  /** Every candidate recall ever produced this run, accumulated across all
+   *  iterations of the orchestrator's fixed-point loop and never narrowed by
+   *  the filter. Written by `ResolutionService` immediately before it applies
+   *  each filter pass to `candidates`.
+   *
+   *  Exists because `candidates` is destructively narrowed: a candidate the
+   *  filter drops (wrong brand/category, contradicted primary spec) vanishes
+   *  from it, which previously left `ProductResolution.candidates` empty on
+   *  exactly the near-miss resolutions most worth reviewing. Pair each entry
+   *  with `filter.filteredCandidates` to recover why it was dropped. */
+  recallCandidates?: SlimCandidate[];
   /**
    * Append-only sequence recording every recall-strategy fire, in order. A
    * strategy that fires N times appears N times. Read by strategy `shouldRun`

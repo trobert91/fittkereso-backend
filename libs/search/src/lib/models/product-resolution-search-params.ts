@@ -16,7 +16,7 @@ import {
 } from '@fittkereso-backend/database';
 
 export const RESOLUTION_SORT_FIELDS = [
-  'relevance',
+  'priority',
   'similarityScore',
   'decisionConfidence',
   'createdAt',
@@ -84,13 +84,22 @@ export class ProductResolutionSearchParams {
   @Type(() => Number)
   minConfidence?: number;
 
+  /** Work a band of the queue. No default — the queue shows everything, sorted;
+   *  nothing disappears from it silently. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  minPriority?: number;
+
   /** Free-text over the involved products' display names and the anchor key. */
   @IsOptional()
   @IsString()
   query?: string;
 
-  /** `relevance` (default) means pending first, then closest calls — the order
-   *  to review in. Any other field sorts by that column directly. */
+  /** `priority` (default) — how important it is that a human looks at the row.
+   *  Every option is a real column; there is no computed order any more. */
   @IsOptional()
   @IsIn(RESOLUTION_SORT_FIELDS as unknown as string[])
   sortBy?: ProductResolutionSortField;

@@ -7,6 +7,7 @@ import { SCHEDULING_DEFAULTS } from '@fittkereso-backend/config';
 import {
   ProductDuplicateEvaluationService,
   ProductResolutionCleanupService,
+  ProductResolutionPriorityRecomputeService,
 } from '@fittkereso-backend/product';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class DuplicateDetectionScheduler extends BaseScheduler {
     readonly metricsService: SchedulerMetricsService,
     private readonly evaluationService: ProductDuplicateEvaluationService,
     private readonly cleanupService: ProductResolutionCleanupService,
+    private readonly priorityRecomputeService: ProductResolutionPriorityRecomputeService,
     private readonly dynamicConfigService: DynamicConfigService,
   ) {
     super(DuplicateDetectionScheduler.name, metricsService);
@@ -26,6 +28,17 @@ export class DuplicateDetectionScheduler extends BaseScheduler {
   }
 
   private async run(): Promise<void> {
+    await this.detectDuplicates();
+
+    // Rescore last: after detection has added rows and cleanup has removed the
+    // ones nobody will look at, so the pass does no work it will throw away.
+    // Outside the detection switch on purpose — the queue still needs ordering
+    // on a night detection does not run, and this has its own
+    // `resolution.priority.recomputeEnabled` toggle.
+    await this.priorityRecomputeService.recompute();
+  }
+
+  private async detectDuplicates(): Promise<void> {
     const enabled =
       this.dynamicConfigService.scheduling?.duplicateDetection?.enabled ??
       SCHEDULING_DEFAULTS.duplicateDetection.enabled;
