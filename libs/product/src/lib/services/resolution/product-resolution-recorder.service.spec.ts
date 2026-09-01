@@ -10,6 +10,7 @@ import { ProductResolutionRecorderService } from './product-resolution-recorder.
 import { ProductResolutionFingerprintService } from './product-resolution-fingerprint.service';
 import { ProductResolutionPriorityService } from './product-resolution-priority.service';
 import { ResolutionConfidenceService } from './resolution-confidence.service';
+import { ResolutionReviewTriggerService } from './resolution-review-trigger.service';
 import { ResolutionScoringService } from './resolution-scoring.service';
 
 describe('ProductResolutionRecorderService', () => {
@@ -39,6 +40,9 @@ describe('ProductResolutionRecorderService', () => {
       new ProductResolutionFingerprintService(),
       new ResolutionScoringService(
         new ProductResolutionPriorityService(new ResolutionConfidenceService()),
+        new ResolutionReviewTriggerService(
+          mockDynamicConfig as unknown as DynamicConfigService,
+        ),
         mockDynamicConfig as unknown as DynamicConfigService,
       ),
     );
@@ -243,15 +247,44 @@ describe('ProductResolutionRecorderService', () => {
       expect(written().priorityBreakdown.blastRadiusMeasured).toBe(false);
     });
 
+    /** A creation that had a real candidate to reject — `similarityScore` is the
+     *  best candidate's score, so a number without a candidate behind it is a
+     *  shape the pipeline cannot produce. */
+    const creationScoring = (score: number) => ({
+      resolvedProductId: undefined,
+      similarityScore: score,
+      candidates: [
+        {
+          candidateId: 'candidate-1',
+          source: 'fuzzy' as const,
+          matchScore: score,
+          gates: { passed: false, failedGates: ['low_confidence'] },
+        },
+      ],
+    });
+
     it('ranks a near-miss creation above an obviously-new listing', async () => {
       // Both created a product. The one that scored 95 against an existing
       // product and still got its own is how duplicates enter the catalog; the
       // one that resembled nothing is simply a new product.
-      await record({ similarityScore: 95, resolvedProductId: undefined });
-      await record({ similarityScore: 5, resolvedProductId: undefined });
+      await record(creationScoring(95));
+      await record(creationScoring(5));
 
       const [nearMiss, obviouslyNew] = mockRepo.upsertByAnchor.mock.calls;
       expect(nearMiss[0].priority).toBeGreaterThan(obviouslyNew[0].priority);
+    });
+
+    it('refuses to claim confidence in a creation it found nothing to compare', async () => {
+      // The old failure: with no candidates every component but outcomeAgreement
+      // drops out, that one renormalizes to full weight, and "found nothing,
+      // called it new — consistent!" scored 100. Absence of evidence read as
+      // agreement, on exactly the rows the recorder goes out of its way to keep.
+      // See `resolution-scoring.service.spec.ts` for the explained-pool case that
+      // stops this from lifting every ordinary new product.
+      await record({ similarityScore: 0, resolvedProductId: undefined });
+
+      expect(written().decisionConfidence).toBe(0);
+      expect(written().priority).toBeGreaterThan(0);
     });
 
     it('writes them on the anchorless path too', async () => {
@@ -292,6 +325,156 @@ describe('ProductResolutionRecorderService', () => {
         nearIdentical[0].decisionConfidence,
       );
       expect(marginal[0].priority).toBeGreaterThan(nearIdentical[0].priority);
+    });
+  });
+
+  describe('record-time auto-accept', () => {
+    /** A clean cross-source match: one candidate that passed every gate, scored
+     *  high, and nothing for a trigger to object to. */
+    const cleanMatch = (overrides: Record<string, unknown> = {}) =>
+      service.recordResolution({
+        flow: 'product_resolution' as never,
+        similarityScore: 98,
+        anchorKey: 'source-1:sku-clean',
+        resolvedProductId: 'product-1',
+        candidates: [
+          {
+            candidateId: 'product-1',
+            source: 'fuzzy' as never,
+            matchScore: 98,
+            matchComponents: {
+              stringSimilarity: 0.97,
+              tokenOverlap: 1,
+              alphaMatch: 1,
+              aliasMatch: true,
+              specSimilarity: 0.9,
+            },
+            gates: { passed: true, failedGates: [] },
+          },
+        ],
+        specMatchDetails: {
+          comparableCount: 6,
+          matchingCount: 6,
+          primaryMismatches: 0,
+          matcherSpecMismatches: 0,
+          nonPrimaryMismatches: 0,
+          details: [],
+        },
+        decisionSnapshot: {
+          kind: 'matcher_accept' as never,
+          confidence: 98,
+          reason: 'matcher_accept',
+          selectedCandidates: [{ candidateId: 'product-1', confidence: 98 }],
+        },
+        ...overrides,
+      } as never);
+
+    const written = () => mockRepo.upsertByAnchor.mock.calls[0][0];
+
+    beforeEach(() => {
+      mockDynamicConfig.resolution = {
+        automation: { deterministic: { dryRun: false } },
+      } as never;
+    });
+
+    it('settles a trusted row before it ever reaches the queue', async () => {
+      await cleanMatch();
+
+      const { autoAccept, decisionConfidence } = written();
+      expect(decisionConfidence).toBeGreaterThanOrEqual(90);
+      expect(autoAccept?.decidedBy).toBe('system');
+    });
+
+    it('records why, as a second log entry beside the seed', async () => {
+      // The licence for closing a row without asking is that the close can be
+      // explained and reopened. An unexplained `done` would be neither.
+      await cleanMatch();
+
+      const { autoAccept } = written();
+      expect(autoAccept.decision.actor).toBe('system');
+      expect(autoAccept.decision.verdict).toBe('accept');
+      // Nothing to carry out — the seed already performed the match. This is
+      // what makes the deterministic path structurally non-destructive.
+      expect(autoAccept.decision.action.kind).toBe('none');
+      expect(autoAccept.decision.actionPerformed).toBe(false);
+      expect(autoAccept.decision.note).toContain('no review trigger fired');
+    });
+
+    it('scores the row as done, not as the pending row it never was', async () => {
+      // `status` feeds `statusWeight`, so a row written `done` while scored
+      // `pending` would carry a priority describing a queue position it never
+      // occupied.
+      await cleanMatch();
+
+      expect(written().priorityBreakdown.statusWeight).toBeLessThan(1);
+    });
+
+    it('leaves a row alone when a trigger fired', async () => {
+      // Two candidates two points apart — `narrow_margin`, which exists to block
+      // exactly this: the margin term is too lightly weighted to stop a coin-flip
+      // clearing 90 on its own.
+      await cleanMatch({
+        candidates: [
+          {
+            candidateId: 'product-1',
+            source: 'fuzzy',
+            matchScore: 96,
+            gates: { passed: true, failedGates: [] },
+          },
+          {
+            candidateId: 'product-2',
+            source: 'fuzzy',
+            matchScore: 94,
+            gates: { passed: true, failedGates: [] },
+          },
+        ],
+      });
+
+      expect(written().reviewTriggers).toContain('narrow_margin');
+      expect(written().autoAccept).toBeUndefined();
+    });
+
+    it('never settles a duplicate pair', async () => {
+      await service.recordDuplicatePair({
+        flow: 'duplicate_detection' as never,
+        productAId: 'a',
+        productBId: 'b',
+        similarityScore: 99,
+      });
+
+      expect(mockRepo.upsertPair.mock.calls[0][0].autoAccept).toBeUndefined();
+    });
+
+    it('writes nothing in dryRun, however trusted the row', async () => {
+      // The first night is meant to be readable, not consequential.
+      mockDynamicConfig.resolution = {
+        automation: { deterministic: { dryRun: true } },
+      } as never;
+
+      await cleanMatch();
+
+      expect(written().autoAccept).toBeUndefined();
+      expect(written().decisionConfidence).toBeGreaterThanOrEqual(90);
+    });
+
+    it('does nothing at record time when that call site is switched off', async () => {
+      mockDynamicConfig.resolution = {
+        automation: { deterministic: { dryRun: false, atRecordTime: false } },
+      } as never;
+
+      await cleanMatch();
+
+      expect(written().autoAccept).toBeUndefined();
+    });
+
+    it('does nothing when automation is off entirely', async () => {
+      mockDynamicConfig.resolution = {
+        automation: { enabled: false, deterministic: { dryRun: false } },
+      } as never;
+
+      await cleanMatch();
+
+      expect(written().autoAccept).toBeUndefined();
     });
   });
 

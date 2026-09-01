@@ -1,0 +1,56 @@
+meta {
+  name: Run AI Review Batch
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8088/api/admin-product/resolutions/ai-review/run
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "maxPerRun": 5
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Runs the same batch the 3 AM scheduler runs, on demand. Intake is
+  `priority DESC` — the order the admin queue shows — so this and a human work
+  one list from the same end.
+
+  Body fields are all optional; anything omitted falls back to
+  `resolution.automation.ai`.
+
+  - `maxPerRun` — rows this run. Start small.
+  - `minPriority` — priority floor for intake.
+  - `executeDestructive` — can only *tighten* the configured value. Passing
+    `true` when the config says `false` does NOT enable merges; a request must
+    not be able to turn on the switch that deletes products.
+
+  Every reviewed row is written to either way: the verdict lands on `aiReview`
+  and is appended to the `decisions` log. `executeActions` and
+  `executeDestructive` gate whether it is *acted on*, never whether it is stored.
+
+  The summary distinguishes:
+  - `executed` — a recommendation was carried out.
+  - `advisory` — judged and left for a human (low/medium confidence, a kill
+    switch, or an action the row could not legally take).
+  - `abstained` — the model declined to call it. Counts as advisory too.
+  - `skippedStale` — the row changed between intake and the verdict, so the
+    action was discarded. A steady non-zero number here means rows are being
+    re-scraped mid-run.
+  - `capped` — stopped on the row limit or the cost cap, so more work is waiting.
+
+  Which rows are skipped entirely, and why, is in `findAiReviewBatch`: `failed`
+  rows (environmental, not judgement), human-touched rows, unclassified rows, and
+  `insufficient_evidence` rows — the last because there is genuinely nothing to
+  judge, so a call would buy an abstain at full price.
+}

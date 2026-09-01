@@ -213,11 +213,76 @@ export class ProductResolutionSearchService {
       );
     }
 
+    this.applyReviewFilters(query, params);
+
     if (params.query) {
       const displayName = nameOf<ProductModel>('displayName');
       query.andWhere(
         `(productA.${displayName} ILIKE :query OR productB.${displayName} ILIKE :query OR resolvedProduct.${displayName} ILIKE :query OR listingProduct.${displayName} ILIKE :query OR resolution.${nameOf<ProductResolution>('anchorKey')} ILIKE :query)`,
         { query: `%${params.query}%` },
+      );
+    }
+  }
+
+  /**
+   * The review-pipeline filters: why a row is suspect, and what the machine has
+   * already made of it.
+   *
+   * Kept together and separate from `applyFilters` because they share one
+   * property nothing else here has — they read columns that are `NULL` on any
+   * row the nightly sweep has not classified yet, and `NULL` has to mean
+   * "unknown", never "no". A naive `NOT (triggers @> …)` would quietly return
+   * unclassified rows as though they had been checked and found clean, which is
+   * the one wrong answer that matters when the whole point of these filters is
+   * to audit what auto-accept will trust.
+   */
+  private applyReviewFilters(
+    query: SelectQueryBuilder<ProductResolution>,
+    params: ProductResolutionSearchParams,
+  ): void {
+    const triggers = nameOf<ProductResolution>('reviewTriggers');
+
+    if (!isEmpty(params.triggers)) {
+      // `jsonb_exists_any` is the function the `?|` operator resolves to — "does
+      // this jsonb array contain any of these strings". Written as a call rather
+      // than as `?|` on purpose: a literal `?` inside a query-builder fragment is
+      // ambiguous with a positional placeholder, and the escaping needed to get
+      // one through varies by driver and TypeORM version. The function form has
+      // no such reading, and states the intent besides.
+      query.andWhere(
+        `jsonb_exists_any(resolution.${triggers}, :triggers::text[])`,
+        { triggers: params.triggers },
+      );
+    }
+
+    if (params.untriggered !== undefined) {
+      query.andWhere(
+        params.untriggered
+          ? `resolution.${triggers} = '[]'::jsonb`
+          : `(resolution.${triggers} IS NOT NULL AND resolution.${triggers} <> '[]'::jsonb)`,
+      );
+    }
+
+    if (!isEmpty(params.aiConfidence)) {
+      query.andWhere(
+        `resolution.${nameOf<ProductResolution>('aiConfidence')} IN (:...aiConfidence)`,
+        { aiConfidence: params.aiConfidence },
+      );
+    }
+
+    if (params.aiReviewed !== undefined) {
+      const aiReviewedAt = nameOf<ProductResolution>('aiReviewedAt');
+      query.andWhere(
+        params.aiReviewed
+          ? `resolution.${aiReviewedAt} IS NOT NULL`
+          : `resolution.${aiReviewedAt} IS NULL`,
+      );
+    }
+
+    if (!isEmpty(params.decidedBy)) {
+      query.andWhere(
+        `resolution.${nameOf<ProductResolution>('decidedBy')} IN (:...decidedBy)`,
+        { decidedBy: params.decidedBy },
       );
     }
   }

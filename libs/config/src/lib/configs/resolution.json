@@ -6,7 +6,31 @@
   "review": {
     "cleanupEnabled": true,
     "supersededRetentionDays": 60,
-    "doneRetentionDays": 60
+    "doneRetentionDays": 60,
+    "pendingRetentionDays": 120,
+    "nearMissBand": 10,
+    "nameOnlySpecSimilarityMax": 0.05
+  },
+  "automation": {
+    "enabled": true,
+    "deterministic": {
+      "enabled": true,
+      "atRecordTime": true,
+      "dryRun": true,
+      "minConfidence": 90,
+      "maxPerRunNightly": 200
+    },
+    "ai": {
+      "enabled": true,
+      "model": "gpt-5.6-luna",
+      "effort": "medium",
+      "executeActions": true,
+      "executeDestructive": false,
+      "maxPerRun": 100,
+      "minPriority": 10,
+      "maxCostUsdPerRun": 2,
+      "reReviewAfterDays": 30
+    }
   },
   "priority": {
     "recomputeEnabled": true,

@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import {
+  brandCategoryKey,
   OfferRepository,
+  ProductModelRepository,
   ProductResolution,
+  ProductResolutionFlow,
   ProductResolutionRepository,
   ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { compact, isEmpty, sumBy, uniq } from 'lodash';
+import { compact, isEmpty, sumBy, uniq, uniqBy } from 'lodash';
 import type { BlastRadius } from './product-resolution-priority.service';
 import { ResolutionScoringService } from './resolution-scoring.service';
 
@@ -47,6 +50,7 @@ export class ProductResolutionPriorityRecomputeService {
     private readonly resolutionRepo: ProductResolutionRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerRepo: OfferRepository,
+    private readonly productRepo: ProductModelRepository,
     private readonly scoringService: ResolutionScoringService,
     private readonly dynamicConfigService: DynamicConfigService,
   ) {}
@@ -96,14 +100,55 @@ export class ProductResolutionPriorityRecomputeService {
   }
 
   private async rescore(batch: ProductResolution[]): Promise<void> {
-    const blastRadii = await this.blastRadiusFor(batch);
+    const [blastRadii, populatedCorners] = await Promise.all([
+      this.blastRadiusFor(batch),
+      this.populatedBrandCategoryPairs(batch),
+    ]);
 
     await this.resolutionRepo.updateScores(
       batch.map((resolution) => ({
         id: resolution.id,
-        ...this.scoringService.forRow(resolution, blastRadii.get(resolution.id)),
+        ...this.scoringService.forRow(
+          resolution,
+          blastRadii.get(resolution.id),
+          this.catalogHasSiblings(resolution, populatedCorners),
+        ),
       })),
     );
+  }
+
+  /**
+   * Which (brand, category) corners of the catalog are populated, for every
+   * zero-candidate row in the batch.
+   *
+   * This is what turns `no_candidates_but_named` from a trigger that fires on
+   * every new product into one that names a real recall failure: recall finding
+   * nothing is only surprising when we already hold products of that brand in
+   * that category. One grouped query for the batch, and only for the rows that
+   * can possibly need it.
+   */
+  private async populatedBrandCategoryPairs(
+    batch: ProductResolution[],
+  ): Promise<Set<string>> {
+    const pairs = uniqBy(
+      compact(batch.map((resolution) => brandCategoryOf(resolution))),
+      (pair) => brandCategoryKey(pair.brandId, pair.categoryId),
+    );
+
+    return this.productRepo.findPopulatedBrandCategoryPairs(pairs);
+  }
+
+  /** `undefined` rather than `false` when the row has no brand/category corner to
+   *  look up — the trigger service reads that as "not looked up" and suppresses
+   *  the trigger, which is different from "looked up and found nothing". */
+  private catalogHasSiblings(
+    resolution: ProductResolution,
+    populatedCorners: Set<string>,
+  ): boolean | undefined {
+    const pair = brandCategoryOf(resolution);
+    if (!pair) return undefined;
+
+    return populatedCorners.has(brandCategoryKey(pair.brandId, pair.categoryId));
   }
 
   /**
@@ -156,4 +201,30 @@ export class ProductResolutionPriorityRecomputeService {
       ]),
     );
   }
+}
+
+/**
+ * The catalog corner a zero-candidate resolution row was searching in.
+ *
+ * Only ever meaningful for `product_resolution` rows that recalled nothing —
+ * every other row has candidates to reason about, so looking this up for them
+ * would query for an answer nobody reads. Both ids come from the *resolved*
+ * brand and category on the input snapshot: a brand that never resolved has no
+ * corner to check, and is separately surprising on its own.
+ */
+function brandCategoryOf(
+  resolution: ProductResolution,
+): { brandId: string; categoryId: string } | undefined {
+  if (resolution.flow !== ProductResolutionFlow.product_resolution) return undefined;
+  if (!isEmpty(resolution.candidates)) return undefined;
+
+  const snapshot =
+    resolution.inputSnapshot?.kind === 'product_resolution'
+      ? resolution.inputSnapshot
+      : undefined;
+
+  const brandId = snapshot?.brand?.id;
+  const categoryId = snapshot?.category?.id;
+
+  return brandId && categoryId ? { brandId, categoryId } : undefined;
 }

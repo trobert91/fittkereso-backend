@@ -19,6 +19,7 @@ import {
   Seller,
 } from '@fittkereso-backend/database';
 import type {
+  MatchResultComponents,
   ProductResolutionCandidateRecord,
   ProductDuplicateDetectionInputSnapshot,
 } from '@fittkereso-backend/database';
@@ -56,6 +57,14 @@ interface PendingScrapeDuplicate {
   candidateProductId: string;
   confidence: number;
   reason?: string;
+  /** The matcher's score for this candidate, which is a different number from
+   *  `confidence` (the LLM's self-report about its own indecision). Carried so
+   *  the recorded row shows what the matcher actually thought. */
+  matchScore?: number;
+  /** The matcher's score breakdown. Carried through because it is computed
+   *  during resolution and unrecoverable afterwards — without it these rows are
+   *  thinner than the nightly duplicate pairs for no reason. */
+  matchComponents?: MatchResultComponents;
 }
 
 interface ResolvedIdentity {
@@ -659,10 +668,15 @@ export class ProductScrapeUpdaterService {
     if (resolutionContext?.decision?.kind !== 'llm_unresolved') return undefined;
     const bestCandidate = resolutionContext.scoring?.bestCandidate;
     if (!bestCandidate) return undefined;
+    const scored = resolutionContext.candidates.find(
+      (candidate) => candidate.productId === bestCandidate.candidateId,
+    );
     return {
       candidateProductId: bestCandidate.candidateId,
       confidence: resolutionContext.decision.confidence,
       reason: resolutionContext.decision.evidenceSummary,
+      matchScore: bestCandidate.score,
+      matchComponents: scored?.matchComponents,
     };
   }
 
@@ -688,6 +702,10 @@ export class ProductScrapeUpdaterService {
       const candidateModel = await this.productRepo.findOne({
         where: { id: pendingDuplicate.candidateProductId },
         select: ['id', 'specs', 'model', 'displayName'],
+        // `brand` labels the recorded candidate (the nightly duplicate path
+        // records one too); `aliases` fills in the input snapshot below, which
+        // claimed the candidate had none.
+        relations: ['brand', 'aliases'],
       });
       if (!candidateModel) {
         this.logger.warn(
@@ -714,13 +732,19 @@ export class ProductScrapeUpdaterService {
         ...(pendingDuplicate.reason ? [pendingDuplicate.reason] : []),
       ];
 
+      const candidateAliases = compact(
+        (candidateModel.aliases ?? []).map((alias) => alias.alias),
+      );
+
       const candidates: ProductResolutionCandidateRecord[] = [
         {
           candidateId: candidateModel.id,
+          brand: candidateModel.brand?.name,
           model: candidateModel.model,
           displayName: candidateModel.displayName,
           source: 'duplicate_detection_pair',
-          matchScore: pendingDuplicate.confidence,
+          matchScore: pendingDuplicate.matchScore ?? pendingDuplicate.confidence,
+          matchComponents: pendingDuplicate.matchComponents,
           gates: { passed: false, failedGates: ['llm_unresolved'] },
           specMatchDetails,
         },
@@ -736,7 +760,7 @@ export class ProductScrapeUpdaterService {
         candidate: {
           model: candidateModel.model ?? '',
           displayName: candidateModel.displayName,
-          aliases: [],
+          aliases: candidateAliases,
           specs: candidateModel.specs,
         },
         categorySlug: scrapedProduct.category?.slug,

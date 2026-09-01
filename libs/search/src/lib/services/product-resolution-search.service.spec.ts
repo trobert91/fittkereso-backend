@@ -3,6 +3,9 @@ import {
   ProductResolution,
   ProductResolutionRepository,
   ProductResolutionStatus,
+  ResolutionAiConfidence,
+  ResolutionDecidedBy,
+  ResolutionReviewTrigger,
 } from '@fittkereso-backend/database';
 import { DataSource, getMetadataArgsStorage } from 'typeorm';
 import type { SelectQueryBuilder } from 'typeorm';
@@ -186,6 +189,136 @@ describe('ProductResolutionSearchService', () => {
 
     it('applies no priority floor unless asked, so nothing vanishes silently', () => {
       expect(buildPaginatedQuery().getQuery()).not.toContain(':minPriority');
+    });
+  });
+
+  describe('the review filters', () => {
+    /** Just the WHERE clause. The generated SELECT lists every column of every
+     *  joined entity, so a substring check over the whole statement matches
+     *  names that were never filtered on. */
+    const whereClauseOf = (
+      query: SelectQueryBuilder<ProductResolution>,
+    ): string => query.getQuery().split(' WHERE ')[1] ?? '';
+
+    it('matches any of the requested triggers, not all of them', () => {
+      // They are independent suspicions, not facets: "spec conflict OR narrow
+      // margin" is the question a reviewer asks, and the intersection of two
+      // suspicions is usually empty.
+      const query = buildPaginatedQuery({
+        triggers: [
+          ResolutionReviewTrigger.spec_conflict,
+          ResolutionReviewTrigger.narrow_margin,
+        ],
+      });
+
+      expect(query.getQuery()).toContain(
+        'jsonb_exists_any("resolution"."reviewTriggers", :triggers::text[])',
+      );
+      expect(query.getParameters()['triggers']).toEqual([
+        ResolutionReviewTrigger.spec_conflict,
+        ResolutionReviewTrigger.narrow_margin,
+      ]);
+    });
+
+    it('emits no bare `?` for the jsonb any-of, which a driver could eat', () => {
+      // `?|` is the natural operator and the reason this uses the function form:
+      // a literal `?` in a query-builder fragment is ambiguous with a positional
+      // placeholder.
+      const sql = buildPaginatedQuery({
+        triggers: [ResolutionReviewTrigger.spec_conflict],
+      }).getQuery();
+
+      expect(sql).not.toContain('?|');
+      expect(sql).not.toContain('??');
+    });
+
+    it('finds the untriggered rows by empty-array equality', () => {
+      // The set auto-accept will trust. Being able to read a page of it before
+      // Phase 3 is enabled is the point of this filter.
+      const sql = buildPaginatedQuery({ untriggered: true }).getQuery();
+
+      expect(sql).toContain(`"resolution"."reviewTriggers" = '[]'::jsonb`);
+    });
+
+    it('never counts an unclassified row as one that fired a trigger', () => {
+      // The load-bearing property of every filter here: `NULL` means the sweep
+      // has not classified the row, so it belongs in neither answer. A plain
+      // `<> '[]'` would silently drop it too — but only because NULL comparisons
+      // are falsy, which is luck rather than intent. The explicit IS NOT NULL is
+      // what makes it a decision.
+      const sql = buildPaginatedQuery({ untriggered: false }).getQuery();
+
+      expect(sql).toContain('"resolution"."reviewTriggers" IS NOT NULL');
+      expect(sql).toContain(`"resolution"."reviewTriggers" <> '[]'::jsonb`);
+    });
+
+    it('reads unreviewed as "the AI has not looked", not as "it found nothing"', () => {
+      expect(buildPaginatedQuery({ aiReviewed: false }).getQuery()).toContain(
+        '"resolution"."aiReviewedAt" IS NULL',
+      );
+      expect(buildPaginatedQuery({ aiReviewed: true }).getQuery()).toContain(
+        '"resolution"."aiReviewedAt" IS NOT NULL',
+      );
+    });
+
+    it('filters the queue down to what the machine could not settle', () => {
+      // The payoff filter: low/medium is where a human's time is worth most.
+      const query = buildPaginatedQuery({
+        aiConfidence: [
+          ResolutionAiConfidence.low,
+          ResolutionAiConfidence.medium,
+        ],
+      });
+
+      expect(query.getQuery()).toContain(
+        '"resolution"."aiConfidence" IN (:...aiConfidence)',
+      );
+      expect(query.getParameters()['aiConfidence']).toEqual(['low', 'medium']);
+    });
+
+    it('exposes the automation audit stream', () => {
+      // `decidedBy IN (system, ai)` over `status = done` is "what did the machine
+      // close last night" — the spot-check, with no separate mechanism needed.
+      const query = buildPaginatedQuery({
+        statuses: [ProductResolutionStatus.done],
+        decidedBy: [ResolutionDecidedBy.system, ResolutionDecidedBy.ai],
+      });
+
+      expect(query.getQuery()).toContain(
+        '"resolution"."decidedBy" IN (:...decidedBy)',
+      );
+      expect(query.getParameters()['decidedBy']).toEqual(['system', 'ai']);
+    });
+
+    it('narrows on none of the review columns unless asked', () => {
+      // The queue must not quietly restrict itself to classified rows just
+      // because the columns now exist — an unswept row is still work.
+      //
+      // Asserted against the WHERE clause alone: every one of these names also
+      // appears in the SELECT list, since they are entity columns, so a check
+      // over the whole statement could never pass and would be testing nothing.
+      const where = whereClauseOf(buildPaginatedQuery());
+
+      expect(where).not.toContain('reviewTriggers');
+      expect(where).not.toContain('aiConfidence');
+      expect(where).not.toContain('aiReviewedAt');
+      expect(where).not.toContain('decidedBy');
+      // …while the filter that should always be there still is.
+      expect(where).toContain('status');
+    });
+
+    it('still resolves the paginated order-by with every filter applied', () => {
+      // Same invariant as the ordering suite: the DISTINCT-subquery rewrite only
+      // happens with skip/take, and it parses each term as `alias.property`.
+      const query = buildPaginatedQuery({
+        triggers: [ResolutionReviewTrigger.gate_only_rejection],
+        untriggered: false,
+        aiConfidence: [ResolutionAiConfidence.high],
+        aiReviewed: true,
+        decidedBy: [ResolutionDecidedBy.ai],
+      });
+
+      expect(() => resolveOrderByForPagination(query)).not.toThrow();
     });
   });
 });

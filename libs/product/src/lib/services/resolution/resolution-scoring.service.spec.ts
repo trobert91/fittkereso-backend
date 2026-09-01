@@ -11,6 +11,7 @@ import {
 import type { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { ProductResolutionPriorityService } from './product-resolution-priority.service';
 import { ResolutionConfidenceService } from './resolution-confidence.service';
+import { ResolutionReviewTriggerService } from './resolution-review-trigger.service';
 import {
   ResolutionScoringService,
   type RecordScoringInput,
@@ -24,6 +25,9 @@ describe('ResolutionScoringService', () => {
     config = { resolution: { minScoreToRecord: 60 } };
     service = new ResolutionScoringService(
       new ProductResolutionPriorityService(new ResolutionConfidenceService()),
+      new ResolutionReviewTriggerService(
+        config as unknown as DynamicConfigService,
+      ),
       config as unknown as DynamicConfigService,
     );
   });
@@ -118,6 +122,84 @@ describe('ResolutionScoringService', () => {
       expect(service.forRow(row).decisionConfidence).toBe(
         service.forRecord(input).decisionConfidence,
       );
+    });
+  });
+
+  describe('a creation with nothing to compare against', () => {
+    /** What the pipeline actually writes when recall returned nothing: score 0
+     *  (there was no best candidate to take one from) and an empty pool. */
+    const foundNothing = (
+      overrides: Partial<RecordScoringInput> = {},
+    ): RecordScoringInput =>
+      recordInput({
+        similarityScore: 0,
+        resolvedProductId: undefined,
+        candidates: [],
+        specMatchDetails: undefined,
+        decisionSnapshot: {
+          kind: 'matcher_reject',
+          confidence: 0,
+          reason: 'no_qualifying_candidates',
+          selectedCandidates: [],
+        },
+        seedDecision: seed({
+          verdict: ResolutionVerdict.created_new,
+          action: { kind: ResolutionActionKind.create },
+        }),
+        ...overrides,
+      });
+
+    it('claims no confidence while the empty pool is unexplained', () => {
+      // Every component needs a candidate except outcomeAgreement, which would
+      // renormalize to full weight and read "found nothing, called it new — those
+      // agree" as a perfect 1.0. Confidence 100 and priority 0, from the absence
+      // of evidence, on the rows most likely to be duplicates.
+      const scores = service.forRecord(foundNothing());
+
+      expect(scores.decisionConfidence).toBe(0);
+      expect(scores.priority).toBeGreaterThan(0);
+    });
+
+    it('is confident again once an empty catalog corner explains it', () => {
+      // Nothing of this brand in this category exists, so recall finding nothing
+      // is the expected outcome for an ordinary new product, not a recall
+      // failure. This is what keeps the queue from filling with every new product
+      // in a growing catalog.
+      const scores = service.forRecord(
+        foundNothing({ catalogHasBrandCategorySiblings: false }),
+      );
+
+      expect(scores.decisionConfidence).toBeGreaterThan(90);
+      expect(scores.priority).toBe(0);
+    });
+
+    it('stays unconfident when the catalog does hold that brand and category', () => {
+      // Recall should have found something and did not — a brand-alias gap or an
+      // over-tight filter, and a fault that affects every future listing of this
+      // brand, not just this row.
+      const scores = service.forRecord(
+        foundNothing({ catalogHasBrandCategorySiblings: true }),
+      );
+
+      expect(scores.decisionConfidence).toBe(0);
+    });
+
+    it('leaves a rejection that had a candidate scored on the evidence', () => {
+      // The exception is narrow on purpose: an empty pool is the only case where
+      // the similarity score describes nothing. A real near-miss still scores.
+      const scores = service.forRecord(
+        foundNothing({
+          similarityScore: 65,
+          candidates: [
+            candidate({
+              matchScore: 65,
+              gates: { passed: false, failedGates: ['low_confidence'] },
+            }),
+          ],
+        }),
+      );
+
+      expect(scores.decisionConfidence).toBeGreaterThan(0);
     });
   });
 

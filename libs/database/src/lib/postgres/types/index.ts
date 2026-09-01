@@ -9,6 +9,7 @@ export * from './product-resolution-decision-entry';
 export * from './product-resolution-state';
 export * from './product-resolution-origin';
 export * from './product-resolution-candidate';
+export * from './product-resolution-review';
 export * from './product-resolution-input-snapshot';
 export * from './product-resolution-decision-snapshot';
 export * from './resolution-priority-breakdown';

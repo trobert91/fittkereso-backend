@@ -3,8 +3,10 @@ import {
   ProductResolution,
   ProductResolutionFlow,
   ProductResolutionRepository,
+  ProductResolutionStatus,
   ResolutionActionKind,
   ResolutionActor,
+  ResolutionDecidedBy,
   ResolutionVerdict,
   type CreateProductResolutionParams,
   type ProductResolutionDecisionEntry,
@@ -13,8 +15,15 @@ import {
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductResolutionFingerprintService } from './product-resolution-fingerprint.service';
-import { ResolutionScoringService } from './resolution-scoring.service';
+import {
+  ResolutionScoringService,
+  type ResolutionScores,
+} from './resolution-scoring.service';
 import { minScoreToRecord } from './resolution-record-threshold';
+import {
+  deterministicAutomationConfig,
+  trustRuleRejection,
+} from './resolution-trust-rule';
 
 /**
  * Single shared mechanism both the resolution flow (`libs/resolution`, via
@@ -55,10 +64,30 @@ export class ProductResolutionRecorderService {
     if (!this.shouldRecordResolution(params)) return null;
 
     const seedDecision = this.buildResolutionSeed(params);
-    const scores = this.scoringService.forRecord({ ...params, seedDecision });
+    const scored = this.scoringService.forRecord({ ...params, seedDecision });
+    const autoAccept = this.autoAcceptFor(params, scored);
+
+    // Rescore when the rule settles the row: `status` is the one scoring input
+    // that changed, and it feeds `statusWeight`, so a row written `done` while
+    // scored as `pending` would carry a priority describing a queue position it
+    // never occupied. Confidence and the triggers are unaffected — status enters
+    // priority only — so this is a second pass over pure arithmetic, not a
+    // second look at the evidence.
+    const scores = autoAccept
+      ? this.scoringService.forRecord({
+          ...params,
+          seedDecision,
+          status: ProductResolutionStatus.done,
+        })
+      : scored;
 
     if (!params.anchorKey) {
-      return this.resolutionRepo.insert({ ...params, ...scores, seedDecision });
+      return this.resolutionRepo.insert({
+        ...params,
+        ...scores,
+        seedDecision,
+        autoAccept,
+      });
     }
 
     const fingerprint = this.fingerprintService.compute({
@@ -75,6 +104,7 @@ export class ProductResolutionRecorderService {
       anchorKey: params.anchorKey,
       fingerprint,
       seedDecision,
+      autoAccept,
     });
 
     this.logger.debug('Recorded product resolution', {
@@ -83,9 +113,74 @@ export class ProductResolutionRecorderService {
       outcome,
       priority: scores.priority,
       decisionConfidence: scores.decisionConfidence,
+      reviewTriggers: scores.reviewTriggers,
+      autoAccepted: !!autoAccept,
     });
 
     return resolution;
+  }
+
+  /**
+   * The record-time half of the deterministic rule — the primary call site.
+   *
+   * Costs nothing extra: confidence and the triggers were already computed to be
+   * written on the row, so the rule is a handful of comparisons over values in
+   * hand. That is the whole reason it runs here rather than only nightly — a row
+   * the scores can be trusted on should never appear in the queue at all, not
+   * appear and be closed a few hours later.
+   *
+   * `reviewedAt` is deliberately absent from the subject: this describes a
+   * situation, not a stored row, and nobody can have touched a row that does not
+   * exist. The refresh path checks it against the real row instead.
+   *
+   * In `dryRun` the verdict is logged and discarded, which is what makes the
+   * first night readable: the log shows exactly which rows *would* have been
+   * closed, against real traffic, before anything is closed for real.
+   */
+  private autoAcceptFor(
+    params: CreateProductResolutionParams,
+    scores: ResolutionScores,
+  ): CreateProductResolutionParams['autoAccept'] {
+    const config = deterministicAutomationConfig(this.dynamicConfigService);
+    if (!config.enabled || !config.atRecordTime) return undefined;
+
+    const rejection = trustRuleRejection(
+      {
+        flow: params.flow,
+        decisionConfidence: scores.decisionConfidence,
+        reviewTriggers: scores.reviewTriggers,
+        candidates: params.candidates,
+      },
+      config,
+    );
+
+    if (rejection) return undefined;
+
+    if (config.dryRun) {
+      this.logger.log('Would auto-accept at record time (dryRun)', {
+        anchorKey: params.anchorKey,
+        resolvedProductId: params.resolvedProductId,
+        decisionConfidence: scores.decisionConfidence,
+        candidateCount: params.candidates?.length ?? 0,
+      });
+      return undefined;
+    }
+
+    const now = new Date().toISOString();
+    return {
+      decidedBy: ResolutionDecidedBy.system,
+      decision: {
+        at: now,
+        actor: ResolutionActor.system,
+        verdict: ResolutionVerdict.accept,
+        // Nothing to carry out: the seed entry already performed the match or
+        // the creation. This entry is the confirmation, which is exactly what
+        // makes the deterministic path non-destructive.
+        action: { kind: ResolutionActionKind.none },
+        actionPerformed: false,
+        note: `auto-accepted: confidence ${scores.decisionConfidence} ≥ ${config.minConfidence}, no review trigger fired`,
+      },
+    };
   }
 
   /** Used by the duplicate-detection flow (nightly + scrape-time ambiguous) —

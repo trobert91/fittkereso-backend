@@ -157,6 +157,76 @@ export interface DynamicConfigData {
        *  asked again, so one whose listing is still being scraped is never
        *  pruned. Default: 60 */
       doneRetentionDays?: number;
+      /** How far below `matching.acceptThreshold` still counts as a near miss
+       *  for the `near_miss_rejection` review trigger. Best-vs-threshold, as
+       *  opposed to `matching.ambiguityGap`'s best-vs-second. Default: 10 */
+      nearMissBand?: number;
+      /** Upper bound on `specSimilarity` (0–1) for a match to count as resting
+       *  on the name alone — `name_only_match`. Not zero, because a single
+       *  incidentally-shared spec should not read as corroboration.
+       *  Default: 0.05 */
+      nameOnlySpecSimilarityMax?: number;
+      /** Days to keep undecided rows, aged by `lastSeenAt`. Far longer than the
+       *  decided retention because deleting an open row is deciding it by
+       *  neglect; this exists only so rows nobody will ever judge do not
+       *  accumulate forever. `failed` rows are never pruned. Default: 120 */
+      pendingRetentionDays?: number;
+    };
+    /** Settling rows without a human. */
+    automation?: {
+      /** Master switch over every automated path. Default: true */
+      enabled?: boolean;
+      /** The score-only rule: accept rows whose confidence is high enough and
+       *  where no review trigger fired. Bookkeeping only — restricted to the
+       *  `product_resolution` flow, where accepting confirms an action the
+       *  pipeline already performed and changes nothing in the catalog. */
+      deterministic?: {
+        enabled?: boolean;
+        /** Apply the rule during scraping, so a trusted row is settled before it
+         *  ever reaches the queue. Off leaves only the nightly catch-up.
+         *  Default: true */
+        atRecordTime?: boolean;
+        /** Log what would be accepted without writing anything. Ships **on**:
+         *  read a night's worth of would-accepts against real traffic before
+         *  letting it close rows for real. Default: true */
+        dryRun?: boolean;
+        /** `decisionConfidence` a row must reach. A starting guess to measure,
+         *  not a constant to trust — see the dryRun output. Default: 90 */
+        minConfidence?: number;
+        /** Upper bound on rows the nightly catch-up settles in one run.
+         *  Default: 200 */
+        maxPerRunNightly?: number;
+      };
+      /** The LLM reviewer: reads the gathered evidence plus live catalog data
+       *  and judges whether the pipeline's conclusion holds up. Unlike the
+       *  deterministic rule it may act destructively, behind its own switch. */
+      ai?: {
+        enabled?: boolean;
+        /** Prefix-routed to a provider — `gpt-`/`o1-`/`o3-` → openai,
+         *  `claude-` → claude, `gemini-` → gemini, `deepseek-` → deepseek.
+         *  Default: 'gpt-5.6-luna' */
+        model?: string;
+        /** Provider-native reasoning effort. Default: 'medium' */
+        effort?: string;
+        /** Carry out a high-confidence recommendation at all. Off makes every
+         *  verdict advisory. Default: true */
+        executeActions?: boolean;
+        /** Allow merges and splits specifically. Separate from `executeActions`
+         *  because confirming a resolution is bookkeeping while merging deletes
+         *  a product — the AI can be trusted with the first before the second.
+         *  Ships **off**. Default: false */
+        executeDestructive?: boolean;
+        /** Rows reviewed per nightly run. Default: 100 */
+        maxPerRun?: number;
+        /** Priority floor for intake — don't spend tokens on a drained queue.
+         *  Default: 10 */
+        minPriority?: number;
+        /** Hard spend stop per run, via the running cost total. Default: 2 */
+        maxCostUsdPerRun?: number;
+        /** Re-review a row this many days after the last verdict even when
+         *  nothing about it changed. Default: 30 */
+        reReviewAfterDays?: number;
+      };
     };
     /** The review-queue priority score: how important it is that a human looks
      *  at a row. */
@@ -528,6 +598,147 @@ export const dynamicConfigSchema = {
               description:
                 'Days to keep decided resolution rows, aged by lastSeenAt so rows for still-scraped listings are never pruned. Default: 60',
               default: 60,
+            },
+            nearMissBand: {
+              type: 'number',
+              minimum: 0,
+              maximum: 100,
+              description:
+                'How far below matching.acceptThreshold still counts as a near miss for the near_miss_rejection review trigger. Default: 10',
+              default: 10,
+            },
+            nameOnlySpecSimilarityMax: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description:
+                'Upper bound on specSimilarity (0-1) for a match to count as resting on the name alone — the name_only_match review trigger. Default: 0.05',
+              default: 0.05,
+            },
+            pendingRetentionDays: {
+              type: 'number',
+              minimum: 1,
+              description:
+                'Days to keep undecided rows, aged by lastSeenAt. Failed rows are never pruned. Default: 120',
+              default: 120,
+            },
+          },
+        },
+        automation: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Settling review-queue rows without a human.',
+          properties: {
+            enabled: {
+              type: 'boolean',
+              description:
+                'Master switch over every automated review path. Default: true',
+              default: true,
+            },
+            deterministic: {
+              type: 'object',
+              additionalProperties: true,
+              description:
+                'The score-only auto-accept rule. Bookkeeping only — restricted to the product_resolution flow, where accepting confirms an action already performed and changes nothing in the catalog.',
+              properties: {
+                enabled: {
+                  type: 'boolean',
+                  description:
+                    'Master switch for deterministic auto-accept. Default: true',
+                  default: true,
+                },
+                atRecordTime: {
+                  type: 'boolean',
+                  description:
+                    'Apply the rule during scraping so a trusted row never enters the queue. Off leaves only the nightly catch-up. Default: true',
+                  default: true,
+                },
+                dryRun: {
+                  type: 'boolean',
+                  description:
+                    'Log what would be accepted without writing anything. Ships on. Default: true',
+                  default: true,
+                },
+                minConfidence: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 100,
+                  description:
+                    'decisionConfidence a row must reach to be auto-accepted. Default: 90',
+                  default: 90,
+                },
+                maxPerRunNightly: {
+                  type: 'number',
+                  minimum: 0,
+                  description:
+                    'Upper bound on rows the nightly catch-up settles in one run. Default: 200',
+                  default: 200,
+                },
+              },
+            },
+            ai: {
+              type: 'object',
+              additionalProperties: true,
+              description:
+                'The LLM reviewer. Reads the gathered evidence plus live catalog data and judges whether the pipeline was right. May act destructively, behind its own switch.',
+              properties: {
+                enabled: {
+                  type: 'boolean',
+                  description: 'Master switch for AI review. Default: true',
+                  default: true,
+                },
+                model: {
+                  type: 'string',
+                  description:
+                    'Prefix-routed to a provider (gpt-/o1-/o3- → openai, claude- → claude, gemini- → gemini, deepseek- → deepseek). Default: gpt-5.6-luna',
+                  default: 'gpt-5.6-luna',
+                },
+                effort: {
+                  type: 'string',
+                  description:
+                    'Provider-native reasoning effort. Default: medium',
+                  default: 'medium',
+                },
+                executeActions: {
+                  type: 'boolean',
+                  description:
+                    'Carry out a high-confidence recommendation at all. Off makes every verdict advisory. Default: true',
+                  default: true,
+                },
+                executeDestructive: {
+                  type: 'boolean',
+                  description:
+                    'Allow merges and splits specifically. Ships off — confirming a resolution is bookkeeping, merging deletes a product. Default: false',
+                  default: false,
+                },
+                maxPerRun: {
+                  type: 'number',
+                  minimum: 0,
+                  description: 'Rows reviewed per nightly run. Default: 100',
+                  default: 100,
+                },
+                minPriority: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 100,
+                  description:
+                    'Priority floor for intake, so a drained queue costs nothing. Default: 10',
+                  default: 10,
+                },
+                maxCostUsdPerRun: {
+                  type: 'number',
+                  minimum: 0,
+                  description: 'Hard spend stop per run. Default: 2',
+                  default: 2,
+                },
+                reReviewAfterDays: {
+                  type: 'number',
+                  minimum: 1,
+                  description:
+                    'Re-review a row this many days after the last verdict even when nothing changed. Default: 30',
+                  default: 30,
+                },
+              },
             },
           },
         },

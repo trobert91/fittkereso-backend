@@ -13,6 +13,9 @@ import {
   ProductResolutionFlow,
   ProductResolutionOrigin,
   ProductResolutionStatus,
+  ResolutionAiConfidence,
+  ResolutionDecidedBy,
+  ResolutionReviewTrigger,
 } from '@fittkereso-backend/database';
 
 export const RESOLUTION_SORT_FIELDS = [
@@ -92,6 +95,55 @@ export class ProductResolutionSearchParams {
   @Max(100)
   @Type(() => Number)
   minPriority?: number;
+
+  /**
+   * Any-of over `reviewTriggers` — show rows matching **at least one** of these.
+   *
+   * Any-of rather than all-of because the triggers are independent suspicions,
+   * not facets: "show me everything with a spec conflict or a narrow margin" is
+   * the question a reviewer asks, while the intersection of two suspicions is
+   * usually empty and never interesting.
+   */
+  @IsOptional()
+  @IsEnum(ResolutionReviewTrigger, { each: true })
+  triggers?: ResolutionReviewTrigger[];
+
+  /**
+   * `true` — the row has no trigger at all (`reviewTriggers = '[]'`).
+   * `false` — at least one fired.
+   *
+   * Separate from `triggers` because the empty list cannot be expressed as an
+   * any-of over names, and it is the single most important set to be able to
+   * look at: it is exactly what deterministic auto-accept will trust, so being
+   * able to read a page of it *before* enabling Phase 3 is the whole point of
+   * this filter.
+   */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
+  untriggered?: boolean;
+
+  /** How sure the AI was. `low`/`medium` is the "things the machine couldn't
+   *  settle" queue — the rows most worth a human's time. */
+  @IsOptional()
+  @IsEnum(ResolutionAiConfidence, { each: true })
+  aiConfidence?: ResolutionAiConfidence[];
+
+  /** `true` — the AI has judged this row; `false` — it has not yet. */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
+  aiReviewed?: boolean;
+
+  /** Who settled the row. `system`/`ai` on a `done` row is the automation audit
+   *  stream — "what did the machine close last night". */
+  @IsOptional()
+  @IsEnum(ResolutionDecidedBy, { each: true })
+  decidedBy?: ResolutionDecidedBy[];
 
   /** Free-text over the involved products' display names and the anchor key. */
   @IsOptional()

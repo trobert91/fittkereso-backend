@@ -9,8 +9,10 @@ import type {
   ProductResolutionCandidateRecord,
   ProductResolutionInputSnapshot,
   ProductResolutionDecisionSnapshot,
+  SpecMatchDetails,
 } from '@fittkereso-backend/database';
 import { ProductResolutionRecorderService } from '@fittkereso-backend/product';
+import { maxBy } from 'lodash';
 import type {
   ResolutionContext,
   FilterOutcome,
@@ -230,12 +232,6 @@ export class ResolutionService {
         gate,
       ]),
     );
-    const specMatchByCandidateId = new Map(
-      (context.scoringMatches ?? []).map((match) => [
-        match.candidateId,
-        match.specMatchDetails,
-      ]),
-    );
     const filteredByCandidateId = new Map(
       (context.filter?.filteredCandidates ?? []).map((entry) => [
         entry.candidateId,
@@ -259,21 +255,35 @@ export class ResolutionService {
           source: candidate.source,
           matchScore: candidate.matchScore,
           matchComponents: candidate.matchComponents,
-          // A filtered candidate never reached the quality gates, so it has no
-          // gate result of its own; synthesize one naming the filter reason so
-          // `gates.passed`-based readers still count it as a rejection.
+          // Neither synthesized name is a gate that fired — they say why no gate
+          // ever ran. Without them, both cases collapse into an empty
+          // `failedGates` with `passed: false`, which reads as "evaluated and
+          // rejected by nothing at all".
           gates: gatesByCandidateId.get(candidate.productId) ??
             (filtered
               ? { passed: false, failedGates: [`filter_${filtered.reason}`] }
-              : { passed: false, failedGates: [] }),
+              : { passed: false, failedGates: ['not_scored'] }),
           filtered: filtered && {
             reason: filtered.reason,
             detail: filtered.detail,
           },
-          specMatchDetails: specMatchByCandidateId.get(candidate.productId),
+          specMatchDetails: candidate.specMatchDetails,
         };
       },
     );
+
+    // The stage-1 short-circuit returns before recall runs, so there is no pool
+    // to project — yet it did identify a product. Recording zero candidates
+    // beside a resolved product is indistinguishable from "recall found
+    // nothing", which is the one shape a reviewer cannot act on. Say which
+    // product it was and how we knew.
+    if (candidates.length === 0) {
+      const shortCircuit = referenceShortCircuitCandidate(
+        context,
+        result.resolvedModel?.id,
+      );
+      if (shortCircuit) candidates.push(shortCircuit);
+    }
 
     const inputSnapshot: ProductResolutionInputSnapshot = {
       kind: 'product_resolution',
@@ -298,7 +308,10 @@ export class ResolutionService {
       flow: ProductResolutionFlow.product_resolution,
       similarityScore: gatingScore,
       resolvedProductId: result.resolvedModel?.id,
-      specMatchDetails: candidates[0]?.specMatchDetails,
+      specMatchDetails: headlineSpecMatchDetails(
+        candidates,
+        result.resolvedModel?.id,
+      ),
       candidates,
       inputSnapshot,
       decisionSnapshot,
@@ -416,6 +429,59 @@ function mergeCandidatesById(
     }
   }
   return Array.from(merged.values());
+}
+
+/**
+ * The reference product, as the single candidate of a stage-1 short-circuit
+ * (`relation === 'same'`, confidence 100).
+ *
+ * Returns undefined unless the resolved product really is the reference — the
+ * only case this shape describes. `gates.passed` is true because the
+ * short-circuit *is* an acceptance; it just reached one without the matcher.
+ */
+function referenceShortCircuitCandidate(
+  context: ResolutionContext,
+  resolvedProductId?: string,
+): ProductResolutionCandidateRecord | undefined {
+  const reference = context.referenceProduct;
+  if (!reference || !resolvedProductId) return undefined;
+  if (reference.productId !== resolvedProductId) return undefined;
+
+  return {
+    candidateId: reference.productId,
+    brand: reference.brand,
+    model: reference.model,
+    displayName: context.resolvedProduct?.displayName,
+    source: 'reference_short_circuit',
+    matchScore: context.decision?.confidence,
+    gates: { passed: true, failedGates: [] },
+  };
+}
+
+/**
+ * The row-level `specMatchDetails` — the one spec verdict the review queue shows
+ * without expanding a row, and the one `ResolutionConfidenceService` scores
+ * `specAgreement` from.
+ *
+ * It must therefore describe the candidate the decision was *about*: the product
+ * we resolved to, or failing that the best-scoring one. The candidate array is
+ * in first-sighting order, so taking its head picks whichever candidate recall
+ * happened to see first — routinely a different product than the one we matched,
+ * and sometimes one the filter threw out.
+ */
+function headlineSpecMatchDetails(
+  candidates: ProductResolutionCandidateRecord[],
+  resolvedProductId?: string,
+): SpecMatchDetails | undefined {
+  const resolved = resolvedProductId
+    ? candidates.find((candidate) => candidate.candidateId === resolvedProductId)
+    : undefined;
+  if (resolved?.specMatchDetails) return resolved.specMatchDetails;
+
+  return maxBy(
+    candidates.filter((candidate) => !!candidate.specMatchDetails),
+    (candidate) => candidate.matchScore ?? -Infinity,
+  )?.specMatchDetails;
 }
 
 /**

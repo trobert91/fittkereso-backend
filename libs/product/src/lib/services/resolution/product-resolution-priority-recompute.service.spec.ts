@@ -6,6 +6,7 @@ import {
   ResolutionActor,
   ResolutionVerdict,
   type OfferRepository,
+  type ProductModelRepository,
   type ProductResolutionRepository,
   type ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
@@ -13,6 +14,7 @@ import type { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { ProductResolutionPriorityRecomputeService } from './product-resolution-priority-recompute.service';
 import { ProductResolutionPriorityService } from './product-resolution-priority.service';
 import { ResolutionConfidenceService } from './resolution-confidence.service';
+import { ResolutionReviewTriggerService } from './resolution-review-trigger.service';
 import { ResolutionScoringService } from './resolution-scoring.service';
 
 describe('ProductResolutionPriorityRecomputeService', () => {
@@ -22,6 +24,7 @@ describe('ProductResolutionPriorityRecomputeService', () => {
   };
   let sourceRecordRepo: { countByModelIds: jest.Mock };
   let offerRepo: { countByModelIds: jest.Mock };
+  let productRepo: { findPopulatedBrandCategoryPairs: jest.Mock };
   let config: {
     resolution?: { priority?: Record<string, unknown> };
   };
@@ -60,14 +63,21 @@ describe('ProductResolutionPriorityRecomputeService', () => {
     };
     sourceRecordRepo = { countByModelIds: jest.fn().mockResolvedValue(new Map()) };
     offerRepo = { countByModelIds: jest.fn().mockResolvedValue(new Map()) };
+    productRepo = {
+      findPopulatedBrandCategoryPairs: jest.fn().mockResolvedValue(new Set()),
+    };
     config = { resolution: { priority: { recomputeBatchSize: 2 } } };
 
     service = new ProductResolutionPriorityRecomputeService(
       resolutionRepo as unknown as ProductResolutionRepository,
       sourceRecordRepo as unknown as ProductSourceRecordRepository,
       offerRepo as unknown as OfferRepository,
+      productRepo as unknown as ProductModelRepository,
       new ResolutionScoringService(
         new ProductResolutionPriorityService(new ResolutionConfidenceService()),
+        new ResolutionReviewTriggerService(
+          config as unknown as DynamicConfigService,
+        ),
         config as unknown as DynamicConfigService,
       ),
       config as unknown as DynamicConfigService,

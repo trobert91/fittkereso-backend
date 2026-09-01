@@ -7,12 +7,13 @@ import {
   type SpecMatchDetails,
 } from '@fittkereso-backend/database';
 import { RESOLUTION_DEFAULTS } from '@fittkereso-backend/config';
-import { isEmpty, isNumber, maxBy, pickBy } from 'lodash';
+import { isEmpty, isNumber, pickBy } from 'lodash';
 import {
   deriveSystemAssertion,
   outcomeTension,
   type SystemAssertion,
 } from './outcome-tension';
+import { subjectCandidate } from './resolution-subject-candidate';
 
 export interface ResolutionConfidenceParams {
   flow: ProductResolutionFlow;
@@ -26,6 +27,16 @@ export interface ResolutionConfidenceParams {
   scoring?: { bestScore?: number; secondScore?: number };
   /** Recording threshold, to undo the truncation of the score range. */
   floor?: number;
+  /**
+   * Does the catalog hold any product of this row's brand **and** category?
+   *
+   * Only consulted for a rejection with an empty candidate pool, where it is the
+   * difference between "recall is broken for this brand" and "this is simply a
+   * new product". `false` is the only value that makes an empty pool
+   * *explainable*; `undefined` means nobody looked, and an unchecked assumption
+   * of correctness is exactly what this service exists to avoid.
+   */
+  catalogHasBrandCategorySiblings?: boolean;
   /** Runtime overrides for `CONFIDENCE_WEIGHTS`; anything omitted keeps its
    *  default. Passed in rather than read here so this service stays pure and
    *  its caller owns the config dependency. */
@@ -98,11 +109,11 @@ export class ResolutionConfidenceService {
     params: ResolutionConfidenceParams,
   ): ResolutionConfidenceBreakdown {
     const assertion = deriveSystemAssertion(params);
-    const candidate = this.subjectCandidate(params);
+    const candidate = subjectCandidate(params.candidates, params.decisionSnapshot);
     const weights = resolveWeights(params.weights);
 
     const components = [
-      this.outcomeAgreement(params),
+      this.outcomeAgreement(params, assertion),
       this.specAgreement(params, assertion, candidate),
       this.gateAgreement(assertion, candidate),
       this.corroboration(assertion, candidate),
@@ -120,29 +131,46 @@ export class ResolutionConfidenceService {
   }
 
   /**
-   * The candidate the assertion is about: the one picked when a match was made,
-   * otherwise the strongest one — the candidate that was rejected, which is what
-   * a rejection's confidence is a claim about.
+   * Does the conclusion match how alike the two things look?
+   *
+   * Applicable to every row that had something to compare against. The one
+   * exception is a rejection with an empty candidate pool *that we cannot
+   * explain*, and it is worth spelling out because it used to be this service's
+   * worst failure.
+   *
+   * On such a row the similarity score is 0 because nothing was scored, not
+   * because anything scored low — and since every other component needs a
+   * candidate, this one would be renormalized to the full weight and return a
+   * flat 1.0: "we found nothing and called it new, and those agree." A perfect
+   * confidence derived from the absence of evidence, on precisely the rows the
+   * recorder goes out of its way to keep (the created-product exemption exists
+   * because these are how duplicate products enter the catalog). Dropping it
+   * leaves no components at all, so confidence falls to 0 and the row is ranked
+   * by what rides on it.
+   *
+   * `catalogHasBrandCategorySiblings === false` is what makes an empty pool
+   * *explainable*: the catalog holds nothing of this brand in this category, so
+   * finding nothing is the expected outcome for an ordinary new product rather
+   * than a recall failure, and the agreement is real evidence again. That one
+   * fact drives the `no_candidates_but_named` trigger too — the same signal
+   * moving both, in the same direction, rather than a score and a trigger with
+   * separate opinions.
+   *
+   * The asymmetry with `same` is deliberate: an empty pool beside an asserted
+   * match means we matched something recall never produced, which should be
+   * impossible and is alarming rather than reassuring.
    */
-  private subjectCandidate(
-    params: ResolutionConfidenceParams,
-  ): ProductResolutionCandidateRecord | undefined {
-    const candidates = params.candidates ?? [];
-    if (isEmpty(candidates)) return undefined;
-
-    const pickedId = params.decisionSnapshot?.selectedCandidates?.[0]?.candidateId;
-    const picked = pickedId
-      ? candidates.find((entry) => entry.candidateId === pickedId)
-      : undefined;
-
-    return picked ?? maxBy(candidates, (entry) => entry.matchScore ?? 0);
-  }
-
-  /** Does the conclusion match how alike the two things look? Always applicable
-   *  — every row has a score and an assertion. */
   private outcomeAgreement(
     params: ResolutionConfidenceParams,
-  ): ConfidenceSignal {
+    assertion: SystemAssertion,
+  ): ConfidenceSignal | undefined {
+    const unexplainedEmptyPool =
+      assertion === 'different' &&
+      isEmpty(params.candidates) &&
+      params.catalogHasBrandCategorySiblings !== false;
+
+    if (unexplainedEmptyPool) return undefined;
+
     return { key: 'outcomeAgreement', value: 1 - outcomeTension(params) };
   }
 

@@ -1,0 +1,36 @@
+meta {
+  name: AI Review One Resolution
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8088/api/admin-product/resolutions/00000000-0000-0000-0000-000000000000/ai-review
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Hands one row to the LLM reviewer immediately, rather than waiting for the
+  nightly batch.
+
+  The verdict is always stored: it lands on `aiReview`/`aiConfidence` and is
+  appended to the `decisions` log, whether or not the AI was allowed to act on
+  it. Whether it *acts* depends on `resolution.automation.ai`:
+
+  - `confidence: "high"` plus `executeActions` — carried out through the ordinary
+    action path, as actor `ai`. The action path writes its own decision entry.
+  - `merge_into` / `split`, or accepting an unexecuted duplicate proposal, also
+    need `executeDestructive` — those delete or move products.
+  - anything less than `high` stays advisory: the row remains pending with the
+    recommendation stored for a one-click apply.
+
+  `notExecutedReason` says which of those applied. `stale` means the row changed
+  while the model was thinking (a re-scrape, or you decided it first) and the
+  recommendation was discarded rather than applied to a different question.
+}

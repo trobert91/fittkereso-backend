@@ -95,7 +95,7 @@ describe('ProductResolutionActionService', () => {
         }),
       );
 
-      await service.accept('resolution-1', {});
+      await service.accept('resolution-1', { actor: ResolutionActor.admin });
 
       expect(mergeService.mergeProducts).not.toHaveBeenCalled();
       expect(lastEntry().actionPerformed).toBe(false);
@@ -114,7 +114,7 @@ describe('ProductResolutionActionService', () => {
         }),
       );
 
-      await service.accept('resolution-1', {});
+      await service.accept('resolution-1', { actor: ResolutionActor.admin });
 
       // Oldest product wins: productA (Jan) survives, productB (Jun) is merged away.
       expect(mergeService.mergeProducts).toHaveBeenCalledWith({
@@ -135,7 +135,7 @@ describe('ProductResolutionActionService', () => {
         }),
       );
 
-      await service.accept('resolution-1', {});
+      await service.accept('resolution-1', { actor: ResolutionActor.admin });
 
       expect(lastEntry().action.sourceRecordIds).toEqual([
         'record-7',
@@ -148,7 +148,7 @@ describe('ProductResolutionActionService', () => {
         makeState({ status: ProductResolutionStatus.done, availableActions: [] }),
       );
 
-      await expect(service.accept('resolution-1', {})).rejects.toBeInstanceOf(
+      await expect(service.accept('resolution-1', { actor: ResolutionActor.admin })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(mergeService.mergeProducts).not.toHaveBeenCalled();
@@ -171,6 +171,7 @@ describe('ProductResolutionActionService', () => {
       );
 
       await service.decline('resolution-1', {
+        actor: ResolutionActor.admin,
         correction: ResolutionCorrection.split,
       });
 
@@ -199,6 +200,7 @@ describe('ProductResolutionActionService', () => {
       );
 
       await service.decline('resolution-1', {
+        actor: ResolutionActor.admin,
         correction: ResolutionCorrection.merge_into,
         targetProductId: 'product-y',
       });
@@ -225,6 +227,7 @@ describe('ProductResolutionActionService', () => {
 
       await expect(
         service.decline('resolution-1', {
+          actor: ResolutionActor.admin,
           correction: ResolutionCorrection.merge_into,
           targetProductId: 'product-x',
         }),
@@ -246,6 +249,7 @@ describe('ProductResolutionActionService', () => {
       );
 
       await service.decline('resolution-1', {
+        actor: ResolutionActor.admin,
         correction: ResolutionCorrection.dismiss,
         note: 'not the same bike',
       });
@@ -275,6 +279,7 @@ describe('ProductResolutionActionService', () => {
 
       await expect(
         service.decline('resolution-1', {
+          actor: ResolutionActor.admin,
           correction: ResolutionCorrection.split,
         }),
       ).rejects.toThrow(/merge_already_reversed/);
@@ -304,6 +309,7 @@ describe('ProductResolutionActionService', () => {
     it('marks the row failed and keeps the error on the log entry', async () => {
       await expect(
         service.decline('resolution-1', {
+          actor: ResolutionActor.admin,
           correction: ResolutionCorrection.split,
         }),
       ).rejects.toThrow('source records span two products');
@@ -320,6 +326,7 @@ describe('ProductResolutionActionService', () => {
     it('writes exactly one log entry', async () => {
       await expect(
         service.decline('resolution-1', {
+          actor: ResolutionActor.admin,
           correction: ResolutionCorrection.split,
         }),
       ).rejects.toThrow();
@@ -338,7 +345,7 @@ describe('ProductResolutionActionService', () => {
         }),
       );
 
-      await service.reopen('resolution-1', {});
+      await service.reopen('resolution-1', { actor: ResolutionActor.admin });
 
       expect(mergeService.mergeProducts).not.toHaveBeenCalled();
       expect(splitService.splitIntoNewProduct).not.toHaveBeenCalled();
@@ -372,17 +379,122 @@ describe('ProductResolutionActionService', () => {
         }),
       );
 
-      await service.retry('resolution-1');
+      await service.retry('resolution-1', { actor: ResolutionActor.admin });
 
       expect(splitService.splitIntoNewProduct).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('who acted, and what that writes', () => {
+    const acceptableState = () =>
+      makeState({
+        lastPerformed: {
+          at: '',
+          actor: ResolutionActor.system,
+          verdict: ResolutionVerdict.matched_existing,
+          action: { kind: ResolutionActionKind.match },
+          actionPerformed: true,
+        },
+        availableActions: [{ action: 'accept', requiresTargetProduct: false }],
+      });
+
+    it.each([
+      [ResolutionActor.system, 'system'],
+      [ResolutionActor.ai, 'ai'],
+      [ResolutionActor.admin, 'admin'],
+    ])('records %s as the actor on the log entry', async (actor, expected) => {
+      stateService.deriveVerified.mockResolvedValue(acceptableState());
+
+      await service.accept('resolution-1', { actor });
+
+      expect(lastEntry().actor).toBe(expected);
+    });
+
+    it('stamps reviewedAt for a human and for nobody else', async () => {
+      // The automation rail. If a machine wrote this, it would lock the row away
+      // from itself for good — and a row a human reopened could never return to
+      // the automated path.
+      for (const actor of [ResolutionActor.system, ResolutionActor.ai]) {
+        repo.appendDecision.mockClear();
+        stateService.deriveVerified.mockResolvedValue(acceptableState());
+
+        await service.accept('resolution-1', { actor });
+
+        expect(lastPatch().reviewedAt).toBeUndefined();
+      }
+
+      repo.appendDecision.mockClear();
+      stateService.deriveVerified.mockResolvedValue(acceptableState());
+
+      await service.accept('resolution-1', { actor: ResolutionActor.admin });
+
+      expect(lastPatch().reviewedAt).toBeInstanceOf(Date);
+    });
+
+    it.each([
+      [ResolutionActor.system, 'system'],
+      [ResolutionActor.ai, 'ai'],
+      [ResolutionActor.admin, 'admin'],
+    ])('sets decidedBy to %s when the row goes done', async (actor, expected) => {
+      stateService.deriveVerified.mockResolvedValue(acceptableState());
+
+      await service.accept('resolution-1', { actor });
+
+      expect(lastPatch().decidedBy).toBe(expected);
+    });
+
+    it('clears decidedBy on a reopen rather than leaving a stale decider', async () => {
+      // An explicit null, not undefined: the row is back in the queue and has no
+      // decider again. Left set, it would keep showing in the automation audit as
+      // something the machine had closed.
+      stateService.deriveVerified.mockResolvedValue(
+        makeState({
+          status: ProductResolutionStatus.done,
+          accepted: true,
+          availableActions: [{ action: 'reopen', requiresTargetProduct: false }],
+        }),
+      );
+
+      await service.reopen('resolution-1', { actor: ResolutionActor.admin });
+
+      expect(lastPatch().decidedBy).toBeNull();
+    });
+
+    it('leaves decidedBy alone when an action fails', async () => {
+      // A failed action decided nothing. Neither claiming nor clearing a decider
+      // is right, so the column is not in the patch at all.
+      mergeService.mergeProducts.mockRejectedValue(new Error('db timeout'));
+      stateService.deriveVerified.mockResolvedValue(
+        makeState({
+          listingProductId: 'product-a',
+          availableActions: [
+            {
+              action: 'decline',
+              correction: ResolutionCorrection.merge_into,
+              requiresTargetProduct: true,
+            },
+          ],
+        }),
+      );
+
+      await expect(
+        service.decline('resolution-1', {
+          actor: ResolutionActor.admin,
+          correction: ResolutionCorrection.merge_into,
+          targetProductId: 'product-x',
+        }),
+      ).rejects.toThrow('db timeout');
+
+      expect(lastPatch().status).toBe(ProductResolutionStatus.failed);
+      expect(lastPatch().decidedBy).toBeUndefined();
     });
   });
 
   it('404s on an unknown resolution', async () => {
     repo.findForAction.mockResolvedValue(null);
 
-    await expect(service.accept('nope', {})).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.accept('nope', { actor: ResolutionActor.admin }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

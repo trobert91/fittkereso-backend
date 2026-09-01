@@ -1,4 +1,7 @@
-import type { ProductModel } from '@fittkereso-backend/database';
+import type {
+  ProductModel,
+  SpecMatchDetails,
+} from '@fittkereso-backend/database';
 import { ResolutionService } from './resolution.service';
 import type {
   ReferenceProductResolver,
@@ -737,6 +740,214 @@ describe('ResolutionService.search()', () => {
       expect(byId['cand-keep'].filtered).toBeUndefined();
       expect(byId['cand-1'].matchScore).toBeUndefined();
       expect(byId['cand-1'].filtered.detail).toBe(MISMATCH_DETAIL);
+    });
+  });
+
+  /**
+   * The recorded row is the only thing a later reviewer — human or automated —
+   * gets to see. These cover the evidence that used to exist during the run and
+   * be dropped on the way to the row.
+   */
+  describe('recording candidate evidence', () => {
+    const INPUT = { brand: 'KTM', model: 'MACINA KAPOHO ELITE' };
+    const OPTIONS = {
+      useEmbedding: true,
+      webSearchEnabled: false,
+      mode: 'loose' as const,
+    };
+
+    function specMatch(matchingCount: number): SpecMatchDetails {
+      return {
+        comparableCount: 7,
+        matchingCount,
+        primaryMismatches: 0,
+        matcherSpecMismatches: 7 - matchingCount,
+        nonPrimaryMismatches: 0,
+        details: [],
+      };
+    }
+
+    it('records the reference product as the candidate on a stage-1 short-circuit', async () => {
+      const reference = makeReferenceProduct();
+      const recorder = makeResolutionRecorder();
+
+      // The real resolver populates ctx.referenceProduct before returning
+      // 'resolved'; the short-circuit record is built from that.
+      const referenceResolver = {
+        resolve: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          ctx.referenceProduct = {
+            productId: 'ref-1',
+            brand: 'Samsung',
+            model: 'S95D',
+            productCategory: {
+              id: 'c-monitors',
+              name: 'Monitor',
+              slug: 'monitors',
+            },
+            specs: { screenSize: '34"' },
+          };
+          return {
+            kind: 'resolved',
+            product: reference,
+            confidence: 100,
+            reason: 'reference_same',
+          } as ReferenceResult;
+        }),
+      } as unknown as ReferenceProductResolver;
+
+      const service = new ResolutionService(
+        referenceResolver,
+        makeStage<BrandResolverService>('resolve'),
+        makeStage<CategoryResolverService>('resolve'),
+        makeStage<RecallService>('recall'),
+        makeStage<FilterService>('filter'),
+        makeStage<ScoringService>('score'),
+        makeStage<DecisionService>('decide'),
+        makeStage<FinalizeService>('finalize'),
+        recorder,
+      );
+
+      await service.search(INPUT, OPTIONS);
+
+      const params = (recorder.recordResolution as jest.Mock).mock.calls[0][0];
+      // Without this the row records zero candidates beside a resolved product,
+      // which is indistinguishable from "recall found nothing".
+      expect(params.candidates).toHaveLength(1);
+      expect(params.candidates[0]).toMatchObject({
+        candidateId: 'ref-1',
+        brand: 'Samsung',
+        model: 'S95D',
+        source: 'reference_short_circuit',
+        gates: { passed: true, failedGates: [] },
+      });
+    });
+
+    it('marks a candidate that never reached the gates as not_scored', async () => {
+      const recorder = makeResolutionRecorder();
+      const candidate = {
+        productId: 'cand-1',
+        displayName: 'KTM MACINA KAPOHO ELITE',
+        source: 'fuzzy' as const,
+      };
+
+      const recallService = {
+        recall: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          if (ctx.strategiesRun.length === 0) {
+            ctx.strategiesRun.push('fuzzy');
+            ctx.candidates = [candidate];
+          }
+        }),
+      } as unknown as RecallService;
+
+      const filterService = {
+        filter: jest.fn().mockReturnValue({
+          qualifyingCandidates: [candidate],
+          outcome: { qualifyingCandidateIds: ['cand-1'], filteredCandidates: [] },
+        }),
+      } as unknown as FilterService;
+
+      const service = new ResolutionService(
+        makeReferenceResolver(null),
+        makeStage<BrandResolverService>('resolve'),
+        makeStage<CategoryResolverService>('resolve'),
+        recallService,
+        filterService,
+        makeStage<ScoringService>('score'),
+        makeStage<DecisionService>('decide'),
+        makeFinalize({} as ResolutionResult),
+        recorder,
+      );
+
+      await service.search(INPUT, OPTIONS);
+
+      const params = (recorder.recordResolution as jest.Mock).mock.calls[0][0];
+      // An empty failedGates with passed:false would read as "every gate was
+      // evaluated and none objected" — the opposite of what happened.
+      expect(params.candidates[0].gates).toEqual({
+        passed: false,
+        failedGates: ['not_scored'],
+      });
+    });
+
+    it('takes the row-level specMatchDetails from the resolved product, not the first-recalled candidate', async () => {
+      const recorder = makeResolutionRecorder();
+      const firstSeen = {
+        productId: 'cand-other',
+        displayName: 'KTM MACINA KAPOHO ELITE 2019',
+        source: 'fuzzy' as const,
+      };
+      const resolved = {
+        productId: 'cand-resolved',
+        displayName: 'KTM MACINA KAPOHO ELITE 2023',
+        source: 'fuzzy' as const,
+        specs: { motorModel: 'Bosch CX' },
+        aliases: ['macina-kapoho-elite-2023'],
+        productCategory: { id: 'c-ebike', name: 'E-bike', slug: 'ebike' },
+      };
+
+      const recallService = {
+        recall: jest.fn().mockImplementation(async (ctx: ResolutionContext) => {
+          if (ctx.strategiesRun.length === 0) {
+            ctx.strategiesRun.push('fuzzy');
+            // Recall order, which is what the row used to take its headline
+            // spec verdict from.
+            ctx.candidates = [firstSeen, resolved];
+          }
+        }),
+      } as unknown as RecallService;
+
+      const filterService = {
+        filter: jest.fn().mockReturnValue({
+          qualifyingCandidates: [firstSeen, resolved],
+          outcome: {
+            qualifyingCandidateIds: ['cand-other', 'cand-resolved'],
+            filteredCandidates: [],
+          },
+        }),
+      } as unknown as FilterService;
+
+      // Mimics ScoringService annotating each SlimCandidate in place.
+      const scoringService = {
+        score: jest.fn().mockImplementation((ctx: ResolutionContext) => {
+          for (const c of ctx.candidates) {
+            const isResolved = c.productId === 'cand-resolved';
+            c.matchScore = isResolved ? 88 : 61;
+            c.specMatchDetails = specMatch(isResolved ? 7 : 2);
+          }
+        }),
+      } as unknown as ScoringService;
+
+      const service = new ResolutionService(
+        makeReferenceResolver(null),
+        makeStage<BrandResolverService>('resolve'),
+        makeStage<CategoryResolverService>('resolve'),
+        recallService,
+        filterService,
+        scoringService,
+        makeStage<DecisionService>('decide'),
+        makeFinalize({
+          resolvedModel: { id: 'cand-resolved' },
+        } as ResolutionResult),
+        recorder,
+      );
+
+      await service.search(INPUT, OPTIONS);
+
+      const params = (recorder.recordResolution as jest.Mock).mock.calls[0][0];
+      // 7, not 2: the row's headline spec verdict must describe the product we
+      // matched. It feeds `specAgreement` in the confidence score, so the wrong
+      // candidate's verdict here corrupts the score itself.
+      expect(params.specMatchDetails.matchingCount).toBe(7);
+
+      const byId = Object.fromEntries(
+        params.candidates.map((c: { candidateId: string }) => [c.candidateId, c]),
+      );
+      // Each candidate keeps its own matcher verdict — that is the part no
+      // later reader can recompute, since it depends on the config and code of
+      // the moment. The candidate's specs are not copied here: they are live
+      // catalog data, loaded fresh from `candidateId` at review time.
+      expect(byId['cand-other'].specMatchDetails.matchingCount).toBe(2);
+      expect(byId['cand-resolved'].specs).toBeUndefined();
     });
   });
 });

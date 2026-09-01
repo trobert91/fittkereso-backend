@@ -11,6 +11,7 @@ import {
   ResolutionActionKind,
   ResolutionActor,
   ResolutionCorrection,
+  ResolutionDecidedBy,
   ResolutionVerdict,
   type AppendDecisionPatch,
   type ProductResolutionDecisionAction,
@@ -23,18 +24,32 @@ import { ProductSplitService } from '../merge/product-split.service';
 import { selectMergeTarget } from '../duplicate/select-merge-target';
 import { ProductResolutionStateService } from './product-resolution-state.service';
 
-export interface AcceptResolutionParams {
+/**
+ * Who is performing this action.
+ *
+ * Required, never defaulted. A default of `admin` would be the more convenient
+ * signature and exactly the wrong one: a new automated caller that forgot to
+ * pass an actor would silently record itself as a human *and* stamp
+ * `reviewedAt`, which permanently withdraws the row from every automated path.
+ * That failure leaves no error behind, so the type system is the only place it
+ * can be caught.
+ */
+export interface ResolutionActorParams {
+  actor: ResolutionActor;
+}
+
+export interface AcceptResolutionParams extends ResolutionActorParams {
   note?: string;
 }
 
-export interface DeclineResolutionParams {
+export interface DeclineResolutionParams extends ResolutionActorParams {
   correction: ResolutionCorrection;
   /** Required when `correction` is `merge_into`. */
   targetProductId?: string;
   note?: string;
 }
 
-export interface ReopenResolutionParams {
+export interface ReopenResolutionParams extends ResolutionActorParams {
   note?: string;
 }
 
@@ -72,13 +87,14 @@ export class ProductResolutionActionService {
    */
   public async accept(
     id: string,
-    params: AcceptResolutionParams = {},
+    params: AcceptResolutionParams,
   ): Promise<ProductResolution> {
     const { resolution, state } = await this.loadAndDerive(id);
     this.assertAvailable(state, 'accept');
 
     if (state.lastPerformed) {
       return this.commit(resolution, {
+        actor: params.actor,
         verdict: ResolutionVerdict.accept,
         action: { kind: ResolutionActionKind.none },
         actionPerformed: false,
@@ -87,7 +103,7 @@ export class ProductResolutionActionService {
       });
     }
 
-    return this.performMergeProposal(resolution, params.note);
+    return this.performMergeProposal(resolution, params.actor, params.note);
   }
 
   /**
@@ -104,12 +120,13 @@ export class ProductResolutionActionService {
 
     switch (params.correction) {
       case ResolutionCorrection.split:
-        return this.performSplit(resolution, state, params.note);
+        return this.performSplit(resolution, state, params.actor, params.note);
       case ResolutionCorrection.merge_into:
         return this.performMergeInto(resolution, state, params);
       case ResolutionCorrection.dismiss:
       default:
         return this.commit(resolution, {
+          actor: params.actor,
           verdict: ResolutionVerdict.decline,
           action: { kind: ResolutionActionKind.none },
           actionPerformed: false,
@@ -123,12 +140,13 @@ export class ProductResolutionActionService {
    *  reopened row simply offers the correction that reverses current state. */
   public async reopen(
     id: string,
-    params: ReopenResolutionParams = {},
+    params: ReopenResolutionParams,
   ): Promise<ProductResolution> {
     const { resolution, state } = await this.loadAndDerive(id);
     this.assertAvailable(state, 'reopen');
 
     return this.commit(resolution, {
+      actor: params.actor,
       verdict: ResolutionVerdict.reopen,
       action: { kind: ResolutionActionKind.none },
       actionPerformed: false,
@@ -139,7 +157,10 @@ export class ProductResolutionActionService {
 
   /** Re-runs the action that failed, against freshly derived state — the world
    *  may have changed since, which is exactly why it is re-derived. */
-  public async retry(id: string): Promise<ProductResolution> {
+  public async retry(
+    id: string,
+    params: ResolutionActorParams,
+  ): Promise<ProductResolution> {
     const { resolution, state } = await this.loadAndDerive(id);
     this.assertAvailable(state, 'retry');
 
@@ -151,14 +172,15 @@ export class ProductResolutionActionService {
     switch (failed.action.kind) {
       case ResolutionActionKind.merge:
         return failed.verdict === ResolutionVerdict.accept
-          ? this.performMergeProposal(resolution, failed.note)
+          ? this.performMergeProposal(resolution, params.actor, failed.note)
           : this.performMergeInto(resolution, state, {
+              actor: params.actor,
               correction: ResolutionCorrection.merge_into,
               targetProductId: failed.action.targetProductId,
               note: failed.note,
             });
       case ResolutionActionKind.split:
-        return this.performSplit(resolution, state, failed.note);
+        return this.performSplit(resolution, state, params.actor, failed.note);
       default:
         throw new BadRequestException(
           `Cannot retry action "${failed.action.kind}"`,
@@ -203,11 +225,13 @@ export class ProductResolutionActionService {
    *  system proposed, oldest product winning. */
   private async performMergeProposal(
     resolution: ProductResolution,
+    actor: ResolutionActor,
     note?: string,
   ): Promise<ProductResolution> {
     if (!resolution.productA || !resolution.productB) {
       // Nothing to execute and nothing already executed — a judgment-only row.
       return this.commit(resolution, {
+        actor,
         verdict: ResolutionVerdict.accept,
         action: { kind: ResolutionActionKind.none },
         actionPerformed: false,
@@ -222,6 +246,7 @@ export class ProductResolutionActionService {
     );
 
     return this.runAction(resolution, {
+      actor,
       verdict: ResolutionVerdict.accept,
       accepted: true,
       note,
@@ -247,12 +272,14 @@ export class ProductResolutionActionService {
   private async performSplit(
     resolution: ProductResolution,
     state: ProductResolutionState,
+    actor: ResolutionActor,
     note?: string,
   ): Promise<ProductResolution> {
     const sourceRecordIds = state.splittableSourceRecordIds;
     const originProductId = state.listingProductId;
 
     return this.runAction(resolution, {
+      actor,
       verdict: ResolutionVerdict.decline,
       accepted: false,
       note,
@@ -297,6 +324,7 @@ export class ProductResolutionActionService {
     }
 
     return this.runAction(resolution, {
+      actor: params.actor,
       verdict: ResolutionVerdict.decline,
       accepted: false,
       note: params.note,
@@ -330,6 +358,7 @@ export class ProductResolutionActionService {
   private async runAction(
     resolution: ProductResolution,
     spec: {
+      actor: ResolutionActor;
       verdict: ResolutionVerdict;
       accepted: boolean;
       note?: string;
@@ -349,6 +378,7 @@ export class ProductResolutionActionService {
       const outcome = await spec.perform();
 
       return await this.commit(resolution, {
+        actor: spec.actor,
         verdict: spec.verdict,
         action: spec.buildAction(
           outcome.movedSourceRecordIds,
@@ -372,6 +402,7 @@ export class ProductResolutionActionService {
       });
 
       await this.commit(resolution, {
+        actor: spec.actor,
         verdict: spec.verdict,
         action: spec.buildAction(),
         actionPerformed: false,
@@ -384,9 +415,27 @@ export class ProductResolutionActionService {
     }
   }
 
+  /**
+   * One log entry plus the workflow fields that go with it — the only place any
+   * of them is written.
+   *
+   * Two of those fields are derived from the actor rather than passed in, and
+   * both derivations are the point of the actor existing:
+   *
+   * - **`reviewedAt` only for `admin`.** It no longer means "reviewed" in the
+   *   loose sense; it means *a human touched this row*, and it is what both
+   *   automated paths test to know they must keep away. If automation wrote it,
+   *   the machine would lock rows away from itself and a reopened row could
+   *   never come back under automation.
+   * - **`decidedBy` tracks who settled it**, set when the row goes `done` and
+   *   cleared when a reopen puts it back in the queue. A `failed` row is neither
+   *   settled nor reopened, so it keeps whatever it had — the action that failed
+   *   did not decide anything.
+   */
   private async commit(
     resolution: ProductResolution,
     params: {
+      actor: ResolutionActor;
       verdict: ResolutionVerdict;
       action: ProductResolutionDecisionAction;
       actionPerformed: boolean;
@@ -398,7 +447,7 @@ export class ProductResolutionActionService {
     const now = new Date();
     const entry: ProductResolutionDecisionEntry = {
       at: now.toISOString(),
-      actor: ResolutionActor.admin,
+      actor: params.actor,
       verdict: params.verdict,
       action: params.action,
       actionPerformed: params.actionPerformed,
@@ -409,8 +458,10 @@ export class ProductResolutionActionService {
 
     await this.resolutionRepo.appendDecision(resolution.id, entry, {
       ...params.patch,
-      reviewedAt: now,
+      reviewedAt:
+        params.actor === ResolutionActor.admin ? now : undefined,
       reviewNote: params.note ?? resolution.reviewNote,
+      decidedBy: decidedByFor(params.actor, params.patch.status),
     });
 
     return this.resolutionRepo.findByIdOrFail(resolution.id);
@@ -422,5 +473,33 @@ export class ProductResolutionActionService {
     return [...(resolution.decisions ?? [])]
       .reverse()
       .find((entry) => !entry.actionPerformed && !!entry.error);
+  }
+}
+
+/**
+ * Who currently owns the verdict on a row.
+ *
+ * `null` on a reopen is a real clear, not a no-op: a row back in the queue has
+ * no decider again, and leaving the old value would keep it showing in the
+ * automation audit as something the machine had closed.
+ *
+ * Returns `undefined` — leave the column alone — for any other status, so a
+ * failed action does not claim to have decided anything.
+ */
+function decidedByFor(
+  actor: ResolutionActor,
+  status?: ProductResolutionStatus,
+): ResolutionDecidedBy | null | undefined {
+  if (status === ProductResolutionStatus.pending) return null;
+  if (status !== ProductResolutionStatus.done) return undefined;
+
+  switch (actor) {
+    case ResolutionActor.system:
+      return ResolutionDecidedBy.system;
+    case ResolutionActor.ai:
+      return ResolutionDecidedBy.ai;
+    case ResolutionActor.admin:
+    default:
+      return ResolutionDecidedBy.admin;
   }
 }

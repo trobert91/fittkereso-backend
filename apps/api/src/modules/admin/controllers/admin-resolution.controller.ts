@@ -15,6 +15,7 @@ import {
   ProductResolutionRepository,
   ProductModel,
   ProductSourceRecord,
+  ResolutionActor,
   ResolutionCorrection,
   UserRole,
 } from '@fittkereso-backend/database';
@@ -24,13 +25,28 @@ import {
   ProductImageDtoService,
   ProductResolutionActionService,
   ProductResolutionStateService,
+  ResolutionAiReviewBatchService,
+  ResolutionAiReviewService,
+} from '@fittkereso-backend/product';
+import type {
+  AiReviewBatchSummary,
+  AiReviewResult,
 } from '@fittkereso-backend/product';
 import {
   ProductResolutionSearchParams,
   ProductResolutionSearchService,
 } from '@fittkereso-backend/search';
 import { SerializeGroup } from '@fittkereso-backend/utils';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import type { DuplicateDetectionRunSummary } from '@fittkereso-backend/product';
 import { compact } from 'lodash';
 import {
@@ -52,6 +68,32 @@ class DeclineResolutionDto extends ReviewNoteDto {
   @IsOptional()
   @IsString()
   targetProductId?: string;
+}
+
+class RunAiReviewDto {
+  /** Rows to review this run. Omit for the configured `maxPerRun`. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  maxPerRun?: number;
+
+  /** Priority floor for intake. Omit for the configured `minPriority`. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  minPriority?: number;
+
+  /**
+   * Can only ever *tighten* the configured setting — passing `true` when the
+   * config says `false` does not enable merges. A request must not be able to
+   * turn on the switch that deletes products.
+   */
+  @IsOptional()
+  @IsBoolean()
+  executeDestructive?: boolean;
 }
 
 class TriggerDuplicateDetectionDto {
@@ -80,6 +122,8 @@ export class AdminResolutionController {
     private readonly stateService: ProductResolutionStateService,
     private readonly evaluationService: ProductDuplicateEvaluationService,
     private readonly imageDtoService: ProductImageDtoService,
+    private readonly aiReviewService: ResolutionAiReviewService,
+    private readonly aiReviewBatchService: ResolutionAiReviewBatchService,
   ) {}
 
   @Post('search')
@@ -118,6 +162,27 @@ export class AdminResolutionController {
     return this.evaluationService.processAllCategories(body.categoryId);
   }
 
+  /**
+   * Runs the AI reviewer over the top of the queue, now.
+   *
+   * The same batch the scheduler runs at 3 AM, on demand — which is what makes
+   * the AI pass usable while you are working: clear what you can by hand, then
+   * hand the next slice to the model and read the summary.
+   *
+   * Declared above the parameterised routes by convention. Nothing depends on
+   * the ordering here — `ai-review/run` cannot collide with `:id/<action>`,
+   * since every one of those requires a different second segment — but a literal
+   * path sitting below a `:id` catch-all is the kind of thing that only breaks
+   * once someone adds the route that does collide.
+   */
+  @Post('ai-review/run')
+  @SerializeOptions({ strategy: 'exposeAll' })
+  async runAiReview(
+    @Body() body: RunAiReviewDto,
+  ): Promise<AiReviewBatchSummary> {
+    return this.aiReviewBatchService.run(body);
+  }
+
   @Get(':id')
   @SerializeOptions({
     groups: [
@@ -141,7 +206,9 @@ export class AdminResolutionController {
     @Param('id') id: string,
     @Body() body: ReviewNoteDto,
   ): Promise<ResolutionListItem> {
-    return this.loadItemAfter(this.actionService.accept(id, body));
+    return this.loadItemAfter(
+      this.actionService.accept(id, { ...body, actor: ResolutionActor.admin }),
+    );
   }
 
   /** "The current state is wrong." The legal corrections depend on the last
@@ -154,7 +221,9 @@ export class AdminResolutionController {
     @Param('id') id: string,
     @Body() body: DeclineResolutionDto,
   ): Promise<ResolutionListItem> {
-    return this.loadItemAfter(this.actionService.decline(id, body));
+    return this.loadItemAfter(
+      this.actionService.decline(id, { ...body, actor: ResolutionActor.admin }),
+    );
   }
 
   /** Puts a decided row back in the queue. Catalog effects are not undone —
@@ -167,7 +236,25 @@ export class AdminResolutionController {
     @Param('id') id: string,
     @Body() body: ReviewNoteDto,
   ): Promise<ResolutionListItem> {
-    return this.loadItemAfter(this.actionService.reopen(id, body));
+    return this.loadItemAfter(
+      this.actionService.reopen(id, { ...body, actor: ResolutionActor.admin }),
+    );
+  }
+
+  /**
+   * Hands one row to the AI reviewer, now.
+   *
+   * The nightly batch works the queue top-down; this is for the row in front of
+   * you. Whether the verdict is acted on depends on the same config the batch
+   * uses — a `high`-confidence verdict executes through the ordinary action
+   * path, anything less comes back as advice with the reasoning attached.
+   */
+  @Post(':id/ai-review')
+  @SerializeOptions({ strategy: 'exposeAll' })
+  async aiReviewResolution(
+    @Param('id') id: string,
+  ): Promise<AiReviewResult> {
+    return this.aiReviewService.reviewById(id);
   }
 
   /** Re-runs an action that failed, against freshly derived state. */
@@ -178,7 +265,9 @@ export class AdminResolutionController {
   async retryResolution(
     @Param('id') id: string,
   ): Promise<ResolutionListItem> {
-    return this.loadItemAfter(this.actionService.retry(id));
+    return this.loadItemAfter(
+      this.actionService.retry(id, { actor: ResolutionActor.admin }),
+    );
   }
 
   @Delete(':id')

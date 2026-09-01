@@ -1,4 +1,4 @@
-import type { ProductSpecs } from '@fittkereso-backend/database';
+import type { ProductSpecs, SpecMatchDetails } from '@fittkereso-backend/database';
 
 /** Slim snapshot of the reference product (the catalog row identified by
  *  `input.referenceProductId`). Source of inherited primary specs for
@@ -54,6 +54,14 @@ export interface SlimCandidate {
   /** Matcher score on the unified 0–100 scale. Populated after the Scoring stage. */
   matchScore?: number;
   matchComponents?: MatchResultComponents;
+  /** Spec-comparison verdict from the Scoring stage.
+   *
+   *  Lives on the candidate rather than being read back off
+   *  `context.scoringMatches` because that list is replaced wholesale by every
+   *  recall iteration, while the candidate objects persist — so a candidate
+   *  scored in an earlier pass keeps its details instead of looking unscored.
+   *  Same reason `matchScore` is set here. */
+  specMatchDetails?: SpecMatchDetails;
 }
 
 /** Funnel counts for candidate recall. */

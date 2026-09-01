@@ -58,7 +58,9 @@ export class ScoringService {
       categorySlug,
     );
 
-    // Annotate slim candidates with matcher score + components.
+    // Annotate slim candidates with matcher score + components. These land on
+    // the candidate objects themselves, which outlive any single recall
+    // iteration — `context.scoringMatches` below does not.
     for (const match of matches) {
       const slim = slimById.get(match.candidateId);
       if (!slim) continue;
@@ -70,6 +72,7 @@ export class ScoringService {
         aliasMatch: match.components.aliasMatch,
         specSimilarity: match.components.specSimilarity,
       };
+      slim.specMatchDetails = match.specMatchDetails;
     }
 
     // Re-sort the persisted candidate list by matcher score (descending) so

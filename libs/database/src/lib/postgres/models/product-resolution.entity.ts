@@ -8,7 +8,13 @@ import { ProductResolutionStatus } from '../types/product-resolution-status';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 import { Expose, Transform } from 'class-transformer';
 import { transfromExposeAll } from '@fittkereso-backend/utils';
+import {
+  ResolutionAiConfidence,
+  ResolutionDecidedBy,
+  ResolutionReviewTrigger,
+} from '../types/product-resolution-review';
 import type { SpecMatchDetails } from '../types/spec-match-details';
+import type { ProductResolutionAiReview } from '../types/product-resolution-review';
 import type { ProductResolutionCandidateRecord } from '../types/product-resolution-candidate';
 import type { ProductResolutionDecisionEntry } from '../types/product-resolution-decision-entry';
 import type {
@@ -69,9 +75,9 @@ export class ProductResolution extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   status: ProductResolutionStatus;
 
-  /** The human verdict. False by default and set true only by an explicit
-   *  admin accept — a declined row and an undecided row are both `false`, which
-   *  is why `status` is what distinguishes them. */
+  /** The verdict, whoever reached it — admin, the deterministic rule, or the AI
+   *  reviewer. `decidedBy` says which. False by default, so a declined row and an
+   *  undecided row are both `false`; `status` is what distinguishes them. */
   @Column({ type: 'boolean', default: false })
   @Expose({ groups: [SerializeGroup.adminList] })
   accepted: boolean;
@@ -126,7 +132,16 @@ export class ProductResolution extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   mergedAt?: Date;
 
-  /** Both flows — set whenever a human approves/rejects any row. */
+  /**
+   * **A human touched this row.** Written by human review actions only —
+   * including reopen — and never by automation.
+   *
+   * That makes it the automation rail: both automated paths require
+   * `reviewedAt IS NULL`, so a row you reopened is never silently re-closed by
+   * the machine. It stays yours until a rescrape changes the situation, at which
+   * point the anchor lifecycle creates a fresh untouched row — a changed
+   * situation is a new question.
+   */
   @Column({ type: 'timestamptz', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList] })
   reviewedAt?: Date;
@@ -218,6 +233,82 @@ export class ProductResolution extends BasePostgresEntity {
    *  nightly sweep works oldest-first from this. */
   @Column({ type: 'timestamptz', nullable: true })
   priorityComputedAt?: Date | null;
+
+  /**
+   * Why this row might be wrong — see `ResolutionReviewTrigger`.
+   *
+   * Computed by `ResolutionReviewTriggerService` and carried in the same
+   * `ResolutionScores` struct as the two scores, so every existing write path
+   * (insert, refresh, pair upsert, sweep) populates it without a new call site.
+   *
+   * Three distinct values, and the difference matters: `NULL` means never
+   * classified (ineligible for every automated path), `[]` means classified and
+   * nothing fired (the value auto-accept trusts), and a non-empty list means at
+   * least one suspicion pattern matched.
+   *
+   * Never an ordering term.
+   *
+   * The btree index serves the two hot predicates — `= '[]'` (the auto-accept
+   * guard, evaluated on the scrape path) and `IS NULL` (the sweep's backfill
+   * cursor). The any-of admin filter (`?|`) wants a GIN index instead, which
+   * TypeORM's `@Index` cannot express and `synchronize` therefore cannot create;
+   * it belongs in the consolidated migration, and until then that filter is an
+   * interactive query over a queue of thousands, not a hot path.
+   */
+  @Index()
+  @Column({ type: 'jsonb', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  reviewTriggers?: ResolutionReviewTrigger[] | null;
+
+  /** When the AI reviewer last completed a pass on this row. Cleared whenever
+   *  the evidence is refreshed, alongside every other `ai*` column. Drives both
+   *  the reviewed/unreviewed filter and intake dedup. */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  aiReviewedAt?: Date | null;
+
+  /** How sure the AI was. `high` is what authorises execution; `low`/`medium`
+   *  leave the row pending with the recommendation shown as a suggestion — which
+   *  makes `aiConfidence IN (low, medium)` the "things the machine couldn't
+   *  settle" filter, the queue a human most wants. */
+  @Index()
+  @Column({
+    type: 'enum',
+    enum: ResolutionAiConfidence,
+    nullable: true,
+  })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  aiConfidence?: ResolutionAiConfidence | null;
+
+  /** The full stored verdict — reasoning, cited evidence, recommended action,
+   *  model and cost. Written on every review, whether or not the AI was allowed
+   *  to act on it. The reasoning is *also* appended to `decisions` as an entry so
+   *  the existing timeline renders it; this is the structured copy the detail
+   *  view reads, and it holds only the latest verdict where the log holds all of
+   *  them. */
+  @Column({ type: 'jsonb', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  @Transform(transfromExposeAll())
+  aiReview?: ProductResolutionAiReview | null;
+
+  /** The row's `fingerprint` when the AI last reviewed it. `aiReviewFingerprint
+   *  IS DISTINCT FROM fingerprint` means the situation itself changed since, so
+   *  the row becomes eligible for review again — which is what stops the batch
+   *  re-judging identical rows every night while still catching real changes. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  aiReviewFingerprint?: string | null;
+
+  /** Who settled this row. The automation audit stream — `decidedBy IN
+   *  (system, ai) AND status = done` is "what did the machine close" — and
+   *  therefore the spot-check mechanism. Cleared on reopen. */
+  @Index()
+  @Column({
+    type: 'enum',
+    enum: ResolutionDecidedBy,
+    nullable: true,
+  })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  decidedBy?: ResolutionDecidedBy | null;
 
   /** The scraped listing this decision was about. Populated for
    *  `product_resolution` rows once the record exists (backfilled right after

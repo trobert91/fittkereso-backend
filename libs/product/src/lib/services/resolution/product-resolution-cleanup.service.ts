@@ -7,6 +7,7 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 export interface ResolutionCleanupSummary {
   supersededDeleted: number;
   doneDeleted: number;
+  pendingDeleted: number;
 }
 
 /**
@@ -22,6 +23,12 @@ export interface ResolutionCleanupSummary {
  *   the repetition this pipeline removes. Every repeat sighting touches
  *   `lastSeenAt`, so an active listing keeps its row indefinitely and only
  *   genuinely quiet ones are pruned.
+ * - `pending` rows age the same way but far more slowly — an undecided row is a
+ *   live question, and deleting one is deciding it by neglect. The retention
+ *   exists only so rows nobody will ever judge (the unjudgeable ones especially)
+ *   do not accumulate forever. `failed` is excluded: those mean a catalog action
+ *   errored and is still broken, so ageing them out would delete the evidence of
+ *   a bug rather than tidy a queue.
  *
  * Nothing else is touched — `ProductSourceRecord`s in particular, since they are
  * what any future correction acts on.
@@ -43,7 +50,7 @@ export class ProductResolutionCleanupService {
 
     if (!(config?.cleanupEnabled ?? defaults.cleanupEnabled)) {
       this.logger.debug('Resolution cleanup is disabled');
-      return { supersededDeleted: 0, doneDeleted: 0 };
+      return { supersededDeleted: 0, doneDeleted: 0, pendingDeleted: 0 };
     }
 
     const supersededDeleted = await this.resolutionRepo.pruneSuperseded(
@@ -54,13 +61,16 @@ export class ProductResolutionCleanupService {
     const doneDeleted = await this.resolutionRepo.pruneDoneNotSeenSince(
       this.cutoff(config?.doneRetentionDays ?? defaults.doneRetentionDays),
     );
+    const pendingDeleted = await this.resolutionRepo.prunePendingNotSeenSince(
+      this.cutoff(
+        config?.pendingRetentionDays ?? defaults.pendingRetentionDays,
+      ),
+    );
 
-    this.logger.log('Resolution cleanup completed', {
-      supersededDeleted,
-      doneDeleted,
-    });
+    const summary = { supersededDeleted, doneDeleted, pendingDeleted };
+    this.logger.log('Resolution cleanup completed', summary);
 
-    return { supersededDeleted, doneDeleted };
+    return summary;
   }
 
   private cutoff(days: number): Date {

@@ -1,7 +1,15 @@
-/** Who made a decision. Extensible — a future automated reviewer is a third
- *  actor, not a special case of either of these. */
+/**
+ * Who made a decision.
+ *
+ * `system` covers both the producing pipeline's own seed entry and the
+ * deterministic trust rule that can settle a row without asking anyone; `ai` is
+ * the LLM reviewer. The distinction that matters operationally is not
+ * machine-vs-human but **whether `reviewedAt` gets written**: only `admin` does,
+ * and that is what withdraws a row from every automated path for good.
+ */
 export enum ResolutionActor {
   system = 'system',
+  ai = 'ai',
   admin = 'admin',
 }
 
