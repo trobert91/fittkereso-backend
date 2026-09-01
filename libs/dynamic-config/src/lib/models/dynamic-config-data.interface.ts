@@ -186,9 +186,9 @@ export interface DynamicConfigData {
          *  ever reaches the queue. Off leaves only the nightly catch-up.
          *  Default: true */
         atRecordTime?: boolean;
-        /** Log what would be accepted without writing anything. Ships **on**:
+        /** Log what would be accepted without writing anything — turn it on to
          *  read a night's worth of would-accepts against real traffic before
-         *  letting it close rows for real. Default: true */
+         *  letting it close rows for real. Default: false */
         dryRun?: boolean;
         /** `decisionConfidence` a row must reach. A starting guess to measure,
          *  not a constant to trust — see the dryRun output. Default: 90 */
@@ -202,6 +202,10 @@ export interface DynamicConfigData {
        *  deterministic rule it may act destructively, behind its own switch. */
       ai?: {
         enabled?: boolean;
+        /** Record the verdict on the row but act on nothing. Withholds the
+         *  catalog action only: the stored verdict and its decision-log entry
+         *  are written either way. Default: false */
+        dryRun?: boolean;
         /** Prefix-routed to a provider — `gpt-`/`o1-`/`o3-` → openai,
          *  `claude-` → claude, `gemini-` → gemini, `deepseek-` → deepseek.
          *  Default: 'gpt-5.6-luna' */
@@ -656,8 +660,8 @@ export const dynamicConfigSchema = {
                 dryRun: {
                   type: 'boolean',
                   description:
-                    'Log what would be accepted without writing anything. Ships on. Default: true',
-                  default: true,
+                    'Log what would be accepted without writing anything. Default: false',
+                  default: false,
                 },
                 minConfidence: {
                   type: 'number',
@@ -686,6 +690,12 @@ export const dynamicConfigSchema = {
                   type: 'boolean',
                   description: 'Master switch for AI review. Default: true',
                   default: true,
+                },
+                dryRun: {
+                  type: 'boolean',
+                  description:
+                    'Record the verdict on the row but act on nothing. The verdict and its decision-log entry are still written. Default: false',
+                  default: false,
                 },
                 model: {
                   type: 'string',

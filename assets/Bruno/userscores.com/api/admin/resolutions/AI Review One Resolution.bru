@@ -23,6 +23,8 @@ docs {
   appended to the `decisions` log, whether or not the AI was allowed to act on
   it. Whether it *acts* depends on `resolution.automation.ai`:
 
+  - `dryRun` — recorded, but nothing acted on.
+    `notExecutedReason: "dry_run"`.
   - `confidence: "high"` plus `executeActions` — carried out through the ordinary
     action path, as actor `ai`. The action path writes its own decision entry.
   - `merge_into` / `split`, or accepting an unexecuted duplicate proposal, also

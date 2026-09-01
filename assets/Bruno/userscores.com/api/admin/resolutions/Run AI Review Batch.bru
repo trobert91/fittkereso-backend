@@ -31,13 +31,15 @@ docs {
 
   - `maxPerRun` — rows this run. Start small.
   - `minPriority` — priority floor for intake.
+  - `dryRun` — record the verdicts but act on nothing.
   - `executeDestructive` — can only *tighten* the configured value. Passing
     `true` when the config says `false` does NOT enable merges; a request must
     not be able to turn on the switch that deletes products.
 
-  Every reviewed row is written to either way: the verdict lands on `aiReview`
-  and is appended to the `decisions` log. `executeActions` and
-  `executeDestructive` gate whether it is *acted on*, never whether it is stored.
+  Every reviewed row is written to: the verdict lands on `aiReview` and is
+  appended to the `decisions` log. `dryRun`, `executeActions` and
+  `executeDestructive` all gate whether it is *acted on*, never whether it is
+  stored — a call that was paid for is always readable on the row afterwards.
 
   The summary distinguishes:
   - `executed` — a recommendation was carried out.

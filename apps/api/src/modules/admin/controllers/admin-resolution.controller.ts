@@ -86,6 +86,11 @@ class RunAiReviewDto {
   @Type(() => Number)
   minPriority?: number;
 
+  /** Record the verdicts but act on nothing. */
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
+
   /**
    * Can only ever *tighten* the configured setting — passing `true` when the
    * config says `false` does not enable merges. A request must not be able to

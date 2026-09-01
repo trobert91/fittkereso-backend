@@ -36,6 +36,7 @@ describe('ResolutionAiReviewService', () => {
     overrides: Partial<AiAutomationConfig> = {},
   ): AiAutomationConfig => ({
     enabled: true,
+    dryRun: false,
     model: 'gpt-5.6-luna',
     effort: 'medium',
     executeActions: true,
@@ -175,8 +176,8 @@ describe('ResolutionAiReviewService', () => {
     );
 
     it('stores the verdict even when it is not allowed to act', async () => {
-      // The point of the whole feature: a call that was paid for is never
-      // thrown away, whichever gate stopped it from acting.
+      // Every gate except dryRun withholds the action only: a call that was paid
+      // for still lands on the row.
       await service.review(
         resolution(),
         config({ executeActions: false }),
@@ -185,6 +186,18 @@ describe('ResolutionAiReviewService', () => {
       expect(actionService.accept).not.toHaveBeenCalled();
       expect(repo.saveAiReview).toHaveBeenCalled();
       expect(repo.appendDecision).toHaveBeenCalled();
+    });
+
+    it('records the verdict in dryRun but acts on nothing', async () => {
+      // dryRun withholds the catalog action, not the judgement — the row must
+      // still show what the model said, or the run cannot be reviewed.
+      const result = await service.review(resolution(), config({ dryRun: true }));
+
+      expect(actionService.accept).not.toHaveBeenCalled();
+      expect(repo.saveAiReview).toHaveBeenCalled();
+      expect(repo.appendDecision).toHaveBeenCalled();
+      expect(result.notExecutedReason).toBe('dry_run');
+      expect(result.review.verdict).toBe(ResolutionAiVerdict.agree);
     });
 
     it('treats an abstain as low confidence rather than as a recommendation', async () => {

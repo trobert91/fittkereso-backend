@@ -10,12 +10,23 @@ import { isEmpty, isNil } from 'lodash';
 
 export interface AiAutomationConfig {
   enabled: boolean;
+  /**
+   * Judge and record, act on nothing.
+   *
+   * The verdict still lands on the row — `aiReview`, `aiConfidence`, and an
+   * advisory entry in the decision log — because a batch you cannot inspect row
+   * by row is not the thing this flag exists to give you. What it withholds is
+   * the catalog action, which is the only irreversible half.
+   *
+   * Overlaps `executeActions` deliberately: that one is the operator's standing
+   * policy ("the AI does not act here"), this one is a per-run choice ("not on
+   * this run"). Either being set is enough to keep the AI advisory.
+   */
+  dryRun: boolean;
   model: string;
   effort: string;
   /** Carry out a high-confidence recommendation at all. Off makes every verdict
-   *  advisory — judged and recorded, but waiting on a human to apply it. There
-   *  is no separate "judge but don't store" mode: a verdict that was paid for is
-   *  always written to the row. */
+   *  advisory — judged and recorded, but waiting on a human to apply it. */
   executeActions: boolean;
   /**
    * Allow the destructive half — merge and split — to be carried out.
@@ -169,6 +180,7 @@ export function aiAutomationConfig(
 
   return {
     enabled: (automation?.enabled ?? defaults.enabled) && (ai?.enabled ?? defaults.ai.enabled),
+    dryRun: ai?.dryRun ?? defaults.ai.dryRun,
     model: ai?.model ?? defaults.ai.model,
     effort: ai?.effort ?? defaults.ai.effort,
     executeActions: ai?.executeActions ?? defaults.ai.executeActions,

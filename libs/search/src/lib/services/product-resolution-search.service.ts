@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import {
-  OPEN_RESOLUTION_STATUSES,
   ProductCategory,
   ProductModel,
   ProductResolution,
@@ -147,15 +146,20 @@ export class ProductResolutionSearchService {
       });
     }
 
-    // Default to the open statuses: the queue is a to-do list, and decided or
-    // superseded rows are history the reviewer has to ask for explicitly.
-    const statuses = uniq(
-      compact([params.status, ...(params.statuses ?? [])]),
-    );
-    query.andWhere(
-      `resolution.${nameOf<ProductResolution>('status')} IN (:...statuses)`,
-      { statuses: isEmpty(statuses) ? OPEN_RESOLUTION_STATUSES : statuses },
-    );
+    // No status given means no status filter — "everything", not a default.
+    //
+    // This used to fall back to the open statuses so the queue read as a to-do
+    // list. That made an absent filter mean something, which is a surprising
+    // thing for an absent filter to do: a caller asking for no filter got one,
+    // and there was no way to ask for genuinely all rows except by listing all
+    // four. The queue's default view now sends the open statuses explicitly.
+    const statuses = uniq(compact([params.status, ...(params.statuses ?? [])]));
+    if (!isEmpty(statuses)) {
+      query.andWhere(
+        `resolution.${nameOf<ProductResolution>('status')} IN (:...statuses)`,
+        { statuses },
+      );
+    }
 
     if (params.accepted !== undefined) {
       query.andWhere(

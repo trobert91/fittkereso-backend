@@ -15,6 +15,7 @@ import { ResolutionAiReviewService } from './resolution-ai-review.service';
 export interface AiReviewBatchOverrides {
   maxPerRun?: number;
   minPriority?: number;
+  dryRun?: boolean;
   executeDestructive?: boolean;
 }
 
@@ -33,6 +34,7 @@ export interface AiReviewBatchSummary {
   costUsd: number;
   /** Stopped early on the cost cap or the row cap — more work is waiting. */
   capped: boolean;
+  dryRun: boolean;
   durationMs: number;
 }
 
@@ -72,6 +74,7 @@ export class ResolutionAiReviewBatchService {
       failed: 0,
       costUsd: 0,
       capped: false,
+      dryRun: config.dryRun,
       durationMs: 0,
     };
 
@@ -131,7 +134,12 @@ export class ResolutionAiReviewBatchService {
 
     summary.durationMs = Date.now() - startedAt;
 
-    this.logger.log('AI review batch completed', summary);
+    this.logger.log(
+      config.dryRun
+        ? 'AI review batch completed (dryRun — verdicts recorded, nothing acted on)'
+        : 'AI review batch completed',
+      summary,
+    );
 
     return summary;
   }
@@ -152,6 +160,7 @@ export class ResolutionAiReviewBatchService {
       ...config,
       maxPerRun: overrides.maxPerRun ?? config.maxPerRun,
       minPriority: overrides.minPriority ?? config.minPriority,
+      dryRun: overrides.dryRun ?? config.dryRun,
       // An override can only ever tighten this one. Letting a request switch on
       // destructive execution would make the config's "off" meaningless, and
       // this is the switch that deletes products.

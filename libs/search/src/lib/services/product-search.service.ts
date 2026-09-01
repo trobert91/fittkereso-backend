@@ -15,6 +15,12 @@ import { isEmpty, isArray } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
 
+/** Any RFC 4122 variant, since ids come from elsewhere in the system rather than
+ *  being generated here — the point is only to keep a non-uuid away from a uuid
+ *  column comparison. */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class ProductSearchService {
   constructor(
@@ -61,6 +67,22 @@ export class ProductSearchService {
     }
 
     // --- Filters ---
+    // An exact id short-circuits everything else worth ranking: it either names
+    // a product or it does not. A value that is not a uuid cannot match any row,
+    // and comparing it against a uuid column is a Postgres cast error rather
+    // than an empty result — so it is turned into an unsatisfiable predicate
+    // instead of being handed to the database.
+    if (params.id && !isEmpty(params.id.trim())) {
+      const id = params.id.trim();
+      if (UUID_PATTERN.test(id)) {
+        query = query.andWhere(`product.${nameOf<ProductModel>('id')} = :id`, {
+          id,
+        });
+      } else {
+        query = query.andWhere('1 = 0');
+      }
+    }
+
     if (!isEmpty(params.categoryIds)) {
       query = query.andWhere(
         `category.${nameOf<ProductCategory>('id')} IN (:...categoryIds)`,

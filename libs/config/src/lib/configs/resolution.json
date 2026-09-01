@@ -16,12 +16,13 @@
     "deterministic": {
       "enabled": true,
       "atRecordTime": true,
-      "dryRun": true,
+      "dryRun": false,
       "minConfidence": 90,
       "maxPerRunNightly": 200
     },
     "ai": {
       "enabled": true,
+      "dryRun": false,
       "model": "gpt-5.6-luna",
       "effort": "medium",
       "executeActions": true,

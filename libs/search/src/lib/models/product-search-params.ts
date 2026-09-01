@@ -36,6 +36,20 @@ export class ProductSearchParams {
   @IsString()
   searchTerm?: string;
 
+  /**
+   * Exact product id. Separate from `searchTerm` rather than folded into it: a
+   * uuid is something you have (from a log line, a decision entry, another
+   * screen) and want to look up exactly, and putting it through the trigram
+   * ranker would return near-miss ids alongside the one asked for.
+   *
+   * A malformed uuid must not 500 the search — Postgres rejects the comparison
+   * before any row is read — so the value is validated here and the service
+   * treats an unparseable one as "no product has this id".
+   */
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @IsOptional()
   @IsNumber()
   @Min(1)

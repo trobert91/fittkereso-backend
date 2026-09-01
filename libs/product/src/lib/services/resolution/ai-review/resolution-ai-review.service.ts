@@ -27,6 +27,8 @@ export interface AiReviewResult {
   confidence: ResolutionAiConfidence;
   /** Why the recommendation was not carried out, when it was not. */
   notExecutedReason?:
+    /** Server is in dry run: judged and returned, nothing written or acted on. */
+    | 'dry_run'
     | 'not_confident'
     | 'execution_disabled'
     | 'destructive_disabled'
@@ -102,13 +104,21 @@ export class ResolutionAiReviewService {
       error: execution.error,
     };
 
+    // The verdict is recorded on every pass, dry run included.
+    //
+    // `dryRun` withholds the *action*, not the judgement: a call that was paid
+    // for should be readable on the row afterwards, and a batch you cannot
+    // inspect row by row is not the thing the flag exists to give you. Nothing
+    // written here touches the catalog or the row's workflow state, so a dry run
+    // remains non-destructive.
     await this.resolutionRepo.saveAiReview(resolution.id, {
       review,
       confidence: outcome.confidence,
       fingerprint: fingerprintAtIntake,
     });
 
-    // Every verdict goes in the log, not just the ones that changed something.
+    // Every stored verdict goes in the log, not just the ones that changed
+    // something.
     //
     // A judgement that recommended nothing be done is still a judgement, and the
     // log is what answers "what has been decided about this row" — a question an
@@ -129,6 +139,7 @@ export class ResolutionAiReviewService {
       executed: review.executed,
       notExecutedReason: execution.reason,
       costUsd: review.costUsd,
+      dryRun: config.dryRun,
     });
 
     return {
@@ -178,14 +189,15 @@ export class ResolutionAiReviewService {
   /**
    * Carry out the recommendation, or say why not.
    *
-   * Three gates before anything is written, in order of how cheaply they can be
-   * decided: the confidence bar, the two kill switches, and finally whether the
-   * action is still legal at all. Only `high` acts — `medium` reads as
-   * "probably, but check", and a system that acts on "probably" is one whose
+   * Four gates before anything is written, in order of how cheaply they can be
+   * decided: the dry run, the confidence bar, the two kill switches, and finally
+   * whether the action is still legal at all. Only `high` acts — `medium` reads
+   * as "probably, but check", and a system that acts on "probably" is one whose
    * mistakes nobody sees coming.
    *
-   * Note this gates *acting*, never *recording*: the verdict is stored either
-   * way, so a row that was judged always shows what the judgement was.
+   * Apart from `dry_run`, these gate *acting*, never *recording*: the verdict is
+   * stored either way, so a row that was judged always shows what the judgement
+   * was. Dry run is the one that withholds both.
    */
   private async execute(params: {
     resolution: ProductResolution;
@@ -203,6 +215,7 @@ export class ResolutionAiReviewService {
   }> {
     const { resolution, config, confidence, recommendedAction } = params;
 
+    if (config.dryRun) return { executed: false, reason: 'dry_run' };
     if (confidence !== ResolutionAiConfidence.high) {
       return { executed: false, reason: 'not_confident' };
     }

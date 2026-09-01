@@ -37,8 +37,9 @@ export class ProductResolutionSearchParams {
   flow?: ProductResolutionFlow;
 
   /** Filter to a single workflow state. Combined with `statuses` if both given.
-   *  When neither is set the search returns only rows that still need
-   *  attention — the queue shows work, not history. */
+   *  When neither is set no status filter is applied at all — every row is
+   *  returned, history included. The review queue asks for the open statuses
+   *  explicitly rather than relying on a default here. */
   @IsOptional()
   @IsEnum(ProductResolutionStatus)
   status?: ProductResolutionStatus;

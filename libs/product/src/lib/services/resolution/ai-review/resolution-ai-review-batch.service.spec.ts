@@ -21,6 +21,7 @@ describe('ResolutionAiReviewBatchService', () => {
       automation: {
         enabled?: boolean;
         ai?: {
+          dryRun?: boolean;
           executeDestructive?: boolean;
           maxCostUsdPerRun?: number;
         };
@@ -65,7 +66,7 @@ describe('ResolutionAiReviewBatchService', () => {
       resolution: {
         automation: {
           enabled: true,
-          ai: { executeDestructive: true, maxCostUsdPerRun: 2 },
+          ai: { dryRun: false, executeDestructive: true, maxCostUsdPerRun: 2 },
         },
       },
     };
@@ -175,6 +176,7 @@ describe('ResolutionAiReviewBatchService', () => {
       // The switch that deletes products. A request being able to flip it would
       // make the config's "off" meaningless — an override may only tighten.
       config.resolution.automation.ai = {
+        dryRun: false,
         executeDestructive: false,
       };
       repo.findAiReviewBatch.mockResolvedValue(rows(1));

@@ -142,13 +142,13 @@ describe('ProductResolutionSearchService', () => {
   });
 
   describe('filtering', () => {
-    it('defaults to the open statuses, so the queue shows work and not history', () => {
+    it('applies no status filter when none is asked for', () => {
+      // An absent filter means "everything", not a default. The review queue
+      // sends the open statuses explicitly when it wants a to-do list.
       const query = buildPaginatedQuery();
 
-      expect(query.getParameters()['statuses']).toEqual([
-        ProductResolutionStatus.pending,
-        ProductResolutionStatus.failed,
-      ]);
+      expect(query.getParameters()['statuses']).toBeUndefined();
+      expect(query.getQuery()).not.toContain('resolution.status IN');
     });
 
     it('uses the requested statuses when given', () => {
@@ -297,13 +297,17 @@ describe('ProductResolutionSearchService', () => {
       // Asserted against the WHERE clause alone: every one of these names also
       // appears in the SELECT list, since they are entity columns, so a check
       // over the whole statement could never pass and would be testing nothing.
-      const where = whereClauseOf(buildPaginatedQuery());
+      // A status is passed so the WHERE clause is non-empty for the positive
+      // assertion below — status itself no longer defaults to anything.
+      const where = whereClauseOf(
+        buildPaginatedQuery({ statuses: [ProductResolutionStatus.pending] }),
+      );
 
       expect(where).not.toContain('reviewTriggers');
       expect(where).not.toContain('aiConfidence');
       expect(where).not.toContain('aiReviewedAt');
       expect(where).not.toContain('decidedBy');
-      // …while the filter that should always be there still is.
+      // …while the filter that *was* asked for still is.
       expect(where).toContain('status');
     });
 
