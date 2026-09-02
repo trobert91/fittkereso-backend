@@ -109,14 +109,32 @@ export class ResolutionListItem {
   @Type(() => ResolutionListingSummary)
   listing?: ResolutionListingSummary;
 
+  /**
+   * `productId => imageUrl` for the row's candidates.
+   *
+   * The stored candidate holds a `candidateId` and no entity data, so without
+   * this the queue can name a candidate but not show it. A plain map rather than
+   * hydrated products: the card needs a picture, and shipping a full
+   * `ProductModel` per candidate would put the review payload back into a
+   * paginated list.
+   *
+   * An id missing from the map has no picture to show — deleted product, or no
+   * image on it.
+   */
+  @Expose({ groups: [SerializeGroup.adminList] })
+  @Transform(transfromExposeAll())
+  candidateImageUrls?: Record<string, string>;
+
   static of(
     resolution: ProductResolution,
     state: ProductResolutionState,
+    candidateImageUrls?: Record<string, string>,
   ): ResolutionListItem {
     const item = new ResolutionListItem();
     item.resolution = resolution;
     item.state = state;
     item.listing = ResolutionListingSummary.from(resolution.sourceRecord);
+    item.candidateImageUrls = candidateImageUrls;
     return item;
   }
 }

@@ -237,10 +237,10 @@
     }
   ],
   "primarySpecs": [
+    "modelYear",
     "batteryCapacity",
     "wheelSize",
     "torque",
-    "modelYear",
     "usageType"
   ],
   "matcherSpecHierarchies": {
@@ -251,9 +251,7 @@
   },
   "matcherSpecs": [
     "motorPower",
-    "modelYear",
     "weight",
-    "forkTravel",
     "frameMaterial",
     "gearCount",
     "topSpeed",
@@ -261,7 +259,16 @@
     "motorModel"
   ],
   "matchingConfig": {
-    "maxMatcherSpecMismatches": 2
+    "maxMatcherSpecMismatches": 2,
+    "specTolerances": {
+      "modelYear": { "absolute": 0 },
+      "wheelSize": { "absolute": 0 },
+      "batteryCapacity": { "absolute": 0 },
+      "torque": { "absolute": 0 },
+      "gearCount": { "absolute": 0 },
+      "topSpeed": { "absolute": 0 },
+      "motorPower": { "absolute": 0 }
+    }
   },
   "normalizationStrategy": "full-sorted",
   "offerLevelSpecs": [

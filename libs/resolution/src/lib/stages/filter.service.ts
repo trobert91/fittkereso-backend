@@ -131,6 +131,7 @@ export class FilterService {
       specsB: candidate.specs,
       primarySpecs,
       matcherSpecHierarchies: matchConfig.matcherSpecHierarchies,
+      specTolerances: matchConfig.specTolerances,
     });
 
     if (result.primaryMismatches === 0) return undefined;

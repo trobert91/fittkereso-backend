@@ -47,6 +47,7 @@ export function deriveReferenceRelation(
     primarySpecs: matchConfig.primarySpecs,
     matcherSpecs: matchConfig.matcherSpecs,
     matcherSpecHierarchies: matchConfig.matcherSpecHierarchies,
+    specTolerances: matchConfig.specTolerances,
   });
 
   const specsConsistent =

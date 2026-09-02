@@ -10,4 +10,6 @@ export interface CategoryMatchConfig {
   primarySpecs?: string[];
   matcherSpecs?: string[];
   maxMatcherSpecMismatches?: number;
+  /** Per-spec numeric comparison overrides — see `CategoryMatchingConfig`. */
+  specTolerances?: Record<string, { absolute?: number; percent?: number }>;
 }

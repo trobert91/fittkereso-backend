@@ -325,12 +325,12 @@
     "ui:widget": "checkbox"
   },
   "ui:order": [
+    "modelYear",
     "frameType",
     "batteryCapacity",
     "motorModel",
     "wheelSize",
     "torque",
-    "modelYear",
     "usageType",
     "frameMaterial",
     "weight",

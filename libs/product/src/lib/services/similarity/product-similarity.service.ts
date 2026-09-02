@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ProductSpecs, SpecMatchDetails } from '@fittkereso-backend/database';
+import {
+  ProductSpecs,
+  SpecMatchDetails,
+  SpecTolerance,
+} from '@fittkereso-backend/database';
 import { DebugTraceService } from '@fittkereso-backend/debug';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { distance as levenshtein } from 'fastest-levenshtein';
@@ -131,12 +135,16 @@ export class ProductSimilarityService {
     const matcherSpecs = this.inputNormalization.getMatcherSpecs(
       input.categorySlug,
     );
+    const specTolerances = this.inputNormalization.getSpecTolerances(
+      input.categorySlug,
+    );
     const specMatchDetails = this.computeSpecMatchDetails(
       input.query.specs,
       input.candidate.specs,
       primarySpecs,
       hierarchies,
       matcherSpecs,
+      specTolerances,
     );
 
     // Spec similarity for tiebreaking (not used in score formula)
@@ -146,6 +154,7 @@ export class ProductSimilarityService {
       hierarchies,
       primarySpecs,
       matcherSpecs,
+      specTolerances,
     );
 
     // Alias match (diagnostic)
@@ -601,6 +610,7 @@ export class ProductSimilarityService {
     primarySpecs: string[] | undefined,
     hierarchies?: Record<string, Record<string, string[]>>,
     matcherSpecs?: string[],
+    specTolerances?: Record<string, SpecTolerance>,
   ): SpecMatchDetails | undefined {
     if (!querySpecs || !candidateSpecs) return undefined;
 
@@ -610,6 +620,7 @@ export class ProductSimilarityService {
       primarySpecs,
       matcherSpecs,
       matcherSpecHierarchies: hierarchies,
+      specTolerances,
     });
   }
 

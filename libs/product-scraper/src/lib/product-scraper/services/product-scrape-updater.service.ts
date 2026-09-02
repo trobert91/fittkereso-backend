@@ -724,6 +724,7 @@ export class ProductScrapeUpdaterService {
         primarySpecs: categoryConfig?.primarySpecs,
         matcherSpecs: categoryConfig?.matcherSpecs,
         matcherSpecHierarchies: categoryConfig?.matcherSpecHierarchies,
+        specTolerances: categoryConfig?.matchingConfig?.specTolerances,
       });
 
       const reasons = [

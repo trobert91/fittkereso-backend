@@ -4,6 +4,7 @@ import type {
   SpecMatchDetails,
   SpecMatchDetail,
   SpecMatchResult,
+  SpecTolerance,
 } from '@fittkereso-backend/database';
 import { compact, isNil, isEmpty } from 'lodash';
 
@@ -33,6 +34,7 @@ export class SpecComparisonService {
     primarySpecs?: string[];
     matcherSpecs?: string[];
     matcherSpecHierarchies?: Record<string, Record<string, string[]>>;
+    specTolerances?: Record<string, SpecTolerance>;
   }): SpecMatchDetails {
     const {
       specsA,
@@ -40,6 +42,7 @@ export class SpecComparisonService {
       primarySpecs,
       matcherSpecs,
       matcherSpecHierarchies,
+      specTolerances,
     } = params;
 
     const emptyResult: SpecMatchDetails = {
@@ -94,7 +97,12 @@ export class SpecComparisonService {
 
       comparableCount++;
       const specHierarchy = matcherSpecHierarchies?.[key];
-      const matchResult = this.compareValues(valueA, valueB, specHierarchy);
+      const matchResult = this.compareValues(
+        valueA,
+        valueB,
+        specHierarchy,
+        specTolerances?.[key],
+      );
 
       if (matchResult === 'match' || matchResult === 'compatible') {
         matchingCount++;
@@ -138,6 +146,7 @@ export class SpecComparisonService {
     matcherSpecHierarchies?: Record<string, Record<string, string[]>>,
     primarySpecs?: string[],
     matcherSpecs?: string[],
+    specTolerances?: Record<string, SpecTolerance>,
   ): number {
     if (!specsA || !specsB) return 0;
 
@@ -166,7 +175,12 @@ export class SpecComparisonService {
       if (isNil(valueB)) continue;
 
       const specHierarchy = matcherSpecHierarchies?.[key];
-      const result = this.compareValues(valueA, valueB, specHierarchy);
+      const result = this.compareValues(
+        valueA,
+        valueB,
+        specHierarchy,
+        specTolerances?.[key],
+      );
 
       if (result === 'match' || result === 'compatible') {
         confirmed++;
@@ -199,10 +213,11 @@ export class SpecComparisonService {
     valueA: string | number | boolean | string[],
     valueB: string | number | boolean | string[],
     hierarchy?: Record<string, string[]>,
+    tolerance?: SpecTolerance,
   ): SpecMatchResult {
     // Both numbers — use tolerance
     if (typeof valueA === 'number' && typeof valueB === 'number') {
-      return this.isNumberWithinTolerance(valueA, valueB)
+      return this.isNumberWithinTolerance(valueA, valueB, tolerance)
         ? 'match'
         : 'mismatch';
     }
@@ -222,10 +237,15 @@ export class SpecComparisonService {
     const stringB = this.toStringValue(valueB);
 
     // Try numeric parse from both string values
+    // A spec published as `"2024"` by one shop and `2024` by another lands here
+    // rather than in the numeric branch above, so the override has to apply on
+    // both paths or it would depend on how a scraper happened to type the value.
     const numA = this.extractStandaloneNumber(stringA);
     const numB = this.extractStandaloneNumber(stringB);
     if (numA !== null && numB !== null) {
-      return this.isNumberWithinTolerance(numA, numB) ? 'match' : 'mismatch';
+      return this.isNumberWithinTolerance(numA, numB, tolerance)
+        ? 'match'
+        : 'mismatch';
     }
 
     // Hierarchy compatibility check
@@ -243,14 +263,37 @@ export class SpecComparisonService {
 
   // ─── Numeric Helpers ──────────────────────────────────────────────────────
 
-  private isNumberWithinTolerance(numberA: number, numberB: number): boolean {
+  /**
+   * Whether two numbers are close enough to count as the same value.
+   *
+   * Relative by default, which is right for magnitudes: 750Wh and 760Wh are the
+   * same battery however the two shops rounded it. It is wrong for
+   * identity-bearing integers, where the same 5% spans the entire plausible
+   * range — every model year between 2015 and 2030 is within 5% of every other,
+   * so a year could never contradict anything. `tolerance` is the per-spec
+   * override that fixes those, `{ absolute: 0 }` meaning exact.
+   */
+  private isNumberWithinTolerance(
+    numberA: number,
+    numberB: number,
+    tolerance?: SpecTolerance,
+  ): boolean {
     if (numberA === numberB) return true;
+
+    const difference = Math.abs(numberA - numberB);
+
+    // Checked before `percent` so `{ absolute: 0 }` is honoured — a plain
+    // truthiness test would read 0 as "unset" and silently fall through to the
+    // relative default, which is the exact bug this option exists to fix.
+    if (!isNil(tolerance?.absolute)) {
+      return difference <= tolerance.absolute;
+    }
 
     const max = Math.max(Math.abs(numberA), Math.abs(numberB));
     if (max === 0) return true;
 
-    const percentDiff = (Math.abs(numberA - numberB) / max) * 100;
-    return percentDiff <= NUMERIC_TOLERANCE_PERCENT;
+    const percentDiff = (difference / max) * 100;
+    return percentDiff <= (tolerance?.percent ?? NUMERIC_TOLERANCE_PERCENT);
   }
 
   /**

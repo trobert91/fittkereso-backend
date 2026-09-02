@@ -95,6 +95,29 @@ export class ProductModelRepository extends BasePostgresRepository<ProductModel>
    * One query for every candidate on the row rather than one each, because a
    * resolution can carry dozens.
    */
+  /**
+   * Just enough of each product to render its thumbnail: the id and its main
+   * image, nothing else.
+   *
+   * Separate from `findForReview` because the two answer different questions.
+   * That one loads brand, category and aliases so a *reviewer* can judge a
+   * candidate; this one backs a picture in a list, and a page of the queue can
+   * reference a hundred products across its rows. Pulling the review payload for
+   * all of them to read one filename each would be the expensive way to draw a
+   * thumbnail.
+   */
+  public async findMainImages(ids: string[]): Promise<ProductModel[]> {
+    if (isEmpty(ids)) return [];
+
+    const mainImage = nameOf<ProductModel>('mainImage');
+
+    return this.repo.find({
+      where: ids.map((id) => ({ id })),
+      select: { id: true },
+      relations: [mainImage],
+    });
+  }
+
   public async findForReview(ids: string[]): Promise<ProductModel[]> {
     if (isEmpty(ids)) return [];
 

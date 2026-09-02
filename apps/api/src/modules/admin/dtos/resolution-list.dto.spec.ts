@@ -138,6 +138,21 @@ describe('resolution list serialization', () => {
     );
   });
 
+  it('carries the candidate thumbnail map through serialization', () => {
+    // A plain `Record` has no target type, so under `excludeAll` it survives
+    // only because of the exposeAll transform — the same trap the class comment
+    // describes. Worth pinning: without it the field silently ships as `{}`.
+    const item = ResolutionListItem.of(makeResolution(), makeState(), {
+      'candidate-1': 'https://cdn.test/products/candidate-1/main.webp',
+    });
+
+    const plain = instanceToPlain(item, listOptions) as Record<string, any>;
+
+    expect(plain.candidateImageUrls).toEqual({
+      'candidate-1': 'https://cdn.test/products/candidate-1/main.webp',
+    });
+  });
+
   it('carries the listing and the product it currently sits on', () => {
     const item = ResolutionListItem.of(makeResolution(), makeState());
 

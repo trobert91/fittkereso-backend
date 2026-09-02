@@ -44,6 +44,27 @@ export interface CategoryMatchingConfig {
    *  Rejection occurs when matcherSpecMismatches > maxMatcherSpecMismatches.
    *  Default: 2. Categories with few matcherSpecs should use 0 or 1. */
   maxMatcherSpecMismatches?: number;
+
+  /** Per-spec overrides for numeric comparison, keyed by spec name.
+   *
+   *  Numeric specs are compared with a **relative** tolerance by default, which
+   *  suits magnitudes (750Wh vs 760Wh) but is meaningless for identity-bearing
+   *  integers: at the 5% default, every model year from 2015 to 2030 matches
+   *  every other, so `modelYear` never contradicts anything. Listing a spec here
+   *  is what makes it compare the way it reads. */
+  specTolerances?: Record<string, SpecTolerance>;
+}
+
+/** How far apart two numeric values may be and still count as the same.
+ *
+ *  Exactly one of the two applies — `absolute` when set, otherwise `percent`.
+ *  `absolute: 0` means exact equality, which is what a year, a generation or a
+ *  discrete rating needs. */
+export interface SpecTolerance {
+  /** Maximum allowed difference in the value's own units. `0` = exact. */
+  absolute?: number;
+  /** Maximum allowed difference as a percentage of the larger value. */
+  percent?: number;
 }
 
 export interface CategoryPromptConfig {

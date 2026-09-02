@@ -145,11 +145,28 @@ export class AdminResolutionController {
       this.resolutionSearchService.collectProducts(items),
     );
 
+    // Candidate thumbnails, batched across the whole page rather than per row:
+    // a candidate persists only its id, so this is the one lookup that lets the
+    // queue show the products it is comparing.
+    const candidateImageUrls = await this.imageDtoService.getMainImageUrls(
+      items.flatMap((resolution) =>
+        (resolution.candidates ?? []).map(
+          (candidate) => candidate.candidateId,
+        ),
+      ),
+    );
+
     const page = new ResolutionListResult();
     // The pure derivation here — one page of rows must not cost a query per
     // row. The orchestrator re-derives against live data before acting.
     page.items = items.map((resolution) =>
-      ResolutionListItem.of(resolution, this.stateService.derive(resolution)),
+      ResolutionListItem.of(
+        resolution,
+        this.stateService.derive(resolution),
+        // Sliced per row so each item carries only its own candidates' URLs,
+        // rather than every row repeating the page-wide map.
+        pickCandidateUrls(candidateImageUrls, resolution),
+      ),
     );
     page.page = result.page;
     page.pageSize = result.pageSize;
@@ -358,6 +375,27 @@ export class AdminResolutionController {
     return ResolutionListItem.of(
       resolution,
       await this.stateService.deriveVerified(resolution),
+      await this.imageDtoService.getMainImageUrls(
+        (resolution.candidates ?? []).map(
+          (candidate) => candidate.candidateId,
+        ),
+      ),
     );
   }
+}
+
+/** The page-wide thumbnail map narrowed to one row's candidates, so an item
+ *  carries its own URLs rather than every row shipping a copy of the page's. */
+function pickCandidateUrls(
+  urls: Record<string, string>,
+  resolution: ProductResolution,
+): Record<string, string> {
+  return (resolution.candidates ?? []).reduce<Record<string, string>>(
+    (map, candidate) => {
+      const url = urls[candidate.candidateId];
+      if (url) map[candidate.candidateId] = url;
+      return map;
+    },
+    {},
+  );
 }

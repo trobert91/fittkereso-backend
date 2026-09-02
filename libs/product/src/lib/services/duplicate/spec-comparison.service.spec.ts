@@ -426,6 +426,96 @@ describe('SpecComparisonService', () => {
       });
     });
 
+    describe('per-spec tolerance overrides', () => {
+      // The relative default is meaningless for a year: 2015 and 2030 are within
+      // 5% of each other, so without an override modelYear can never contradict.
+      it('treats adjacent model years as a mismatch under absolute: 0', () => {
+        const result = service.compareSpecs({
+          specsA: { modelYear: 2024 },
+          specsB: { modelYear: 2025 },
+          primarySpecs: ['modelYear'],
+          specTolerances: { modelYear: { absolute: 0 } },
+        });
+
+        expect(result.primaryMismatches).toBe(1);
+        expect(result.matchingCount).toBe(0);
+      });
+
+      it('matches those same years without the override', () => {
+        const result = service.compareSpecs({
+          specsA: { modelYear: 2024 },
+          specsB: { modelYear: 2025 },
+          primarySpecs: ['modelYear'],
+        });
+
+        expect(result.primaryMismatches).toBe(0);
+        expect(result.matchingCount).toBe(1);
+      });
+
+      it('applies the override to string-typed values too', () => {
+        // One shop publishes "2024", another 2024 — the value takes a different
+        // branch through compareValues depending on which, and the override has
+        // to hold on both or it would depend on the scraper.
+        const result = service.compareSpecs({
+          specsA: { modelYear: '2024' },
+          specsB: { modelYear: 2025 },
+          primarySpecs: ['modelYear'],
+          specTolerances: { modelYear: { absolute: 0 } },
+        });
+
+        expect(result.primaryMismatches).toBe(1);
+      });
+
+      it('leaves specs without an override on the relative default', () => {
+        const result = service.compareSpecs({
+          specsA: { modelYear: 2024, batteryCapacity: 750 },
+          specsB: { modelYear: 2025, batteryCapacity: 760 },
+          primarySpecs: ['modelYear', 'batteryCapacity'],
+          specTolerances: { modelYear: { absolute: 0 } },
+        });
+
+        // The year contradicts; the battery is the same to within rounding.
+        expect(result.primaryMismatches).toBe(1);
+        expect(result.matchingCount).toBe(1);
+      });
+
+      it('honours a non-zero absolute tolerance', () => {
+        const tolerances = { modelYear: { absolute: 1 } };
+
+        expect(
+          service.compareSpecs({
+            specsA: { modelYear: 2024 },
+            specsB: { modelYear: 2025 },
+            primarySpecs: ['modelYear'],
+            specTolerances: tolerances,
+          }).primaryMismatches,
+        ).toBe(0);
+
+        expect(
+          service.compareSpecs({
+            specsA: { modelYear: 2024 },
+            specsB: { modelYear: 2026 },
+            primarySpecs: ['modelYear'],
+            specTolerances: tolerances,
+          }).primaryMismatches,
+        ).toBe(1);
+      });
+
+      it('still skips a spec missing on either side', () => {
+        // An absent value is not a contradiction, override or not — webshops
+        // rarely publish every field.
+        const result = service.compareSpecs({
+          specsA: { modelYear: 2024 },
+          specsB: {},
+          primarySpecs: ['modelYear'],
+          specTolerances: { modelYear: { absolute: 0 } },
+        });
+
+        expect(result.comparableCount).toBe(0);
+        expect(result.primaryMismatches).toBe(0);
+      });
+    });
+
     describe('string', () => {
       it('matches exact case-insensitive', () => {
         expect(affinity({ val: 'IPS' }, { val: 'ips' })).toBe(1);

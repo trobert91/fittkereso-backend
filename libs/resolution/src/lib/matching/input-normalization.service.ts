@@ -29,6 +29,7 @@ export interface CategoryMatchConfig {
   primarySpecs?: string[];
   matcherSpecs?: string[];
   maxMatcherSpecMismatches?: number;
+  specTolerances?: Record<string, { absolute?: number; percent?: number }>;
 }
 
 export interface ParsedModelCode {
@@ -103,6 +104,7 @@ export class InputNormalizationService {
       primarySpecs,
       matcherSpecs,
       maxMatcherSpecMismatches: config.maxMatcherSpecMismatches,
+      specTolerances: config.specTolerances,
     };
   }
 

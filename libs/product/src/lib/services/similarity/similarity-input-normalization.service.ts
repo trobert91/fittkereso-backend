@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import type { SpecTolerance } from '@fittkereso-backend/database';
 import { isEmpty } from 'lodash';
 import {
   TokenParserConfig,
@@ -35,6 +36,10 @@ export class SimilarityInputNormalizationService {
   >();
   private readonly primarySpecsCache = new Map<string, string[] | undefined>();
   private readonly matcherSpecsCache = new Map<string, string[] | undefined>();
+  private readonly specTolerancesCache = new Map<
+    string,
+    Record<string, SpecTolerance> | undefined
+  >();
 
   constructor(
     private readonly categoryConfigService: CategoryConfigService,
@@ -125,6 +130,28 @@ export class SimilarityInputNormalizationService {
     const hierarchies = fullCategoryConfig?.matcherSpecHierarchies;
     this.hierarchyCache.set(categorySlug, hierarchies);
     return hierarchies;
+  }
+
+  /**
+   * Load and cache per-spec numeric tolerances for spec comparison.
+   *
+   * Nested under `matchingConfig`, unlike the sibling lists — it is a knob on how
+   * matching compares, not a set of keys to compare.
+   */
+  getSpecTolerances(
+    categorySlug?: string,
+  ): Record<string, SpecTolerance> | undefined {
+    if (!categorySlug) return undefined;
+
+    if (this.specTolerancesCache.has(categorySlug)) {
+      return this.specTolerancesCache.get(categorySlug);
+    }
+
+    const fullCategoryConfig =
+      this.categoryConfigService.getConfig(categorySlug);
+    const tolerances = fullCategoryConfig?.matchingConfig?.specTolerances;
+    this.specTolerancesCache.set(categorySlug, tolerances);
+    return tolerances;
   }
 
   /**
