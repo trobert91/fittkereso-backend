@@ -6,10 +6,6 @@ import {
   ProductAliasRepository,
   ProductAliasSource,
   ProductCategory,
-  ProductResolution,
-  ProductResolutionFlow,
-  ProductResolutionOrigin,
-  ProductResolutionRepository,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
@@ -17,11 +13,6 @@ import {
   ScrapeTask,
   ScrapeTaskRepository,
   Seller,
-} from '@fittkereso-backend/database';
-import type {
-  MatchResultComponents,
-  ProductResolutionCandidateRecord,
-  ProductDuplicateDetectionInputSnapshot,
 } from '@fittkereso-backend/database';
 import {
   ResolutionContext,
@@ -44,42 +35,16 @@ import {
   ProductMergeService,
   ProductModelFactoryService,
   ProductNormalizerService,
-  ProductResolutionFingerprintService,
-  ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
-  SpecComparisonService,
 } from '@fittkereso-backend/product';
 import { ScrapedProduct } from '@fittkereso-backend/product';
 import { compact, isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
-interface PendingScrapeDuplicate {
-  candidateProductId: string;
-  confidence: number;
-  reason?: string;
-  /** The matcher's score for this candidate, which is a different number from
-   *  `confidence` (the LLM's self-report about its own indecision). Carried so
-   *  the recorded row shows what the matcher actually thought. */
-  matchScore?: number;
-  /** The matcher's score breakdown. Carried through because it is computed
-   *  during resolution and unrecoverable afterwards — without it these rows are
-   *  thinner than the nightly duplicate pairs for no reason. */
-  matchComponents?: MatchResultComponents;
-}
-
 interface ResolvedIdentity {
   model?: ProductModel;
   isExistingMatch: boolean;
   resolutionContext?: ResolutionContext;
-  /** Set when Path 4's LLM merge decision considered a candidate close enough
-   *  to adjudicate but did not confidently accept it. The scraper proceeds to
-   *  create a new product (the safe default), but also flags this candidate
-   *  pair for human review — see `writeScrapeAmbiguousDuplicate`. */
-  pendingDuplicate?: PendingScrapeDuplicate;
-  /** The `ProductResolution` row this decision was logged to, when Path 4 ran
-   *  and cleared the recording threshold. Used to link the row back to the
-   *  listing once it is persisted — see `linkResolutionToListing`. */
-  resolutionRecordId?: string;
 }
 
 interface PersistResult {
@@ -107,10 +72,6 @@ export class ProductScrapeUpdaterService {
     private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
-    private readonly resolutionRecorder: ProductResolutionRecorderService,
-    private readonly resolutionFingerprint: ProductResolutionFingerprintService,
-    private readonly resolutionRepo: ProductResolutionRepository,
-    private readonly specComparison: SpecComparisonService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -258,21 +219,9 @@ export class ProductScrapeUpdaterService {
     // trusting it for cross-source matches.
     // Agent already filters candidates to category C via preResolvedCategories.
     //
-    // Look up the listing's own record first (Paths 2/3 above only return early
-    // when it is already linked to a product; an orphaned or freshly-relinked
-    // record still lands here). Passing its id lets the recorder attach the
-    // review row to the listing immediately rather than waiting for the
-    // post-persist backfill.
-    const existingSourceRecord = await this.findExistingSourceRecord(
-      task,
-      scrapedProduct,
-    );
-    const resolved = await this.findExistingProductModel(
-      task,
-      scrapedProduct,
-      existingSourceRecord?.id,
-      { taskId: task.id },
-    );
+    const resolved = await this.findExistingProductModel(task, scrapedProduct, {
+      taskId: task.id,
+    });
     const candidate = resolved.resolvedModel;
     const resolutionContext = resolved.context;
 
@@ -287,88 +236,26 @@ export class ProductScrapeUpdaterService {
         model: candidate,
         isExistingMatch: true,
         resolutionContext,
-        resolutionRecordId: resolved.resolutionRecordId,
       };
     }
 
-    // No accepted match. If the scrape-merge LLM decision actually ran and
-    // considered a near-miss candidate without confidently accepting it
-    // (llm_unresolved — distinct from matcher_reject, where the LLM was never
-    // invoked at all because nothing was close enough to be worth asking),
-    // flag that candidate for human review rather than silently creating a
-    // duplicate with no trace. See writeScrapeAmbiguousDuplicate.
-    const pendingDuplicate = this.extractPendingDuplicate(resolutionContext);
-    if (pendingDuplicate) {
+    // No accepted match. `llm_unresolved` means the scrape-merge LLM actually
+    // looked at a near-miss candidate and wasn't confident — distinct from
+    // `matcher_reject`, where it was never invoked because nothing was close
+    // enough to be worth asking. The scraper creates a new product either way
+    // (the safe default); the distinction is worth a metric because it measures
+    // how often the matcher leaves the LLM undecided.
+    if (resolutionContext?.decision?.kind === 'llm_unresolved') {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
         'llm_merge_reject',
       );
-      return {
-        isExistingMatch: false,
-        resolutionContext,
-        pendingDuplicate,
-        resolutionRecordId: resolved.resolutionRecordId,
-      };
     }
 
     return {
       isExistingMatch: false,
       resolutionContext,
-      resolutionRecordId: resolved.resolutionRecordId,
     };
-  }
-
-  /**
-   * Links the review row back to the listing and product the decision produced.
-   *
-   * Resolution runs *before* the listing is persisted, so at record time there
-   * is no `ProductSourceRecord` yet — and for a newly created product, no
-   * product id either. This closes both gaps once they exist, which is what
-   * makes the row actionable: split needs to know which listing to carve out,
-   * and the next scrape of this URL needs the link to recognize the situation
-   * as already-decided. Never fatal — a missing link degrades review options,
-   * it must not fail the scrape.
-   */
-  private async linkResolutionToListing(
-    identity: ResolvedIdentity,
-    saveOutcome: PersistResult,
-  ): Promise<void> {
-    if (!identity.resolutionRecordId) {
-      return;
-    }
-
-    try {
-      await this.resolutionRepo.save({
-        id: identity.resolutionRecordId,
-        sourceRecord: saveOutcome.sourceRecord,
-        resolvedProduct: saveOutcome.model,
-      } as Partial<ProductResolution> as ProductResolution);
-    } catch (error: unknown) {
-      this.logger.warn('Failed to link ProductResolution to its listing', {
-        resolutionId: identity.resolutionRecordId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  /** The `ProductSourceRecord` for this listing if it has been scraped before,
-   *  by the same (source, externalId) then URL identity the scraper already uses
-   *  to recognize a known listing. */
-  private async findExistingSourceRecord(
-    task: ScrapeTask,
-    scrapedProduct: ScrapedProduct,
-  ): Promise<ProductSourceRecord | null> {
-    if (scrapedProduct.externalId) {
-      const byExternalId = await this.sourceRecordRepo.findBySourceAndExternalId(
-        task.source.id,
-        scrapedProduct.externalId,
-      );
-      if (byExternalId) {
-        return byExternalId;
-      }
-    }
-
-    return task.url ? this.sourceRecordRepo.findByUrl(normalizeUrl(task.url)) : null;
   }
 
   private async persistProduct(params: {
@@ -416,17 +303,6 @@ export class ProductScrapeUpdaterService {
     } else {
       this.productMetricsService.productUpdated(task.source.name);
     }
-
-    if (saveOutcome.created && identity.pendingDuplicate) {
-      await this.writeScrapeAmbiguousDuplicate(
-        task,
-        scrapedProduct,
-        saveOutcome.model,
-        identity.pendingDuplicate,
-      );
-    }
-
-    await this.linkResolutionToListing(identity, saveOutcome);
 
     task.product = saveOutcome.model;
     if (identity.resolutionContext) {
@@ -655,154 +531,9 @@ export class ProductScrapeUpdaterService {
     return result.generatedMaps.length || result.identifiers.length;
   }
 
-  // Extract the near-miss candidate from an `llm_unresolved` decision, so it
-  // can be flagged for human review. Deliberately does NOT fire on
-  // `matcher_reject` (the LLM was never invoked — nothing was close enough to
-  // be worth asking) or on `llm_resolved` (already handled as a merge above) —
-  // only a genuine "the scrape-merge LLM looked at this and wasn't
-  // confident" outcome should create a review row, to avoid flooding the
-  // queue with every plain "no match found at all" scrape.
-  private extractPendingDuplicate(
-    resolutionContext: ResolutionContext | undefined,
-  ): PendingScrapeDuplicate | undefined {
-    if (resolutionContext?.decision?.kind !== 'llm_unresolved') return undefined;
-    const bestCandidate = resolutionContext.scoring?.bestCandidate;
-    if (!bestCandidate) return undefined;
-    const scored = resolutionContext.candidates.find(
-      (candidate) => candidate.productId === bestCandidate.candidateId,
-    );
-    return {
-      candidateProductId: bestCandidate.candidateId,
-      confidence: resolutionContext.decision.confidence,
-      reason: resolutionContext.decision.evidenceSummary,
-      matchScore: bestCandidate.score,
-      matchComponents: scored?.matchComponents,
-    };
-  }
-
-  // Scrape-time safety net for step 6 of the matching upgrade: when the
-  // scrape-merge LLM decision considered a near-miss candidate but wasn't
-  // confident enough to merge, the scraper still creates a new product (the
-  // safe default — see extractPendingDuplicate) but also writes a
-  // ProductResolution row (flow=duplicate_detection) so a human can later
-  // confirm or reject a merge. Reuses the exact entity/repo/admin-UI the
-  // nightly dedup job already uses — the only addition is the `origin` tag
-  // distinguishing this from the nightly job's own pairs. Independently,
-  // `ResolutionService.search()`'s own automatic recording will also produce a
-  // passive flow=product_resolution row for this same llm_unresolved event —
-  // both are actionable, with deliberately different approve semantics (this
-  // one merges; the resolution-flow one is confirmation-only).
-  private async writeScrapeAmbiguousDuplicate(
-    task: ScrapeTask,
-    scrapedProduct: ScrapedProduct,
-    newModel: ProductModel,
-    pendingDuplicate: PendingScrapeDuplicate,
-  ): Promise<void> {
-    try {
-      const candidateModel = await this.productRepo.findOne({
-        where: { id: pendingDuplicate.candidateProductId },
-        select: ['id', 'specs', 'model', 'displayName'],
-        // `brand` labels the recorded candidate (the nightly duplicate path
-        // records one too); `aliases` fills in the input snapshot below, which
-        // claimed the candidate had none.
-        relations: ['brand', 'aliases'],
-      });
-      if (!candidateModel) {
-        this.logger.warn(
-          'Scrape-merge candidate no longer exists, skipping duplicate-record fallback',
-          { taskId: task.id, candidateId: pendingDuplicate.candidateProductId },
-        );
-        return;
-      }
-
-      const categoryConfig = this.categoryConfigService.getConfig(
-        scrapedProduct.category?.slug,
-      );
-      const specMatchDetails = this.specComparison.compareSpecs({
-        specsA: newModel.specs,
-        specsB: candidateModel.specs,
-        primarySpecs: categoryConfig?.primarySpecs,
-        matcherSpecs: categoryConfig?.matcherSpecs,
-        matcherSpecHierarchies: categoryConfig?.matcherSpecHierarchies,
-        specTolerances: categoryConfig?.matchingConfig?.specTolerances,
-      });
-
-      const reasons = [
-        'scrape-time ambiguous match',
-        `LLM confidence ${pendingDuplicate.confidence}`,
-        ...(pendingDuplicate.reason ? [pendingDuplicate.reason] : []),
-      ];
-
-      const candidateAliases = compact(
-        (candidateModel.aliases ?? []).map((alias) => alias.alias),
-      );
-
-      const candidates: ProductResolutionCandidateRecord[] = [
-        {
-          candidateId: candidateModel.id,
-          brand: candidateModel.brand?.name,
-          model: candidateModel.model,
-          displayName: candidateModel.displayName,
-          source: 'duplicate_detection_pair',
-          matchScore: pendingDuplicate.matchScore ?? pendingDuplicate.confidence,
-          matchComponents: pendingDuplicate.matchComponents,
-          gates: { passed: false, failedGates: ['llm_unresolved'] },
-          specMatchDetails,
-        },
-      ];
-      const inputSnapshot: ProductDuplicateDetectionInputSnapshot = {
-        kind: 'duplicate_detection',
-        query: {
-          model: newModel.model ?? '',
-          displayName: newModel.displayName,
-          aliases: [],
-          specs: newModel.specs,
-        },
-        candidate: {
-          model: candidateModel.model ?? '',
-          displayName: candidateModel.displayName,
-          aliases: candidateAliases,
-          specs: candidateModel.specs,
-        },
-        categorySlug: scrapedProduct.category?.slug,
-        trigramScore: pendingDuplicate.confidence,
-      };
-
-      await this.resolutionRecorder.recordDuplicatePair({
-        flow: ProductResolutionFlow.duplicate_detection,
-        productAId: newModel.id,
-        productBId: candidateModel.id,
-        similarityScore: pendingDuplicate.confidence,
-        specMatchDetails,
-        pendingReasons: reasons,
-        origin: ProductResolutionOrigin.scrape_time,
-        candidates,
-        inputSnapshot,
-      });
-
-      this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
-        'scrape_ambiguous_pending_review',
-      );
-    } catch (error: unknown) {
-      // Never fail the scrape over the review-queue write — the new product
-      // is already created and saved by this point; losing the review row
-      // is a diagnosability gap, not a data-correctness one.
-      this.logger.warn(
-        'Failed to write scrape-time duplicate-record fallback, continuing',
-        {
-          taskId: task.id,
-          newModelId: newModel.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-    }
-  }
-
   private async findExistingProductModel(
     task: ScrapeTask,
     scrapedProduct: ScrapedProduct,
-    existingSourceRecordId: string | undefined,
     logContext?: Record<string, string>,
   ): Promise<ResolutionResult> {
     const resolution = await this.productSearch.search(
@@ -834,17 +565,6 @@ export class ProductScrapeUpdaterService {
       },
       undefined,
       logContext,
-      {
-        // Anchors the decision to this physical listing, so re-scraping it
-        // updates the existing review row instead of queueing the same
-        // question again. externalId is preferred: it survives URL changes.
-        anchorKey: this.resolutionFingerprint.listingAnchor({
-          sourceId: task.source.id,
-          externalId: scrapedProduct.externalId,
-          url: task.url,
-        }),
-        sourceRecordId: existingSourceRecordId,
-      },
     );
 
     if (resolution.resolvedModel?.id) {
@@ -856,14 +576,12 @@ export class ProductScrapeUpdaterService {
         resolvedModel,
         context: resolution.context,
         confidence: resolution.confidence,
-        resolutionRecordId: resolution.resolutionRecordId,
       };
     }
 
     return {
       context: resolution.context,
       confidence: resolution.confidence,
-      resolutionRecordId: resolution.resolutionRecordId,
     };
   }
 

@@ -13,7 +13,6 @@ import {
   IncrementalSyncMetricsService,
   ProductCollectionMetricsService,
   ZyteMetricsService,
-  DuplicateDetectionMetricsService,
   TranslationMetricsService,
   ProductScrapingMetricsService,
 } from './services';
@@ -34,7 +33,6 @@ import {
     IncrementalSyncMetricsService,
     ProductCollectionMetricsService,
     ZyteMetricsService,
-    DuplicateDetectionMetricsService,
     TranslationMetricsService,
     ProductScrapingMetricsService,
   ],
@@ -50,7 +48,6 @@ import {
     IncrementalSyncMetricsService,
     ProductCollectionMetricsService,
     ZyteMetricsService,
-    DuplicateDetectionMetricsService,
     TranslationMetricsService,
     ProductScrapingMetricsService,
   ],

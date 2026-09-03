@@ -9,7 +9,6 @@ export * from './product-source-record-repository';
 export * from './product-source-repository';
 export * from './scrape-task-repository';
 export * from './task-repository';
-export * from './product-resolution-repository';
 export * from './translation-cache.repository';
 export * from './seller-repository';
 export * from './billing-info-repository';

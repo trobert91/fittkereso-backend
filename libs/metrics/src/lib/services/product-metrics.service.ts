@@ -30,12 +30,9 @@ export type ScrapeResolutionOutcome =
    *  the deterministic quality gates had rejected. */
   | 'llm_merge_accept'
   /** The scrape-merge LLM decision considered a near-miss candidate but was
-   *  not confident enough to merge — falls through to `new_product`, and also
-   *  produces a `scrape_ambiguous_pending_review` duplicate-record write. */
-  | 'llm_merge_reject'
-  /** A `ProductResolution` row (flow=duplicate_detection) was written for
-   *  human review after an `llm_merge_reject` outcome. */
-  | 'scrape_ambiguous_pending_review';
+   *  not confident enough to merge — falls through to `new_product`. Measures
+   *  how often the matcher leaves the LLM undecided. */
+  | 'llm_merge_reject';
 
 @Injectable()
 export class ProductMetricsService {

@@ -9,6 +9,5 @@ export * from './public-api-metrics.service';
 export * from './incremental-sync-metrics.service';
 export * from './product-collection-metrics.service';
 export * from './zyte-metrics.service';
-export * from './duplicate-detection-metrics.service';
 export * from './translation-metrics.service';
 export * from './product-scraping-metrics.service';

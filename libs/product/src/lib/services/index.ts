@@ -16,6 +16,5 @@ export * from './image';
 export * from './merge';
 export * from './product-spec';
 export * from './product-identity';
-export * from './duplicate';
 export * from './similarity';
 export * from './resolution';

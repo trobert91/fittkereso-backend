@@ -3,7 +3,7 @@ import {
   ProductSimilarityInput,
 } from './product-similarity.service';
 import { SimilarityInputNormalizationService } from './similarity-input-normalization.service';
-import { SpecComparisonService } from '../duplicate/spec-comparison.service';
+import { SpecComparisonService } from './spec-comparison.service';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { DebugTraceService } from '@fittkereso-backend/debug';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';

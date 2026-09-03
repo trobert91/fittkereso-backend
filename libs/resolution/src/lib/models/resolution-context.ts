@@ -185,9 +185,9 @@ export interface ResolutionContext {
    *
    *  Exists because `candidates` is destructively narrowed: a candidate the
    *  filter drops (wrong brand/category, contradicted primary spec) vanishes
-   *  from it, which previously left `ProductResolution.candidates` empty on
-   *  exactly the near-miss resolutions most worth reviewing. Pair each entry
-   *  with `filter.filteredCandidates` to recover why it was dropped. */
+   *  from it, which loses exactly the near-misses most worth inspecting when
+   *  a resolution looks wrong. Pair each entry with `filter.filteredCandidates`
+   *  to recover why it was dropped. */
   recallCandidates?: SlimCandidate[];
   /**
    * Append-only sequence recording every recall-strategy fire, in order. A
@@ -229,9 +229,7 @@ export interface ResolutionContext {
   scoringMatchConfig?: unknown;
   /** Full per-candidate gate pass/fail breakdown, populated by
    *  `DecisionService.runMatcherFilter` via `QualityGatesService.evaluateAllCandidates`.
-   *  Transient — never persisted onto `ScrapeTask.resolutionContext` (the
-   *  resolution-flow recorder reads it directly to build each candidate's
-   *  persisted `gates` field on the `ProductResolution` row). */
+   *  Transient — never persisted onto `ScrapeTask.resolutionContext`. */
   candidateGateResults?: CandidateGateResult[];
 
   // ── Decision (Stage 6 output) ──────────────────────────────────────────────

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ProductSourceSyncScheduler } from './product-source-sync-scheduler.service';
-import { DuplicateDetectionScheduler } from './duplicate-detection-scheduler.service';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { TaskModule } from '@fittkereso-backend/task';
 import { MetricsModule } from '@fittkereso-backend/metrics';
@@ -17,6 +16,6 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     SearchModule,
     TaskModule,
   ],
-  providers: [ProductSourceSyncScheduler, DuplicateDetectionScheduler],
+  providers: [ProductSourceSyncScheduler],
 })
 export class SchedulingModule {}

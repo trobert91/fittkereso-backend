@@ -24,27 +24,5 @@
   "searchQueryProcessing": {
     "chunkSize": 30,
     "avgRelevanceThreshold": 45
-  },
-  "duplicateDetection": {
-    "enabled": true,
-    "minSimilarityThreshold": 60,
-    "autoMergeThreshold": 80,
-    "minPendingReviewThreshold": 60,
-    "maxNonPrimaryMismatches": 2,
-    "batchSize": 100,
-    "maxMergesPerRun": 50,
-    "highActivityThreshold": 10
-  },
-  "resolutionBackfill": {
-    "enabled": true,
-    "scoredResolution": {
-      "topN": 50,
-      "retryMaxAgeDays": 365,
-      "cooldown": {
-        "baseCooldownHours": 168,
-        "backoffBase": 2,
-        "maxCooldownHours": 2160
-      }
-    }
   }
 }

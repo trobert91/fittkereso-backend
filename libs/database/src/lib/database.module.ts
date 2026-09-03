@@ -23,8 +23,6 @@ import {
   ScrapeTaskRepository,
 } from './postgres';
 import { ProductSource } from './postgres/models/product-source.entity';
-import { ProductResolution } from './postgres/models/product-resolution.entity';
-import { ProductResolutionRepository } from './postgres/repositories/product-resolution-repository';
 import { TranslationCache } from './postgres/models/translation-cache.entity';
 import { TranslationCacheRepository } from './postgres/repositories/translation-cache.repository';
 import { Seller } from './postgres/models/seller.entity';
@@ -48,7 +46,6 @@ export const entityList = [
   ProductSource,
   ScrapeTask,
   Task,
-  ProductResolution,
   TranslationCache,
   Seller,
   BillingInfo,
@@ -69,7 +66,6 @@ export const entityList = [
     ProductSourceRepository,
     ScrapeTaskRepository,
     TaskRepository,
-    ProductResolutionRepository,
     TranslationCacheRepository,
     SellerRepository,
     BillingInfoRepository,
@@ -87,7 +83,6 @@ export const entityList = [
     ProductSourceRepository,
     ScrapeTaskRepository,
     TaskRepository,
-    ProductResolutionRepository,
     TranslationCacheRepository,
     SellerRepository,
     BillingInfoRepository,

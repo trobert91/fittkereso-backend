@@ -2,57 +2,6 @@
   "embeddingSimilarityThreshold": 0.4,
   "embeddingResultLimit": 5,
   "webSearchRelevanceGate": 70,
-  "minScoreToRecord": 60,
-  "review": {
-    "cleanupEnabled": true,
-    "supersededRetentionDays": 60,
-    "doneRetentionDays": 60,
-    "pendingRetentionDays": 120,
-    "nearMissBand": 10,
-    "nameOnlySpecSimilarityMax": 0.05
-  },
-  "automation": {
-    "enabled": true,
-    "deterministic": {
-      "enabled": true,
-      "atRecordTime": true,
-      "dryRun": false,
-      "minConfidence": 90,
-      "maxPerRunNightly": 200
-    },
-    "ai": {
-      "enabled": true,
-      "dryRun": false,
-      "model": "gpt-5.6-luna",
-      "effort": "medium",
-      "executeActions": true,
-      "executeDestructive": false,
-      "maxPerRun": 100,
-      "minPriority": 10,
-      "maxCostUsdPerRun": 2,
-      "reReviewAfterDays": 30
-    }
-  },
-  "priority": {
-    "recomputeEnabled": true,
-    "recomputeBatchSize": 500,
-    "maxRowsPerRun": 50000,
-    "weights": {
-      "confidence": {
-        "outcomeAgreement": 0.3,
-        "specAgreement": 0.21,
-        "gateAgreement": 0.17,
-        "corroboration": 0.15,
-        "margin": 0.085,
-        "selfReport": 0.085
-      },
-      "impact": {
-        "blastRadius": 0.5,
-        "actionKind": 0.3,
-        "mergeReach": 0.2
-      }
-    }
-  },
   "matching": {
     "acceptThreshold": 70,
     "acceptThresholdStrict": 80,

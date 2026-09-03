@@ -1,28 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import type { ChatTraceData } from '@fittkereso-backend/debug';
-import {
-  ProductResolutionFlow,
-} from '@fittkereso-backend/database';
-import type {
-  CreateProductResolutionParams,
-  ProductResolutionCandidateRecord,
-  ProductResolutionInputSnapshot,
-  ProductResolutionDecisionSnapshot,
-  SpecMatchDetails,
-} from '@fittkereso-backend/database';
-import { ProductResolutionRecorderService } from '@fittkereso-backend/product';
-import { maxBy } from 'lodash';
 import type {
   ResolutionContext,
   FilterOutcome,
 } from './models/resolution-context';
 import type { ProductResolutionInput } from './models/resolution-input';
 import type { ResolutionOptions } from './models/resolution-options';
-import type {
-  ResolutionRecordingContext,
-  ResolutionResult,
-} from './models/resolution-result';
+import type { ResolutionResult } from './models/resolution-result';
 import { ResolutionStatus } from './models/resolution-status';
 import { ReferenceProductResolver } from './stages/reference-product-resolver';
 import { BrandResolverService } from './stages/brand-resolver.service';
@@ -74,7 +59,6 @@ export class ResolutionService {
     private readonly scoringService: ScoringService,
     private readonly decisionService: DecisionService,
     private readonly finalizeService: FinalizeService,
-    private readonly resolutionRecorder: ProductResolutionRecorderService,
   ) {}
 
   async search(
@@ -82,7 +66,6 @@ export class ResolutionService {
     options: ResolutionOptions,
     traceCollector?: (data: ChatTraceData) => void,
     logContext?: Record<string, string>,
-    recordingContext?: ResolutionRecordingContext,
   ): Promise<ResolutionResult> {
     const startedAt = Date.now();
     const context = createInitialContext(input, options);
@@ -115,12 +98,6 @@ export class ResolutionService {
         context,
         confidence: referenceResult.confidence,
       };
-      earlyResult.resolutionRecordId = await this.recordResolution(
-        context,
-        earlyResult,
-        logContext,
-        recordingContext,
-      );
       return earlyResult;
     }
 
@@ -177,151 +154,7 @@ export class ResolutionService {
 
     context.totals.durationMs = Date.now() - startedAt;
     this.logResolutionSummary(context, logContext);
-    result.resolutionRecordId = await this.recordResolution(
-      context,
-      result,
-      logContext,
-      recordingContext,
-    );
     return result;
-  }
-
-  /**
-   * Persists a `ProductResolution` row (flow=product_resolution) for this
-   * decision via the shared `ProductResolutionRecorderService`, gated by
-   * `resolution.minScoreToRecord` inside the recorder. Called from both
-   * return paths (Stage-1 reference short-circuit and the normal 7-stage
-   * path) so every caller of `search()` — scrape-time resolution, the ad-hoc
-   * admin test endpoint, anything else — is covered automatically. Never
-   * throws: a recording failure must not fail the resolution call itself.
-   */
-  private async recordResolution(
-    context: ResolutionContext,
-    result: ResolutionResult,
-    logContext?: Record<string, string>,
-    recordingContext?: ResolutionRecordingContext,
-  ): Promise<string | undefined> {
-    try {
-      const params = this.buildResolutionRecordParams(
-        context,
-        result,
-        recordingContext,
-      );
-      const recorded = await this.resolutionRecorder.recordResolution(params);
-      return recorded?.id;
-    } catch (error: unknown) {
-      this.logger.warn('Failed to record ProductResolution, continuing', {
-        error: error instanceof Error ? error.message : String(error),
-        ...logContext,
-      });
-      return undefined;
-    }
-  }
-
-  private buildResolutionRecordParams(
-    context: ResolutionContext,
-    result: ResolutionResult,
-    recordingContext?: ResolutionRecordingContext,
-  ): CreateProductResolutionParams {
-    const gatingScore =
-      context.scoring?.bestCandidate?.score ?? context.decision?.confidence ?? 0;
-
-    const gatesByCandidateId = new Map(
-      (context.candidateGateResults ?? []).map((gate) => [
-        gate.candidateId,
-        gate,
-      ]),
-    );
-    const filteredByCandidateId = new Map(
-      (context.filter?.filteredCandidates ?? []).map((entry) => [
-        entry.candidateId,
-        entry,
-      ]),
-    );
-
-    // Record the full recall pool, not the post-filter survivors. A candidate
-    // the filter dropped is precisely the near-miss a reviewer needs to see —
-    // recording only survivors renders these rows as "nothing was recalled".
-    const recordable = context.recallCandidates ?? context.candidates;
-
-    const candidates: ProductResolutionCandidateRecord[] = recordable.map(
-      (candidate) => {
-        const filtered = filteredByCandidateId.get(candidate.productId);
-        return {
-          candidateId: candidate.productId,
-          brand: candidate.brand,
-          model: candidate.model,
-          displayName: candidate.displayName,
-          source: candidate.source,
-          matchScore: candidate.matchScore,
-          matchComponents: candidate.matchComponents,
-          // Neither synthesized name is a gate that fired — they say why no gate
-          // ever ran. Without them, both cases collapse into an empty
-          // `failedGates` with `passed: false`, which reads as "evaluated and
-          // rejected by nothing at all".
-          gates: gatesByCandidateId.get(candidate.productId) ??
-            (filtered
-              ? { passed: false, failedGates: [`filter_${filtered.reason}`] }
-              : { passed: false, failedGates: ['not_scored'] }),
-          filtered: filtered && {
-            reason: filtered.reason,
-            detail: filtered.detail,
-          },
-          specMatchDetails: candidate.specMatchDetails,
-        };
-      },
-    );
-
-    // The stage-1 short-circuit returns before recall runs, so there is no pool
-    // to project — yet it did identify a product. Recording zero candidates
-    // beside a resolved product is indistinguishable from "recall found
-    // nothing", which is the one shape a reviewer cannot act on. Say which
-    // product it was and how we knew.
-    if (candidates.length === 0) {
-      const shortCircuit = referenceShortCircuitCandidate(
-        context,
-        result.resolvedModel?.id,
-      );
-      if (shortCircuit) candidates.push(shortCircuit);
-    }
-
-    const inputSnapshot: ProductResolutionInputSnapshot = {
-      kind: 'product_resolution',
-      input: context.input,
-      options: context.options,
-      referenceProduct: context.referenceProduct,
-      effectiveMatchSpecs: context.effectiveMatchSpecs,
-      brand: context.brand,
-      category: context.category,
-    };
-
-    const decisionSnapshot: ProductResolutionDecisionSnapshot | undefined =
-      context.decision && {
-        kind: context.decision.kind,
-        confidence: context.decision.confidence,
-        reason: context.decision.reason,
-        selectedCandidates: context.decision.selectedCandidates,
-        evidenceSummary: context.decision.evidenceSummary,
-      };
-
-    return {
-      flow: ProductResolutionFlow.product_resolution,
-      similarityScore: gatingScore,
-      resolvedProductId: result.resolvedModel?.id,
-      specMatchDetails: headlineSpecMatchDetails(
-        candidates,
-        result.resolvedModel?.id,
-      ),
-      candidates,
-      inputSnapshot,
-      decisionSnapshot,
-      anchorKey: recordingContext?.anchorKey,
-      sourceRecordId: recordingContext?.sourceRecordId,
-      // `decisionConfidence` is deliberately not passed: the recorder derives it
-      // from all the evidence via `ResolutionConfidenceService`. The decider's
-      // self-reported number reaches it as one weighted input, inside
-      // `decisionSnapshot.confidence`.
-    };
   }
 
   /**
@@ -368,8 +201,7 @@ export class ResolutionService {
       strategiesRun: context.strategiesRun,
       recallFunnel: context.recallFunnel,
       filter: context.filter,
-      // The full recall pool, matching what gets persisted on the
-      // `ProductResolution` row — `filter.qualifyingCandidateIds` says which of
+      // The full recall pool — `filter.qualifyingCandidateIds` says which of
       // these survived. Logging the narrowed `context.candidates` here made
       // filter rejections read as empty-recall in Loki.
       candidates: (context.recallCandidates ?? context.candidates).map(
@@ -429,59 +261,6 @@ function mergeCandidatesById(
     }
   }
   return Array.from(merged.values());
-}
-
-/**
- * The reference product, as the single candidate of a stage-1 short-circuit
- * (`relation === 'same'`, confidence 100).
- *
- * Returns undefined unless the resolved product really is the reference — the
- * only case this shape describes. `gates.passed` is true because the
- * short-circuit *is* an acceptance; it just reached one without the matcher.
- */
-function referenceShortCircuitCandidate(
-  context: ResolutionContext,
-  resolvedProductId?: string,
-): ProductResolutionCandidateRecord | undefined {
-  const reference = context.referenceProduct;
-  if (!reference || !resolvedProductId) return undefined;
-  if (reference.productId !== resolvedProductId) return undefined;
-
-  return {
-    candidateId: reference.productId,
-    brand: reference.brand,
-    model: reference.model,
-    displayName: context.resolvedProduct?.displayName,
-    source: 'reference_short_circuit',
-    matchScore: context.decision?.confidence,
-    gates: { passed: true, failedGates: [] },
-  };
-}
-
-/**
- * The row-level `specMatchDetails` — the one spec verdict the review queue shows
- * without expanding a row, and the one `ResolutionConfidenceService` scores
- * `specAgreement` from.
- *
- * It must therefore describe the candidate the decision was *about*: the product
- * we resolved to, or failing that the best-scoring one. The candidate array is
- * in first-sighting order, so taking its head picks whichever candidate recall
- * happened to see first — routinely a different product than the one we matched,
- * and sometimes one the filter threw out.
- */
-function headlineSpecMatchDetails(
-  candidates: ProductResolutionCandidateRecord[],
-  resolvedProductId?: string,
-): SpecMatchDetails | undefined {
-  const resolved = resolvedProductId
-    ? candidates.find((candidate) => candidate.candidateId === resolvedProductId)
-    : undefined;
-  if (resolved?.specMatchDetails) return resolved.specMatchDetails;
-
-  return maxBy(
-    candidates.filter((candidate) => !!candidate.specMatchDetails),
-    (candidate) => candidate.matchScore ?? -Infinity,
-  )?.specMatchDetails;
 }
 
 /**

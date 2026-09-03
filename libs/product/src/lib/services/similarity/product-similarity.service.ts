@@ -8,7 +8,7 @@ import { DebugTraceService } from '@fittkereso-backend/debug';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { distance as levenshtein } from 'fastest-levenshtein';
 import { isEmpty } from 'lodash';
-import { SpecComparisonService } from '../duplicate/spec-comparison.service';
+import { SpecComparisonService } from './spec-comparison.service';
 import {
   SimilarityInputNormalizationService,
   ParsedName,

@@ -45,8 +45,7 @@ import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ProductMergeService } from './services/merge/product-merge.service';
 import { ProductSplitService } from './services/merge/product-split.service';
 import { ProductModelFactoryService } from './services/product-model-factory.service';
-import { SpecComparisonService } from './services/duplicate/spec-comparison.service';
-import { ProductDuplicateEvaluationService } from './services/duplicate/product-duplicate-evaluation.service';
+import { SpecComparisonService } from './services/similarity/spec-comparison.service';
 import { SimilarityInputNormalizationService } from './services/similarity/similarity-input-normalization.service';
 import { ProductSimilarityService } from './services/similarity/product-similarity.service';
 import { SearchModule } from '@fittkereso-backend/search';
@@ -58,21 +57,6 @@ import { ProductFuzzySearchService } from './services/resolution/product-fuzzy-s
 import { ProductWebSearchService } from './services/resolution/product-web-search.service';
 import { SellerResolutionService } from './services/resolution/seller-resolution.service';
 import { OfferMatchingService } from './services/resolution/offer-matching.service';
-import { ProductResolutionRecorderService } from './services/resolution/product-resolution-recorder.service';
-import { ProductResolutionFingerprintService } from './services/resolution/product-resolution-fingerprint.service';
-import { ResolutionConfidenceService } from './services/resolution/resolution-confidence.service';
-import { ProductResolutionPriorityService } from './services/resolution/product-resolution-priority.service';
-import { ResolutionReviewTriggerService } from './services/resolution/resolution-review-trigger.service';
-import { ResolutionScoringService } from './services/resolution/resolution-scoring.service';
-import { ProductResolutionPriorityRecomputeService } from './services/resolution/product-resolution-priority-recompute.service';
-import { ProductResolutionCleanupService } from './services/resolution/product-resolution-cleanup.service';
-import { ProductResolutionStateService } from './services/resolution/product-resolution-state.service';
-import { ProductResolutionActionService } from './services/resolution/product-resolution-action.service';
-import { ProductResolutionAutoAcceptService } from './services/resolution/product-resolution-auto-accept.service';
-import { AiReviewContextBuilderService } from './services/resolution/ai-review/ai-review-context-builder.service';
-import { AiReviewDecisionService } from './services/resolution/ai-review/ai-review-decision.service';
-import { ResolutionAiReviewService } from './services/resolution/ai-review/resolution-ai-review.service';
-import { ResolutionAiReviewBatchService } from './services/resolution/ai-review/resolution-ai-review-batch.service';
 import { SellerCreateService } from './services/seller/seller-create.service';
 import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
@@ -130,7 +114,6 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductSourcePostProcessService,
     ProductSourcePostProcessMergeService,
     SpecComparisonService,
-    ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,
     ProductSimilarityService,
     BrandResolutionService,
@@ -141,21 +124,6 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductWebSearchService,
     SellerResolutionService,
     OfferMatchingService,
-    ProductResolutionRecorderService,
-    ProductResolutionFingerprintService,
-    ResolutionConfidenceService,
-    ProductResolutionPriorityService,
-    ResolutionReviewTriggerService,
-    ResolutionScoringService,
-    ProductResolutionPriorityRecomputeService,
-    ProductResolutionCleanupService,
-    ProductResolutionStateService,
-    ProductResolutionActionService,
-    ProductResolutionAutoAcceptService,
-    AiReviewContextBuilderService,
-    AiReviewDecisionService,
-    ResolutionAiReviewService,
-    ResolutionAiReviewBatchService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,
@@ -195,7 +163,6 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductSourcePostProcessService,
     ProductSourcePostProcessMergeService,
     SpecComparisonService,
-    ProductDuplicateEvaluationService,
     SimilarityInputNormalizationService,
     ProductSimilarityService,
     BrandResolutionService,
@@ -206,21 +173,6 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductWebSearchService,
     SellerResolutionService,
     OfferMatchingService,
-    ProductResolutionRecorderService,
-    ProductResolutionFingerprintService,
-    ResolutionConfidenceService,
-    ProductResolutionPriorityService,
-    ResolutionReviewTriggerService,
-    ResolutionScoringService,
-    ProductResolutionPriorityRecomputeService,
-    ProductResolutionCleanupService,
-    ProductResolutionStateService,
-    ProductResolutionActionService,
-    ProductResolutionAutoAcceptService,
-    AiReviewContextBuilderService,
-    AiReviewDecisionService,
-    ResolutionAiReviewService,
-    ResolutionAiReviewBatchService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,

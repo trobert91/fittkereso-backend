@@ -45,12 +45,9 @@ import { Express } from 'express';
 import { ProductSpecUpdateDto } from '@fittkereso-backend/product';
 import { ProductSpecUpdaterService } from '@fittkereso-backend/product';
 import {
-  DuplicateSearchParams,
-  DuplicateSearchResult,
   OfferSearchParams,
   OfferSearchResult,
   OfferSearchService,
-  ProductDuplicationSearchService,
   ProductSearchService,
 } from '@fittkereso-backend/search';
 import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
@@ -76,7 +73,6 @@ export class AdminProductController {
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
     private readonly mergeService: ProductMergeService,
-    private readonly duplicationSearchService: ProductDuplicationSearchService,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly offerSearchService: OfferSearchService,
   ) {}
@@ -89,14 +85,6 @@ export class AdminProductController {
     const result = await this.searchService.searchProducts(searchParams);
     this.imageDtoService.updateProductImageUrls(result.items);
     return result;
-  }
-
-  @Post('duplicates')
-  @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
-  async findDuplicates(
-    @Body() params: DuplicateSearchParams,
-  ): Promise<DuplicateSearchResult> {
-    return this.duplicationSearchService.findDuplicates(params);
   }
 
   @Get(':id')

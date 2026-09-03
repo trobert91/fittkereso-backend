@@ -16,11 +16,7 @@ export * from './product-source-search-result';
 export * from './scrape-task-search-params';
 export * from './scrape-task-search-result';
 
-export * from './duplicate-search-params';
-export * from './duplicate-search-result';
 
-export * from './product-resolution-search-params';
-export * from './product-resolution-search-result';
 
 export * from './seller-search-params';
 export * from './seller-search-result';

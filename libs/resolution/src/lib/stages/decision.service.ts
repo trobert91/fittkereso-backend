@@ -155,9 +155,8 @@ export class DecisionService {
   /** Run the per-candidate accept filter. Falls back to an empty array when the
    *  scoring stage didn't run (no matches recorded) — callers treat that the
    *  same as "no candidates above threshold". Also stashes the full
-   *  per-candidate gate breakdown onto `context.candidateGateResults` so the
-   *  resolution-flow recorder (`ProductResolutionRecorderService`, via
-   *  `ResolutionService`) can persist which gates each candidate passed/failed. */
+   *  per-candidate gate breakdown onto `context.candidateGateResults`, which is
+   *  what the resolution summary log renders for each candidate. */
   private runMatcherFilter(context: ResolutionContext) {
     const matches = context.scoringMatches;
     if (!matches || matches.length === 0) return [];

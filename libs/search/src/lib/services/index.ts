@@ -4,7 +4,5 @@ export * from './brand-search.service';
 export * from './task-search.service';
 export * from './product-source-search.service';
 export * from './scrape-task-search.service';
-export * from './product-duplication-search.service';
-export * from './product-resolution-search.service';
 export * from './seller-search.service';
 export * from './offer-search.service';

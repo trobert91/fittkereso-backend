@@ -5,7 +5,6 @@ import {
   ProductCategory,
   ProductModel,
   ProductModelRepository,
-  ProductResolutionRepository,
   ProductSourceRecordRepository,
   ScrapeTask,
   ScrapeTaskRepository,
@@ -19,11 +18,8 @@ import type {
   ProductMergeService,
   ProductModelFactoryService,
   ProductNormalizerService,
-  ProductResolutionFingerprintService,
-  ProductResolutionRecorderService,
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
-  SpecComparisonService,
 } from '@fittkereso-backend/product';
 
 jest.mock('@fittkereso-backend/resolution', () => ({
@@ -109,8 +105,6 @@ describe('ProductScrapeUpdaterService', () => {
   let service: ProductScrapeUpdaterService;
   let mockProductSearch: jest.Mocked<ResolutionService>;
   let mockModelFactory: jest.Mocked<ProductModelFactoryService>;
-  let mockResolutionRepo: jest.Mocked<ProductResolutionRepository>;
-  let mockResolutionFingerprint: jest.Mocked<ProductResolutionFingerprintService>;
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
@@ -123,8 +117,6 @@ describe('ProductScrapeUpdaterService', () => {
   let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
-  let mockResolutionRecorder: jest.Mocked<ProductResolutionRecorderService>;
-  let mockSpecComparison: jest.Mocked<SpecComparisonService>;
 
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
@@ -203,22 +195,6 @@ describe('ProductScrapeUpdaterService', () => {
       getConfig: jest.fn().mockReturnValue(undefined),
     } as unknown as jest.Mocked<CategoryConfigService>;
 
-    mockResolutionRecorder = {
-      recordDuplicatePair: jest.fn().mockResolvedValue(undefined),
-      recordResolution: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<ProductResolutionRecorderService>;
-
-    mockSpecComparison = {
-      compareSpecs: jest.fn().mockReturnValue({
-        comparableCount: 0,
-        matchingCount: 0,
-        primaryMismatches: 0,
-        matcherSpecMismatches: 0,
-        nonPrimaryMismatches: 0,
-        details: [],
-      }),
-    } as unknown as jest.Mocked<SpecComparisonService>;
-
     mockModelFactory = {
       // Mirrors the real factory: an unsaved shell with no id, which is what
       // marks the model as newly created downstream.
@@ -229,14 +205,6 @@ describe('ProductScrapeUpdaterService', () => {
         return model;
       }),
     } as unknown as jest.Mocked<ProductModelFactoryService>;
-
-    mockResolutionRepo = {
-      save: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<ProductResolutionRepository>;
-
-    mockResolutionFingerprint = {
-      listingAnchor: jest.fn().mockReturnValue('source-1:sku-1'),
-    } as unknown as jest.Mocked<ProductResolutionFingerprintService>;
 
     service = new ProductScrapeUpdaterService(
       mockProductSearch,
@@ -253,10 +221,6 @@ describe('ProductScrapeUpdaterService', () => {
       mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
-      mockResolutionRecorder,
-      mockResolutionFingerprint,
-      mockResolutionRepo,
-      mockSpecComparison,
     );
   });
 
@@ -381,9 +345,6 @@ describe('ProductScrapeUpdaterService', () => {
       expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
-      // Anchors the decision to this listing so a re-scrape updates the
-      // existing review row instead of queueing the same question again.
-      expect.objectContaining({ anchorKey: 'source-1:sku-1' }),
     );
   });
 
@@ -410,9 +371,6 @@ describe('ProductScrapeUpdaterService', () => {
       expect.objectContaining({ mode: 'strict' }),
       undefined,
       { taskId: task.id },
-      // Anchors the decision to this listing so a re-scrape updates the
-      // existing review row instead of queueing the same question again.
-      expect.objectContaining({ anchorKey: 'source-1:sku-1' }),
     );
   });
 
