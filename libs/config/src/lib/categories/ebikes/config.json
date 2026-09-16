@@ -241,7 +241,8 @@
     "batteryCapacity",
     "wheelSize",
     "torque",
-    "usageType"
+    "usageType",
+    "frameType"
   ],
   "matcherSpecHierarchies": {
     "usageType": {
@@ -254,12 +255,9 @@
     "weight",
     "frameMaterial",
     "gearCount",
-    "topSpeed",
-    "frameType",
-    "motorModel"
+    "topSpeed"
   ],
   "matchingConfig": {
-    "maxMatcherSpecMismatches": 2,
     "specTolerances": {
       "modelYear": { "absolute": 0 },
       "wheelSize": { "absolute": 0 },

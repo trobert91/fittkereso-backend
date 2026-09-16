@@ -24,30 +24,7 @@
       }
     ],
 
-    "categoryLinks": [
-      {
-        "op": "parseJsonAttr",
-        "selector": "#app",
-        "attr": "data-page",
-        "path": "props.lastPage",
-        "as": "lastPage"
-      },
-      {
-        "op": "buildBaseUrl",
-        "from": "task.url",
-        "stripQuery": true,
-        "trimTrailingSlash": true,
-        "as": "baseUrl"
-      },
-      {
-        "op": "generatePaginationLinks",
-        "totalPages": "lastPage",
-        "startPage": 2,
-        "baseUrl": "baseUrl",
-        "urlTemplate": "{baseUrl}?oldal={page}",
-        "titleTemplate": "Page {page}"
-      }
-    ],
+    "categoryLinks": [],
 
     "productLinks": [
       {

@@ -147,11 +147,11 @@ All three read `source.config`/`source.name` — none of them know or care which
 
 This service was already the persistence core before this change and is mostly unchanged in shape — the main addition is Offer/Seller handling. Flow:
 
-1. `resolveProductIdentity` — is this a known product (fast normalized-name match) or does it need the full fuzzy/embedding/LLM resolution pipeline (`libs/resolution`)?
+1. `resolveProductIdentity` — is this a known product (a stored id: the task, an offer externalId, a source externalId) or does it need listing matching (`libs/product-identity`, Path 4: name score, spec gates, and the LLM only for the near-misses)?
 2. `persistProduct` — create or update the `ProductModel`, write the per-source `ProductModelSource` row (now via `source: ProductSource` FK instead of a `type` enum — see step 10), re-merge specs across all sources by `ProductSource.priority`.
 3. `applyPostSaveSideEffects` — slug generation, alias insertion, image copying to Bunny CDN, and (new) **`createOrUpdateOffers`**.
 
-**`createOrUpdateOffers`** (new): if `scrapedProduct.offers` is populated, for each entry it resolves/creates a `Seller` via `SellerResolutionService` (`libs/product/src/lib/services/resolution/seller-resolution.service.ts` — exact-name lookup, create if missing) and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSeenAt`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
+**`createOrUpdateOffers`** (new): if `scrapedProduct.offers` is populated, for each entry it takes the seller from the task's own `ProductSource.seller` and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSeenAt`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
 
 Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup. Seller is never scraped per offer — every offer belongs to its `ProductSource.seller`.
 

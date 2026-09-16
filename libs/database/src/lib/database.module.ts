@@ -33,6 +33,8 @@ import { Offer } from './postgres/models/offer.entity';
 import { OfferRepository } from './postgres/repositories/offer-repository';
 import { PriceHistory } from './postgres/models/price-history.entity';
 import { PriceHistoryRepository } from './postgres/repositories/price-history-repository';
+import { ProductDuplicatePair } from './postgres/models/product-duplicate-pair.entity';
+import { ProductDuplicatePairRepository } from './postgres/repositories/product-duplicate-pair-repository';
 
 export const entityList = [
   Brand,
@@ -51,6 +53,7 @@ export const entityList = [
   BillingInfo,
   Offer,
   PriceHistory,
+  ProductDuplicatePair,
 ];
 
 @Module({
@@ -71,6 +74,7 @@ export const entityList = [
     BillingInfoRepository,
     OfferRepository,
     PriceHistoryRepository,
+    ProductDuplicatePairRepository,
   ],
   exports: [
     BrandAliasRepository,
@@ -88,6 +92,7 @@ export const entityList = [
     BillingInfoRepository,
     OfferRepository,
     PriceHistoryRepository,
+    ProductDuplicatePairRepository,
   ],
 })
 export class DatabaseModule {}

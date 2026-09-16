@@ -34,8 +34,6 @@ import {
   ProductImageOrderService,
   ProductImageUploadService,
   ProductMergeService,
-  ProductSearchParams,
-  ProductSearchResult,
   ProductUpdateService,
 } from '@fittkereso-backend/product';
 import { nameOf, SerializeGroup } from '@fittkereso-backend/utils';
@@ -48,8 +46,11 @@ import {
   OfferSearchParams,
   OfferSearchResult,
   OfferSearchService,
+  ProductSearchParams,
+  ProductSearchResult,
   ProductSearchService,
 } from '@fittkereso-backend/search';
+import { ProductDuplicateService } from '@fittkereso-backend/product-identity';
 import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
 import { QueueStatusDto } from '../dtos/product-source-sync.dto';
 import { ProductMergeDto } from '../dtos/product-merge.dto';
@@ -75,6 +76,7 @@ export class AdminProductController {
     private readonly mergeService: ProductMergeService,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly offerSearchService: OfferSearchService,
+    private readonly duplicateService: ProductDuplicateService,
   ) {}
 
   @Post('search')
@@ -245,15 +247,13 @@ export class AdminProductController {
     @Param('id') sourceId: string,
     @Body() body: ProductMergeDto,
   ): Promise<ProductModel> {
-    const { product } = await this.mergeService.mergeProducts({
-      sourceId,
-      targetId: body.targetProductId,
-    });
-    return product;
+    // Through the duplicate service, so the survivor is re-detected afterwards
+    // exactly as it is when the merge comes from the Duplicates page.
+    return this.duplicateService.mergeProducts(sourceId, body.targetProductId);
   }
 
-  // Recomputes this product's specs and identity fields (brand/model/
-  // displayName/aliases) from its current ProductSourceRecords —
+  // Recomputes this product's specs and name fields (brand/model/
+  // displayName/aliases/normalizedName) from its current ProductSourceRecords —
   // the same idempotent recompute every scrape/manual-edit/product-merge
   // already triggers, exposed as a standalone on-demand action.
   @Post(':id/merge-sources')

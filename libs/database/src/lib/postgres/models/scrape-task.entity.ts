@@ -7,7 +7,7 @@ import { ProductModel } from './product-model.entity';
 import { ScrapeQueueName } from '../types';
 import { IsDate } from 'class-validator';
 import { SerializeGroup } from '@fittkereso-backend/utils';
-import type { ResolutionContext as PersistedResolutionContext } from '../../models/resolution-context';
+import type { ListingMatchDecision } from '../../models/listing-match-decision';
 
 @Entity()
 export class ScrapeTask extends BasePostgresEntity {
@@ -71,9 +71,10 @@ export class ScrapeTask extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   error?: any;
 
+  /** What listing matching decided for this scrape. */
   @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  resolutionContext?: PersistedResolutionContext | null;
+  identityDecision?: ListingMatchDecision | null;
 
   @Column('float', { nullable: true })
   @Expose({ groups: [SerializeGroup.list] })

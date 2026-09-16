@@ -3,7 +3,7 @@ export * from './product-source-config';
 export * from './scrape-operation';
 export * from './queues';
 export * from './product-source-sync-mode';
-export * from './spec-match-details';
 export * from './seller-type';
 export * from './offer-condition';
 export * from './offer-availability';
+export * from './product-duplicate-pair.types';

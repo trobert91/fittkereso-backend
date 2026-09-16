@@ -16,23 +16,15 @@
 
   "listPage": {
     "categoryName": [
-      { "op": "selectText", "selector": "h1.category-title", "first": true, "trim": true }
+      { "op": "selectText", "selector": "h1.page-head-center-title", "first": true, "trim": true }
     ],
-    "categoryLinks": [
-      {
-        "op": "buildBaseUrl",
-        "from": "task.url",
-        "stripQuery": true,
-        "trimTrailingSlash": true,
-        "as": "baseUrl"
-      }
-    ],
+    "categoryLinks": [],
     "productLinks": [
-      { "op": "selectAll", "selector": ".product-box .name a, .list-view .product-box a.name", "as": "boxes" },
+      { "op": "selectAll", "selector": ".snapshot-list-item.list_prouctname", "as": "boxes" },
       {
         "op": "extractLinkFromBox",
         "on": "boxes",
-        "linkSelector": "a",
+        "linkSelector": "a.list-productname-link",
         "first": true,
         "titleFrom": ["attr:title", "text"]
       }
@@ -198,18 +190,14 @@
 
     "offers": {
       "offerList": [
-        { "op": "selectAll", "selector": ".productstock-param-row" }
+        { "op": "selectAll", "selector": ".product-page-price-wrapper" }
       ],
       "itemMode": "cheerio",
       "itemPipeline": [
         {
           "op": "assembleOffer",
           "price": [
-            { "op": "selectText", "selector": ".price_special_color", "first": true, "trim": true, "as": "specialPriceText" },
-            { "op": "selectText", "selector": ".price:not(.price_special_color):not(.price_original_color)", "first": true, "trim": true, "as": "regularPriceText" },
-            { "op": "coalesce", "candidates": ["specialPriceText", "regularPriceText"] },
-            { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithDots" },
-            { "op": "stripPattern", "value": "priceWithDots", "pattern": "\\.", "flags": "g" }
+            { "op": "selectAttr", "selector": "meta[itemprop=\"price\"]", "attr": "content", "first": true, "trim": true }
           ],
           "priceWithoutDiscount": [
             { "op": "selectText", "selector": ".price_original_color", "first": true, "trim": true },
@@ -217,19 +205,21 @@
             { "op": "stripPattern", "value": "priceWithoutDiscountWithDots", "pattern": "\\.", "flags": "g" }
           ],
           "currency": [
-            { "op": "literal", "value": "HUF" }
+            { "op": "selectAttr", "selector": "meta[itemprop=\"pricecurrency\"]", "attr": "content", "first": true, "trim": true }
           ],
           "availability": [
-            { "op": "selectText", "selector": ".productstock-param.param-value", "first": true, "trim": true },
+            { "op": "selectAttr", "selector": "link[itemprop=\"availability\"]", "attr": "href", "first": true, "trim": true },
+            { "op": "regexCapture", "pattern": "schema\\.org/(\\w+)", "group": 1 },
             {
               "op": "mapValue",
               "cases": {
-                "Raktáron": "in_stock",
-                "Készleten": "in_stock",
-                "Beszerezhető": "preorder",
-                "Gyártói készlet": "preorder",
-                "Nincs készleten": "out_of_stock",
-                "Elfogyott": "out_of_stock"
+                "InStock": "in_stock",
+                "LimitedAvailability": "in_stock",
+                "PreOrder": "preorder",
+                "BackOrder": "preorder",
+                "OutOfStock": "out_of_stock",
+                "SoldOut": "out_of_stock",
+                "Discontinued": "out_of_stock"
               },
               "default": "unknown"
             }

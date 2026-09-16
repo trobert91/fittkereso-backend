@@ -6,7 +6,7 @@ import { groupBy, maxBy } from 'lodash';
  * per distinct ProductSource (or 'manual' for sourceless/admin-entered
  * rows), so a source that was re-scraped multiple times only contributes
  * its latest data to a merge. Shared by ProductMergeService.mergeSources
- * (specs) and ProductIdentityMergeService.mergeIdentity (brand/model/etc.)
+ * (specs) and ProductNameMergeService.mergeNames (brand/model/etc.)
  * — both need the exact same "which rows count" answer.
  */
 export function getLatestSourcePerSource(

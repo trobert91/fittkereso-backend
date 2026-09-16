@@ -126,9 +126,7 @@ export class SearchTools {
         ? this.categoryConfigService.getConfig(item.slug)?.matchingConfig
         : undefined;
 
-      const matchStatus = matchingConfig
-        ? `Yes (${matchingConfig.strictness ?? 'default'})`
-        : 'No';
+      const matchStatus = matchingConfig ? 'Yes' : 'No';
 
       L.push(
         `| ${item.id} | ${item.name} | ${item.enabled} | ${matchStatus} |`,

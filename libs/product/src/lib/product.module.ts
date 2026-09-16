@@ -31,7 +31,7 @@ import {
   ProductSourcePostProcessMergeService,
   ProductSourceRecordUpdaterService,
 } from './services';
-import { ProductIdentityMergeService } from './services/product-identity/product-identity-merge.service';
+import { ProductNameMergeService } from './services/product-name/product-name-merge.service';
 import { ProductDetailService } from './services/product-detail.service';
 import { ProductUpdateService } from './services/update/product-update.service';
 import { ProductUpdateMapperService } from './services/update/product-update-mapper.service';
@@ -45,18 +45,9 @@ import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ProductMergeService } from './services/merge/product-merge.service';
 import { ProductSplitService } from './services/merge/product-split.service';
 import { ProductModelFactoryService } from './services/product-model-factory.service';
-import { SpecComparisonService } from './services/similarity/spec-comparison.service';
-import { SimilarityInputNormalizationService } from './services/similarity/similarity-input-normalization.service';
-import { ProductSimilarityService } from './services/similarity/product-similarity.service';
 import { SearchModule } from '@fittkereso-backend/search';
-import { BrandResolutionService } from './services/resolution/brand-resolution.service';
-import { CategoryNameMatcherService } from './services/resolution/category-name-matcher.service';
-import { ProductAliasAutoCreateService } from './services/resolution/product-alias-auto-create.service';
-import { ProductEmbeddingMatchService } from './services/resolution/product-embedding-match.service';
-import { ProductFuzzySearchService } from './services/resolution/product-fuzzy-search.service';
-import { ProductWebSearchService } from './services/resolution/product-web-search.service';
-import { SellerResolutionService } from './services/resolution/seller-resolution.service';
-import { OfferMatchingService } from './services/resolution/offer-matching.service';
+import { BrandResolutionService } from './services/brand/brand-resolution.service';
+import { OfferMatchingService } from './services/offer/offer-matching.service';
 import { SellerCreateService } from './services/seller/seller-create.service';
 import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
@@ -108,21 +99,12 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductMergeService,
     ProductSplitService,
     ProductModelFactoryService,
-    ProductIdentityMergeService,
+    ProductNameMergeService,
     ProductSourceRecordUpdaterService,
     SpecExtractionService,
     ProductSourcePostProcessService,
     ProductSourcePostProcessMergeService,
-    SpecComparisonService,
-    SimilarityInputNormalizationService,
-    ProductSimilarityService,
     BrandResolutionService,
-    CategoryNameMatcherService,
-    ProductAliasAutoCreateService,
-    ProductEmbeddingMatchService,
-    ProductFuzzySearchService,
-    ProductWebSearchService,
-    SellerResolutionService,
     OfferMatchingService,
     SellerCreateService,
     SellerDetailService,
@@ -157,21 +139,12 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     ProductMergeService,
     ProductSplitService,
     ProductModelFactoryService,
-    ProductIdentityMergeService,
+    ProductNameMergeService,
     ProductSourceRecordUpdaterService,
     SpecExtractionService,
     ProductSourcePostProcessService,
     ProductSourcePostProcessMergeService,
-    SpecComparisonService,
-    SimilarityInputNormalizationService,
-    ProductSimilarityService,
     BrandResolutionService,
-    CategoryNameMatcherService,
-    ProductAliasAutoCreateService,
-    ProductEmbeddingMatchService,
-    ProductFuzzySearchService,
-    ProductWebSearchService,
-    SellerResolutionService,
     OfferMatchingService,
     SellerCreateService,
     SellerDetailService,

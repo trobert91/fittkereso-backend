@@ -12,14 +12,16 @@ import {
 import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
 import { ProductCategory, UserRole } from '@fittkereso-backend/database';
 import {
-  CategorySearchParams,
   CategoryUpdateDto,
   CategoryWithConfigDto,
   CategoryWithConfigSearchResultDto,
   ProductCategoryDetailService,
   ProductCategoryUpdateService,
 } from '@fittkereso-backend/product';
-import { ProductCategorySearchService } from '@fittkereso-backend/search';
+import {
+  CategorySearchParams,
+  ProductCategorySearchService,
+} from '@fittkereso-backend/search';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 

@@ -1,0 +1,699 @@
+{
+  "reviewedAt": "2026-09-16T20:01:42.052Z",
+  "catalogExportedAt": "2026-09-16T20:10:44.464Z",
+  "cases": [
+    {
+      "slug": "c001",
+      "verdict": "same",
+      "rule": "frame token",
+      "scoreAtReview": 94,
+      "a": {
+        "id": "6abecb15-556d-4d54-b4d4-5b54baa6e009",
+        "shop": "speedbike",
+        "nameKey": "773 l lycan macina"
+      },
+      "b": {
+        "id": "50d3e883-5a9d-44ae-97d5-0a3783facdf5",
+        "shop": "speedbike",
+        "nameKey": "773 lycan macina"
+      },
+      "note": "same, these are just different frameSizes"
+    },
+    {
+      "slug": "c002",
+      "verdict": "different",
+      "rule": "frame token",
+      "scoreAtReview": 93,
+      "a": {
+        "id": "8785fa5a-cd0d-4163-80c7-63709ecc66b2",
+        "shop": "ebikeshop",
+        "nameKey": "810 axs cx gx macina tour"
+      },
+      "b": {
+        "id": "42d56d4b-5739-4302-93b9-7dc4ba2e65ec",
+        "shop": "ebikeshop",
+        "nameKey": "810 axs cx gx macina tour tr"
+      },
+      "note": "they have different frameTypes, but it is missing from the extracted specs that we should fix. TR one is \"Trapéz\", the US is \"Alacsony\""
+    },
+    {
+      "slug": "c003",
+      "verdict": "same",
+      "rule": "frame token",
+      "scoreAtReview": 93,
+      "a": {
+        "id": "105757cb-97c1-4126-b104-0ecd03c089ad",
+        "shop": "ebikeshop",
+        "nameKey": "macina prime0 sport sx t-type"
+      },
+      "b": {
+        "id": "ef2e5dff-a809-46c5-a865-2116144f7fda",
+        "shop": "ebikeshop",
+        "nameKey": "macina prime0 sport sx t-type tr"
+      }
+    },
+    {
+      "slug": "c004",
+      "verdict": "skipped",
+      "rule": "frame token",
+      "scoreAtReview": 93,
+      "a": {
+        "id": "298cff68-394e-4f90-9234-7571e75db2d6",
+        "shop": "ebikeshop",
+        "nameKey": "macina prime0 sport sx t-type"
+      },
+      "b": {
+        "id": "ef2e5dff-a809-46c5-a865-2116144f7fda",
+        "shop": "ebikeshop",
+        "nameKey": "macina prime0 sport sx t-type tr"
+      }
+    },
+    {
+      "slug": "c005",
+      "verdict": "same",
+      "rule": "frame token",
+      "scoreAtReview": 90,
+      "a": {
+        "id": "2dbe59b3-63e4-4b45-a3eb-e4e318a0783f",
+        "shop": "speedbike",
+        "nameKey": "8973 kapoho l macina"
+      },
+      "b": {
+        "id": "3f8b750c-adc8-4dbc-9eb7-9cf15de2a1c6",
+        "shop": "speedbike",
+        "nameKey": "8973 kapoho macina"
+      }
+    },
+    {
+      "slug": "c006",
+      "verdict": "different",
+      "rule": "frame token",
+      "scoreAtReview": 88,
+      "a": {
+        "id": "2b5a7619-abd3-4e80-b996-5a5d17644fad",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city he macina"
+      },
+      "b": {
+        "id": "0952dcd0-b873-48b7-9af8-7a173c0f2518",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina"
+      },
+      "note": "again, frameType not extracted, fix it. Different products since the frameTypes are different"
+    },
+    {
+      "slug": "c007",
+      "verdict": "same",
+      "rule": "frame token",
+      "scoreAtReview": 88,
+      "a": {
+        "id": "0952dcd0-b873-48b7-9af8-7a173c0f2518",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina"
+      },
+      "b": {
+        "id": "b00989b7-d647-49b6-a5cb-c2f305fe5442",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      }
+    },
+    {
+      "slug": "c008",
+      "verdict": "different",
+      "rule": "frame token",
+      "scoreAtReview": 83,
+      "a": {
+        "id": "0d8a2edc-8355-4892-b1da-67eb554ba501",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina"
+      },
+      "b": {
+        "id": "e7267079-0a6a-4d09-81de-66ecb8997700",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      },
+      "note": "frameType is wrongly extracted again. Váztípus: alacsony vs trapéz, different products"
+    },
+    {
+      "slug": "c009",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 79,
+      "a": {
+        "id": "56754088-8593-47f9-86a4-9555bad86013",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      },
+      "b": {
+        "id": "b6f9bd9d-a001-45be-bada-5483439f8fa7",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina prestige scarp sx"
+      }
+    },
+    {
+      "slug": "c010",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 79,
+      "a": {
+        "id": "c803e168-414c-4f44-88f6-bb42e509d462",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      },
+      "b": {
+        "id": "b6f9bd9d-a001-45be-bada-5483439f8fa7",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina prestige scarp sx"
+      }
+    },
+    {
+      "slug": "c011",
+      "verdict": "different",
+      "rule": "frame token",
+      "scoreAtReview": 78,
+      "a": {
+        "id": "2b5a7619-abd3-4e80-b996-5a5d17644fad",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city he macina"
+      },
+      "b": {
+        "id": "b00989b7-d647-49b6-a5cb-c2f305fe5442",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      },
+      "note": "different frameTypes again, different products"
+    },
+    {
+      "slug": "c012",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 73,
+      "a": {
+        "id": "f90b6999-ac40-477c-b61b-8b5d269c3553",
+        "shop": "speedbike",
+        "nameKey": "kapoho macina master"
+      },
+      "b": {
+        "id": "f613cfd5-31c4-4684-a852-8abeec5e2406",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina prestige"
+      }
+    },
+    {
+      "slug": "c013",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 73,
+      "a": {
+        "id": "6f54c55e-ce62-4f8b-b232-3fab6935bfcf",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina master"
+      },
+      "b": {
+        "id": "f613cfd5-31c4-4684-a852-8abeec5e2406",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina prestige"
+      }
+    },
+    {
+      "slug": "c014",
+      "verdict": "same",
+      "rule": "other naming difference",
+      "scoreAtReview": 70,
+      "a": {
+        "id": "98f4bafa-d41b-4135-b5e3-6bcade063192",
+        "shop": "speedbike",
+        "nameKey": "771 di2 glorious lycan macina"
+      },
+      "b": {
+        "id": "35b0535b-0d81-4f9f-89c3-80f6a2954295",
+        "shop": "speedbike",
+        "nameKey": "771 di2 lycan macina"
+      }
+    },
+    {
+      "slug": "c015",
+      "verdict": "same",
+      "rule": "other naming difference",
+      "scoreAtReview": 70,
+      "a": {
+        "id": "9c9f9f92-9d45-4f5d-b050-7be70ff3c512",
+        "shop": "speedbike",
+        "nameKey": "771 di2 glorious lycan macina"
+      },
+      "b": {
+        "id": "35b0535b-0d81-4f9f-89c3-80f6a2954295",
+        "shop": "speedbike",
+        "nameKey": "771 di2 lycan macina"
+      }
+    },
+    {
+      "slug": "c016",
+      "verdict": "same",
+      "rule": "other naming difference",
+      "scoreAtReview": 70,
+      "a": {
+        "id": "a0015809-8719-4ef0-a4a3-6145dda88331",
+        "shop": "speedbike",
+        "nameKey": "771 di2 glorious lycan macina"
+      },
+      "b": {
+        "id": "35b0535b-0d81-4f9f-89c3-80f6a2954295",
+        "shop": "speedbike",
+        "nameKey": "771 di2 lycan macina"
+      }
+    },
+    {
+      "slug": "c017",
+      "verdict": "same",
+      "rule": "other naming difference",
+      "scoreAtReview": 70,
+      "a": {
+        "id": "027e1342-01ec-4e90-b276-97a53a00583e",
+        "shop": "speedbike",
+        "nameKey": "772 di2 glorious lycan macina"
+      },
+      "b": {
+        "id": "421c4e52-2b6f-4df1-a181-289bda3eec5a",
+        "shop": "speedbike",
+        "nameKey": "772 di2 lycan macina"
+      }
+    },
+    {
+      "slug": "c018",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 60,
+      "a": {
+        "id": "195aa301-95d7-4648-9892-ca6069702d10",
+        "shop": "speedbike",
+        "nameKey": "elite macina scarp sx"
+      },
+      "b": {
+        "id": "5feaa648-51d8-4a11-8a9a-6a262d933936",
+        "shop": "ebikeshop",
+        "nameKey": "exonicx macina scarp sx t-type"
+      }
+    },
+    {
+      "slug": "c019",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 60,
+      "a": {
+        "id": "8785fa5a-cd0d-4163-80c7-63709ecc66b2",
+        "shop": "ebikeshop",
+        "nameKey": "810 axs cx gx macina tour"
+      },
+      "b": {
+        "id": "b00989b7-d647-49b6-a5cb-c2f305fe5442",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      }
+    },
+    {
+      "slug": "c020",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 60,
+      "a": {
+        "id": "33ac7f9b-296c-421a-8f0c-1f0c371a7d00",
+        "shop": "ebikeshop",
+        "nameKey": "elite macina scarp sx"
+      },
+      "b": {
+        "id": "5feaa648-51d8-4a11-8a9a-6a262d933936",
+        "shop": "ebikeshop",
+        "nameKey": "exonicx macina scarp sx t-type"
+      }
+    },
+    {
+      "slug": "c021",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 59,
+      "a": {
+        "id": "199d0fad-fc44-4c6d-ac96-e371bed1ab60",
+        "shop": "speedbike",
+        "nameKey": "892 chacana lfc macina"
+      },
+      "b": {
+        "id": "4d1ce9d9-42b0-4035-9a1a-61a7f523afe9",
+        "shop": "speedbike",
+        "nameKey": "892 lycan macina"
+      }
+    },
+    {
+      "slug": "c022",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 56,
+      "a": {
+        "id": "ae706a01-8e2b-4447-9e03-cb91199cd395",
+        "shop": "speedbike",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "f90b6999-ac40-477c-b61b-8b5d269c3553",
+        "shop": "speedbike",
+        "nameKey": "kapoho macina master"
+      }
+    },
+    {
+      "slug": "c023",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 56,
+      "a": {
+        "id": "ae706a01-8e2b-4447-9e03-cb91199cd395",
+        "shop": "speedbike",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "6f54c55e-ce62-4f8b-b232-3fab6935bfcf",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina master"
+      }
+    },
+    {
+      "slug": "c024",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 56,
+      "a": {
+        "id": "f90b6999-ac40-477c-b61b-8b5d269c3553",
+        "shop": "speedbike",
+        "nameKey": "kapoho macina master"
+      },
+      "b": {
+        "id": "8031545f-f782-491f-b397-ac7032acea54",
+        "shop": "ebikeshop",
+        "nameKey": "elite kapoho macina"
+      }
+    },
+    {
+      "slug": "c025",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 56,
+      "a": {
+        "id": "8031545f-f782-491f-b397-ac7032acea54",
+        "shop": "ebikeshop",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "6f54c55e-ce62-4f8b-b232-3fab6935bfcf",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina master"
+      }
+    },
+    {
+      "slug": "c026",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 55,
+      "a": {
+        "id": "f613cfd5-31c4-4684-a852-8abeec5e2406",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina prestige"
+      },
+      "b": {
+        "id": "810cdfe1-16b7-4471-ac18-b03a79b9048e",
+        "shop": "ebikeshop",
+        "nameKey": "macina prestige prowler"
+      }
+    },
+    {
+      "slug": "c027",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 54,
+      "a": {
+        "id": "9cdb9e68-71a7-4a49-a253-93a280e037dc",
+        "shop": "speedbike",
+        "nameKey": "872 chacana lfc macina"
+      },
+      "b": {
+        "id": "26512d35-b218-44b9-95ae-c36b56519876",
+        "shop": "speedbike",
+        "nameKey": "872 lycan macina"
+      }
+    },
+    {
+      "slug": "c028",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 54,
+      "a": {
+        "id": "01a7ec5b-6661-46f1-8e25-67f56bbb88c7",
+        "shop": "speedbike",
+        "nameKey": "elite macina prowler"
+      },
+      "b": {
+        "id": "810cdfe1-16b7-4471-ac18-b03a79b9048e",
+        "shop": "ebikeshop",
+        "nameKey": "macina prestige prowler"
+      }
+    },
+    {
+      "slug": "c029",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 54,
+      "a": {
+        "id": "42d56d4b-5739-4302-93b9-7dc4ba2e65ec",
+        "shop": "ebikeshop",
+        "nameKey": "810 axs cx gx macina tour tr"
+      },
+      "b": {
+        "id": "b00989b7-d647-49b6-a5cb-c2f305fe5442",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      }
+    },
+    {
+      "slug": "c030",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 53,
+      "a": {
+        "id": "195aa301-95d7-4648-9892-ca6069702d10",
+        "shop": "speedbike",
+        "nameKey": "elite macina scarp sx"
+      },
+      "b": {
+        "id": "56754088-8593-47f9-86a4-9555bad86013",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      }
+    },
+    {
+      "slug": "c031",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 53,
+      "a": {
+        "id": "195aa301-95d7-4648-9892-ca6069702d10",
+        "shop": "speedbike",
+        "nameKey": "elite macina scarp sx"
+      },
+      "b": {
+        "id": "c803e168-414c-4f44-88f6-bb42e509d462",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      }
+    },
+    {
+      "slug": "c032",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 53,
+      "a": {
+        "id": "56754088-8593-47f9-86a4-9555bad86013",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      },
+      "b": {
+        "id": "33ac7f9b-296c-421a-8f0c-1f0c371a7d00",
+        "shop": "ebikeshop",
+        "nameKey": "elite macina scarp sx"
+      }
+    },
+    {
+      "slug": "c033",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 53,
+      "a": {
+        "id": "c803e168-414c-4f44-88f6-bb42e509d462",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina master scarp sx"
+      },
+      "b": {
+        "id": "33ac7f9b-296c-421a-8f0c-1f0c371a7d00",
+        "shop": "ebikeshop",
+        "nameKey": "elite macina scarp sx"
+      }
+    },
+    {
+      "slug": "c034",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 52,
+      "a": {
+        "id": "199d0fad-fc44-4c6d-ac96-e371bed1ab60",
+        "shop": "speedbike",
+        "nameKey": "892 chacana lfc macina"
+      },
+      "b": {
+        "id": "3b04df0e-2da5-488a-bba5-65087c0593fc",
+        "shop": "ebikeshop",
+        "nameKey": "892 abs lfc macina team"
+      }
+    },
+    {
+      "slug": "c035",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 49,
+      "a": {
+        "id": "195aa301-95d7-4648-9892-ca6069702d10",
+        "shop": "speedbike",
+        "nameKey": "elite macina scarp sx"
+      },
+      "b": {
+        "id": "b6f9bd9d-a001-45be-bada-5483439f8fa7",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina prestige scarp sx"
+      }
+    },
+    {
+      "slug": "c036",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 49,
+      "a": {
+        "id": "b6f9bd9d-a001-45be-bada-5483439f8fa7",
+        "shop": "ebikeshop",
+        "nameKey": "di2 macina prestige scarp sx"
+      },
+      "b": {
+        "id": "33ac7f9b-296c-421a-8f0c-1f0c371a7d00",
+        "shop": "ebikeshop",
+        "nameKey": "elite macina scarp sx"
+      }
+    },
+    {
+      "slug": "c037",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 48,
+      "a": {
+        "id": "4d1ce9d9-42b0-4035-9a1a-61a7f523afe9",
+        "shop": "speedbike",
+        "nameKey": "892 lycan macina"
+      },
+      "b": {
+        "id": "3b04df0e-2da5-488a-bba5-65087c0593fc",
+        "shop": "ebikeshop",
+        "nameKey": "892 abs lfc macina team"
+      }
+    },
+    {
+      "slug": "c038",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 48,
+      "a": {
+        "id": "ae706a01-8e2b-4447-9e03-cb91199cd395",
+        "shop": "speedbike",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "f613cfd5-31c4-4684-a852-8abeec5e2406",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina prestige"
+      }
+    },
+    {
+      "slug": "c039",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 48,
+      "a": {
+        "id": "8785fa5a-cd0d-4163-80c7-63709ecc66b2",
+        "shop": "ebikeshop",
+        "nameKey": "810 axs cx gx macina tour"
+      },
+      "b": {
+        "id": "0952dcd0-b873-48b7-9af8-7a173c0f2518",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina"
+      }
+    },
+    {
+      "slug": "c040",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 48,
+      "a": {
+        "id": "b00989b7-d647-49b6-a5cb-c2f305fe5442",
+        "shop": "ebikeshop",
+        "nameKey": "810 belt city macina tr"
+      },
+      "b": {
+        "id": "41770b1d-fa38-4522-922f-f2535963aca4",
+        "shop": "ebikeshop",
+        "nameKey": "810 di2 macina style"
+      }
+    },
+    {
+      "slug": "c041",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 48,
+      "a": {
+        "id": "8031545f-f782-491f-b397-ac7032acea54",
+        "shop": "ebikeshop",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "f613cfd5-31c4-4684-a852-8abeec5e2406",
+        "shop": "ebikeshop",
+        "nameKey": "kapoho macina prestige"
+      }
+    },
+    {
+      "slug": "c042",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 46,
+      "a": {
+        "id": "ae706a01-8e2b-4447-9e03-cb91199cd395",
+        "shop": "speedbike",
+        "nameKey": "elite kapoho macina"
+      },
+      "b": {
+        "id": "01a7ec5b-6661-46f1-8e25-67f56bbb88c7",
+        "shop": "speedbike",
+        "nameKey": "elite macina prowler"
+      }
+    },
+    {
+      "slug": "c043",
+      "verdict": "different",
+      "rule": "other naming difference",
+      "scoreAtReview": 46,
+      "a": {
+        "id": "01a7ec5b-6661-46f1-8e25-67f56bbb88c7",
+        "shop": "speedbike",
+        "nameKey": "elite macina prowler"
+      },
+      "b": {
+        "id": "8031545f-f782-491f-b397-ac7032acea54",
+        "shop": "ebikeshop",
+        "nameKey": "elite kapoho macina"
+      }
+    }
+  ]
+}

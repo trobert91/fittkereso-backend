@@ -1,50 +1,4 @@
-export interface TokenPriorityMap {
-  prefix?: number; // e.g., size in monitors (27), generation in GPUs (4000)
-  generation?: number; // e.g., generation markers
-  model?: number; // core model identifier
-  variant?: number; // variant suffixes
-}
-
-export interface StrictnessOverrides {
-  tokenOverlap?: number; // minimum token overlap ratio
-  numericHitRatio?: number; // minimum numeric token match ratio
-  maxScore?: number; // maximum acceptable score
-}
-
-/**
- * Numeric token rule for matching
- */
-export interface NumericTokenRule {
-  pattern: string; // regex pattern as string
-  weight: number;
-  description: string;
-  critical: boolean; // Critical tokens must match exactly
-}
-
 export interface CategoryMatchingConfig {
-  strictness?: 'strict' | 'moderate' | 'loose';
-
-  // Patterns that must be preserved during normalization
-  criticalTokenPatterns?: string[]; // regex patterns as strings, e.g., '\\d{2}[A-Z]{2}\\d' for monitors
-
-  // Numeric token rules (pattern-based weighting)
-  numericTokenRules?: NumericTokenRule[];
-
-  // Weight multipliers for token positions/types
-  tokenPriorityMap?: TokenPriorityMap;
-
-  // Threshold overrides for this category
-  strictnessOverrides?: StrictnessOverrides;
-
-  // Token grouping hints for normalization
-  preserveTokenGroups?: boolean; // whether to preserve certain token combinations
-  tokenSeparator?: string; // preferred separator when reconstructing tokens
-
-  /** Maximum number of matcherSpec mismatches allowed before rejecting in strict mode.
-   *  Rejection occurs when matcherSpecMismatches > maxMatcherSpecMismatches.
-   *  Default: 2. Categories with few matcherSpecs should use 0 or 1. */
-  maxMatcherSpecMismatches?: number;
-
   /** Per-spec overrides for numeric comparison, keyed by spec name.
    *
    *  Numeric specs are compared with a **relative** tolerance by default, which
@@ -199,8 +153,7 @@ export interface ProductCategoryConfig {
    *  into ProductModel.specs; they're captured per-Offer instead, so two
    *  listings of the same model in different sizes/colors match to one
    *  ProductModel with multiple Offer rows instead of each variant tripping
-   *  the model-level spec-mismatch gate in the resolution pipeline's filter
-   *  stage. Always optional per-listing — absence of a value is normal, not
+   *  the model-level spec gates in `libs/product-identity`. Always optional per-listing — absence of a value is normal, not
    *  an error. */
   offerLevelSpecs?: string[];
   /** Ordered subset of spec keys (must exist in the category's

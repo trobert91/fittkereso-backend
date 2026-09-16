@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DynamicConfigData, GeneralConfig, ProductSearchAgentConfig } from './models/dynamic-config-data.interface';
+import { DynamicConfigData, GeneralConfig } from './models/dynamic-config-data.interface';
 import { DynamicConfigFileLoaderService } from './dynamic-config-file-loader.service';
 
 @Injectable()
@@ -28,16 +28,8 @@ export class DynamicConfigService {
     return this.fileLoader.getData().scheduling;
   }
 
-  get resolution(): DynamicConfigData['resolution'] {
-    return this.fileLoader.getData().resolution;
-  }
-
   get enrichment(): DynamicConfigData['enrichment'] {
     return this.fileLoader.getData().enrichment;
-  }
-
-  get search(): ProductSearchAgentConfig | undefined {
-    return this.fileLoader.getData().resolution?.search;
   }
 
   get openai(): DynamicConfigData['openai'] {

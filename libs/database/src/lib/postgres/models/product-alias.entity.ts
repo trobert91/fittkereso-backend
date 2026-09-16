@@ -15,6 +15,12 @@ export enum ProductAliasSource {
 @Index([nameOf<ProductAlias>('model'), nameOf<ProductAlias>('alias')])
 export class ProductAlias extends BasePostgresEntity {
   @Index()
+  // Trigram index for candidate recall. TypeORM can't declare a GIN operator
+  // class, so it's created by hand once per environment, and
+  // `synchronize: false` keeps sync from dropping it:
+  // CREATE INDEX IF NOT EXISTS product_alias_alias_trgm_idx
+  //   ON product_alias USING gin (alias gin_trgm_ops);
+  @Index('product_alias_alias_trgm_idx', { synchronize: false })
   @Column()
   @Expose({ groups: [SerializeGroup.list] })
   alias: string;

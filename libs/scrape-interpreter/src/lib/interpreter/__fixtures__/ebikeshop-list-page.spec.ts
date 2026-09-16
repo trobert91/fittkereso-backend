@@ -94,15 +94,12 @@ describe('ebikeshop list page — declarative config golden fixture', () => {
       },
     ]);
 
-    // Page 1 of 20, pagination generated for pages 2..20.
-    expect(result.categoryLinks).toHaveLength(19);
-    expect(result.categoryLinks[0]).toEqual({
-      url: 'https://ebikeshop.hu/termekek/elektromos-kerekparok?oldal=2',
-      title: 'Page 2',
-    });
-    expect(result.categoryLinks[18]).toEqual({
-      url: 'https://ebikeshop.hu/termekek/elektromos-kerekparok?oldal=20',
-      title: 'Page 20',
-    });
+    // The config emits no pagination: `generatePaginationLinks` has no
+    // "only on page 1" guard and createCategoryTasks doesn't dedupe, so
+    // self-pagination re-emitted pages 2..20 from every page it landed on —
+    // page 1 spawning 19 list tasks, each spawning 19 more. Page ranges are
+    // enumerated by apps/product-collector/scripts/enqueue-ktm-catalog.ts
+    // instead, which also makes a run's page count exact.
+    expect(result.categoryLinks).toEqual([]);
   });
 });

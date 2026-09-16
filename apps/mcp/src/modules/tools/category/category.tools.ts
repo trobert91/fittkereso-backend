@@ -268,12 +268,14 @@ export class CategoryTools {
     // Matching config
     const matchingConfig = config?.matchingConfig;
     if (matchingConfig) {
-      const parts: string[] = [];
-      if (matchingConfig.strictness)
-        parts.push(`strictness: ${matchingConfig.strictness}`);
-      if (matchingConfig.numericTokenRules?.length)
-        parts.push(`${matchingConfig.numericTokenRules.length} numeric rules`);
-      lines.push(`- **Matching Config**: Yes (${parts.join(', ')})`);
+      const tolerances = Object.keys(matchingConfig.specTolerances ?? {});
+      lines.push(
+        `- **Matching Config**: Yes (${
+          tolerances.length
+            ? `spec tolerances: ${tolerances.join(', ')}`
+            : 'no spec tolerances'
+        })`,
+      );
     } else {
       lines.push('- **Matching Config**: No');
     }

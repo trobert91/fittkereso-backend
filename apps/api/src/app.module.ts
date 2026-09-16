@@ -16,8 +16,8 @@ import { APP_FILTER } from '@nestjs/core';
 import { EntityNotFoundExceptionFilter } from './exceptions/entity-not-found';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { TestModule } from './modules/test/test.module';
 import { PublicModule } from './modules/public/public.module';
+import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 
 @Module({
   imports: [
@@ -81,8 +81,8 @@ import { PublicModule } from './modules/public/public.module';
     ]),
     AdminModule,
     MetricsModule,
+    ProductIdentityModule,
     PublicModule,
-    TestModule,
   ],
   providers: [
     {

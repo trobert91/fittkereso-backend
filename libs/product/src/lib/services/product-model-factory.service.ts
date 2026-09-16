@@ -4,7 +4,7 @@ import {
   ProductEmbedding,
   ProductModel,
 } from '@fittkereso-backend/database';
-import { BrandResolutionService } from './resolution/brand-resolution.service';
+import { BrandResolutionService } from './brand/brand-resolution.service';
 import { ProductEmbeddingService } from './product-embedding.service';
 
 /** Message thrown when no brand can be identified. Callers match on this to

@@ -40,11 +40,12 @@ describe('ProductMergeService.moveOffers', () => {
       {} as any, // specMergeService
       {} as any, // specSortService
       {} as any, // validatorService
-      {} as any, // identityMergeService
+      {} as any, // nameMergeService
       {} as any, // categoryConfigService
       {} as any, // embeddingService
       {} as any, // detailService
       {} as any, // offerRepo
+      {} as any, // duplicatePairRepo
     );
   });
 
@@ -172,11 +173,12 @@ describe('ProductMergeService.moveProductSourceRecords', () => {
       {} as any, // specMergeService
       {} as any, // specSortService
       {} as any, // validatorService
-      {} as any, // identityMergeService
+      {} as any, // nameMergeService
       {} as any, // categoryConfigService
       {} as any, // embeddingService
       {} as any, // detailService
       {} as any, // offerRepo
+      {} as any, // duplicatePairRepo
     );
   });
 
@@ -250,6 +252,7 @@ describe('ProductMergeService.movePriceHistory', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   });
 
@@ -267,12 +270,82 @@ describe('ProductMergeService.movePriceHistory', () => {
   });
 });
 
+describe('ProductMergeService.mergeProducts', () => {
+  const TRANSACTION_STEPS = [
+    'moveProductSourceRecords',
+    'moveProductImages',
+    'moveOffers',
+    'createAliasesFromSource',
+    'moveProductAliases',
+    'moveScrapeTasks',
+    'movePriceHistory',
+    'deleteSourceProduct',
+  ];
+
+  // The delete cascades the source's own pairs away, so the dismissals have to
+  // be copied onto the target first — and in the same transaction, so a failed
+  // merge carries nothing.
+  it('carries dismissed duplicate pairs inside the transaction, just before the source is deleted', async () => {
+    const manager = {
+      findOne: jest.fn(async (_entity: unknown, { where }: { where: { id: string } }) => ({
+        id: where.id,
+        displayName: where.id,
+      })),
+    };
+    const productRepo = {
+      repo: {
+        manager: {
+          connection: {
+            transaction: jest.fn(async (work: (m: unknown) => Promise<void>) => work(manager)),
+          },
+        },
+      },
+    };
+    const duplicatePairRepo = { carryDismissalsForMerge: jest.fn().mockResolvedValue(0) };
+    const detailService = { getProductById: jest.fn().mockResolvedValue({ id: 'target-1' }) };
+
+    const service = new ProductMergeService(
+      productRepo as any, // productRepo
+      {} as any, // specMergeService
+      {} as any, // specSortService
+      {} as any, // validatorService
+      {} as any, // nameMergeService
+      {} as any, // categoryConfigService
+      {} as any, // embeddingService
+      detailService as any, // detailService
+      {} as any, // offerRepo
+      duplicatePairRepo as any, // duplicatePairRepo
+    );
+    const steps = Object.fromEntries(
+      TRANSACTION_STEPS.map((step) => [
+        step,
+        jest
+          .spyOn(service as any, step)
+          .mockResolvedValue(step === 'moveProductSourceRecords' ? [] : undefined),
+      ]),
+    );
+    jest.spyOn(service as any, 'postMergeUpdates').mockResolvedValue(undefined);
+
+    await service.mergeProducts({ sourceId: 'source-1', targetId: 'target-1' });
+
+    const carryOrder = duplicatePairRepo.carryDismissalsForMerge.mock.invocationCallOrder[0];
+    expect(duplicatePairRepo.carryDismissalsForMerge).toHaveBeenCalledWith(
+      manager,
+      'source-1',
+      'target-1',
+    );
+    expect(carryOrder).toBeGreaterThan(steps['movePriceHistory'].mock.invocationCallOrder[0]);
+    expect(carryOrder).toBeLessThan(steps['deleteSourceProduct'].mock.invocationCallOrder[0]);
+    expect(steps['deleteSourceProduct']).toHaveBeenCalledWith(manager, 'source-1');
+  });
+});
+
 describe('ProductMergeService.mergeSources', () => {
   let service: ProductMergeService;
   let specMergeService: { mergeSpecs: jest.Mock };
   let specSortService: { sortSpecs: jest.Mock };
   let validatorService: { validateSpecs: jest.Mock };
-  let identityMergeService: { mergeIdentity: jest.Mock };
+  let nameMergeService: { mergeNames: jest.Mock };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
 
   const category = { slug: 'ebikes' } as any;
@@ -285,7 +358,7 @@ describe('ProductMergeService.mergeSources', () => {
     validatorService = {
       validateSpecs: jest.fn().mockReturnValue({ isValid: true, errors: {} }),
     };
-    identityMergeService = { mergeIdentity: jest.fn().mockResolvedValue(undefined) };
+    nameMergeService = { mergeNames: jest.fn().mockResolvedValue(undefined) };
     categoryConfigService = {
       getJsonSchema: jest.fn().mockReturnValue(undefined),
       getConfig: jest.fn().mockReturnValue(undefined),
@@ -296,8 +369,9 @@ describe('ProductMergeService.mergeSources', () => {
       specMergeService as any,
       specSortService as any,
       validatorService as any,
-      identityMergeService as any,
+      nameMergeService as any,
       categoryConfigService as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -310,10 +384,10 @@ describe('ProductMergeService.mergeSources', () => {
     await service.mergeSources(model);
 
     expect(specMergeService.mergeSpecs).not.toHaveBeenCalled();
-    expect(identityMergeService.mergeIdentity).not.toHaveBeenCalled();
+    expect(nameMergeService.mergeNames).not.toHaveBeenCalled();
   });
 
-  it('merges specs, strips offer-level keys, and calls identity merge with the same latest-per-source set', async () => {
+  it('merges specs, strips offer-level keys, and calls the name merge with the same latest-per-source set and category slug', async () => {
     categoryConfigService.getConfig.mockReturnValue({
       offerLevelSpecs: ['frameSize'],
     });
@@ -335,9 +409,10 @@ describe('ProductMergeService.mergeSources', () => {
     );
     // frameSize is offer-level for this category — stripped from model.specs
     expect(model.specs).toEqual({ weight: 22 });
-    expect(identityMergeService.mergeIdentity).toHaveBeenCalledWith(
+    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(
       model,
       [sourceA],
+      'ebikes',
     );
   });
 

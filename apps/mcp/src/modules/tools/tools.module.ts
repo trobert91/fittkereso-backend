@@ -4,6 +4,7 @@ import { EntityToolsModule } from './entity/entity-tools.module';
 import { CategoryToolsModule } from './category/category-tools.module';
 import { AiChatToolsModule } from './ai-chat/ai-chat-tools.module';
 import { ProductSourceToolsModule } from './product-source/product-source-tools.module';
+import { ProductIdentityToolsModule } from './product-identity/product-identity-tools.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ProductSourceToolsModule } from './product-source/product-source-tools.
     CategoryToolsModule,
     AiChatToolsModule,
     ProductSourceToolsModule,
+    ProductIdentityToolsModule,
   ],
 })
 export class ToolsModule {}

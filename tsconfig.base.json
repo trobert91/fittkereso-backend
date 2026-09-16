@@ -40,11 +40,11 @@
       "@fittkereso-backend/metrics": ["libs/metrics/src/index.ts"],
       "@fittkereso-backend/openai": ["libs/openai/src/index.ts"],
       "@fittkereso-backend/product": ["libs/product/src/index.ts"],
+      "@fittkereso-backend/product-identity": [
+        "libs/product-identity/src/index.ts"
+      ],
       "@fittkereso-backend/product-scraper": [
         "libs/product-scraper/src/index.ts"
-      ],
-      "@fittkereso-backend/resolution": [
-        "libs/resolution/src/index.ts"
       ],
       "@fittkereso-backend/scrape-interpreter": [
         "libs/scrape-interpreter/src/index.ts"

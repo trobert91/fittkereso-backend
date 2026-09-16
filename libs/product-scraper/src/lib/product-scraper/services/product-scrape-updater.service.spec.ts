@@ -10,7 +10,10 @@ import {
   ScrapeTaskRepository,
 } from '@fittkereso-backend/database';
 import type { ProductMetricsService } from '@fittkereso-backend/metrics';
-import type { ResolutionService } from '@fittkereso-backend/resolution';
+import type {
+  ListingMatchService,
+  ProductDuplicateService,
+} from '@fittkereso-backend/product-identity';
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   OfferMatchingService,
@@ -22,9 +25,7 @@ import type {
   ScrapedProduct,
 } from '@fittkereso-backend/product';
 
-jest.mock('@fittkereso-backend/resolution', () => ({
-  productSpecsToStructuredSpecs: jest.fn((specs) => specs),
-}));
+jest.mock('@fittkereso-backend/product-identity', () => ({}));
 
 jest.mock('@fittkereso-backend/product', () => ({}));
 
@@ -101,9 +102,17 @@ function makeAliasInsertBuilder() {
   };
 }
 
+/** What ListingMatchService returns when nothing was close enough to attach. */
+function createdDecision() {
+  return {
+    decision: { outcome: 'created', nameKey: 'mx keys', candidates: [] },
+  };
+}
+
 describe('ProductScrapeUpdaterService', () => {
   let service: ProductScrapeUpdaterService;
-  let mockProductSearch: jest.Mocked<ResolutionService>;
+  let mockListingMatch: jest.Mocked<ListingMatchService>;
+  let mockDuplicateService: jest.Mocked<ProductDuplicateService>;
   let mockModelFactory: jest.Mocked<ProductModelFactoryService>;
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
   let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
@@ -121,9 +130,15 @@ describe('ProductScrapeUpdaterService', () => {
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
 
-    mockProductSearch = {
-      search: jest.fn().mockResolvedValue({}),
-    } as unknown as jest.Mocked<ResolutionService>;
+    // The common case for every test that isn't about matching: nothing close
+    // enough, so a new product. The six offer tests all fall through to this.
+    mockListingMatch = {
+      match: jest.fn().mockResolvedValue(createdDecision()),
+    } as unknown as jest.Mocked<ListingMatchService>;
+
+    mockDuplicateService = {
+      detect: jest.fn().mockResolvedValue(0),
+    } as unknown as jest.Mocked<ProductDuplicateService>;
 
     mockProductRepo = {
       findOne: jest.fn(),
@@ -207,7 +222,8 @@ describe('ProductScrapeUpdaterService', () => {
     } as unknown as jest.Mocked<ProductModelFactoryService>;
 
     service = new ProductScrapeUpdaterService(
-      mockProductSearch,
+      mockListingMatch,
+      mockDuplicateService,
       mockModelFactory,
       mockProductRepo,
       mockTaskRepo,
@@ -249,12 +265,12 @@ describe('ProductScrapeUpdaterService', () => {
 
   // Regression: a source's own catalog legitimately accumulates several
   // ProductSourceRecords on one ProductModel (one per variant URL — see
-  // §2.1a's offerLinks dispatch), so a same-source match from the resolution
-  // engine is not inherently a false positive. Rejecting it (the old
-  // hasSourceRow gate) forced a new ProductModel per variant for sources with
-  // no group-level externalId configured, which raced two variant scrapes
-  // into a ProductModel.slug uniqueness violation in production.
-  it('reuses a same-source match from the cross-source search (variant siblings)', async () => {
+  // §2.1a's offerLinks dispatch), so a same-source match is not inherently a
+  // false positive. Rejecting it (the old hasSourceRow gate) forced a new
+  // ProductModel per variant for sources with no group-level externalId
+  // configured, which raced two variant scrapes into a ProductModel.slug
+  // uniqueness violation in production.
+  it('attaches to the product listing matching picked by score', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       displayName: 'LG 39GS95QE-W',
@@ -265,9 +281,21 @@ describe('ProductScrapeUpdaterService', () => {
     otherVariant.id = 'model-variant-b';
     otherVariant.sources = [{ source: { id: 'source-arukereso' } } as never];
 
-    mockProductSearch.search.mockResolvedValueOnce({
-      resolvedModel: { id: otherVariant.id } as never,
-      context: undefined,
+    mockListingMatch.match.mockResolvedValueOnce({
+      productId: otherVariant.id,
+      decision: {
+        outcome: 'identified',
+        nameKey: '39gs95qe-w lg',
+        candidates: [
+          {
+            productId: otherVariant.id,
+            displayName: 'LG 39GS95QE-W',
+            score: 100,
+            matchedOn: 'name',
+            failedGates: [],
+          },
+        ],
+      },
     } as never);
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(otherVariant);
     mockProductRepo.save.mockResolvedValue(otherVariant);
@@ -275,15 +303,187 @@ describe('ProductScrapeUpdaterService', () => {
     const result = await service.createOrUpdateProduct(task, scrapedProduct);
 
     expect(result?.id).toBe('model-variant-b');
-    expect(mockProductSearch.search).toHaveBeenCalled();
+    expect(mockListingMatch.match).toHaveBeenCalledWith(scrapedProduct, {
+      taskId: task.id,
+    });
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
-      'cross_source_merge',
+      'identified',
+    );
+    expect(mockMetricsService.productMatched).toHaveBeenCalledWith('arukereso');
+    expect(mockMetricsService.scrapeResolutionOutcome).not.toHaveBeenCalledWith(
+      'arukereso',
+      'created',
+    );
+    expect(task.identityDecision).toEqual(
+      expect.objectContaining({ outcome: 'identified' }),
+    );
+  });
+
+  it('attaches on the LLM’s pick and labels it separately', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct();
+    const chosen = makeExistingModel();
+
+    mockListingMatch.match.mockResolvedValueOnce({
+      productId: chosen.id,
+      decision: {
+        outcome: 'llm_identified',
+        nameKey: 'mx keys',
+        candidates: [],
+        llm: { productId: chosen.id, confidence: 92, reason: 'same board' },
+      },
+    } as never);
+    mockProductRepo.findOneOrFail.mockResolvedValueOnce(chosen);
+    mockProductRepo.save.mockResolvedValue(chosen);
+
+    const result = await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(result?.id).toBe('model-1');
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'llm_identified',
+    );
+    expect(mockMetricsService.productMatched).toHaveBeenCalledWith('arukereso');
+  });
+
+  it('creates a product when the LLM was asked and declined', async () => {
+    // Two labels, and both matter: `llm_declined` says a call was spent and
+    // came back undecided, `created` says what happened to the listing.
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct();
+
+    mockListingMatch.match.mockResolvedValueOnce({
+      decision: {
+        outcome: 'created',
+        nameKey: 'mx keys',
+        candidates: [],
+        llm: { confidence: 40, reason: 'different layout' },
+      },
+    } as never);
+    mockProductRepo.findOne.mockResolvedValue(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-llm-declined';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'llm_declined',
+    );
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'created',
+    );
+    expect(mockMetricsService.productMatched).not.toHaveBeenCalled();
+  });
+
+  it('creates a product without an LLM label when nothing was close enough', async () => {
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct();
+
+    mockProductRepo.findOne.mockResolvedValue(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-not-found';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'created',
     );
     expect(mockMetricsService.scrapeResolutionOutcome).not.toHaveBeenCalledWith(
       'arukereso',
-      'new_product',
+      'llm_declined',
     );
+  });
+
+  it('creates a product when the brand did not resolve, with no name key to store', async () => {
+    // Recall is scoped by brand, so an unresolved one has nothing to search.
+    // The listing takes the create path it has always taken, and the stored
+    // decision records that there was no key to match on.
+    const task = makeTask();
+    const scrapedProduct = makeScrapedProduct({ brand: 'Unknown Co' });
+
+    mockListingMatch.match.mockResolvedValueOnce({
+      decision: { outcome: 'created', candidates: [] },
+    } as never);
+    mockProductRepo.findOne.mockResolvedValue(null);
+    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+      if (!model.id) model.id = 'model-no-brand';
+      return model;
+    });
+
+    await service.createOrUpdateProduct(task, scrapedProduct);
+
+    expect(task.identityDecision).toEqual({
+      outcome: 'created',
+      candidates: [],
+    });
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'created',
+    );
+  });
+
+  describe('duplicate detection after the scrape', () => {
+    it('runs for a listing whose identity Path 4 decided', async () => {
+      const task = makeTask();
+      const scrapedProduct = makeScrapedProduct();
+
+      mockProductRepo.findOne.mockResolvedValue(null);
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = 'model-detect';
+        return model;
+      });
+
+      await service.createOrUpdateProduct(task, scrapedProduct);
+
+      expect(mockDuplicateService.detect).toHaveBeenCalledWith(
+        'model-detect',
+        'scrape',
+      );
+    });
+
+    it('does not run when a stored id resolved the listing', async () => {
+      // Path 1: the task is pinned to a product, so nothing was scored and
+      // there is no new neighbourhood to look at.
+      const task = makeTask();
+      task.product = { id: 'existing-model-1' } as never;
+      const existingModel = makeExistingModel();
+
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(existingModel);
+      mockProductRepo.save.mockResolvedValue(existingModel);
+
+      await service.createOrUpdateProduct(task, makeScrapedProduct());
+
+      expect(mockListingMatch.match).not.toHaveBeenCalled();
+      expect(mockDuplicateService.detect).not.toHaveBeenCalled();
+    });
+
+    it('does not fail the scrape when detection throws', async () => {
+      // The product and its offers are already saved by this point; a missing
+      // suggestion is worth far less than a lost scrape.
+      const task = makeTask();
+      const scrapedProduct = makeScrapedProduct();
+
+      mockDuplicateService.detect.mockRejectedValueOnce(
+        new Error('recall exploded'),
+      );
+      mockProductRepo.findOne.mockResolvedValue(null);
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = 'model-detect-fails';
+        return model;
+      });
+
+      const result = await service.createOrUpdateProduct(task, scrapedProduct);
+
+      expect(result?.id).toBe('model-detect-fails');
+    });
   });
 
   it('passes ScrapedProduct.category.slug explicitly to mergeSources for a brand-new product', async () => {
@@ -296,10 +496,6 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
 
     mockProductRepo.findOne.mockResolvedValue(null);
-    mockProductSearch.search.mockResolvedValueOnce({
-      resolvedModel: undefined,
-      context: undefined,
-    } as never);
     mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
       if (!model.id) model.id = 'model-new';
       return model;
@@ -313,7 +509,7 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
-  it('uses strict matching for scrape-time resolution', async () => {
+  it('hands the whole scraped listing to matching, with the task for log context', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       brand: 'MSI',
@@ -336,42 +532,9 @@ describe('ProductScrapeUpdaterService', () => {
 
     await service.createOrUpdateProduct(task, scrapedProduct);
 
-    expect(mockProductSearch.search).toHaveBeenCalledWith(
-      expect.objectContaining({
-        brand: scrapedProduct.brand,
-        model: scrapedProduct.model,
-        displayName: scrapedProduct.displayName,
-      }),
-      expect.objectContaining({ mode: 'strict' }),
-      undefined,
-      { taskId: task.id },
-    );
-  });
-
-  it('uses strict matching for non-monitor scrapes too', async () => {
-    const task = makeTask();
-    const scrapedProduct = makeScrapedProduct();
-
-    mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) {
-        model.id = 'model-3';
-      }
-      return model;
+    expect(mockListingMatch.match).toHaveBeenCalledWith(scrapedProduct, {
+      taskId: task.id,
     });
-
-    await service.createOrUpdateProduct(task, scrapedProduct);
-
-    expect(mockProductSearch.search).toHaveBeenCalledWith(
-      expect.objectContaining({
-        brand: scrapedProduct.brand,
-        model: scrapedProduct.model,
-        displayName: scrapedProduct.displayName,
-      }),
-      expect.objectContaining({ mode: 'strict' }),
-      undefined,
-      { taskId: task.id },
-    );
   });
 
   it('does not touch Seller/Offer plumbing when ScrapedProduct.offers is absent', async () => {

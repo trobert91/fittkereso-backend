@@ -14,12 +14,11 @@ import {
   ScrapeTaskRepository,
   Seller,
 } from '@fittkereso-backend/database';
+import type { ListingMatchDecision } from '@fittkereso-backend/database';
 import {
-  ResolutionContext,
-  ResolutionResult,
-  ResolutionService,
-  productSpecsToStructuredSpecs,
-} from '@fittkereso-backend/resolution';
+  ListingMatchService,
+  ProductDuplicateService,
+} from '@fittkereso-backend/product-identity';
 import {
   generateSlug,
   nameOf,
@@ -44,7 +43,12 @@ import { ProductMetricsService } from '@fittkereso-backend/metrics';
 interface ResolvedIdentity {
   model?: ProductModel;
   isExistingMatch: boolean;
-  resolutionContext?: ResolutionContext;
+  /**
+   * What listing matching decided. Set by Path 4 and only by Path 4, so its
+   * presence is also how the post-save step knows to look for duplicates —
+   * Paths 1–3 resolved by a stored id and have nothing new to compare.
+   */
+  decision?: ListingMatchDecision;
 }
 
 interface PersistResult {
@@ -58,7 +62,8 @@ export class ProductScrapeUpdaterService {
   private readonly logger = new CustomLogger(ProductScrapeUpdaterService.name);
 
   constructor(
-    private readonly productSearch: ResolutionService,
+    private readonly listingMatch: ListingMatchService,
+    private readonly duplicateService: ProductDuplicateService,
     private readonly modelFactory: ProductModelFactoryService,
     private readonly productRepo: ProductModelRepository,
     private readonly taskRepo: ScrapeTaskRepository,
@@ -114,6 +119,7 @@ export class ProductScrapeUpdaterService {
         scrapedProduct,
         model: persisted.model,
         sourceRecord: persisted.sourceRecord,
+        identity,
       });
       return persisted.model;
     } catch (error) {
@@ -129,7 +135,8 @@ export class ProductScrapeUpdaterService {
   }
 
   // One canonical name for this scrape, stored on the new ProductSourceRecord
-  // row and used for ProductModel.normalizedName on new products.
+  // row and used as a new product's first normalizedName (mergeSources then
+  // rebuilds it from the resolved brand).
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
     const strategy =
       this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
@@ -209,53 +216,43 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    // Path 4: strict cross-source search. Also the fallback for same-source
-    // variant siblings that carry no group-level externalId (Path 3) — a
-    // source's own catalog legitimately accumulates several
-    // ProductSourceRecords on one ProductModel (one per variant URL; see
-    // §2.1a's offerLinks dispatch), so a same-source hit here is not
-    // inherently a false positive. The engine already runs in `strict` mode
-    // with brand/category/spec gates, so trusting it here is no weaker than
-    // trusting it for cross-source matches.
-    // Agent already filters candidates to category C via preResolvedCategories.
-    //
-    const resolved = await this.findExistingProductModel(task, scrapedProduct, {
-      taskId: task.id,
-    });
-    const candidate = resolved.resolvedModel;
-    const resolutionContext = resolved.context;
+    // Path 4: match the listing against the stored catalog by name and specs.
+    // Also the fallback for same-source variant siblings that carry no
+    // group-level externalId (Path 3) — a source's own catalog legitimately
+    // accumulates several ProductSourceRecords on one ProductModel (one per
+    // variant URL; see §2.1a's offerLinks dispatch), so a same-source hit here
+    // is not inherently a false positive.
+    const { productId, decision } = await this.listingMatch.match(
+      scrapedProduct,
+      { taskId: task.id },
+    );
 
-    if (candidate) {
-      const isLlmMerge = resolutionContext?.decision?.kind === 'llm_resolved';
+    if (productId) {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
-        isLlmMerge ? 'llm_merge_accept' : 'cross_source_merge',
+        decision.outcome === 'llm_identified' ? 'llm_identified' : 'identified',
       );
       this.productMetricsService.productMatched(task.source.name);
-      return {
-        model: candidate,
-        isExistingMatch: true,
-        resolutionContext,
-      };
+      return { model, isExistingMatch: true, decision };
     }
 
-    // No accepted match. `llm_unresolved` means the scrape-merge LLM actually
-    // looked at a near-miss candidate and wasn't confident — distinct from
-    // `matcher_reject`, where it was never invoked because nothing was close
-    // enough to be worth asking. The scraper creates a new product either way
-    // (the safe default); the distinction is worth a metric because it measures
-    // how often the matcher leaves the LLM undecided.
-    if (resolutionContext?.decision?.kind === 'llm_unresolved') {
+    // No match. `llm_declined` means the LLM actually looked at near-miss
+    // candidates and wasn't confident — distinct from nothing being close
+    // enough to be worth asking, which costs no call at all. A new product
+    // either way (the safe default); the distinction measures how often
+    // scoring leaves the LLM undecided.
+    if (decision.llm) {
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
-        'llm_merge_reject',
+        'llm_declined',
       );
     }
 
-    return {
-      isExistingMatch: false,
-      resolutionContext,
-    };
+    return { isExistingMatch: false, decision };
   }
 
   private async persistProduct(params: {
@@ -275,7 +272,7 @@ export class ProductScrapeUpdaterService {
       );
       this.productMetricsService.scrapeResolutionOutcome(
         task.source.name,
-        'new_product',
+        'created',
       );
     }
 
@@ -305,8 +302,8 @@ export class ProductScrapeUpdaterService {
     }
 
     task.product = saveOutcome.model;
-    if (identity.resolutionContext) {
-      task.resolutionContext = identity.resolutionContext;
+    if (identity.decision) {
+      task.identityDecision = identity.decision;
     }
     await this.taskRepo.save(task);
 
@@ -318,8 +315,9 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct;
     model: ProductModel;
     sourceRecord?: ProductSourceRecord;
+    identity: ResolvedIdentity;
   }): Promise<void> {
-    const { task, scrapedProduct, model, sourceRecord } = params;
+    const { task, scrapedProduct, model, sourceRecord, identity } = params;
 
     if (!model.slug) {
       await this.generateProductSlug(model);
@@ -370,6 +368,32 @@ export class ProductScrapeUpdaterService {
     }
 
     await this.createOrUpdateOffers(task, scrapedProduct, model, sourceRecord);
+
+    if (identity.decision) {
+      await this.detectDuplicates(task, model);
+    }
+  }
+
+  /**
+   * Only after Path 4, where a listing's identity was decided by scoring rather
+   * than by a stored id. This is also where two products that both matched the
+   * listing become a pair for someone to look at. Never fails the scrape: the
+   * product and its offers are already saved, and a missing suggestion is worth
+   * far less than a lost scrape.
+   */
+  private async detectDuplicates(
+    task: ScrapeTask,
+    model: ProductModel,
+  ): Promise<void> {
+    try {
+      await this.duplicateService.detect(model.id, 'scrape');
+    } catch (error) {
+      this.logger.warn('Duplicate detection failed, continuing', {
+        taskId: task.id,
+        productId: model.id,
+        error,
+      });
+    }
   }
 
   // No-op for sources whose config doesn't populate ScrapedProduct.offers.
@@ -529,60 +553,6 @@ export class ProductScrapeUpdaterService {
       .execute();
 
     return result.generatedMaps.length || result.identifiers.length;
-  }
-
-  private async findExistingProductModel(
-    task: ScrapeTask,
-    scrapedProduct: ScrapedProduct,
-    logContext?: Record<string, string>,
-  ): Promise<ResolutionResult> {
-    const resolution = await this.productSearch.search(
-      {
-        brand: scrapedProduct.brand,
-        model: scrapedProduct.model,
-        displayName: scrapedProduct.displayName,
-        specs: productSpecsToStructuredSpecs(scrapedProduct.specs),
-        category: scrapedProduct.category
-          ? {
-              id: scrapedProduct.category.id,
-              name: scrapedProduct.category.name,
-            }
-          : undefined,
-      },
-      {
-        useEmbedding: true,
-        webSearchEnabled: false,
-        mode: 'strict',
-        // Let DecisionService fall back to the scrape-merge LLM decision when
-        // quality gates reject every candidate but the best one is still
-        // close to threshold (see MatchingConfig.llmDecisionFloor) — without
-        // this, an ambiguous Path 4 result silently became a new product with
-        // no adjudication or review trail. Explicitly NOT webSearchEnabled:
-        // true — that would also turn on SERP web search, a different cost/
-        // evidence profile this change isn't meant to introduce.
-        llmDecisionEnabled: true,
-        decisionStrategy: 'scrape-merge',
-      },
-      undefined,
-      logContext,
-    );
-
-    if (resolution.resolvedModel?.id) {
-      const resolvedModel = await this.productRepo.findOneOrFail({
-        where: { id: resolution.resolvedModel.id },
-        relations: this.getProductRelations(),
-      });
-      return {
-        resolvedModel,
-        context: resolution.context,
-        confidence: resolution.confidence,
-      };
-    }
-
-    return {
-      context: resolution.context,
-      confidence: resolution.confidence,
-    };
   }
 
   private async saveProductModel(params: {

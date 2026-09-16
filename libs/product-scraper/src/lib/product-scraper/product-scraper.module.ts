@@ -7,7 +7,7 @@ import { ScrapeUrlDeduplicationService } from './services/scrape-url-deduplicati
 import { GenericProductSourceSyncService } from './services/generic-product-source-sync.service';
 import { ProductSourceSimulationService } from './services/product-source-simulation.service';
 import { TaskModule } from '@fittkereso-backend/task';
-import { ResolutionModule } from '@fittkereso-backend/resolution';
+import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { AiModule } from '@fittkereso-backend/ai';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { StorageModule } from '@fittkereso-backend/storage';
@@ -20,7 +20,7 @@ import { TranslationModule } from '@fittkereso-backend/translation';
 @Module({
   imports: [
     DatabaseModule,
-    ResolutionModule,
+    ProductIdentityModule,
     ProductModule,
     AiModule,
     ScraperModule,

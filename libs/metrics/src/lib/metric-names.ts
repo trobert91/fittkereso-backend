@@ -95,13 +95,6 @@ export const LIST_PAGE_PRODUCTS_SKIPPED_TOTAL =
 export const LIST_PAGE_DETAIL_TASKS_CREATED_TOTAL =
   'list_page_detail_tasks_created_total';
 
-// Duplicate detection metrics
-export const DUPLICATE_PAIRS_DETECTED_TOTAL = 'duplicate_pairs_detected_total';
-export const DUPLICATE_SKIPPED_TOTAL = 'duplicate_skipped_total';
-export const DUPLICATE_DETECTION_DURATION_SECONDS =
-  'duplicate_detection_duration_seconds';
-export const DUPLICATE_SIMILARITY_SCORE = 'duplicate_similarity_score';
-
 // Extended product outcome metrics
 export const PRODUCT_MATCHED_TOTAL = 'product_matched_total';
 export const PRODUCT_ALIAS_CREATED_TOTAL = 'product_alias_created_total';

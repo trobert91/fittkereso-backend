@@ -9,6 +9,7 @@ import {
   PriceHistory,
   ProductAlias,
   ProductAliasSource,
+  ProductDuplicatePairRepository,
   ProductImage,
   ProductModel,
   ProductModelRepository,
@@ -24,7 +25,7 @@ import { ProductSpecSortService } from '../product-spec/product-spec-sort.servic
 import { ProductSpecValidatorService } from '../product-spec/product-spec-validator.service';
 import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
 import { getProductLevelSpecs } from '../product-spec/product-level-specs';
-import { ProductIdentityMergeService } from '../product-identity/product-identity-merge.service';
+import { ProductNameMergeService } from '../product-name/product-name-merge.service';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductDetailService } from '../product-detail.service';
@@ -55,11 +56,12 @@ export class ProductMergeService {
     private readonly specMergeService: ProductSpecMergeService,
     private readonly specSortService: ProductSpecSortService,
     private readonly validatorService: ProductSpecValidatorService,
-    private readonly identityMergeService: ProductIdentityMergeService,
+    private readonly nameMergeService: ProductNameMergeService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly detailService: ProductDetailService,
     private readonly offerRepo: OfferRepository,
+    private readonly duplicatePairRepo: ProductDuplicatePairRepository,
   ) {}
 
   /**
@@ -79,7 +81,7 @@ export class ProductMergeService {
   /**
    * The single idempotent "recompute ProductModel from its
    * ProductSourceRecords" operation — specs (via ProductSpecMergeService)
-   * and identity fields (via ProductIdentityMergeService) alike. Purely a
+   * and name fields (via ProductNameMergeService) alike. Purely a
    * function of model.sources (already-persisted ProductSourceRecords), so
    * it's safe to call repeatedly, from any trigger (a fresh scrape's
    * source-record upsert, a manual admin retry, or post-model-merge
@@ -129,7 +131,11 @@ export class ProductMergeService {
       ? finalValidation.errors
       : undefined;
 
-    await this.identityMergeService.mergeIdentity(model, latestPerSource);
+    await this.nameMergeService.mergeNames(
+      model,
+      latestPerSource,
+      categorySlug,
+    );
 
     return model;
   }
@@ -177,6 +183,12 @@ export class ProductMergeService {
         await this.moveProductAliases(manager, sourceId, targetId);
         await this.moveScrapeTasks(manager, sourceId, targetId);
         await this.movePriceHistory(manager, sourceId, targetId);
+        // Before the delete, which cascades the source's own pairs away.
+        await this.duplicatePairRepo.carryDismissalsForMerge(
+          manager,
+          sourceId,
+          targetId,
+        );
         await this.deleteSourceProduct(manager, sourceId);
 
         this.logger.log('Product merge transaction completed', {
@@ -525,7 +537,7 @@ export class ProductMergeService {
         ],
       });
 
-      // Recompute specs and identity fields from all sources now that
+      // Recompute specs and name fields from all sources now that
       // sources have been consolidated
       if (!isEmpty(target.sources)) {
         await this.mergeSources(target);

@@ -15,15 +15,31 @@ import { ProductValueMapperService } from '../services/product-value-mapper.serv
 import { RuntimeDataProvider } from '../interfaces/runtime-data-provider.interface';
 import { registerOps } from '../ops/register-ops';
 import speedbikeConfig from './speedbike.config.json';
+// The last spec here asserts that this source's spec mapping still fits the
+// category's real, current schema, so it has to read that exact file rather
+// than a copy. libs/config exposes it only through CategoryConfigService's
+// runtime disk load, which a pure fixture test shouldn't have to stand up.
+// eslint-disable-next-line @nx/enforce-module-boundaries
 import ebikesJsonSchema from '../../../../../config/src/lib/categories/ebikes/jsonSchema.json';
 
 // Real capture of speedbike.hu's server-rendered detail page markup (KTM
 // Macina Scarp SX Prestige Di2, Olive Pearl — saved from docs/products/...
 // in this repo's working directory during onboarding), trimmed to the
 // structural pieces the config actually reads: the inline `ShopRenter.product`
-// script blob, the schema.org breadcrumb, the full `table.parameter_table`
-// spec sheet (all 55 rows, several intentionally empty — a real listing
-// never fills every attribute), and the `og:image` meta tag.
+// script blob, the schema.org breadcrumb, the `.product-page-price-wrapper`
+// offer block, the full `table.parameter_table` spec sheet (all 55 rows,
+// several intentionally empty — a real listing never fills every attribute),
+// and the `og:image` meta tag.
+//
+// The offer block is the schema.org microdata the page publishes
+// (`meta[itemprop=price]`, `meta[itemprop=pricecurrency]`,
+// `link[itemprop=availability]`), which is what `detailPage.offers` reads.
+// It replaced an earlier capture keyed off `.productstock-param-row` +
+// `.price_special_color`: re-fetching three live KTM listings in 2026-09
+// found no `productstock-param-row` on any of them, so that pipeline
+// silently produced zero offers. The visible `.price_original_color` span is
+// still the only place the pre-discount price appears, and is absent
+// entirely on a listing that isn't discounted.
 //
 // Note: the site's actual product image gallery (`#productimages_wrapper`,
 // `.fancybox`/`.product-images img`) is injected client-side by JS after
@@ -63,14 +79,18 @@ function buildHtml(): string {
             </span>
           </div>
         </section>
-        <span class="price price_original_color product_table_original">3.359.000 Ft</span>
-        <span class="price price_special_color product_table_special">3.045.957 Ft</span>
-        <table class="product_parameters">
-          <tr class="product-parameter-row productstock-param-row stock_status_id-9">
-            <td class="param-label productstock-param">Elérhetőség:</td>
-            <td class="param-value productstock-param"><span style="color:#739623;">Raktáron</span></td>
-          </tr>
-        </table>
+        <div class="product-page-price-wrapper" itemprop="offers" itemscope itemtype="//schema.org/Offer">
+          <div class="product-page-price">
+            <div class="price_row price_row_2">
+              <span class="price price_original_color product_table_original">3.359.000 Ft</span>
+              <span class="price price_special_color product_table_special">3.045.957 Ft</span>
+              <meta itemprop="price" content="3045957"/>
+              <link itemprop="url" href="https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben"/>
+            </div>
+            <meta content="HUF" itemprop="pricecurrency"/>
+            <link itemprop="availability" href="http://schema.org/InStock"/>
+          </div>
+        </div>
         <table class="parameter_table">
           <tbody>
             <tr class="odd row-param-ebike_akkuteljesitmeny"><td><strong>wattora</strong></td><td>400 Wh</td></tr>
@@ -259,8 +279,8 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
 
   it('omits priceWithoutDiscount for a listing with no discount (only .price, no special/original variants)', async () => {
     const html = buildHtml().replace(
-      '<span class="price price_original_color product_table_original">3.359.000 Ft</span>\n        <span class="price price_special_color product_table_special">3.045.957 Ft</span>',
-      '<span class="price">3.045.957 Ft</span>',
+      '<span class="price price_original_color product_table_original">3.359.000 Ft</span>\n              <span class="price price_special_color product_table_special">3.045.957 Ft</span>',
+      '<span class="price price_color product_table_price">3.045.957 Ft</span>',
     );
     const $ = cheerio.load(html);
     const config = speedbikeConfig as unknown as ProductSourceConfig;
@@ -280,11 +300,11 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
     ]);
   });
 
-  it('maps stock status to an out_of_stock/preorder/unknown OfferAvailability from Elérhetőség row text', async () => {
-    async function runWithStockText(stockText: string) {
+  it('maps the schema.org availability link to an OfferAvailability', async () => {
+    async function runWithAvailability(schemaValue: string) {
       const html = buildHtml().replace(
-        '<span style="color:#739623;">Raktáron</span>',
-        stockText,
+        'href="http://schema.org/InStock"',
+        `href="http://schema.org/${schemaValue}"`,
       );
       const $ = cheerio.load(html);
       const config = speedbikeConfig as unknown as ProductSourceConfig;
@@ -292,13 +312,22 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
       return result.rawOffers[0]?.availability;
     }
 
-    await expect(runWithStockText('Nincs készleten')).resolves.toBe(
-      'out_of_stock',
+    await expect(runWithAvailability('OutOfStock')).resolves.toBe('out_of_stock');
+    await expect(runWithAvailability('PreOrder')).resolves.toBe('preorder');
+    await expect(runWithAvailability('LimitedAvailability')).resolves.toBe(
+      'in_stock',
     );
-    await expect(runWithStockText('Beszerezhető')).resolves.toBe('preorder');
-    await expect(runWithStockText('Valami ismeretlen státusz')).resolves.toBe(
-      'unknown',
-    );
+    await expect(runWithAvailability('SomethingNew')).resolves.toBe('unknown');
+  });
+
+  it('produces no offer when the page has no price block at all', async () => {
+    const $ = cheerio.load(buildHtml());
+    $('.product-page-price-wrapper').remove();
+    const config = speedbikeConfig as unknown as ProductSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.rawOffers).toEqual([]);
   });
 
   it('deterministically maps the real page rawSpecs onto the current ebikes jsonSchema via specMapping', async () => {

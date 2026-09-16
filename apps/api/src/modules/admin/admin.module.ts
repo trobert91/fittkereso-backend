@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminProductController } from './controllers/admin-product.controller';
 import { ProductModule } from '@fittkereso-backend/product';
+import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { AdminCategoryController } from './controllers/admin-category.controller';
 import { AuthModule } from '@fittkereso-backend/auth';
 import { SearchModule } from '@fittkereso-backend/search';
@@ -10,6 +11,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
 import { AdminTaskController } from './controllers/admin-task.controller';
 import { AdminTestController } from './controllers/admin-test.controller';
 import { AdminProductSourceController } from './controllers/admin-product-source.controller';
+import { AdminProductDuplicateController } from './controllers/admin-product-duplicate.controller';
 import { AdminScrapeTaskController } from './controllers/admin-scrape-task.controller';
 import { AdminSellerController } from './controllers/admin-seller.controller';
 
@@ -18,6 +20,7 @@ import { AdminSellerController } from './controllers/admin-seller.controller';
     AuthModule,
     DatabaseModule,
     ProductModule,
+    ProductIdentityModule,
     SearchModule,
     TaskModule,
   ],
@@ -25,6 +28,7 @@ import { AdminSellerController } from './controllers/admin-seller.controller';
     AdminBrandController,
     AdminCategoryController,
     AdminProductController,
+    AdminProductDuplicateController,
     AdminProductSourceController,
     AdminScrapeTaskController,
     AdminSellerController,

@@ -25,7 +25,6 @@ export class DynamicConfigFileLoaderService {
   private loadAll(): DynamicConfigData {
     const general = this.readJsonFile<Record<string, unknown>>('general.json') ?? {};
     const scheduling = this.readJsonFile<DynamicConfigData['scheduling']>('scheduling.json');
-    const resolution = this.readJsonFile<DynamicConfigData['resolution']>('resolution.json');
     const openai = this.readJsonFile<DynamicConfigData['openai']>('openai.json');
     const gemini = this.readJsonFile<DynamicConfigData['gemini']>('gemini.json');
     const claude = this.readJsonFile<DynamicConfigData['claude']>('claude.json');
@@ -39,7 +38,6 @@ export class DynamicConfigFileLoaderService {
       ...(general['amazonAffiliateTag'] !== undefined && general['amazonAffiliateTag'] !== '' && { amazonAffiliateTag: general['amazonAffiliateTag'] as string }),
       ...(debugFromGeneral && { debug: debugFromGeneral }),
       ...(scheduling && { scheduling }),
-      ...(resolution && { resolution }),
       ...(openai && { openai }),
       ...(gemini && { gemini }),
       ...(claude && { claude }),

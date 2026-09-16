@@ -23,3 +23,6 @@ export * from './seller-search-result';
 
 export * from './offer-search-params';
 export * from './offer-search-result';
+
+export * from './product-duplicate-pair-search-params';
+export * from './product-duplicate-pair-search-result';

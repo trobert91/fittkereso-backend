@@ -10,8 +10,15 @@
  * from this source belongs to (ProductSource.seller is non-nullable; there
  * is no per-offer sellerName in the scrape pipeline).
  *
- * Usage:
- *   npx ts-node -r tsconfig-paths/register apps/product-collector/scripts/seed-product-source-configs.ts
+ * Usage (from the repo root):
+ *   PRODUCT_COLLECTOR_CONFIG_PATH=apps/product-collector/src/config/config.yaml \
+ *     npx ts-node --project apps/product-collector/tsconfig.app.json \
+ *     -r tsconfig-paths/register \
+ *     apps/product-collector/scripts/seed-product-source-configs.ts
+ *
+ * Both parts are needed: without --project, ts-node resolves as ESM and can't
+ * find the path aliases or the .ts extension; without the config-path
+ * override, ConfigLoader looks for the copy webpack puts next to main.js.
  */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
@@ -153,7 +160,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error('Seed failed:', error);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // The Nest context keeps handles open, so the script would otherwise sit
+    // here long after its work is committed, looking like a hang.
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Seed failed:', error);
+    process.exit(1);
+  });

@@ -144,7 +144,7 @@ export class ProductUpdateMapperService {
 
     // Admin-entered specs have no ProductSource behind them (source: null) —
     // that's what distinguishes them from scraped ProductSourceRecord rows.
-    let manualSource = entity.sources.find((s) => !s.source);
+    const manualSource = entity.sources.find((s) => !s.source);
 
     if (manualSource) {
       manualSource.scrapedProduct = { ...manualSource.scrapedProduct, specs };

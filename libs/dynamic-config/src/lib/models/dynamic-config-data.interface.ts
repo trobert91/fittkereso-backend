@@ -3,77 +3,6 @@ export interface GeneralConfig {
   amazonAffiliateTag?: string;
 }
 
-export interface ProductSearchAgentConfig {
-  /** Maximum entries in context.modelVariants across all iterations. Default: 20 */
-  maxModelVariants?: number;
-  /** Maximum candidate pool size after each merge. Default: 50 */
-  maxCandidates?: number;
-  /** When true, the candidate pre-filter (CandidatePreFilterService) drops candidates
-   *  that violate effectiveMatchSpecs or the category constraint before the matcher
-   *  and contextual-resolution agents run. Set to false for rollback to pre-WI-4
-   *  behavior. Default: true. */
-  preFilterEnabled?: boolean;
-  /** When true, the WI 7 SERP-evidence pipeline runs alongside today's extraction:
-   *  build SearchEvidence[] from each SERP fetch, run per-record model-number
-   *  extraction, and re-search the catalog for the extracted SKUs. Set to false
-   *  to disable for emergency rollback. Default: true. */
-  serpEvidenceEnabled?: boolean;
-  /** Conservative acceptance threshold for the decision LLM. Final decisions
-   *  below this threshold are downgraded to `unresolved` with
-   *  `unresolvedReason='low_confidence'` (legacy) / `reason='below_accept_threshold'`
-   *  (new lib).
-   *
-   *  Scale depends on which lib reads it:
-   *  - `libs/product-resolution` (legacy): 0–1 float. Default: 0.5.
-   *  - `libs/product-search` (new): 0–100 integer. Default: 50.
-   *
-   *  Stage 7 (cutover) flips `resolution.json` to set this to `50` and the
-   *  legacy lib is removed. Until then, leave the JSON value unset so each lib
-   *  uses its own default.
-   *
-   *  @deprecated Use `resolution.matching.acceptThreshold` /
-   *  `acceptThresholdStrict` (mode-aware). The decision LLM now reads the
-   *  matcher's threshold pair via `MatchingConfigService` so the matcher and
-   *  the LLM share a single source of truth. This field is no longer consumed
-   *  by the resolution pipeline and will be removed in a follow-up. */
-  acceptThreshold?: number;
-  /** LLM model used by ProductResolutionDecisionService for the final
-   *  decision call. Default: 'deepseek-v4-flash' */
-  decisionModel?: string;
-  webSearch?: {
-    /** LLM model for extraction and disambiguation calls. Default: 'deepseek-v4-flash' */
-    extractionModel?: string;
-    /** Min confidence to accept extracted product identity. Default: 0.5 */
-    minProductConfidence?: number;
-    /** Min confidence to accept a cross-market variant. Default: 0.6 */
-    minVariantConfidence?: number;
-  };
-  crossMarket?: {
-    /** Max candidates shown to the LLM ranker. Default: 5 */
-    topCandidates?: number;
-    /** Min embedding/fuzzy confidence to include a candidate in LLM ranking. Default: 0.6 */
-    minCandidateConfidence?: number;
-    /** Min LLM confidence to accept a ranked cross-market match. Default: 0.7 */
-    minMatchConfidence?: number;
-    /** LLM model for the cross-market ranking call. Default: uses webSearch.extractionModel */
-    rankingModel?: string;
-  };
-  /** Search result cache configuration */
-  cache?: {
-    enabled?: boolean;
-    positiveTtlDays?: number;
-    negativeTtlDays?: number;
-    similarityThreshold?: number;
-  };
-  /** LLM disambiguation for ambiguous matches */
-  llmDisambiguation?: {
-    enabled?: boolean;
-    model?: string;
-    minConfidence?: number;
-    maxCandidates?: number;
-  };
-}
-
 export interface TranslationConfig {
   /** Enable LLM-backed translation. When false, only dictionary + cache lookups run. Default: true */
   enabled?: boolean;
@@ -113,34 +42,6 @@ export interface DynamicConfigData {
     staleTaskTimeoutMinutes?: number;
     /** Minutes before a PROCESSING scrape task is considered stale and eligible for re-pickup. Default: 240 (4 hours) */
     staleScrapeTaskTimeoutMinutes?: number;
-  };
-
-  // Product resolution thresholds and matching weights
-  resolution?: {
-    embeddingSimilarityThreshold?: number;
-    embeddingResultLimit?: number;
-    /** Minimum reference relevance to trigger a web search during product resolution */
-    webSearchRelevanceGate?: number;
-    matching?: {
-      acceptThreshold?: number;
-      acceptThresholdStrict?: number;
-      ambiguityGap?: number;
-      defaultStrictness?: 'strict' | 'moderate' | 'loose';
-      defaultNumericTokenWeight?: number;
-      /** Used by product-normalizer for token importance filtering */
-      importantTokenWeightThreshold?: number;
-      /** Hard cap on how many picks the decision LLM may return. Bounds prompt
-       *  cost and downstream candidate fan-out. Default: 6 */
-      maxLlmPicks?: number;
-      /** Minimum matcher score (0–100) a rejected candidate set's best
-       *  candidate must still clear before the scrape-time LLM merge decision
-       *  is worth invoking — below this, the candidate is simply wrong, not
-       *  "close but ambiguous," and asking an LLM to adjudicate wastes a call
-       *  and adds false-merge risk. Default: 50 */
-      llmDecisionFloor?: number;
-    };
-    // ProductSearchAgent configuration
-    search?: ProductSearchAgentConfig;
   };
 
   // OpenAI pricing and retry configuration
@@ -387,68 +288,6 @@ export const dynamicConfigSchema = {
               description:
                 'Include full page content in results. Default: true',
               default: true,
-            },
-          },
-        },
-      },
-    },
-    resolution: {
-      type: 'object',
-      additionalProperties: true,
-      description: 'Product resolution thresholds and matching weights.',
-      properties: {
-        embeddingSimilarityThreshold: {
-          type: 'number',
-          minimum: 0,
-          maximum: 1,
-          description:
-            'Minimum cosine similarity for embedding search candidates. Default: 0.6',
-          default: 0.6,
-        },
-        embeddingResultLimit: {
-          type: 'number',
-          minimum: 1,
-          maximum: 50,
-          description:
-            'Max candidates returned from embedding search. Default: 5',
-          default: 5,
-        },
-        webSearchRelevanceGate: {
-          type: 'number',
-          minimum: 0,
-          maximum: 100,
-          description:
-            'Minimum reference relevance to trigger a web search during product resolution. Default: 70',
-          default: 70,
-        },
-        search: {
-          type: 'object',
-          additionalProperties: true,
-          description: 'ProductSearchAgent configuration.',
-          properties: {
-            maxModelVariants: {
-              type: 'number',
-              minimum: 1,
-              maximum: 100,
-              description:
-                'Maximum entries in context.modelVariants across all iterations. Default: 20',
-              default: 20,
-            },
-            maxCandidates: {
-              type: 'number',
-              minimum: 1,
-              maximum: 500,
-              description:
-                'Maximum candidate pool size after each merge. Default: 50',
-              default: 50,
-            },
-            acceptThreshold: {
-              type: 'number',
-              minimum: 0,
-              maximum: 1,
-              description:
-                'Conservative acceptance threshold (0–1) for final resolution. Picks below this score are downgraded to unresolved. Default: 0.5',
-              default: 0.5,
             },
           },
         },

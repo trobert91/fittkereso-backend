@@ -24,15 +24,18 @@ export type ScrapeResolutionOutcome =
    *  Tried before the group-level match since it's available whenever a
    *  source identifies its listings at all. */
   | 'offer_external_id_hit'
-  | 'cross_source_merge'
-  | 'new_product'
-  /** Path 4's scrape-merge LLM decision confidently accepted a candidate that
-   *  the deterministic quality gates had rejected. */
-  | 'llm_merge_accept'
-  /** The scrape-merge LLM decision considered a near-miss candidate but was
-   *  not confident enough to merge — falls through to `new_product`. Measures
-   *  how often the matcher leaves the LLM undecided. */
-  | 'llm_merge_reject';
+  /** Path 4: exactly one candidate scored at or above `ACCEPT_SCORE`. */
+  | 'identified'
+  /** Path 4: several candidates were close and the LLM picked one. */
+  | 'llm_identified'
+  /** Path 4 created a new product — nothing was close enough, or the LLM
+   *  declined. */
+  | 'created'
+  /** Path 4's LLM looked at near-miss candidates and was not confident enough
+   *  to attach, so a new product was created. Distinct from nothing being
+   *  close enough to be worth asking, which costs no call at all — this
+   *  measures how often scoring leaves the LLM undecided. */
+  | 'llm_declined';
 
 @Injectable()
 export class ProductMetricsService {

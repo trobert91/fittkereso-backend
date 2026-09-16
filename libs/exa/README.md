@@ -183,9 +183,9 @@ Get contents for specific URLs.
 
 **Returns:** `Promise<ExaContentsResponse>`
 
-## Integration with Product Resolution
+## Integration with web research
 
-The Exa library is designed to work with the unified ProductWebSearchService:
+The Exa library is used by the review-collection web-research path:
 
 ```typescript
 import { ExaSearchService } from "@fittkereso-backend/exa";
@@ -214,7 +214,7 @@ if (provider === WebSearchProvider.Exa) {
 - Use `highlights` instead of `text` when full content isn't needed
 - Set `maxCharacters` limits to control token usage
 - Use `type: 'auto'` for balanced cost/quality
-- Cache results in database (see ProductWebSearchService)
+- Cache results in the database
 
 ## Resources
 
