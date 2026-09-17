@@ -117,6 +117,13 @@ export class ProductDuplicatePairSearchService {
       );
     }
 
+    if (params.maxScore !== undefined) {
+      query = query.andWhere(
+        `pair.${nameOf<ProductDuplicatePair>('similarityScore')} <= :maxScore`,
+        { maxScore: params.maxScore },
+      );
+    }
+
     if (!isEmpty(params.detectedBy)) {
       query = query.andWhere(
         `pair.${nameOf<ProductDuplicatePair>('detectedBy')} IN (:...detectedBy)`,
@@ -155,6 +162,7 @@ export class ProductDuplicatePairSearchService {
     searchResult.status = params.status;
     searchResult.categoryIds = params.categoryIds;
     searchResult.minScore = params.minScore;
+    searchResult.maxScore = params.maxScore;
 
     return searchResult;
   }

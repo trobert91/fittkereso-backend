@@ -23,12 +23,20 @@ export class ProductDuplicatePairSearchParams {
   @IsString()
   productId?: string;
 
+  /** Both bounds are inclusive; either alone is a one-sided range. */
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(100)
   @Type(() => Number)
   minScore?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  maxScore?: number;
 
   @IsOptional()
   @IsArray()

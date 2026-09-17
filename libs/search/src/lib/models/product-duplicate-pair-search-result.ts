@@ -7,4 +7,6 @@ export class ProductDuplicatePairSearchResult extends BasePageResult<ProductDupl
   categoryIds?: string[];
 
   minScore?: number;
+
+  maxScore?: number;
 }
