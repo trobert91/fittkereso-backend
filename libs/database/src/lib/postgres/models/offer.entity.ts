@@ -126,8 +126,12 @@ export class Offer extends BasePostgresEntity {
    * Always optional: a listing may not surface any, or only some, of these
    * values (e.g. frameSize known but color not extractable from this source)
    * — absence must never block creating/matching the Offer itself.
+   *
+   * Also on `adminDetails`, for the Duplicates page: a 53cm against a 48cm of
+   * the same bike is a variant rather than a duplicate, so these values are
+   * often the whole answer, and that list is served without `details`.
    */
-  @Expose({ groups: [SerializeGroup.details] })
+  @Expose({ groups: [SerializeGroup.details, SerializeGroup.adminDetails] })
   @Column({ type: 'jsonb', nullable: true })
   @Transform(transfromExposeAll())
   specs?: ProductSpecs;
