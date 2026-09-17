@@ -5,6 +5,7 @@ import {
   ProductDuplicatePair,
   ProductDuplicatePairRepository,
   ProductModel,
+  ProductSourceRecord,
 } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 import { isEmpty } from 'lodash';
@@ -16,8 +17,8 @@ const DEFAULT_PAGE_SIZE = 50;
 
 /**
  * The Duplicates page's query. Both products come back with the brand,
- * category and main image the page shows, and every filter matches either
- * side of the pair — a pair belongs to both its products.
+ * category, main image and source listings the page shows, and every filter
+ * matches either side of the pair — a pair belongs to both its products.
  */
 @Injectable()
 export class ProductDuplicatePairSearchService {
@@ -58,6 +59,22 @@ export class ProductDuplicatePairSearchService {
         .leftJoinAndSelect(
           `${side}.${nameOf<ProductModel>('mainImage')}`,
           `${side}Image`,
+        )
+        // Which shops each side is sold in, and for how much — the reviewer's
+        // first question about a pair. `skip`/`take` still paginate correctly
+        // with these one-to-many joins: TypeORM selects the page's ids in its
+        // own query before joining.
+        .leftJoinAndSelect(
+          `${side}.${nameOf<ProductModel>('sources')}`,
+          `${side}Sources`,
+        )
+        .leftJoinAndSelect(
+          `${side}Sources.${nameOf<ProductSourceRecord>('source')}`,
+          `${side}Source`,
+        )
+        .leftJoinAndSelect(
+          `${side}Sources.${nameOf<ProductSourceRecord>('offers')}`,
+          `${side}SourceOffers`,
         );
     }
 
