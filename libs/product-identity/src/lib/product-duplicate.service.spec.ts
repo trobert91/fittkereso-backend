@@ -19,7 +19,12 @@ function candidateOf(productId: string, score: number): ProductCandidate {
 
 describe('ProductDuplicateService', () => {
   let productRepo: { findOne: jest.Mock };
-  let pairRepo: { upsertPairs: jest.Mock; dismiss: jest.Mock; findOne: jest.Mock };
+  let pairRepo: {
+    upsertPairs: jest.Mock;
+    dismiss: jest.Mock;
+    reopen: jest.Mock;
+    findOne: jest.Mock;
+  };
   let queryService: { ofProduct: jest.Mock };
   let finder: { findCandidates: jest.Mock };
   let mergeService: { mergeProducts: jest.Mock };
@@ -30,6 +35,7 @@ describe('ProductDuplicateService', () => {
     pairRepo = {
       upsertPairs: jest.fn().mockResolvedValue(1),
       dismiss: jest.fn().mockResolvedValue(true),
+      reopen: jest.fn().mockResolvedValue(true),
       findOne: jest.fn(),
     };
     queryService = { ofProduct: jest.fn().mockReturnValue({ productId: PRODUCT_ID }) };
@@ -97,6 +103,19 @@ describe('ProductDuplicateService', () => {
     });
   });
 
+  describe('reopen', () => {
+    it('puts a dismissed pair back in the queue', async () => {
+      await expect(service.reopen('pair-1')).resolves.toBeUndefined();
+      expect(pairRepo.reopen).toHaveBeenCalledWith('pair-1');
+    });
+
+    it('rejects a pair that is missing or already open', async () => {
+      pairRepo.reopen.mockResolvedValue(false);
+
+      await expect(service.reopen('pair-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe('mergePair', () => {
     const openPair = {
       id: 'pair-1',
@@ -117,14 +136,20 @@ describe('ProductDuplicateService', () => {
       expect(queryService.ofProduct).toHaveBeenCalled(); // re-detected the survivor
     });
 
-    it('refuses a missing or dismissed pair', async () => {
+    it('refuses a pair that does not exist', async () => {
       pairRepo.findOne.mockResolvedValue(null);
-      await expect(service.mergePair('pair-1', OTHER_ID)).rejects.toBeInstanceOf(NotFoundException);
 
-      pairRepo.findOne.mockResolvedValue({ ...openPair, dismissedAt: new Date() });
       await expect(service.mergePair('pair-1', OTHER_ID)).rejects.toBeInstanceOf(NotFoundException);
-
       expect(mergeService.mergeProducts).not.toHaveBeenCalled();
+    });
+
+    it('merges a dismissed pair, because being wrong about it is the point', async () => {
+      pairRepo.findOne.mockResolvedValue({ ...openPair, dismissedAt: new Date() });
+
+      await expect(service.mergePair('pair-1', OTHER_ID)).resolves.toEqual({
+        id: OTHER_ID,
+      });
+      expect(mergeService.mergeProducts).toHaveBeenCalled();
     });
 
     it('refuses a survivor that is not one of the pair', async () => {

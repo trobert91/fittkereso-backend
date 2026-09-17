@@ -77,7 +77,11 @@ export class ProductDuplicateService {
     return written;
   }
 
-  /** "Not duplicates": the pair closes for good, and no later detection reopens it. */
+  /**
+   * "Not duplicates": no later *detection* reopens the pair. Only a person
+   * does, through `reopen` — which is the whole reason a dismissal is a
+   * timestamp rather than a deletion.
+   */
   public async dismiss(pairId: string): Promise<void> {
     const dismissed = await this.pairRepo.dismiss(pairId);
     if (!dismissed) {
@@ -85,14 +89,28 @@ export class ProductDuplicateService {
     }
   }
 
-  /** Merges one side of an open pair into the other, which the caller picks. */
+  /** Puts a dismissed pair back in the queue — someone changed their mind. */
+  public async reopen(pairId: string): Promise<void> {
+    const reopened = await this.pairRepo.reopen(pairId);
+    if (!reopened) {
+      throw new NotFoundException(`Dismissed duplicate pair ${pairId} not found`);
+    }
+  }
+
+  /**
+   * Merges one side of a pair into the other, which the caller picks.
+   *
+   * A dismissed pair merges too: "not duplicates" records what someone thought
+   * at the time, and being wrong about it is exactly the case this has to
+   * serve — otherwise the only route back is to dismiss, reopen, then merge.
+   */
   public async mergePair(
     pairId: string,
     survivorProductId: string,
   ): Promise<ProductModel> {
     const pair = await this.pairRepo.findOne({ where: { id: pairId } });
-    if (!pair || pair.dismissedAt) {
-      throw new NotFoundException(`Open duplicate pair ${pairId} not found`);
+    if (!pair) {
+      throw new NotFoundException(`Duplicate pair ${pairId} not found`);
     }
     if (![pair.productAId, pair.productBId].includes(survivorProductId)) {
       throw new BadRequestException(

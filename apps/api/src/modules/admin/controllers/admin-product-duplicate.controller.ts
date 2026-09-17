@@ -58,11 +58,18 @@ export class AdminProductDuplicateController {
     return result;
   }
 
-  /** "Not duplicates": the pair closes for good and no later scan reopens it. */
+  /** "Not duplicates": no later scan reopens the pair — only a person does. */
   @Post(':id/dismiss')
   @HttpCode(HttpStatus.NO_CONTENT)
   async dismissDuplicatePair(@Param('id') id: string): Promise<void> {
     await this.duplicateService.dismiss(id);
+  }
+
+  /** Puts a dismissed pair back in the queue, for a change of mind. */
+  @Post(':id/reopen')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async reopenDuplicatePair(@Param('id') id: string): Promise<void> {
+    await this.duplicateService.reopen(id);
   }
 
   /** Keeps the chosen product of the pair and folds the other one into it. */

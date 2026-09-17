@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, IsNull, LessThan, Repository } from 'typeorm';
+import { EntityManager, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { groupBy, isEmpty, orderBy, sortBy } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
 import { BasePostgresRepository } from './base-postgres-repository';
@@ -89,6 +89,23 @@ export class ProductDuplicatePairRepository extends BasePostgresRepository<Produ
     const result = await this.repo.update(
       { id, dismissedAt: IsNull() },
       { dismissedAt: new Date() },
+    );
+    return (result.affected ?? 0) > 0;
+  }
+
+  /**
+   * Reopens a dismissed pair — someone changed their mind. False when there's
+   * no such pair or it was already open.
+   *
+   * `updatedAt` moves to now with it (`@UpdateDateColumn`), which matters: a
+   * complete scan deletes open pairs it didn't re-find, and a pair dismissed
+   * months ago would otherwise be swept away by the next one before anybody
+   * looked at it again.
+   */
+  public async reopen(id: string): Promise<boolean> {
+    const result = await this.repo.update(
+      { id, dismissedAt: Not(IsNull()) },
+      { dismissedAt: null },
     );
     return (result.affected ?? 0) > 0;
   }
