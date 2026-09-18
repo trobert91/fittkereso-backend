@@ -71,6 +71,7 @@ export class AdminProductSourceController {
   ): Promise<ProductSource> {
     const source = await this.productSourceRepo.findOne({
       where: { id: productSourceId },
+      relations: { seller: true },
     });
 
     if (!source) {

@@ -2,6 +2,7 @@ import { ProductSourceConfig } from '@fittkereso-backend/database';
 
 export interface ProductSourceUpdateParams {
   name?: string;
+  sellerId?: string;
   config?: ProductSourceConfig;
   schedulingEnabled?: boolean;
   processingEnabled?: boolean;
@@ -10,4 +11,6 @@ export interface ProductSourceUpdateParams {
   requestsPerHour?: number;
   fullSyncInterval?: string | null;
   incrementalSyncInterval?: string | null;
+  nextFullSyncAt?: string | null;
+  nextIncrementalSyncAt?: string | null;
 }

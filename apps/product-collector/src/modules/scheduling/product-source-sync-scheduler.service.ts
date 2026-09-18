@@ -105,7 +105,7 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
     });
   }
 
-  private computeNextRun(interval?: ms.StringValue): Date {
+  private computeNextRun(interval?: ms.StringValue | null): Date {
     return new Date(Date.now() + ms(interval ?? '7 days'));
   }
 }

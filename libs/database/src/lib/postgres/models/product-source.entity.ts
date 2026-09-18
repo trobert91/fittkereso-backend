@@ -56,11 +56,11 @@ export class ProductSource extends BasePostgresEntity {
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'text', nullable: true })
-  fullSyncInterval?: ms.StringValue;
+  fullSyncInterval?: ms.StringValue | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
-  nextFullSyncAt?: Date;
+  nextFullSyncAt?: Date | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
@@ -68,11 +68,11 @@ export class ProductSource extends BasePostgresEntity {
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'text', nullable: true })
-  incrementalSyncInterval?: ms.StringValue;
+  incrementalSyncInterval?: ms.StringValue | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
-  nextIncrementalSyncAt?: Date;
+  nextIncrementalSyncAt?: Date | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
