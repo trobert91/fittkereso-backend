@@ -4,18 +4,25 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
   Put,
+  Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { MinRole } from '@fittkereso-backend/auth';
+import { AuthenticatedUser, CurrentUser, MinRole } from '@fittkereso-backend/auth';
 import {
   ProductSource,
+  ProductSourceConfigValidatorService,
   ProductSourceRepository,
   ProductSourceSyncMode,
+  ProductSourceVersion,
   UserRole,
 } from '@fittkereso-backend/database';
-import { ProductSourceUpdateService } from '@fittkereso-backend/product';
+import {
+  ProductSourceUpdateService,
+  ProductSourceVersionService,
+} from '@fittkereso-backend/product';
 import {
   ProductSourceSearchParams,
   ProductSourceSearchResult,
@@ -28,6 +35,12 @@ import {
   QueueStatusDto,
   TriggerProductSourceFullSyncDto,
 } from '../dtos/product-source-sync.dto';
+import {
+  actorFor,
+  ProductSourceActionListDto,
+  ProductSourceHistoryQueryDto,
+  ProductSourceVersionListDto,
+} from '../dtos/product-source-history.dto';
 
 @Controller('admin-product-source')
 @MinRole(UserRole.admin)
@@ -37,6 +50,8 @@ export class AdminProductSourceController {
     private readonly productSourceRepo: ProductSourceRepository,
     private readonly queuePublisher: QueuePublisherService,
     private readonly updateService: ProductSourceUpdateService,
+    private readonly configValidator: ProductSourceConfigValidatorService,
+    private readonly versionService: ProductSourceVersionService,
   ) {}
 
   @Post('search')
@@ -55,6 +70,28 @@ export class AdminProductSourceController {
     return await this.searchService.search(searchParams);
   }
 
+  /**
+   * The JSON Schema every product source config is validated against.
+   *
+   * Declared BEFORE `GET :id`, and it has to stay there: Nest matches routes
+   * in declaration order, so below it "config-schema" would be swallowed as
+   * an :id and answered with a 404.
+   *
+   * `exposeAll` because the schema is a plain object rather than an entity —
+   * the global serializer runs excludeAll, and without this the response is
+   * an empty object.
+   *
+   * Served rather than duplicated in the admin client: the editor validates
+   * against the same document the backend rejects saves with, so the two
+   * cannot disagree about what a valid config is.
+   */
+  @Get('config-schema')
+  @MinRole(UserRole.user)
+  @SerializeOptions({ strategy: 'exposeAll' })
+  getConfigSchema(): Record<string, unknown> {
+    return this.configValidator.schema;
+  }
+
   @Get(':id')
   @MinRole(UserRole.user)
   @SerializeOptions({
@@ -66,19 +103,17 @@ export class AdminProductSourceController {
       SerializeGroup.details,
     ],
   })
+  /**
+   * The source, with its config history and audit trail attached.
+   *
+   * One response carries everything the details page renders, so the page has
+   * no second request to make and cannot show a source and a history that
+   * disagree. The update and restore routes answer with the same shape.
+   */
   async getProductSource(
     @Param('id') productSourceId: string,
   ): Promise<ProductSource> {
-    const source = await this.productSourceRepo.findOne({
-      where: { id: productSourceId },
-      relations: { seller: true },
-    });
-
-    if (!source) {
-      throw new NotFoundException('Product source not found');
-    }
-
-    return source;
+    return this.versionService.getDetail(productSourceId);
   }
 
   @Put(':id')
@@ -94,14 +129,110 @@ export class AdminProductSourceController {
   async updateProductSource(
     @Param('id') productSourceId: string,
     @Body() updateDto: UpdateProductSourceDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ProductSource> {
-    return this.updateService.updateProductSource(productSourceId, updateDto);
+    return this.updateService.updateProductSource(productSourceId, {
+      ...updateDto,
+      actor: actorFor(currentUser),
+    });
+  }
+
+  /**
+   * Every configuration this source has had, newest number first.
+   *
+   * Paged rather than returned whole: a source edited often accumulates
+   * versions indefinitely, and each row carries a complete config.
+   */
+  @Get(':id/versions')
+  @MinRole(UserRole.user)
+  @SerializeOptions({
+    strategy: 'exposeAll',
+    groups: [SerializeGroup.adminList, SerializeGroup.list],
+  })
+  async listVersions(
+    @Param('id') productSourceId: string,
+    @Query() query: ProductSourceHistoryQueryDto,
+  ): Promise<ProductSourceVersionListDto> {
+    const [items, total] = await this.versionService.listVersions(productSourceId, {
+      skip: query.skip,
+      take: query.take,
+    });
+
+    return { items, total };
+  }
+
+  /** One numbered revision, with its whole config. */
+  @Get(':id/versions/:version')
+  @MinRole(UserRole.user)
+  @SerializeOptions({
+    strategy: 'exposeAll',
+    groups: [
+      SerializeGroup.adminList,
+      SerializeGroup.list,
+      SerializeGroup.adminDetails,
+      SerializeGroup.details,
+    ],
+  })
+  async getVersion(
+    @Param('id') productSourceId: string,
+    @Param('version', ParseIntPipe) version: number,
+  ): Promise<ProductSourceVersion> {
+    return this.versionService.getVersion(productSourceId, version);
+  }
+
+  /**
+   * Puts an earlier config back, as a NEW version.
+   *
+   * Addressed by the version being restored FROM. Restoring v2 while v5 is in
+   * force writes v6 carrying v2's config: v2 stays where it is, v5 stays in
+   * the history, and the restore is itself reversible.
+   */
+  @Post(':id/versions/:version/restore')
+  @SerializeOptions({
+    strategy: 'exposeAll',
+    groups: [
+      SerializeGroup.adminList,
+      SerializeGroup.list,
+      SerializeGroup.adminDetails,
+      SerializeGroup.details,
+    ],
+  })
+  async restoreVersion(
+    @Param('id') productSourceId: string,
+    @Param('version', ParseIntPipe) version: number,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ): Promise<ProductSource> {
+    return this.versionService.restoreVersion(
+      productSourceId,
+      version,
+      actorFor(currentUser),
+    );
+  }
+
+  /** The audit timeline: what happened to this source, when, and who did it. */
+  @Get(':id/actions')
+  @MinRole(UserRole.user)
+  @SerializeOptions({
+    strategy: 'exposeAll',
+    groups: [SerializeGroup.adminList, SerializeGroup.list],
+  })
+  async listActions(
+    @Param('id') productSourceId: string,
+    @Query() query: ProductSourceHistoryQueryDto,
+  ): Promise<ProductSourceActionListDto> {
+    const [items, total] = await this.versionService.listActions(productSourceId, {
+      skip: query.skip,
+      take: query.take,
+    });
+
+    return { items, total };
   }
 
   @Post(':id/full-sync')
   async triggerFullSync(
     @Param('id') productSourceId: string,
     @Body() body: TriggerProductSourceFullSyncDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<QueueStatusDto> {
     const source = await this.productSourceRepo.findOne({
       where: { id: productSourceId },
@@ -118,12 +249,28 @@ export class AdminProductSourceController {
       brandNames: body?.brandNames,
     });
 
+    // Recorded as 'manual' because this route only exists for a person
+    // pressing a button; the scheduler queues its own syncs without coming
+    // through here at all.
+    await this.versionService.recordAction(
+      source,
+      'sync_triggered',
+      {
+        mode: ProductSourceSyncMode.full,
+        trigger: 'manual',
+        categoryIds: body?.categoryIds ?? null,
+        brandNames: body?.brandNames ?? null,
+      },
+      actorFor(currentUser),
+    );
+
     return { status: 'queued' };
   }
 
   @Post(':id/incremental-sync')
   async triggerIncrementalSync(
     @Param('id') productSourceId: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<QueueStatusDto> {
     const source = await this.productSourceRepo.findOne({
       where: { id: productSourceId },
@@ -137,6 +284,13 @@ export class AdminProductSourceController {
       productSourceId,
       syncMode: ProductSourceSyncMode.incremental,
     });
+
+    await this.versionService.recordAction(
+      source,
+      'sync_triggered',
+      { mode: ProductSourceSyncMode.incremental, trigger: 'manual' },
+      actorFor(currentUser),
+    );
 
     return { status: 'queued' };
   }

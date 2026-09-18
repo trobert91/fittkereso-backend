@@ -27,6 +27,7 @@
  * override, ConfigLoader looks for the copy webpack puts next to main.js.
  */
 import { NestFactory } from '@nestjs/core';
+import { ProductSourceVersionService } from '@fittkereso-backend/product';
 import { AppModule } from '../src/app.module';
 import {
   ProductSource,
@@ -35,6 +36,7 @@ import {
   Seller,
   SellerRepository,
   SellerType,
+  systemActor,
 } from '@fittkereso-backend/database';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -136,6 +138,7 @@ async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const sourceRepo = app.get(ProductSourceRepository);
   const sellerRepo = app.get(SellerRepository);
+  const versionService = app.get(ProductSourceVersionService);
 
   try {
     for (const spec of SOURCES) {
@@ -163,11 +166,27 @@ async function main(): Promise<void> {
       }
 
       source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);
-      source.config = config;
+
+      // Saved before the config, because the version service addresses a
+      // source by id and a new row has none until it exists.
       const saved = await sourceRepo.save(source);
 
+      // The config goes in as a VERSION rather than onto the column, so a
+      // seeded source starts at v1 with a history like any other, and the
+      // schema check happens on the way. Null when the fixture already matches
+      // what is in force — the ordinary outcome of re-running this.
+      //
+      // It also ends this script's old habit of overwriting the column on every
+      // run: an edit somebody made through the admin UI now becomes a version
+      // this replaces rather than one that silently disappears.
+      const version = await versionService.addVersionIfChanged(saved.id, config, {
+        actor: systemActor('seed'),
+        note: `Seeded from ${spec.configFile}`,
+      });
+
       console.log(
-        `${existing ? 'Updated' : 'Created'} ProductSource "${saved.name}" (id=${saved.id})`,
+        `${existing ? 'Updated' : 'Created'} ProductSource "${saved.name}" (id=${saved.id}), ` +
+          `config: ${version ? `v${version.version}` : 'unchanged'}`,
       );
     }
   } finally {

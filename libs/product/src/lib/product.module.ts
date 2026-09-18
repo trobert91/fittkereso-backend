@@ -53,6 +53,7 @@ import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
 import { SellerUpdateService } from './services/seller/seller-update.service';
 import { ProductSourceUpdateService } from './services/product-source/product-source-update.service';
+import { ProductSourceVersionService } from './services/product-source/product-source-version.service';
 
 @Module({
   imports: [
@@ -111,6 +112,7 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     SellerProductSourceCreateService,
     SellerUpdateService,
     ProductSourceUpdateService,
+    ProductSourceVersionService,
   ],
   exports: [
     ProductImageDtoService,
@@ -151,6 +153,7 @@ import { ProductSourceUpdateService } from './services/product-source/product-so
     SellerProductSourceCreateService,
     SellerUpdateService,
     ProductSourceUpdateService,
+    ProductSourceVersionService,
   ],
 })
 export class ProductModule {}

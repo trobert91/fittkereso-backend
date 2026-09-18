@@ -4,6 +4,7 @@ import {
   ScrapeTaskRepository,
   ScrapeQueueName,
   ScrapeTask,
+  isProductSourceConfigInvalidError,
 } from '@fittkereso-backend/database';
 import {
   SCHEDULING_DEFAULTS,
@@ -12,6 +13,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScrapeTaskMetricsService } from '@fittkereso-backend/metrics';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { describeTaskError } from './describe-task-error';
 
 export abstract class BaseScrapeTaskManagerService {
   protected readonly logger = new CustomLogger(
@@ -97,17 +99,19 @@ export abstract class BaseScrapeTaskManagerService {
       this.taskMetricsService.taskFailed(task.queue, task.source.name);
 
       task.executionTimeInSec = (Date.now() - startTime) / 1000;
-      task.error = JSON.stringify(
-        error instanceof Error
-          ? { message: error.message, stack: error.stack }
-          : error,
-      );
+      task.error = describeTaskError(error);
       task.lastRunAt = new Date();
 
       task.attempts++;
       task.status = TaskStatus.FAILED;
-      // Exponential backoff: delay = 2^attempts * 1 minute (capped at 1 hour)
-      if (task.attempts < this.taskConfig.maxAttempts) {
+
+      // A failure retrying cannot change is parked immediately rather than
+      // repeated on a backoff for the same answer. See ScrapeTask.terminal.
+      if (isProductSourceConfigInvalidError(error)) {
+        task.terminal = true;
+        task.scheduledAt = null;
+      } else if (task.attempts < this.taskConfig.maxAttempts) {
+        // Exponential backoff: delay = 2^attempts * 1 minute (capped at 1 hour)
         const delayMinutes = Math.min(Math.pow(2, task.attempts), 60);
         task.scheduledAt = new Date(Date.now() + delayMinutes * 60 * 1000);
       } else {

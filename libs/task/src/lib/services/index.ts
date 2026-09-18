@@ -5,3 +5,4 @@ export * from './scrape-task-publisher.service';
 export * from './scrape-task-creator.service';
 
 export * from './base-scheduler';
+export * from './describe-task-error';

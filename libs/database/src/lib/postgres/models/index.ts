@@ -8,6 +8,8 @@ export * from './product-image.entity';
 export * from './product-model.entity';
 export * from './product-source-record.entity';
 export * from './product-source.entity';
+export * from './product-source-version.entity';
+export * from './product-source-action.entity';
 export * from './scrape-task.entity';
 export * from './task.entity';
 export * from './with-similarity';

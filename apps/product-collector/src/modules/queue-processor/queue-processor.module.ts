@@ -12,6 +12,7 @@ import {
 import { ScrapeTaskQueueDepthService } from './scrape-task/scrape-task-queue-depth.service';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
+import { ProductModule } from '@fittkereso-backend/product';
 
 @Module({
   imports: [
@@ -21,6 +22,9 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductScraperModule,
     TaskModule,
     MetricsModule,
+    // For ProductSourceVersionService, which the two config guards use to
+    // record a validation failure on the source's own timeline.
+    ProductModule,
   ],
   providers: [
     ProductSourceSyncListener,

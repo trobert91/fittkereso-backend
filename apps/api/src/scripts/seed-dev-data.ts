@@ -26,6 +26,13 @@
  * exception is ProductSource.config, which is always refreshed from the fixture
  * JSON - that file, not the database, is where the config is authored.
  *
+ * The config goes in through ProductSourceVersionService rather than onto the
+ * column, so a seeded source starts at v1 with a history like any other. That
+ * also makes the refresh above safe to repeat: an unchanged fixture is a no-op
+ * rather than a new version, and a changed one appends the next version instead
+ * of overwriting what was there. A config the schema rejects stops the seed
+ * rather than being written for a scrape task to fail on later.
+ *
  * Usage without npm:
  *   API_CONFIG_PATH=apps/api/src/config/config.yaml npx ts-node \
  *     --project apps/api/tsconfig.app.json -r tsconfig-paths/register \
@@ -53,7 +60,9 @@ import {
   Seller,
   SellerRepository,
   SellerType,
+  systemActor,
 } from '@fittkereso-backend/database';
+import { ProductSourceVersionService } from '@fittkereso-backend/product';
 import { generateSlug, nameOf } from '@fittkereso-backend/utils';
 import { AppModule } from '../app.module';
 import { AppConfigService } from '../modules/app-config/services/app-config.service';
@@ -294,6 +303,7 @@ function readConfig(configFile: string): ProductSourceConfig {
 
 async function seedSources(app: INestApplicationContext): Promise<void> {
   const sourceRepository = app.get(ProductSourceRepository);
+  const versionService = app.get(ProductSourceVersionService);
 
   for (const spec of SOURCES) {
     const existing = await sourceRepository.findOne({
@@ -315,12 +325,29 @@ async function seedSources(app: INestApplicationContext): Promise<void> {
     }
 
     source.seller = await resolveOrCreateSeller(app, spec.seller);
-    source.config = readConfig(spec.configFile);
 
+    // Saved WITHOUT the config first, because the version service addresses a
+    // source by id and a new row has none until it exists. A brand-new source
+    // is briefly configless, which is the state the column default already
+    // describes and which the next statement resolves.
     const saved = await sourceRepository.save(source);
+
+    // The config, as a version rather than a column write. Returns null when
+    // the fixture matches what is already in force, which is the ordinary
+    // outcome of re-running the seed.
+    const version = await versionService.addVersionIfChanged(
+      saved.id,
+      readConfig(spec.configFile),
+      {
+        actor: systemActor('seed'),
+        note: `Seeded from ${spec.configFile}`,
+      },
+    );
+
     console.log(
       `${existing ? 'Updated' : 'Created'} ProductSource "${saved.name}" ` +
-        `(${saved.id}, seller: ${saved.seller.name}).`,
+        `(${saved.id}, seller: ${saved.seller.name}, ` +
+        `config: ${version ? `v${version.version}` : 'unchanged'}).`,
     );
   }
 }

@@ -71,6 +71,18 @@ export class ScrapeTask extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   error?: any;
 
+  /**
+   * This task failed for a reason that retrying cannot change, so nothing will
+   * claim it again. See Task.terminal — same flag, same reasoning.
+   *
+   * Exposed on the list group so a failed task can be shown as settled rather
+   * than as one still working through its attempts.
+   */
+  @Index()
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @Expose({ groups: [SerializeGroup.list] })
+  terminal: boolean;
+
   /** What listing matching decided for this scrape. */
   @Column({ type: 'jsonb', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })

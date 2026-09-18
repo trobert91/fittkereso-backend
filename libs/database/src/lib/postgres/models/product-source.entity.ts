@@ -5,6 +5,8 @@ import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { ScrapeTask } from './scrape-task.entity';
 import { Seller } from './seller.entity';
 import { ProductSourceConfig } from '../types/product-source-config';
+import { ProductSourceVersion } from './product-source-version.entity';
+import { ProductSourceAction } from './product-source-action.entity';
 import ms from 'ms';
 
 @Entity()
@@ -28,6 +30,31 @@ export class ProductSource extends BasePostgresEntity {
 
   @OneToMany(() => ScrapeTask, (task) => task.source)
   tasks: ScrapeTask[];
+
+  /**
+   * The config history and the audit trail, newest first.
+   *
+   * Declared as relations but NEVER loaded through `relations: {...}`: two
+   * one-to-many collections joined in one query multiply into a cartesian
+   * product, so a source with 40 versions and 300 actions would fetch 12,000
+   * rows to render 340. The detail service loads each with its own ordered,
+   * bounded query and assigns them here.
+   *
+   * They ride on the source itself rather than being fetched separately by the
+   * client, so one response carries everything the details page renders — and
+   * an update answers with the history it just changed, instead of the page
+   * having to ask again and hope it asked late enough.
+   *
+   * Nothing cascades: these are append-only and written only by
+   * ProductSourceVersionService, so saving a source can never rewrite them.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @OneToMany(() => ProductSourceVersion, (version) => version.source)
+  versions?: ProductSourceVersion[];
+
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @OneToMany(() => ProductSourceAction, (action) => action.source)
+  actions?: ProductSourceAction[];
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })

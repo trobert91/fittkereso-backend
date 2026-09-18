@@ -7,6 +7,8 @@ export * from './product-image-repository';
 export * from './product-model-repository';
 export * from './product-source-record-repository';
 export * from './product-source-repository';
+export * from './product-source-version-repository';
+export * from './product-source-action-repository';
 export * from './scrape-task-repository';
 export * from './task-repository';
 export * from './translation-cache.repository';

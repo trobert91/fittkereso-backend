@@ -1,61 +1,41 @@
-import { ProductSourceConfig, ScrapeOperation } from '@fittkereso-backend/database';
-import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
-import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
-import { ProductValueMapperService } from '../services/product-value-mapper.service';
-import { registerOps } from '../ops/register-ops';
+import {
+  ProductSourceConfig,
+  ProductSourceConfigValidatorService,
+} from '@fittkereso-backend/database';
 import ebikeshopConfig from './ebikeshop.config.json';
 import speedbikeConfig from './speedbike.config.json';
 
-// Structural/registry validation of the hand-authored production configs —
-// not a live-site test, but catches typos in op names, missing required
-// pipeline sections, and structurally invalid JSON before these configs are
-// seeded as ProductSource.config rows in Phase 4.
+// Schema validation of the hand-authored production configs — not a live-site
+// test, but it catches typos in op names, missing or misspelled op
+// parameters, unknown keys, bad enum values and structurally invalid JSON
+// before these configs are seeded as ProductSource.config rows.
+//
+// This used to walk the config collecting `op` strings and probe the runtime
+// registry with each one, which checked only that every op NAME existed. The
+// schema checks the parameters too, so the hand-rolled walk is gone; what
+// keeps the schema's op list honest is scrape-operation-schema.spec.ts, which
+// compares it against that same registry directly.
 describe('hand-authored source configs', () => {
-  let registry: ScrapeOpRegistryService;
+  let validator: ProductSourceConfigValidatorService;
 
   beforeAll(() => {
-    registry = new ScrapeOpRegistryService();
-    const runner = new ScrapePipelineRunnerService(registry);
-    registerOps(registry, runner, new ProductValueMapperService());
+    validator = new ProductSourceConfigValidatorService();
   });
 
-  function collectOpNames(value: unknown, names: Set<string>): void {
-    if (Array.isArray(value)) {
-      for (const item of value) collectOpNames(item, names);
-      return;
-    }
-    if (value && typeof value === 'object') {
-      const obj = value as Record<string, unknown>;
-      if (typeof obj['op'] === 'string') {
-        names.add(obj['op']);
-      }
-      for (const key of Object.keys(obj)) {
-        collectOpNames(obj[key], names);
-      }
-    }
-  }
-
   function assertConfigValid(config: ProductSourceConfig, label: string) {
-    expect(config.baseUrl).toEqual(expect.any(String));
-    expect(config.listPage).toBeDefined();
-    expect(config.detailPage).toBeDefined();
-    expect(config.detailPage.rawSpecs).toBeDefined();
-    expect(config.detailPage.category.slugLookup.length).toBeGreaterThan(0);
+    const problems = validator.problems(config);
 
-    const opNames = new Set<string>();
-    collectOpNames(config, opNames);
-    for (const name of opNames) {
-      expect(() => registry.get(name as ScrapeOperation['op'])).not.toThrow(
-        `${label}: unknown op "${name}"`,
-      );
-    }
+    // Rendered into the failure message rather than asserted as `toBeNull()`:
+    // a bare "expected null, got [object Object]" would make somebody re-run
+    // this by hand to find out which path was wrong.
+    expect(problems ? `${label}: ${validator.format(problems)}` : null).toBeNull();
   }
 
-  it('validates the ebikeshop config against the op registry', () => {
+  it('validates the ebikeshop config against the config schema', () => {
     assertConfigValid(ebikeshopConfig as unknown as ProductSourceConfig, 'ebikeshop');
   });
 
-  it('validates the speedbike config against the op registry', () => {
+  it('validates the speedbike config against the config schema', () => {
     assertConfigValid(speedbikeConfig as unknown as ProductSourceConfig, 'speedbike');
   });
 

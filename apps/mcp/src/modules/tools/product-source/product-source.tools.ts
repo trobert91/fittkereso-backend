@@ -3,11 +3,15 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
   ProductSource,
+  ProductSourceConfigValidatorService,
   ProductSourceRepository,
   SellerRepository,
+  systemActor,
 } from '@fittkereso-backend/database';
 import {
+  ProductSourceUpdateParams,
   ProductSourceUpdateService,
+  ProductSourceVersionService,
   SellerProductSourceCreateService,
 } from '@fittkereso-backend/product';
 import {
@@ -25,7 +29,89 @@ export class ProductSourceTools {
     private readonly createService: SellerProductSourceCreateService,
     private readonly updateService: ProductSourceUpdateService,
     private readonly scraperService: ScraperService,
+    private readonly configValidator: ProductSourceConfigValidatorService,
+    private readonly versionService: ProductSourceVersionService,
   ) {}
+
+  // ─── Config schema tools ───────────────────────────────────────────────────
+
+  @Tool({
+    name: 'get_product_source_config_schema',
+    description:
+      'Get the JSON Schema that every ProductSourceConfig is validated against. It documents the whole config shape and every scrape operation, including each op\'s required and optional parameters. Read this BEFORE hand-writing or editing a config — update_product_source rejects anything that does not match it, and copying the shape from an existing config only shows the ops that config happens to use.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async getProductSourceConfigSchema(): Promise<string> {
+    return JSON.stringify(this.configValidator.schema, null, 2);
+  }
+
+  @Tool({
+    name: 'validate_all_product_source_configs',
+    description:
+      'Check every stored ProductSource.config against the config schema and report which sources do not conform. Read-only. Use it to find sources that need fixing — a non-conforming config fails its scrape and sync tasks outright rather than being scraped with the broken part skipped.',
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async validateAllProductSourceConfigs(): Promise<string> {
+    const sources = await this.productSourceRepo.find({
+      relations: { seller: true },
+    });
+
+    if (!sources.length) {
+      return 'No product sources exist.';
+    }
+
+    const lines: string[] = [];
+    let invalid = 0;
+    let unconfigured = 0;
+
+    for (const source of sources) {
+      // A source created but never configured holds `{}` — the column default.
+      // Reported apart from a broken config: nothing is wrong with it yet, it
+      // simply has not been filled in, and it cannot run either way.
+      if (!source.config || Object.keys(source.config).length === 0) {
+        unconfigured += 1;
+        lines.push(`- ${source.name} (${source.id}): no config yet`);
+        continue;
+      }
+
+      const problems = this.configValidator.problems(source.config);
+      if (!problems) continue;
+
+      invalid += 1;
+      lines.push(`- ${source.name} (${source.id}): ${problems.length} problem(s)`);
+      lines.push(...problems.map((problem) => `    ${problem.path}: ${problem.message}`));
+    }
+
+    const header =
+      `Checked ${sources.length} product source(s): ` +
+      `${sources.length - invalid - unconfigured} valid, ${invalid} invalid, ${unconfigured} unconfigured.`;
+
+    return lines.length ? `${header}\n\n${lines.join('\n')}` : header;
+  }
+
+  @Tool({
+    name: 'validate_product_source_config',
+    description:
+      'Check a ProductSourceConfig against the config schema WITHOUT saving anything. Use it while drafting, so a structural mistake is found before update_product_source refuses the write. Reports every problem with the JSON path it is at.',
+    parameters: z.object({
+      config: z
+        .record(z.string(), z.any())
+        .describe('The complete ProductSourceConfig JSON object to check.'),
+    }),
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async validateProductSourceConfig(args: {
+    config: Record<string, unknown>;
+  }): Promise<string> {
+    const problems = this.configValidator.problems(args.config);
+
+    if (!problems) {
+      return 'Valid — this config matches the product source config schema.';
+    }
+
+    const lines = problems.map((problem) => `- ${problem.path}: ${problem.message}`);
+    return `Invalid — ${problems.length} problem(s):\n${lines.join('\n')}`;
+  }
 
   // ─── Read Tools ────────────────────────────────────────────────────────────
 
@@ -131,7 +217,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'update_product_source',
     description:
-      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority, throttling (maxConcurrent, requestsPerHour), and full/incremental sync intervals (ms-compatible strings like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed.',
+      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority, throttling (maxConcurrent, requestsPerHour), and full/incremental sync intervals (ms-compatible strings like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to update'),
       name: z.string().min(1).optional(),
@@ -177,7 +263,15 @@ export class ProductSourceTools {
       // can report the seller link without a re-fetch.
       const source = await this.updateService.updateProductSource(
         productSourceId,
-        params as never,
+        // A system actor rather than a user: the MCP server authenticates as
+        // the server, not as a person, so attributing the change to any
+        // particular admin would be an invention. The label says which path
+        // wrote it, which is the honest answer.
+        // The config arrives from a tool call as an untyped object, so the
+        // cast is unavoidable here — and harmless, because updateProductSource
+        // validates it against the config schema before storing it. The
+        // compiler cannot vouch for this shape; the validator can.
+        { ...params, actor: systemActor('mcp') } as unknown as ProductSourceUpdateParams,
       );
 
       return `Product source "${source.name}" (${source.id}) updated.\n\n${this.formatSource(source)}`;
@@ -185,6 +279,173 @@ export class ProductSourceTools {
       const message = error instanceof Error ? error.message : String(error);
       return `Failed to update product source ${args.productSourceId}: ${message}`;
     }
+  }
+
+  // ─── Config version tools ──────────────────────────────────────────────────
+
+  @Tool({
+    name: 'list_product_source_versions',
+    description:
+      'List a ProductSource\'s config history, newest version first. Every config change writes a version, and the highest number is the one in force. Shows who made each one and any note, but not the configs themselves — use get_product_source_version for one.',
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID'),
+      take: z.number().int().min(1).max(100).optional().describe('Page size, default 25'),
+      skip: z.number().int().min(0).optional().describe('How many to skip, default 0'),
+    }),
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async listProductSourceVersions(args: {
+    productSourceId: string;
+    take?: number;
+    skip?: number;
+  }): Promise<string> {
+    const [versions, total] = await this.versionService.listVersions(
+      args.productSourceId,
+      { take: args.take, skip: args.skip },
+    );
+
+    if (!total) {
+      return 'This product source has no config versions yet.';
+    }
+
+    const current = versions[0]?.version;
+    const lines = versions.map((version) => {
+      const parts = [`v${version.version}`];
+      if (version.version === current && !args.skip) parts.push('(in force)');
+      parts.push(version.createdAt?.toISOString() ?? 'unknown date');
+      parts.push(this.describeActor(version));
+      if (version.restoredFromVersion) {
+        parts.push(`restored from v${version.restoredFromVersion}`);
+      }
+      if (version.note) parts.push(`"${version.note}"`);
+      return `- ${parts.join(' · ')}`;
+    });
+
+    return `${total} version(s):\n${lines.join('\n')}`;
+  }
+
+  @Tool({
+    name: 'get_product_source_version',
+    description:
+      'Get one numbered config version of a ProductSource, including the complete config JSON as it was at that revision. Use it to inspect what changed, or to read a config back before restoring it.',
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID'),
+      version: z.number().int().min(1).describe('The version number to fetch'),
+    }),
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async getProductSourceVersion(args: {
+    productSourceId: string;
+    version: number;
+  }): Promise<string> {
+    const version = await this.versionService.getVersion(
+      args.productSourceId,
+      args.version,
+    );
+
+    const header = [
+      `# Version ${version.version}`,
+      `Created: ${version.createdAt?.toISOString() ?? 'unknown'}`,
+      `By: ${this.describeActor(version)}`,
+      version.restoredFromVersion
+        ? `Restored from: v${version.restoredFromVersion}`
+        : null,
+      version.note ? `Note: ${version.note}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    return `${header}\n\n\`\`\`json\n${JSON.stringify(version.config, null, 2)}\n\`\`\``;
+  }
+
+  @Tool({
+    name: 'restore_product_source_version',
+    description:
+      'Put an earlier config version back into force. This writes a NEW version carrying the old config rather than moving or deleting anything — restoring v2 while v5 is current produces v6, v2 and v5 both stay in the history, and the restore is itself reversible.',
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID'),
+      version: z.number().int().min(1).describe('The version number to restore FROM'),
+    }),
+    annotations: { destructiveHint: false, idempotentHint: false },
+  })
+  async restoreProductSourceVersion(args: {
+    productSourceId: string;
+    version: number;
+  }): Promise<string> {
+    try {
+      const restored = await this.versionService.restoreVersion(
+        args.productSourceId,
+        args.version,
+        systemActor('mcp'),
+      );
+
+      // The restore answers with the whole source; the version it just wrote
+      // is the newest one on it, which is what the history is ordered by.
+      const created = restored.versions?.[0]?.version;
+
+      return `Restored version ${args.version}${created ? ` as new version ${created}` : ''}. The product source now runs the config from v${args.version}.`;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Failed to restore version ${args.version}: ${message}`;
+    }
+  }
+
+  @Tool({
+    name: 'get_product_source_history',
+    description:
+      'The audit timeline for a ProductSource: config versions written and restored, syncs triggered, scheduling/processing toggled, seller changes, and any run-time config validation failures. Newest first.',
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID'),
+      take: z.number().int().min(1).max(100).optional().describe('Page size, default 25'),
+      skip: z.number().int().min(0).optional().describe('How many to skip, default 0'),
+    }),
+    annotations: { readOnlyHint: true, idempotentHint: true },
+  })
+  async getProductSourceHistory(args: {
+    productSourceId: string;
+    take?: number;
+    skip?: number;
+  }): Promise<string> {
+    const [actions, total] = await this.versionService.listActions(
+      args.productSourceId,
+      { take: args.take, skip: args.skip },
+    );
+
+    if (!total) {
+      return 'This product source has no recorded history yet.';
+    }
+
+    const lines = actions.map((action) => {
+      const when = action.occurredAt?.toISOString() ?? 'unknown date';
+      const payload = Object.keys(action.payload ?? {}).length
+        ? ` ${JSON.stringify(action.payload)}`
+        : '';
+      return `- ${when} · ${action.type} · ${this.describeActor(action)}${payload}`;
+    });
+
+    return `${total} entr(ies):\n${lines.join('\n')}`;
+  }
+
+  /**
+   * Who did something, preferring the live account over the frozen label so a
+   * rename shows through, and falling back to the label once the account is
+   * gone. Never invents a name for a system row.
+   */
+  private describeActor(row: {
+    actorType: string;
+    actorUser?: { name?: string; email?: string } | null;
+    actorLabel?: string | null;
+  }): string {
+    if (row.actorType === 'system') {
+      return `system${row.actorLabel ? ` (${row.actorLabel})` : ''}`;
+    }
+
+    return (
+      row.actorUser?.name ||
+      row.actorUser?.email ||
+      row.actorLabel ||
+      'a deleted account'
+    );
   }
 
   // ─── Fetch Tools ───────────────────────────────────────────────────────────

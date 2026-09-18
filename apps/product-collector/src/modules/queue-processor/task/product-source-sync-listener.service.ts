@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import {
   ProductCategoryRepository,
   ProductSource,
+  ProductSourceConfigInvalidError,
+  ProductSourceConfigValidatorService,
   ProductSourceRepository,
   ProductSourceSyncMode,
+  QueueName,
+  systemActor,
 } from '@fittkereso-backend/database';
+import { ProductSourceVersionService } from '@fittkereso-backend/product';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   GenericProductSourceSyncService,
@@ -23,6 +28,8 @@ export class ProductSourceSyncListener {
     private readonly productCategoryRepo: ProductCategoryRepository,
     private readonly genericSyncService: GenericProductSourceSyncService,
     private readonly incrementalSyncService: IncrementalSyncService,
+    private readonly configValidator: ProductSourceConfigValidatorService,
+    private readonly versionService: ProductSourceVersionService,
   ) {}
 
   async process(message: ProductSourceSyncMessage): Promise<any> {
@@ -39,6 +46,12 @@ export class ProductSourceSyncListener {
           },
           transaction,
         );
+
+        // Before any work is done, and before either sync mode is chosen: a
+        // config that cannot be interpreted produces a sync that discovers
+        // nothing, or worse, half a catalogue. Failing here means the reason
+        // is on the task rather than surfacing later as an empty run.
+        await this.assertConfigValid(entity);
 
         if (message.syncMode === ProductSourceSyncMode.incremental) {
           await this.incrementalSyncService.sync(entity);
@@ -66,6 +79,46 @@ export class ProductSourceSyncListener {
       this.logger.error('Error processing ProductSourceSync job: ', error);
       throw error;
     }
+  }
+
+  /**
+   * Refuses a source whose stored config no longer matches the schema.
+   *
+   * Checked here even though every save path validates too: a config written
+   * before the schema existed, or before an op was renamed, passed the rules
+   * of its own day and can still be wrong now. The alternative is discovering
+   * it mid-pipeline, after the page fetches have been paid for.
+   *
+   * The failure is recorded on the source's own timeline as well as on the
+   * task, because "this source stopped working" is a question people ask of
+   * the source, not of a task list they would have to know to search.
+   */
+  private async assertConfigValid(source: ProductSource): Promise<void> {
+    const problems = this.configValidator.problems(source.config);
+    if (!problems) {
+      return;
+    }
+
+    const error = new ProductSourceConfigInvalidError(source, problems);
+
+    try {
+      await this.versionService.recordAction(
+        source,
+        'config_validation_failed',
+        { problems, queue: QueueName.ProductSourceSync },
+        systemActor('scheduler'),
+      );
+    } catch (recordError: unknown) {
+      // Never let an audit write turn into a second, misleading failure — the
+      // config problem is what the task must report.
+      this.logger.warn('Failed to record config validation failure', {
+        sourceId: source.id,
+        error:
+          recordError instanceof Error ? recordError.message : String(recordError),
+      });
+    }
+
+    throw error;
   }
 
   private async resolveSourceTitles(

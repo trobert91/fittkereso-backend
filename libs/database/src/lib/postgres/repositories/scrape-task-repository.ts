@@ -87,6 +87,10 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
           },
         )
         .andWhere(`source.${nameOf<ProductSource>('processingEnabled')} = true`)
+        // A terminal failure is never re-claimed, however many attempts are
+        // left. The status predicate above would otherwise keep picking up a
+        // task whose source config cannot parse, to fail it again identically.
+        .andWhere(`task.${nameOf<ScrapeTask>('terminal')} = false`)
         .andWhere(`task.${nameOf<ScrapeTask>('queue')} IN (:...queues)`, {
           queues,
         })

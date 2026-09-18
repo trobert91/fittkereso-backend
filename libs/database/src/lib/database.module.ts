@@ -37,6 +37,11 @@ import { ProductDuplicatePair } from './postgres/models/product-duplicate-pair.e
 import { ProductDuplicatePairRepository } from './postgres/repositories/product-duplicate-pair-repository';
 import { User } from './postgres/models/user.entity';
 import { UserRepository } from './postgres/repositories/user-repository';
+import { ProductSourceConfigValidatorService } from './postgres/services/product-source-config-validator.service';
+import { ProductSourceVersion } from './postgres/models/product-source-version.entity';
+import { ProductSourceVersionRepository } from './postgres/repositories/product-source-version-repository';
+import { ProductSourceAction } from './postgres/models/product-source-action.entity';
+import { ProductSourceActionRepository } from './postgres/repositories/product-source-action-repository';
 
 export const entityList = [
   Brand,
@@ -57,6 +62,8 @@ export const entityList = [
   PriceHistory,
   ProductDuplicatePair,
   User,
+  ProductSourceVersion,
+  ProductSourceAction,
 ];
 
 @Module({
@@ -79,6 +86,9 @@ export const entityList = [
     PriceHistoryRepository,
     ProductDuplicatePairRepository,
     UserRepository,
+    ProductSourceConfigValidatorService,
+    ProductSourceVersionRepository,
+    ProductSourceActionRepository,
   ],
   exports: [
     BrandAliasRepository,
@@ -98,6 +108,9 @@ export const entityList = [
     PriceHistoryRepository,
     ProductDuplicatePairRepository,
     UserRepository,
+    ProductSourceConfigValidatorService,
+    ProductSourceVersionRepository,
+    ProductSourceActionRepository,
   ],
 })
 export class DatabaseModule {}

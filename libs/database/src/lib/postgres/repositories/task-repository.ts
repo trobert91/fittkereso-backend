@@ -42,6 +42,10 @@ export class TaskRepository extends BasePostgresRepository<Task> {
           },
         )
         .andWhere(`${queueColumn} IN (:...queues)`, { queues })
+        // A terminal failure is never re-claimed, however many attempts are
+        // left. The predicate above would otherwise keep picking up a task
+        // whose config cannot parse, to fail it again for the same reason.
+        .andWhere(`task.${nameOf<Task>('terminal')} = false`)
         .andWhere(
           `(${scheduledAtColumn} IS NULL OR ${scheduledAtColumn} <= NOW())`,
         )
