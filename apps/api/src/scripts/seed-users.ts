@@ -4,6 +4,10 @@
  *   npm run seed:users:dev
  *   npm run seed:users:prod
  *
+ * npm run seed:dev runs the dev variant and then seed-dev-data.ts, which adds
+ * the brands, product category, sellers and product sources a dev database
+ * needs on top of the accounts.
+ *
  * There is deliberately no .sql seed here, unlike the control-plane project
  * this was ported from. That project's app tables and GoTrue's auth.users live
  * in the same Supabase Postgres, so its seeds could INSERT straight into
@@ -231,10 +235,18 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-bootstrap().catch((err) => {
-  console.error(
-    'Failed to seed users:',
-    err instanceof Error ? err.message : err,
-  );
-  process.exit(1);
-});
+bootstrap()
+  .then(() => {
+    // Supabase's client keeps handles open that app.close() knows nothing
+    // about, so the script would otherwise sit here long after its work is
+    // committed, looking like a hang - and npm run seed:dev would never reach
+    // its second step.
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(
+      'Failed to seed users:',
+      err instanceof Error ? err.message : err,
+    );
+    process.exit(1);
+  });
