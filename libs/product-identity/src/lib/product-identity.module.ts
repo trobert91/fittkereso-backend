@@ -9,6 +9,7 @@ import { ProductCandidateFinderService } from './product-candidate-finder.servic
 import { ProductDuplicateScanService } from './product-duplicate-scan.service';
 import { ProductDuplicateService } from './product-duplicate.service';
 import { ProductMatchQueryService } from './product-match-query.service';
+import { TokenIdfService } from './token-idf.service';
 
 /**
  * Product matching and duplicate detection. `CategoryConfigService` comes from
@@ -19,6 +20,7 @@ import { ProductMatchQueryService } from './product-match-query.service';
   providers: [
     ProductMatchQueryService,
     CandidateRecallService,
+    TokenIdfService,
     ProductCandidateFinderService,
     ListingMatchLlmService,
     ListingMatchService,
@@ -28,6 +30,7 @@ import { ProductMatchQueryService } from './product-match-query.service';
   exports: [
     ProductMatchQueryService,
     CandidateRecallService,
+    TokenIdfService,
     ProductCandidateFinderService,
     ListingMatchLlmService,
     ListingMatchService,

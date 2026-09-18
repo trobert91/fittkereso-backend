@@ -101,21 +101,21 @@ describe('case 2: the same bike in both shops, named differently, merges', () =>
       expect(outcomeOf(left, sameBike)).toBe('attach');
     });
 
-    it('merges the ABS rendering at exactly 83 on the name alone', () => {
+    it('merges the ABS rendering at exactly 86 on the name alone', () => {
       const left = listing(SPEEDBIKE, 'kapoho macina master');
       const right = withSpecs(
         listing(EBIKESHOP, 'abs kapoho macina master'),
         left.specs,
       );
 
-      expect(scoreOfPair(left, right)).toBe(83);
+      expect(scoreOfPair(left, right)).toBe(86);
       expect(outcomeOf(left, right)).toBe('attach');
     });
   });
 
   /** A shop's own two renderings of one bike, which really did merge. */
   describe('one shop’s two renderings of a single bike', () => {
-    it.each([[SPEEDBIKE, '773 l lycan macina', '773 lycan macina', 94]])(
+    it.each([[SPEEDBIKE, '773 l lycan macina', '773 lycan macina', 85]])(
       'merges %s %s with %s at %i',
       (shop, leftKey, rightKey, score) => {
         const left = listing(shop, leftKey);

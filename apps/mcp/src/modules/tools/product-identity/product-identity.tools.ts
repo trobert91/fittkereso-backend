@@ -147,15 +147,16 @@ export class ProductIdentityTools {
       L.push('Recall found no candidates.');
     } else {
       L.push(
-        '| # | Product | Matched on | Trigram | Levenshtein | Base | Failed gates | Score |',
+        '| # | Product | Matched on | Trigram | Levenshtein | Alignment | Base | Failed gates | Score |',
       );
       L.push(
-        '|---|---------|------------|---------|-------------|------|--------------|-------|',
+        '|---|---------|------------|---------|-------------|-----------|------|--------------|-------|',
       );
       candidates.forEach((candidate, index) => {
-        const { trigram, levenshtein } = candidate.nameSimilarity;
+        const { trigram, levenshtein, alignment } = candidate.nameSimilarity;
+        const align = alignment === undefined ? '—' : alignment.toFixed(2);
         L.push(
-          `| ${index + 1} | ${candidate.displayName} (${candidate.productId}) | ${candidate.matchedOn}: \`${candidate.matchedValue}\` | ${trigram.toFixed(2)} | ${levenshtein.toFixed(2)} | ${baseScore(candidate.nameSimilarity)} | ${this.formatGates(candidate.failedGates)} | ${candidate.score} |`,
+          `| ${index + 1} | ${candidate.displayName} (${candidate.productId}) | ${candidate.matchedOn}: \`${candidate.matchedValue}\` | ${trigram.toFixed(2)} | ${levenshtein.toFixed(2)} | ${align} | ${baseScore(candidate.nameSimilarity)} | ${this.formatGates(candidate.failedGates)} | ${candidate.score} |`,
         );
       });
     }

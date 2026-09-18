@@ -5,6 +5,10 @@
       "filterType": "multiselect"
     },
     {
+      "key": "gender",
+      "filterType": "multiselect"
+    },
+    {
       "key": "batteryCapacity",
       "filterType": "range"
     },
@@ -242,12 +246,17 @@
     "wheelSize",
     "torque",
     "usageType",
-    "frameType"
+    "frameType",
+    "gender"
   ],
   "matcherSpecHierarchies": {
     "usageType": {
-      "MTB": ["Összteleszkópos MTB"],
-      "Trekking": ["Cross Trekking"]
+      "MTB": [
+        "Összteleszkópos MTB"
+      ],
+      "Trekking": [
+        "Cross Trekking"
+      ]
     }
   },
   "matcherSpecs": [
@@ -259,13 +268,27 @@
   ],
   "matchingConfig": {
     "specTolerances": {
-      "modelYear": { "absolute": 0 },
-      "wheelSize": { "absolute": 0 },
-      "batteryCapacity": { "absolute": 0 },
-      "torque": { "absolute": 0 },
-      "gearCount": { "absolute": 0 },
-      "topSpeed": { "absolute": 0 },
-      "motorPower": { "absolute": 0 }
+      "modelYear": {
+        "absolute": 0
+      },
+      "wheelSize": {
+        "absolute": 0
+      },
+      "batteryCapacity": {
+        "absolute": 0
+      },
+      "torque": {
+        "absolute": 0
+      },
+      "gearCount": {
+        "absolute": 0
+      },
+      "topSpeed": {
+        "absolute": 0
+      },
+      "motorPower": {
+        "absolute": 0
+      }
     }
   },
   "normalizationStrategy": "full-sorted",

@@ -18,10 +18,18 @@ export type CandidateMatchedOn = 'name' | 'alias';
 /** How a pair was first found; set on insert and never changed. */
 export type DuplicateDetectedBy = 'scrape' | 'scan' | 'merge';
 
-/** Both name similarities, in [0, 1]: pg_trgm `similarity()` and 1 − edits / longer key length. */
+/**
+ * Every name similarity of one pair, in [0, 1]: pg_trgm `similarity()`,
+ * 1 − edits / longer key length, and the token alignment that tells a
+ * substitution from an omission. `baseScore` blends all three.
+ *
+ * `alignment` is optional only because rows written before the blend existed
+ * do not carry it; every fresh score sets it.
+ */
 export interface NameSimilarity {
   trigram: number;
   levenshtein: number;
+  alignment?: number;
 }
 
 /** A failed gate, with each product's value placed on the pair's A and B. */

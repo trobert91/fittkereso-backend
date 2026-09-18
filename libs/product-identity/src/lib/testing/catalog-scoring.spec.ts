@@ -1,6 +1,7 @@
 import { baseScore, nameSimilarity } from '../name-similarity';
 import { ACCEPT_SCORE, NEAR_MISS_SCORE } from '../product-identity.constants';
 import {
+  CATALOG_IDF,
   CATALOG,
   allScoredPairs,
   candidateOf,
@@ -108,23 +109,29 @@ describe('scoring the real KTM catalog', () => {
   });
 
   describe('name similarity', () => {
-    it('takes the better of trigram and Levenshtein', () => {
+    it('blends all three, and the character measures alone would overrate this pair', () => {
       // "771 …" against "772 …" differs by one character in twenty-nine, which
-      // Levenshtein reads far more generously than trigram does.
+      // Levenshtein reads far more generously than trigram does — and which
+      // both read far more generously than the alignment does, since a model
+      // number is never absorbed as a typo. The blend is what keeps two
+      // different bikes off ACCEPT_SCORE on the strength of one digit.
       const a = oneByKey('771 di2 glorious lycan macina');
       const b = oneByKey('772 di2 glorious lycan macina');
-      const similarity = nameSimilarity(trigramBetween(a, b), a.nameKey, b.nameKey);
+      const similarity = nameSimilarity(a.nameKey, b.nameKey, CATALOG_IDF);
 
-      expect(similarity.trigram).toBeCloseTo(0.875, 3);
+      expect(similarity.trigram).toBeCloseTo(trigramBetween(a, b), 6);
       expect(similarity.levenshtein).toBeGreaterThan(similarity.trigram);
-      expect(baseScore(similarity)).toBe(Math.round(100 * similarity.levenshtein));
+      expect(similarity.alignment).toBeLessThan(similarity.trigram);
+      expect(baseScore(similarity)).toBeLessThan(
+        Math.round(100 * similarity.levenshtein),
+      );
     });
 
-    it('scores a product against itself at 100 on both measures', () => {
+    it('scores a product against itself at 100 on all three measures', () => {
       const product = CATALOG[0];
-      const similarity = nameSimilarity(1, product.nameKey, product.nameKey);
+      const similarity = nameSimilarity(product.nameKey, product.nameKey, CATALOG_IDF);
 
-      expect(similarity).toEqual({ trigram: 1, levenshtein: 1 });
+      expect(similarity).toEqual({ trigram: 1, levenshtein: 1, alignment: 1 });
       expect(baseScore(similarity)).toBe(100);
     });
   });
@@ -136,11 +143,14 @@ describe('scoring the real KTM catalog', () => {
       expect(pairs).toHaveLength(334);
       // Was 9 before frameType became a primary spec on 2026-09-16.
       expect(pairs.filter((pair) => pair.score >= ACCEPT_SCORE)).toHaveLength(5);
+      // Was 10 before baseScore became a blend: the review band is where a
+      // name difference the character measures could not classify used to
+      // land, and six of those ten resolved to one side of it or the other.
       expect(
         pairs.filter(
           (pair) => pair.score >= NEAR_MISS_SCORE && pair.score < ACCEPT_SCORE,
         ),
-      ).toHaveLength(10);
+      ).toHaveLength(4);
     });
 
     /**
@@ -165,7 +175,7 @@ describe('scoring the real KTM catalog', () => {
         .map((pair) => [pair.query.nameKey, pair.candidate.nameKey, pair.score])
         .sort();
 
-      expect(risky).toEqual([['8973 kapoho l macina', '8973 kapoho macina', 90]]);
+      expect(risky).toEqual([['8973 kapoho l macina', '8973 kapoho macina', 84]]);
     });
   });
 });

@@ -97,15 +97,18 @@ describe('case 1: different bikes from the same shop stay different products', (
   });
 
   describe('the near-miss band, where a person or the LLM decides', () => {
-    it('holds Master and Prestige one point below attaching', () => {
-      // Same year, same battery, no gate fires: only the name distance is
-      // between them, and it lands at 79 — one point from a silent merge.
+    it('holds Master and Prestige well clear of attaching', () => {
+      // Same year, same battery, no gate fires: only the name is between them.
+      // "master" against "prestige" is a substitution — each name says
+      // something the other contradicts — and the blend scores that 68, twelve
+      // points off the bar. max(trigram, Levenshtein) had it at 79, one point
+      // from a silent merge, and it was the closest call in the whole set.
       const master = listing(EBIKESHOP, 'di2 macina master scarp sx');
       const prestige = listing(EBIKESHOP, 'di2 macina prestige scarp sx');
 
       expect(gatesOf(master, prestige)).toEqual([]);
-      expect(scoreOfPair(master, asProduct(prestige))).toBe(79);
-      expect(outcomeOf(master, asProduct(prestige))).toBe('ask_llm');
+      expect(scoreOfPair(master, asProduct(prestige))).toBe(68);
+      expect(outcomeOf(master, asProduct(prestige))).toBe('not_found');
     });
   });
 
@@ -129,15 +132,24 @@ describe('case 1: different bikes from the same shop stay different products', (
       },
     );
 
-    it.each([['6971 kapoho macina'], ['7973 kapoho macina'], ['8973 kapoho macina']])(
-      'but drags %s into review against the Elite row that has none',
-      (leftKey) => {
+    it.each([
+      ['6971 kapoho macina', 59],
+      ['7973 kapoho macina', 59],
+      ['8973 kapoho macina', 64],
+    ])(
+      'still separates %s from the Elite row that has none, at %i',
+      (leftKey, score) => {
         const left = listing(SPEEDBIKE, leftKey);
         const specless = listingWithoutSpecs(SPEEDBIKE, 'elite kapoho macina');
 
+        // With every gate skipped these used to land at 74, inside the review
+        // band, purely on character overlap with "elite kapoho macina". The
+        // name score now reads the difference for what it is — a model number
+        // against a trim word, two tokens neither side shares — so the
+        // specless row no longer drags them anywhere.
         expect(gatesOf(left, specless)).toEqual([]);
-        expect(scoreOfPair(left, asProduct(specless))).toBe(74);
-        expect(outcomeOf(left, asProduct(specless))).toBe('ask_llm');
+        expect(scoreOfPair(left, asProduct(specless))).toBe(score);
+        expect(outcomeOf(left, asProduct(specless))).toBe('not_found');
       },
     );
   });
@@ -161,8 +173,8 @@ describe('case 1: different bikes from the same shop stay different products', (
    */
   describe('differently-named pairs that attach within one shop', () => {
     it.each([
-      [SPEEDBIKE, '8973 kapoho l macina', '8973 kapoho macina', 90],
-      [EBIKESHOP, '810 belt city macina', '810 belt city macina tr', 88],
+      [SPEEDBIKE, '8973 kapoho l macina', '8973 kapoho macina', 84],
+      [EBIKESHOP, '810 belt city macina', '810 belt city macina tr', 86],
     ])(
       '%s attaches %s to %s at %i, which the reviewer confirmed is one bike',
       (shop, leftKey, rightKey, score) => {
@@ -188,9 +200,17 @@ describe('case 1: different bikes from the same shop stay different products', (
           .map((pair) => [shop, pair.a.nameKey, pair.b.nameKey, pair.score]),
       );
 
+      // The three GLORIOUS rows are new, and they are the point of the blend:
+      // speedbike extracted one title twice, keeping the colourway once and
+      // stripping it once, so its own catalogue holds the same bike under two
+      // products. The reviewer called all of them one bike (c014–c017). The
+      // old scorer put them at 70 and spent an LLM call on each.
       expect(attaching).toEqual([
-        [SPEEDBIKE, '8973 kapoho l macina', '8973 kapoho macina', 90],
-        [EBIKESHOP, '810 belt city macina', '810 belt city macina tr', 88],
+        [SPEEDBIKE, '8973 kapoho l macina', '8973 kapoho macina', 84],
+        [SPEEDBIKE, '771 di2 glorious lycan macina', '771 di2 lycan macina', 81],
+        [SPEEDBIKE, '771 di2 glorious lycan macina', '771 di2 lycan macina', 81],
+        [SPEEDBIKE, '772 di2 glorious lycan macina', '772 di2 lycan macina', 81],
+        [EBIKESHOP, '810 belt city macina', '810 belt city macina tr', 86],
       ]);
     });
 

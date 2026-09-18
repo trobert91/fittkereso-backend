@@ -36,7 +36,7 @@ function specGates(querySpecs: ProductSpecs, candidateSpecs: ProductSpecs) {
 /** Score of a candidate whose name key is identical to the query's. */
 function identicalNameScore(querySpecs: ProductSpecs, candidateSpecs: ProductSpecs) {
   return scoreOf(
-    baseScore(nameSimilarity(1, KEY, KEY)),
+    baseScore(nameSimilarity(KEY, KEY)),
     specGates(querySpecs, candidateSpecs),
   );
 }
@@ -159,11 +159,12 @@ describe('scoreOf', () => {
     expect(identicalNameScore(querySpecs, candidateSpecs)).toBe(expected);
   });
 
+  // The model numbers differ, so the gate fires; a subset passes.
   it.each([
-    ['720 cross macina', '725 cross macina', 64],
-    ['2024 720 cross macina', '720 cross macina', 76],
+    ['720 cross macina', '725 cross macina', 38],
+    ['2024 720 cross macina', '720 cross macina', 79],
   ])('scores "%s" against "%s" at %i', (queryKey, candidateKey, expected) => {
-    const base = baseScore(nameSimilarity(0, queryKey, candidateKey));
+    const base = baseScore(nameSimilarity(queryKey, candidateKey));
 
     expect(scoreOf(base, applyGates({ queryKey, candidateKey }))).toBe(expected);
   });

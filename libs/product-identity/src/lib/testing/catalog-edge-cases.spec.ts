@@ -46,16 +46,18 @@ describe('near misses the score correctly rejects', () => {
     expect(scoreBetween(di2, mechanical)).toBeLessThan(NEAR_MISS_SCORE);
   });
 
-  it('keeps two trims of one model just under the bar on name alone', () => {
-    // Master against Prestige: same year, same battery, no gate fires at all.
-    // Only the name distance holds it at 79 — one point from auto-attaching.
+  it('keeps two trims of one model well below the bar on name alone', () => {
+    // Master against Prestige: same year, same battery, no gate fires at all,
+    // so the name carries the whole decision. The two names each hold a token
+    // the other contradicts, which the blend reads as a substitution and
+    // scores 68. It was 79 under max(trigram, Levenshtein) — one point from
+    // auto-attaching, and the closest any wrong pair came.
     const master = oneByKey('di2 macina master scarp sx');
     const prestige = oneByKey('di2 macina prestige scarp sx');
 
     expect(gatesBetween(master, prestige)).toEqual([]);
-    expect(scoreBetween(master, prestige)).toBe(79);
-    expect(scoreBetween(master, prestige)).toBeLessThan(ACCEPT_SCORE);
-    expect(scoreBetween(master, prestige)).toBeGreaterThanOrEqual(NEAR_MISS_SCORE);
+    expect(scoreBetween(master, prestige)).toBe(68);
+    expect(scoreBetween(master, prestige)).toBeLessThan(NEAR_MISS_SCORE);
   });
 
   it.each([
@@ -94,7 +96,7 @@ describe('frame-token pairs that still attach', () => {
     return found;
   }
 
-  it.each([['8973 kapoho l macina', '8973 kapoho macina', 2026, 90]])(
+  it.each([['8973 kapoho l macina', '8973 kapoho macina', 2026, 84]])(
     'attaches %s to %s (%i) at %i with no gate to stop it',
     (leftKey, rightKey, modelYear, score) => {
       const left = productOf(leftKey, modelYear);
@@ -121,7 +123,7 @@ describe('frame-token pairs that still attach', () => {
     expect(gatesBetween(he2026, city2026)).toEqual([
       expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'frameType' }),
     ]);
-    expect(scoreBetween(he2026, city2026)).toBe(58);
+    expect(scoreBetween(he2026, city2026)).toBe(55);
     expect(scoreBetween(he2026, city2026)).toBeLessThan(NEAR_MISS_SCORE);
   });
 
@@ -147,7 +149,7 @@ describe('frame-token pairs that still attach', () => {
       trekking.map((tr) => scoreBetween(city, tr)),
     );
 
-    expect(Math.max(...scores)).toBe(58);
+    expect(Math.max(...scores)).toBe(56);
     expect(scores.some((score) => score >= ACCEPT_SCORE)).toBe(false);
   });
 });

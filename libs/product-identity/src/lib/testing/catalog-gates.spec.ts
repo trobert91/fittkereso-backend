@@ -14,6 +14,14 @@ describe('gates on the real KTM catalog', () => {
     // frameType moved from matcherSpecs to primarySpecs on 2026-09-16: the
     // shops publish a real frame shape (Magas / Trapéz / Alacsony) and a
     // different shape is a different product, so it costs 30, not 5.
+    //
+    // `gender` was split out of it on 2026-09-17. One enum used to hold two
+    // unrelated concepts — the step-over geometry ebikeshop publishes and the
+    // rider speedbike names in its titles — with no value in common, so every
+    // cross-shop pair that had both populated mismatched on vocabulary rather
+    // than on the bikes. It is primary at the same 30 because within one shop
+    // a Férfi/Női difference was a different product on all 28 pairs of the
+    // catalog that have one, and the same product on none.
     expect(EBIKES.primarySpecs).toEqual([
       'modelYear',
       'batteryCapacity',
@@ -21,6 +29,7 @@ describe('gates on the real KTM catalog', () => {
       'torque',
       'usageType',
       'frameType',
+      'gender',
     ]);
     expect(EBIKES.matcherSpecs).toEqual([
       'motorPower',

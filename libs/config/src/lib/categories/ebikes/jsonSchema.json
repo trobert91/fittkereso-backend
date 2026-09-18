@@ -35,18 +35,27 @@
         "order": 1
       },
       "enum": [
-        "Női",
-        "Férfi",
-        "Gyermek",
-        "Alacsony",
         "Magas",
-        "Trapéz",
-        "Összecsukható",
-        "Cargo"
+        "Alacsony",
+        "Trapéz"
       ],
       "type": "string",
       "title": "Frame type",
       "translation": "Váztípus"
+    },
+    "gender": {
+      "meta": {
+        "order": 2
+      },
+      "enum": [
+        "Férfi",
+        "Női",
+        "Uniszex",
+        "Gyermek"
+      ],
+      "type": "string",
+      "title": "Target rider",
+      "translation": "Nem"
     },
     "usageType": {
       "meta": {

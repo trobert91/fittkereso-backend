@@ -136,7 +136,7 @@ describe('duplicate detection on the real KTM catalog', () => {
       const [a, b] = pairByKey('di2 macina master scarp sx');
       const row = pairRowOf(a.id, candidateOf(a, b), 'merge');
 
-      expect(row.nameSimilarity).toEqual({ trigram: 1, levenshtein: 1 });
+      expect(row.nameSimilarity).toEqual({ trigram: 1, levenshtein: 1, alignment: 1 });
       expect(row.similarityScore).toBe(100);
     });
 
@@ -152,9 +152,10 @@ describe('duplicate detection on the real KTM catalog', () => {
   it('keeps the pair count sane — detection is not a cross join', () => {
     const paired = allScoredPairs().filter((pair) => pair.score >= NEAR_MISS_SCORE);
 
-    // 334 pairs are recalled; 15 are worth a person's attention. It was 19
+    // 334 pairs are recalled; 9 are worth a person's attention. It was 19
     // until frameType became a primary spec and pushed four frame-shape pairs
-    // below the bar.
-    expect(paired).toHaveLength(15);
+    // below the bar, then 15 until baseScore became a blend and the trim-word
+    // pairs it used to leave in the band dropped out of it.
+    expect(paired).toHaveLength(9);
   });
 });

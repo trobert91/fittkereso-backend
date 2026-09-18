@@ -1,19 +1,21 @@
 {
   "baseUrl": "https://ebikeshop.hu",
   "fullSyncStartUrl": "https://ebikeshop.hu/termekek/elektromos-kerekparok",
-
   "categories": {
-    "ebikes": { "enabled": true, "sourceTitle": "Elektromos kerékpárok" }
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "Elektromos kerékpárok"
+    }
   },
-
   "incrementalSync": {
-    "searchKeywords": ["elektromos kerékpár ebikeshop"],
+    "searchKeywords": [
+      "elektromos kerékpár ebikeshop"
+    ],
     "numResults": 40,
     "urlClassify": {
       "detailUrlPattern": "ebikeshop\\.hu\\/termek\\/[^/?#]+\\/?$"
     }
   },
-
   "listPage": {
     "categoryName": [
       {
@@ -23,9 +25,7 @@
         "path": "props.meta.h1Title"
       }
     ],
-
     "categoryLinks": [],
-
     "productLinks": [
       {
         "op": "parseJsonAttr",
@@ -43,13 +43,16 @@
       {
         "op": "mapJsonArray",
         "fields": {
-          "url": { "path": "showPageUrl" },
-          "title": { "path": "productName" }
+          "url": {
+            "path": "showPageUrl"
+          },
+          "title": {
+            "path": "productName"
+          }
         }
       }
     ]
   },
-
   "detailPage": {
     "rawSpecs": [
       {
@@ -63,7 +66,9 @@
         "op": "mapJsonArray",
         "on": "propsArray",
         "fields": {
-          "name": { "path": "categoryTitle" },
+          "name": {
+            "path": "categoryTitle"
+          },
           "values": {
             "path": "value",
             "template": "{{value}} {{quantityUnit}}",
@@ -72,16 +77,22 @@
         }
       }
     ],
-
     "category": {
       "breadcrumbOrSource": [
-        { "op": "literal", "value": "Elektromos kerékpárok" }
+        {
+          "op": "literal",
+          "value": "Elektromos kerékpárok"
+        }
       ],
       "slugLookup": [
-        { "when": { "always": true }, "slug": "ebikes" }
+        {
+          "when": {
+            "always": true
+          },
+          "slug": "ebikes"
+        }
       ]
     },
-
     "brand": [
       {
         "op": "parseJsonAttr",
@@ -105,9 +116,14 @@
         "trim": true,
         "as": "legalManufacturerClean"
       },
-      { "op": "coalesce", "candidates": ["manufacturerTitle", "legalManufacturerClean"] }
+      {
+        "op": "coalesce",
+        "candidates": [
+          "manufacturerTitle",
+          "legalManufacturerClean"
+        ]
+      }
     ],
-
     "externalId": [
       {
         "op": "parseJsonAttr",
@@ -116,7 +132,6 @@
         "path": "props.product.productCode"
       }
     ],
-
     "model": [
       {
         "op": "parseJsonAttr",
@@ -146,13 +161,23 @@
         "flags": "i"
       }
     ],
-
     "releaseYear": [
-      { "op": "mapSpecValue", "label": "Modellév", "single": true },
-      { "op": "prependPrefix", "prefix": "20" },
-      { "op": "regexCapture", "pattern": "\\d+", "group": 0, "cast": "number" }
+      {
+        "op": "mapSpecValue",
+        "label": "Modellév",
+        "single": true
+      },
+      {
+        "op": "prependPrefix",
+        "prefix": "20"
+      },
+      {
+        "op": "regexCapture",
+        "pattern": "\\d+",
+        "group": 0,
+        "cast": "number"
+      }
     ],
-
     "images": [
       {
         "op": "parseJsonAttr",
@@ -177,52 +202,224 @@
       {
         "op": "mapJsonArray",
         "fields": {
-          "url": { "path": "url" }
+          "url": {
+            "path": "url"
+          }
         },
         "flattenField": "url"
       }
     ],
-
     "specMapping": {
       "ebikes": {
         "mappings": [
-          { "key": "gender", "labels": ["Nem"] },
-          { "key": "frameType", "labels": ["Váztípus"] },
-          { "key": "frameSize", "labels": ["Vázméret"], "extract": "number" },
-          { "key": "usageType", "labels": ["Felhasználás módja"] },
-          { "key": "condition", "labels": ["Állapot"] },
-          { "key": "batteryPosition", "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"] },
-          { "key": "wheelSize", "labels": ["Kerékméret"], "extract": "number" },
-          { "key": "drivetrain", "labels": ["Erőátvitel"] },
-          { "key": "suspension", "labels": ["Rugózás"] },
-          { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
-          { "key": "gearType", "labels": ["Váltó típusa"] },
-          { "key": "gearCount", "labels": ["Váltó sebességfokozatainak száma"], "extract": "number" },
-          { "key": "shiftingActuation", "labels": ["Váltó működése"] },
-          { "key": "rearDerailleur", "labels": ["Váltó"] },
-          { "key": "batteryCapacity", "labels": ["Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
-          { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
-          { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
-          { "key": "motorBrand", "labels": ["Motor gyártója"] },
-          { "key": "motorModel", "labels": ["Motor típusa"] },
-          { "key": "motorPower", "labels": ["Motor teljesítménye"], "extract": "number" },
-          { "key": "topSpeed", "labels": ["Maximális rásegítés", "Maximális sebesség", "Motoros rásegítés sebessége"], "extract": "number" },
-          { "key": "range", "labels": ["Hatótávolság"], "extract": "number" },
-          { "key": "chargingTime", "labels": ["Töltési idő"], "extract": "number" },
-          { "key": "display", "labels": ["Kijelző", "Kijelzővel rendelkezik", "Kijelző típus"] },
-          { "key": "maxLoad", "labels": ["Maximális terhelhetőség", "Emelt teherbírás"], "extract": "number" },
-          { "key": "weight", "labels": ["Tömeg", "Súly"], "extract": "number" },
-          { "key": "waterResistance", "labels": ["Védettségi szint", "Vízállóság"] },
-          { "key": "smartConnectivity", "labels": ["Applikáció", "GPS követés"] }
+          {
+            "key": "gender",
+            "labels": [
+              "Nem",
+              "Váztípus"
+            ]
+          },
+          {
+            "key": "frameType",
+            "labels": [
+              "Váztípus"
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": [
+              "Vázméret"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "usageType",
+            "labels": [
+              "Felhasználás módja"
+            ]
+          },
+          {
+            "key": "condition",
+            "labels": [
+              "Állapot"
+            ]
+          },
+          {
+            "key": "batteryPosition",
+            "labels": [
+              "Akku elhelyezkedése",
+              "Akkumulátor elhelyezkedése"
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": [
+              "Kerékméret"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "drivetrain",
+            "labels": [
+              "Erőátvitel"
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": [
+              "Rugózás"
+            ]
+          },
+          {
+            "key": "brakeType",
+            "labels": [
+              "Fékfajta",
+              "Féktípus"
+            ]
+          },
+          {
+            "key": "gearType",
+            "labels": [
+              "Váltó típusa"
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "Váltó sebességfokozatainak száma"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": [
+              "Váltó működése"
+            ]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": [
+              "Váltó"
+            ]
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": [
+              "Akku kapacitás",
+              "Akkumulátor kapacitása"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": [
+              "Nyomaték",
+              "Motor nyomaték"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "motorPosition",
+            "labels": [
+              "Motor elhelyezkedése"
+            ]
+          },
+          {
+            "key": "motorBrand",
+            "labels": [
+              "Motor gyártója"
+            ]
+          },
+          {
+            "key": "motorModel",
+            "labels": [
+              "Motor típusa"
+            ]
+          },
+          {
+            "key": "motorPower",
+            "labels": [
+              "Motor teljesítménye"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "topSpeed",
+            "labels": [
+              "Maximális rásegítés",
+              "Maximális sebesség",
+              "Motoros rásegítés sebessége"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "range",
+            "labels": [
+              "Hatótávolság"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "chargingTime",
+            "labels": [
+              "Töltési idő"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "display",
+            "labels": [
+              "Kijelző",
+              "Kijelzővel rendelkezik",
+              "Kijelző típus"
+            ]
+          },
+          {
+            "key": "maxLoad",
+            "labels": [
+              "Maximális terhelhetőség",
+              "Emelt teherbírás"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "weight",
+            "labels": [
+              "Tömeg",
+              "Súly"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "waterResistance",
+            "labels": [
+              "Védettségi szint",
+              "Vízállóság"
+            ]
+          },
+          {
+            "key": "smartConnectivity",
+            "labels": [
+              "Applikáció",
+              "GPS követés"
+            ]
+          }
         ]
       }
     },
-
     "offers": {
       "offerList": [
-        { "op": "selectAll", "selector": "script" },
-        { "op": "findScriptContaining", "contains": "\"@type\":\"Offer\"" },
-        { "op": "wrapInArray" }
+        {
+          "op": "selectAll",
+          "selector": "script"
+        },
+        {
+          "op": "findScriptContaining",
+          "contains": "\"@type\":\"Offer\""
+        },
+        {
+          "op": "wrapInArray"
+        }
       ],
       "itemMode": "json",
       "itemPipeline": [
@@ -246,7 +443,12 @@
             },
             {
               "op": "branch",
-              "condition": { "equals": { "value": "onSaleForOriginalPrice", "to": true } },
+              "condition": {
+                "equals": {
+                  "value": "onSaleForOriginalPrice",
+                  "to": true
+                }
+              },
               "ifTrue": [
                 {
                   "op": "parseJsonAttr",
@@ -266,7 +468,10 @@
             }
           ],
           "currency": [
-            { "op": "literal", "value": "HUF" }
+            {
+              "op": "literal",
+              "value": "HUF"
+            }
           ],
           "availability": [
             {
@@ -287,7 +492,10 @@
             }
           ],
           "url": [
-            { "op": "buildBaseUrl", "from": "task.url" }
+            {
+              "op": "buildBaseUrl",
+              "from": "task.url"
+            }
           ],
           "externalId": [
             {
@@ -319,7 +527,9 @@
               "selector": "li span:not(.text-success):not(.text-error), li a",
               "within": "storesContainer"
             },
-            { "op": "extractTextList" },
+            {
+              "op": "extractTextList"
+            },
             {
               "op": "filterOutEqualsIgnoreCase",
               "against": "manufacturerStockLabel"
@@ -328,7 +538,6 @@
         }
       ]
     },
-
     "translation": {
       "enabled": false,
       "sourceLanguage": "hu",

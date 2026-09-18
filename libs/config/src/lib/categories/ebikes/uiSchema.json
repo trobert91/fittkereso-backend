@@ -8,6 +8,9 @@
   "frameType": {
     "ui:widget": "select"
   },
+  "gender": {
+    "ui:widget": "select"
+  },
   "usageType": {
     "ui:widget": "select"
   },
@@ -327,6 +330,7 @@
   "ui:order": [
     "modelYear",
     "frameType",
+    "gender",
     "batteryCapacity",
     "motorModel",
     "wheelSize",

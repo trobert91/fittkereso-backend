@@ -68,17 +68,19 @@ describe('case 4: different bikes from different shops stay different products',
   });
 
   describe('the closest cross-shop call in the catalog', () => {
-    it('sends Master against Prestige to the LLM instead of merging them', () => {
-      // 73 on the name, and not one gate fires: the shops agree on every spec
-      // they both publish. Only the name distance keeps these two apart, and
-      // it is the nearest any two different bikes get across the two shops.
+    it('keeps Master and Prestige apart on the name alone, without the LLM', () => {
+      // Not one gate fires: the shops agree on every spec they both publish,
+      // so the name is the only thing holding these two apart. "master"
+      // against "prestige" is a substitution — each side naming something the
+      // other contradicts — which the blend scores 65, well clear of review.
+      // max(trigram, Levenshtein) put it at 73 and spent an LLM call on it.
       const master = listing(SPEEDBIKE, 'kapoho macina master');
       const prestige = listing(EBIKESHOP, 'kapoho macina prestige');
 
       expect(master.productId).not.toBe(prestige.productId);
       expect(gatesOf(master, prestige)).toEqual([]);
-      expect(scoreOfPair(master, asProduct(prestige))).toBe(73);
-      expect(outcomeOf(master, asProduct(prestige))).toBe('ask_llm');
+      expect(scoreOfPair(master, asProduct(prestige))).toBe(65);
+      expect(outcomeOf(master, asProduct(prestige))).toBe('not_found');
     });
 
     it('lists every cross-shop pair of different bikes that reaches review', () => {
@@ -86,10 +88,10 @@ describe('case 4: different bikes from different shops stay different products',
         .filter((pair) => pair.score >= NEAR_MISS_SCORE && !pair.sameBike)
         .map((pair) => [pair.speedbike.nameKey, pair.ebikeshop.nameKey, pair.score]);
 
-      // Two, and both are real questions rather than mistakes: a Master against
-      // a Prestige, and speedbike's 2022 Chacana against ebikeshop's 2023.
+      // One, and it is a real question rather than a mistake: speedbike's 2022
+      // Chacana against ebikeshop's 2023, identical names a model year apart.
+      // The Master/Prestige pair used to sit here too and no longer does.
       expect(reviewed).toEqual([
-        ['kapoho macina master', 'kapoho macina prestige', 73],
         ['chacana lfc macina', 'chacana lfc macina', 70],
       ]);
     });
@@ -141,7 +143,7 @@ describe('case 4: different bikes from different shops stay different products',
     const created = pairs.filter((pair) => pair.score < NEAR_MISS_SCORE);
 
     expect(pairs.length).toBeGreaterThan(20);
-    expect(pairs.length - created.length).toBe(2);
+    expect(pairs.length - created.length).toBe(1);
   });
 
   it('attaches nothing across the two shops but the four bikes they share', () => {

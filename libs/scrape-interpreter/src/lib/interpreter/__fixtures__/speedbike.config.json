@@ -1,36 +1,49 @@
 {
   "baseUrl": "https://speedbike.hu",
   "fullSyncStartUrl": "https://speedbike.hu/elektromos-kerekpar",
-
   "categories": {
-    "ebikes": { "enabled": true, "sourceTitle": "E-BIKE" }
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "E-BIKE"
+    }
   },
-
   "incrementalSync": {
-    "searchKeywords": ["elektromos kerékpár speedbike"],
+    "searchKeywords": [
+      "elektromos kerékpár speedbike"
+    ],
     "numResults": 40,
     "urlClassify": {
       "detailUrlPattern": "speedbike\\.hu\\/[^/?#]+-elektromos-[^/?#]*kerekpar[^/?#]*\\/?$"
     }
   },
-
   "listPage": {
     "categoryName": [
-      { "op": "selectText", "selector": "h1.page-head-center-title", "first": true, "trim": true }
+      {
+        "op": "selectText",
+        "selector": "h1.page-head-center-title",
+        "first": true,
+        "trim": true
+      }
     ],
     "categoryLinks": [],
     "productLinks": [
-      { "op": "selectAll", "selector": ".snapshot-list-item.list_prouctname", "as": "boxes" },
+      {
+        "op": "selectAll",
+        "selector": ".snapshot-list-item.list_prouctname",
+        "as": "boxes"
+      },
       {
         "op": "extractLinkFromBox",
         "on": "boxes",
         "linkSelector": "a.list-productname-link",
         "first": true,
-        "titleFrom": ["attr:title", "text"]
+        "titleFrom": [
+          "attr:title",
+          "text"
+        ]
       }
     ]
   },
-
   "detailPage": {
     "rawSpecs": [
       {
@@ -46,10 +59,13 @@
         "dedupeBy": "name"
       }
     ],
-
     "category": {
       "breadcrumbOrSource": [
-        { "op": "selectAll", "selector": "[itemprop=\"itemListElement\"]", "as": "breadcrumbItems" },
+        {
+          "op": "selectAll",
+          "selector": "[itemprop=\"itemListElement\"]",
+          "as": "breadcrumbItems"
+        },
         {
           "op": "selectNestedText",
           "on": "breadcrumbItems",
@@ -60,13 +76,26 @@
         }
       ],
       "slugLookup": [
-        { "when": { "equalsIgnoreCase": "E-BIKE" }, "slug": "ebikes" }
+        {
+          "when": {
+            "equalsIgnoreCase": "E-BIKE"
+          },
+          "slug": "ebikes"
+        }
       ]
     },
-
     "brand": [
-      { "op": "selectAll", "selector": "script", "as": "scripts" },
-      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
       {
         "op": "regexCapture",
         "value": "shopRenterJson",
@@ -76,10 +105,18 @@
         "cast": "jsonString"
       }
     ],
-
     "model": [
-      { "op": "selectAll", "selector": "script", "as": "scripts" },
-      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
       {
         "op": "regexCapture",
         "value": "shopRenterJson",
@@ -96,10 +133,18 @@
         "flags": "i"
       }
     ],
-
     "externalId": [
-      { "op": "selectAll", "selector": "script", "as": "scripts" },
-      { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
       {
         "op": "regexCapture",
         "value": "shopRenterJson",
@@ -108,108 +153,470 @@
         "trim": true
       }
     ],
-
     "releaseYear": [
-      { "op": "mapSpecValue", "label": "E-bike évjárat", "single": true, "cast": "number" }
+      {
+        "op": "mapSpecValue",
+        "label": "E-bike évjárat",
+        "single": true,
+        "cast": "number"
+      }
     ],
-
     "images": [
-      { "op": "selectAll", "selector": "meta[property=\"og:image\"]" },
-      { "op": "extractAttrList", "attr": "content", "trim": true }
+      {
+        "op": "selectAll",
+        "selector": "meta[property=\"og:image\"]"
+      },
+      {
+        "op": "extractAttrList",
+        "attr": "content",
+        "trim": true
+      }
     ],
-
     "specMapping": {
       "ebikes": {
         "mappings": [
-          { "key": "frameType", "labels": ["Váztípus"] },
-          { "key": "usageType", "labels": ["Felhasználás módja"] },
-          { "key": "batteryPosition", "labels": ["Akku elhelyezkedése", "Akkumulátor elhelyezkedése"] },
-          { "key": "drivetrain", "labels": ["Erőátvitel"] },
-          { "key": "suspension", "labels": ["Rugózás"] },
-          { "key": "brakeType", "labels": ["Fékfajta", "Féktípus"] },
-          { "key": "gearType", "labels": ["Váltó típusa"] },
-          { "key": "batteryCapacity", "labels": ["wattora", "Akku kapacitás", "Akkumulátor kapacitása"], "extract": "number" },
-          { "key": "torque", "labels": ["Nyomaték", "Motor nyomaték"], "extract": "number" },
-          { "key": "motorPosition", "labels": ["Motor elhelyezkedése"] },
-          { "key": "motorPower", "labels": ["Motor teljesítménye"], "extract": "number" },
-          { "key": "topSpeed", "labels": ["Maximális rásegítés", "Maximális sebesség", "Motoros rásegítés sebessége"], "extract": "number" },
-          { "key": "range", "labels": ["Hatótávolság"], "extract": "number" },
-          { "key": "chargingTime", "labels": ["Töltési idő"], "extract": "number" },
-          { "key": "display", "labels": ["Kijelző", "Kijelzővel rendelkezik"] },
-          { "key": "maxLoad", "labels": ["Maximális terhelhetőség"], "extract": "number" },
-          { "key": "weight", "labels": ["Tömeg", "Súly"], "extract": "number" },
-          { "key": "waterResistance", "labels": ["Védettségi szint", "Vízállóság"] },
-          { "key": "smartConnectivity", "labels": ["Applikáció", "GPS követés"] },
-          { "key": "gpsModule", "labels": ["GPS modul"] },
-          { "key": "abs", "labels": ["ABS"] },
-
-          { "key": "frameModel", "labels": ["Váz"] },
-          { "key": "forkModel", "labels": ["Villa"] },
-          { "key": "rearShockModel", "labels": ["Lengéscsillapító"] },
-          { "key": "ebikeSystem", "labels": ["E-System"] },
-          { "key": "motorModel", "labels": ["Motor"] },
-          { "key": "batteryModel", "labels": ["Akkumulátor"] },
-          { "key": "batteryLock", "labels": ["Akku zár"] },
-          { "key": "chargerModel", "labels": ["Töltő"] },
-
-          { "key": "rearDerailleur", "labels": ["Hátsó váltó"] },
-          { "key": "frontDerailleur", "labels": ["Első váltó"] },
-          { "key": "shifter", "labels": ["Váltókar jobb", "Váltókar bal"] },
-          { "key": "crankset", "labels": ["Hajtókar"] },
-          { "key": "bottomBracket", "labels": ["Középcsapágy"] },
-          { "key": "chainring", "labels": ["Lánckerék"] },
-          { "key": "cassette", "labels": ["Fogaskoszorú"] },
-          { "key": "chain", "labels": ["Lánc"] },
-
-          { "key": "brakeModel", "labels": ["Első fék", "Hátsó fék"] },
-          { "key": "rotorModel", "labels": ["Első féktárcsa", "Hátsó féktárcsa"] },
-
-          { "key": "wheelset", "labels": ["Első kerék", "Hátsó kerék"] },
-          { "key": "rimModel", "labels": ["Első felni", "Hátsó felni"] },
-          { "key": "hubModel", "labels": ["Első agy", "Hátsó agy"] },
-          { "key": "spokes", "labels": ["Első küllők", "Hátsó küllők"] },
-          { "key": "tireModel", "labels": ["Első gumi", "Hátsó gumi"] },
-
-          { "key": "grips", "labels": ["Markolat"] },
-          { "key": "handlebar", "labels": ["Kormány"] },
-          { "key": "stem", "labels": ["Kormányszár"] },
-          { "key": "headset", "labels": ["Kormánycsapágy"] },
-          { "key": "saddle", "labels": ["Nyereg"] },
-          { "key": "seatpost", "labels": ["Nyeregcső"] },
-          { "key": "seatClamp", "labels": ["Nyeregbilincs"] },
-          { "key": "pedals", "labels": ["Pedál"] },
-
-          { "key": "rack", "labels": ["Hordozó"] },
-          { "key": "lighting", "labels": ["Első lámpa", "Hátsó lámpa"] },
-          { "key": "fenders", "labels": ["Első sárvédő", "Hátsó sárvédő"] },
-          { "key": "chainGuard", "labels": ["Láncvédő"] },
-          { "key": "kickstand", "labels": ["Kitámasztó"] }
+          {
+            "key": "frameType",
+            "labels": [
+              "Váztípus"
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": [
+              "Váztípus"
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": [
+              "Felhasználás módja"
+            ]
+          },
+          {
+            "key": "batteryPosition",
+            "labels": [
+              "Akku elhelyezkedése",
+              "Akkumulátor elhelyezkedése"
+            ]
+          },
+          {
+            "key": "drivetrain",
+            "labels": [
+              "Erőátvitel"
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": [
+              "Rugózás"
+            ]
+          },
+          {
+            "key": "brakeType",
+            "labels": [
+              "Fékfajta",
+              "Féktípus"
+            ]
+          },
+          {
+            "key": "gearType",
+            "labels": [
+              "Váltó típusa"
+            ]
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": [
+              "wattora",
+              "Akku kapacitás",
+              "Akkumulátor kapacitása"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": [
+              "Nyomaték",
+              "Motor nyomaték"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "motorPosition",
+            "labels": [
+              "Motor elhelyezkedése"
+            ]
+          },
+          {
+            "key": "motorPower",
+            "labels": [
+              "Motor teljesítménye"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "topSpeed",
+            "labels": [
+              "Maximális rásegítés",
+              "Maximális sebesség",
+              "Motoros rásegítés sebessége"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "range",
+            "labels": [
+              "Hatótávolság"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "chargingTime",
+            "labels": [
+              "Töltési idő"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "display",
+            "labels": [
+              "Kijelző",
+              "Kijelzővel rendelkezik"
+            ]
+          },
+          {
+            "key": "maxLoad",
+            "labels": [
+              "Maximális terhelhetőség"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "weight",
+            "labels": [
+              "Tömeg",
+              "Súly"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "waterResistance",
+            "labels": [
+              "Védettségi szint",
+              "Vízállóság"
+            ]
+          },
+          {
+            "key": "smartConnectivity",
+            "labels": [
+              "Applikáció",
+              "GPS követés"
+            ]
+          },
+          {
+            "key": "gpsModule",
+            "labels": [
+              "GPS modul"
+            ]
+          },
+          {
+            "key": "abs",
+            "labels": [
+              "ABS"
+            ]
+          },
+          {
+            "key": "frameModel",
+            "labels": [
+              "Váz"
+            ]
+          },
+          {
+            "key": "forkModel",
+            "labels": [
+              "Villa"
+            ]
+          },
+          {
+            "key": "rearShockModel",
+            "labels": [
+              "Lengéscsillapító"
+            ]
+          },
+          {
+            "key": "ebikeSystem",
+            "labels": [
+              "E-System"
+            ]
+          },
+          {
+            "key": "motorModel",
+            "labels": [
+              "Motor"
+            ]
+          },
+          {
+            "key": "batteryModel",
+            "labels": [
+              "Akkumulátor"
+            ]
+          },
+          {
+            "key": "batteryLock",
+            "labels": [
+              "Akku zár"
+            ]
+          },
+          {
+            "key": "chargerModel",
+            "labels": [
+              "Töltő"
+            ]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": [
+              "Hátsó váltó"
+            ]
+          },
+          {
+            "key": "frontDerailleur",
+            "labels": [
+              "Első váltó"
+            ]
+          },
+          {
+            "key": "shifter",
+            "labels": [
+              "Váltókar jobb",
+              "Váltókar bal"
+            ]
+          },
+          {
+            "key": "crankset",
+            "labels": [
+              "Hajtókar"
+            ]
+          },
+          {
+            "key": "bottomBracket",
+            "labels": [
+              "Középcsapágy"
+            ]
+          },
+          {
+            "key": "chainring",
+            "labels": [
+              "Lánckerék"
+            ]
+          },
+          {
+            "key": "cassette",
+            "labels": [
+              "Fogaskoszorú"
+            ]
+          },
+          {
+            "key": "chain",
+            "labels": [
+              "Lánc"
+            ]
+          },
+          {
+            "key": "brakeModel",
+            "labels": [
+              "Első fék",
+              "Hátsó fék"
+            ]
+          },
+          {
+            "key": "rotorModel",
+            "labels": [
+              "Első féktárcsa",
+              "Hátsó féktárcsa"
+            ]
+          },
+          {
+            "key": "wheelset",
+            "labels": [
+              "Első kerék",
+              "Hátsó kerék"
+            ]
+          },
+          {
+            "key": "rimModel",
+            "labels": [
+              "Első felni",
+              "Hátsó felni"
+            ]
+          },
+          {
+            "key": "hubModel",
+            "labels": [
+              "Első agy",
+              "Hátsó agy"
+            ]
+          },
+          {
+            "key": "spokes",
+            "labels": [
+              "Első küllők",
+              "Hátsó küllők"
+            ]
+          },
+          {
+            "key": "tireModel",
+            "labels": [
+              "Első gumi",
+              "Hátsó gumi"
+            ]
+          },
+          {
+            "key": "grips",
+            "labels": [
+              "Markolat"
+            ]
+          },
+          {
+            "key": "handlebar",
+            "labels": [
+              "Kormány"
+            ]
+          },
+          {
+            "key": "stem",
+            "labels": [
+              "Kormányszár"
+            ]
+          },
+          {
+            "key": "headset",
+            "labels": [
+              "Kormánycsapágy"
+            ]
+          },
+          {
+            "key": "saddle",
+            "labels": [
+              "Nyereg"
+            ]
+          },
+          {
+            "key": "seatpost",
+            "labels": [
+              "Nyeregcső"
+            ]
+          },
+          {
+            "key": "seatClamp",
+            "labels": [
+              "Nyeregbilincs"
+            ]
+          },
+          {
+            "key": "pedals",
+            "labels": [
+              "Pedál"
+            ]
+          },
+          {
+            "key": "rack",
+            "labels": [
+              "Hordozó"
+            ]
+          },
+          {
+            "key": "lighting",
+            "labels": [
+              "Első lámpa",
+              "Hátsó lámpa"
+            ]
+          },
+          {
+            "key": "fenders",
+            "labels": [
+              "Első sárvédő",
+              "Hátsó sárvédő"
+            ]
+          },
+          {
+            "key": "chainGuard",
+            "labels": [
+              "Láncvédő"
+            ]
+          },
+          {
+            "key": "kickstand",
+            "labels": [
+              "Kitámasztó"
+            ]
+          }
         ]
       }
     },
-
     "offers": {
       "offerList": [
-        { "op": "selectAll", "selector": ".product-page-price-wrapper" }
+        {
+          "op": "selectAll",
+          "selector": ".product-page-price-wrapper"
+        }
       ],
       "itemMode": "cheerio",
       "itemPipeline": [
         {
           "op": "assembleOffer",
           "price": [
-            { "op": "selectAttr", "selector": "meta[itemprop=\"price\"]", "attr": "content", "first": true, "trim": true }
+            {
+              "op": "selectAttr",
+              "selector": "meta[itemprop=\"price\"]",
+              "attr": "content",
+              "first": true,
+              "trim": true
+            }
           ],
           "priceWithoutDiscount": [
-            { "op": "selectText", "selector": ".price_original_color", "first": true, "trim": true },
-            { "op": "regexCapture", "pattern": "([\\d.]+)\\s*Ft", "group": 1, "as": "priceWithoutDiscountWithDots" },
-            { "op": "stripPattern", "value": "priceWithoutDiscountWithDots", "pattern": "\\.", "flags": "g" }
+            {
+              "op": "selectText",
+              "selector": ".price_original_color",
+              "first": true,
+              "trim": true
+            },
+            {
+              "op": "regexCapture",
+              "pattern": "([\\d.]+)\\s*Ft",
+              "group": 1,
+              "as": "priceWithoutDiscountWithDots"
+            },
+            {
+              "op": "stripPattern",
+              "value": "priceWithoutDiscountWithDots",
+              "pattern": "\\.",
+              "flags": "g"
+            }
           ],
           "currency": [
-            { "op": "selectAttr", "selector": "meta[itemprop=\"pricecurrency\"]", "attr": "content", "first": true, "trim": true }
+            {
+              "op": "selectAttr",
+              "selector": "meta[itemprop=\"pricecurrency\"]",
+              "attr": "content",
+              "first": true,
+              "trim": true
+            }
           ],
           "availability": [
-            { "op": "selectAttr", "selector": "link[itemprop=\"availability\"]", "attr": "href", "first": true, "trim": true },
-            { "op": "regexCapture", "pattern": "schema\\.org/(\\w+)", "group": 1 },
+            {
+              "op": "selectAttr",
+              "selector": "link[itemprop=\"availability\"]",
+              "attr": "href",
+              "first": true,
+              "trim": true
+            },
+            {
+              "op": "regexCapture",
+              "pattern": "schema\\.org/(\\w+)",
+              "group": 1
+            },
             {
               "op": "mapValue",
               "cases": {
@@ -225,11 +632,23 @@
             }
           ],
           "url": [
-            { "op": "buildBaseUrl", "from": "task.url" }
+            {
+              "op": "buildBaseUrl",
+              "from": "task.url"
+            }
           ],
           "externalId": [
-            { "op": "selectAll", "selector": "script", "as": "scripts" },
-            { "op": "findScriptContaining", "on": "scripts", "contains": "ShopRenter.product", "as": "shopRenterJson" },
+            {
+              "op": "selectAll",
+              "selector": "script",
+              "as": "scripts"
+            },
+            {
+              "op": "findScriptContaining",
+              "on": "scripts",
+              "contains": "ShopRenter.product",
+              "as": "shopRenterJson"
+            },
             {
               "op": "regexCapture",
               "value": "shopRenterJson",
@@ -241,14 +660,12 @@
         }
       ]
     },
-
     "translation": {
       "enabled": false,
       "sourceLanguage": "hu",
       "targetLanguage": "en",
       "contextTemplate": "Technical specification values from a speedbike.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."
     },
-
     "postProcess": {
       "enabled": true
     }

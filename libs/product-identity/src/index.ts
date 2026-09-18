@@ -10,6 +10,7 @@ export * from './lib/listing-match.service';
 export * from './lib/duplicate-pairs';
 export * from './lib/product-match-query.service';
 export * from './lib/candidate-recall.service';
+export * from './lib/token-idf.service';
 export * from './lib/product-candidate-finder.service';
 export * from './lib/product-duplicate.service';
 export * from './lib/product-duplicate-scan.service';

@@ -7,9 +7,10 @@ import {
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { applyGates, scoreOf } from './gates';
-import { baseScore, nameSimilarity } from './name-similarity';
+import { TokenIdf, baseScore, nameSimilarity } from './name-similarity';
 import { CandidateRecallService, RecallRow } from './candidate-recall.service';
 import { ProductMatchQueryService } from './product-match-query.service';
+import { TokenIdfService } from './token-idf.service';
 import type { ProductCandidate, ProductMatchQuery } from './types';
 
 interface ScoredRow {
@@ -32,16 +33,20 @@ export class ProductCandidateFinderService {
     private readonly productRepo: ProductModelRepository,
     private readonly queryService: ProductMatchQueryService,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly tokenIdf: TokenIdfService,
   ) {}
 
   public async findCandidates(
     query: ProductMatchQuery,
   ): Promise<ProductCandidate[]> {
-    const rows = await this.recall.recall(query);
-    const bestRows = this.bestRowPerProduct(
-      query,
-      rows.filter((row) => row.productId !== query.productId),
+    const rows = (await this.recall.recall(query)).filter(
+      (row) => row.productId !== query.productId,
     );
+    if (isEmpty(rows)) return [];
+
+    // Only worth a query once something was recalled to score.
+    const idf = await this.tokenIdf.forScope(query.brandId, query.categoryId);
+    const bestRows = this.bestRowPerProduct(query, rows, idf);
     if (isEmpty(bestRows)) return [];
 
     const products = keyBy(
@@ -98,6 +103,7 @@ export class ProductCandidateFinderService {
   private bestRowPerProduct(
     query: ProductMatchQuery,
     rows: RecallRow[],
+    idf: TokenIdf,
   ): ScoredRow[] {
     const scored = rows.map((row): ScoredRow => {
       const candidateKey =
@@ -108,7 +114,7 @@ export class ProductCandidateFinderService {
               categorySlug: query.categorySlug,
             })
           : row.matchedValue;
-      const similarity = nameSimilarity(row.trigram, query.nameKey, candidateKey);
+      const similarity = nameSimilarity(query.nameKey, candidateKey, idf);
       return { row, candidateKey, similarity, base: baseScore(similarity) };
     });
 

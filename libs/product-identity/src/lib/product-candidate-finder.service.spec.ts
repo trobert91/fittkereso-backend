@@ -1,6 +1,7 @@
 import type { ProductModel, ProductSpecs } from '@fittkereso-backend/database';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
 import type { RecallRow } from './candidate-recall.service';
+import { FLAT_IDF } from './name-similarity';
 import { ProductCandidateFinderService } from './product-candidate-finder.service';
 import { ProductMatchQueryService } from './product-match-query.service';
 import type { ProductMatchQuery } from './types';
@@ -9,6 +10,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
   let recall: { recall: jest.Mock };
   let productRepo: { find: jest.Mock };
   let categoryConfigService: { getConfig: jest.Mock };
+  let tokenIdf: { forScope: jest.Mock };
   let finder: ProductCandidateFinderService;
 
   const query: ProductMatchQuery = {
@@ -38,11 +40,13 @@ describe('ProductCandidateFinderService.findCandidates', () => {
     recall = { recall: jest.fn().mockResolvedValue([]) };
     productRepo = { find: jest.fn().mockResolvedValue([]) };
     categoryConfigService = { getConfig: jest.fn().mockReturnValue(undefined) };
+    tokenIdf = { forScope: jest.fn().mockResolvedValue(FLAT_IDF) };
     finder = new ProductCandidateFinderService(
       recall as never,
       productRepo as never,
       new ProductMatchQueryService(new ProductNormalizerService(), categoryConfigService as never),
       categoryConfigService as never,
+      tokenIdf as never,
     );
   });
 
@@ -58,7 +62,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
     expect(productRepo.find).not.toHaveBeenCalled();
   });
 
-  it("keeps each product's best row, re-keying an alias before Levenshtein", async () => {
+  it("keeps each product's best row, scoring an alias on its re-keyed form", async () => {
     recall.recall.mockResolvedValue([
       row('p1', 'name', '140 hybrid', 0.6),
       // Raw alias with the brand in front: re-keyed, it equals the query key.
@@ -73,7 +77,9 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       productId: 'p1',
       matchedOn: 'alias',
       matchedValue: 'Cube Stereo Hybrid 140',
-      nameSimilarity: { trigram: 0.5, levenshtein: 1 },
+      // Re-keyed, the alias equals the query key, so all three agree on 1 —
+      // recall's own 0.5 described the raw alias and never reaches the score.
+      nameSimilarity: { trigram: 1, levenshtein: 1, alignment: 1 },
       score: 100,
       failedGates: [],
     });

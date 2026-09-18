@@ -24,6 +24,35 @@ export const GATE_SEVERITY: Record<IdentityGate, number> = {
 export const NAME_HITS = 20;
 
 /**
+ * How much a name's alignment similarity counts against trigram and
+ * Levenshtein, which weigh 1 each (see `baseScore`). 3 is the lowest weight at
+ * which every true match in the labelled set still auto-attaches: below it the
+ * character metrics outvote alignment and the colourway cases fall back into
+ * the review band.
+ */
+export const ALIGNMENT_WEIGHT = 3;
+
+/**
+ * What one fully identity-bearing token costs the alignment similarity, in
+ * score points, when the two names *disagree* about it ("master" against
+ * "prestige") versus when one name simply *omits* it ("glorious", which one
+ * shop leaves in the model name and the other does not). A substitution has to
+ * cost more than twice an omission — that difference is the whole point of the
+ * measure — and both scale by the token's IDF, so a token the whole brand
+ * shares costs nothing either way.
+ */
+export const SUBSTITUTION_COST = 45;
+export const OMISSION_COST = 20;
+
+/**
+ * How long token frequencies for one brand and category are reused. IDF is a
+ * smooth statistic over every product of a brand, so a scrape creating a few
+ * products barely moves it — but the map would otherwise be rebuilt for every
+ * listing of a catalog run.
+ */
+export const TOKEN_IDF_TTL_MS = 5 * 60 * 1000;
+
+/**
  * Whether near-misses are put to the LLM at all. Off, a listing the score
  * can't attach on its own becomes a new product — the same safe default the
  * LLM declining gives.

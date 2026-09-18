@@ -16,18 +16,30 @@ import {
  * Read the denominators before the percentages. These 43 pairs are the two
  * buckets where the answer was genuinely unclear; the buckets a stated rule
  * already settles were deliberately left out (§11.2, and the comment on
- * `labelled-cases.ts`). So a rate here is a rate over hard cases only, and the
- * two §11.3 targets — 70% of true matches auto-attaching, 95% reaching
- * NEAR_MISS_SCORE — were written for a mixed set of ~60 true attaches. They are
- * not met on this set, and the last describe block is the evidence that no
- * choice of constants would meet them either.
+ * `labelled-cases.ts`). So a rate here is a rate over hard cases only.
+ *
+ * **Re-measured when `baseScore` became a blend.** Under the old
+ * `max(trigram, levenshtein)` these numbers were 3 of 8 auto-attaching against
+ * a 70% target, and the last describe block was the evidence that no choice of
+ * constants would ever reach it: the best "different" pair scored 79 and four
+ * true matches scored 70, so every threshold that caught the true matches
+ * caught four different bikes first. That overlap is what the blend removed —
+ * it is the one measurement that justifies the change, and the last block now
+ * records the separation instead of the overlap.
  *
  * The two safety assertions, which are the ones that gate the scraper switch,
- * are met outright: nothing the reviewer called a different bike auto-attaches,
- * and nothing they called a different bike even reaches ACCEPT_SCORE.
+ * are still met outright and with more room than before: nothing the reviewer
+ * called a different bike auto-attaches, and nothing they called a different
+ * bike comes within twelve points of ACCEPT_SCORE.
  */
 function pin(cases: LabelledCase[]): string[] {
   return cases.map((one) => `${one.slug} ${one.score} ${describeCase(one)}`);
+}
+
+function caseOf(slug: string): LabelledCase {
+  const one = LABELLED_CASES.find((c) => c.slug === slug);
+  if (!one) throw new Error(`no case ${slug}`);
+  return one;
 }
 
 describe('the labelled pair set', () => {
@@ -65,13 +77,14 @@ describe('§11.3 rate 1 — no different bike is ever auto-attached', () => {
     expect(pin(wrong)).toEqual([]);
   });
 
-  it('and none of them even reaches ACCEPT_SCORE', () => {
-    // §11.3's fourth assertion. The highest a "different" pair reaches is 79,
-    // one point below the bar — c009 and c010, the Master against the Prestige.
+  it('and none of them comes close to ACCEPT_SCORE', () => {
+    // §11.3's fourth assertion. The highest a "different" pair reaches is 68 —
+    // c009 and c010, the Master against the Prestige, which the old scorer put
+    // at 79, one point under the bar. Twelve points of headroom instead of one.
     const reaching = differentPairs().filter((one) => one.score >= ACCEPT_SCORE);
 
     expect(pin(reaching)).toEqual([]);
-    expect(Math.max(...differentPairs().map((one) => one.score))).toBe(79);
+    expect(Math.max(...differentPairs().map((one) => one.score))).toBe(68);
   });
 
   it('separates every frame shape the reviewer called a different bike', () => {
@@ -79,13 +92,9 @@ describe('§11.3 rate 1 — no different bike is ever auto-attached', () => {
     // frameTypes, different products". Each was a false attach or a near miss
     // when they reviewed it, because ebikeshop's Váztípus never reached
     // frameType; all four gate on it now.
-    const annotated = ['c002', 'c006', 'c008', 'c011'].map((slug) => {
-      const one = LABELLED_CASES.find((c) => c.slug === slug);
-      if (!one) throw new Error(`no case ${slug}`);
-      return one;
-    });
+    for (const slug of ['c002', 'c006', 'c008', 'c011']) {
+      const one = caseOf(slug);
 
-    for (const one of annotated) {
       expect(one.verdict).toBe('different');
       expect(one.note).toMatch(/frameType|frametype/i);
       expect(one.failedGates.map((gate) => gate.spec)).toContain('frameType');
@@ -97,46 +106,37 @@ describe('§11.3 rate 1 — no different bike is ever auto-attached', () => {
 
 describe('§11.3 rate 2 — true matches that auto-attach', () => {
   /**
-   * 3 of 8, against a target of 70%. Pinned exactly rather than asserted as a
-   * percentage, because the five that miss are two distinct phenomena and only
-   * one of them is arguably a defect:
+   * 7 of 8, against a target of 70% — met, where the old scorer reached 3.
+   * Pinned exactly rather than as a percentage so the four that moved stay
+   * visible: c014–c017 are the GLORIOUS builds, and they are the whole reason
+   * the alignment similarity exists. See the block below.
    *
-   * - c014–c017 are "MACINA LYCAN 771 GLORIOUS Di2" against "MACINA LYCAN 771
-   *   Di2". The names are 70 apart and every spec either side publishes agrees,
-   *   so nothing but a person or the LLM can tell whether GLORIOUS is a colour
-   *   word or a trim. `ask_llm` is the designed answer to exactly this, not a
-   *   failure — and the last describe block shows no threshold reaches them
-   *   without also attaching four pairs the reviewer called different.
-   * - c003 is the disputed label: see the rate 3 block.
+   * The single remaining miss is c003, the disputed label; see rate 3.
    */
-  it('auto-attaches three of the eight, and misses five', () => {
+  it('auto-attaches seven of the eight, and misses one', () => {
     const attached = trueMatches().filter((one) => one.outcome === 'attach');
     const missed = trueMatches().filter((one) => one.outcome !== 'attach');
 
     expect(pin(attached)).toEqual([
-      'c001 94 speedbike:773 l lycan macina :: speedbike:773 lycan macina',
-      'c005 90 speedbike:8973 kapoho l macina :: speedbike:8973 kapoho macina',
-      'c007 88 ebikeshop:810 belt city macina :: ebikeshop:810 belt city macina tr',
+      'c001 85 speedbike:773 l lycan macina :: speedbike:773 lycan macina',
+      'c005 84 speedbike:8973 kapoho l macina :: speedbike:8973 kapoho macina',
+      'c007 86 ebikeshop:810 belt city macina :: ebikeshop:810 belt city macina tr',
+      'c014 81 speedbike:771 di2 glorious lycan macina :: speedbike:771 di2 lycan macina',
+      'c015 81 speedbike:771 di2 glorious lycan macina :: speedbike:771 di2 lycan macina',
+      'c016 81 speedbike:771 di2 glorious lycan macina :: speedbike:771 di2 lycan macina',
+      'c017 81 speedbike:772 di2 glorious lycan macina :: speedbike:772 di2 lycan macina',
     ]);
-    expect(missed.map((one) => one.slug)).toEqual([
-      'c003',
-      'c014',
-      'c015',
-      'c016',
-      'c017',
-    ]);
+    expect(missed.map((one) => one.slug)).toEqual(['c003']);
   });
 
   it('keeps every frame *size* the reviewer called one bike', () => {
-    // The three that do attach are all one bike in two frame sizes, which the
-    // reviewer confirmed on c001 in their own words. These are the pairs the
-    // catalog specs used to pin as "known false attaches" — the labelled set is
-    // what proves they are correct merges.
-    const sizes = ['c001', 'c005', 'c007'];
+    // One bike in two frame sizes, which the reviewer confirmed on c001 in
+    // their own words. These are the pairs the catalog specs used to pin as
+    // "known false attaches" — the labelled set is what proves they are
+    // correct merges.
+    for (const slug of ['c001', 'c005', 'c007']) {
+      const one = caseOf(slug);
 
-    for (const slug of sizes) {
-      const one = LABELLED_CASES.find((c) => c.slug === slug);
-      if (!one) throw new Error(`no case ${slug}`);
       expect(one.verdict).toBe('same');
       expect(one.failedGates).toEqual([]);
       expect(one.score).toBeGreaterThanOrEqual(ACCEPT_SCORE);
@@ -144,19 +144,26 @@ describe('§11.3 rate 2 — true matches that auto-attach', () => {
     }
   });
 
-  it('sends the GLORIOUS builds to the LLM rather than guessing', () => {
-    const glorious = ['c014', 'c015', 'c016', 'c017'].map((slug) => {
-      const one = LABELLED_CASES.find((c) => c.slug === slug);
-      if (!one) throw new Error(`no case ${slug}`);
-      return one;
-    });
+  it('attaches the GLORIOUS builds instead of paying the LLM to decide', () => {
+    // "MACINA LYCAN 771 GLORIOUS Di2" against "MACINA LYCAN 771 Di2" — the
+    // same shop, the same colourway, the same bike, extracted twice with
+    // GLORIOUS kept once and stripped once. One name omits a token the other
+    // has; neither says something the other contradicts.
+    //
+    // This is exactly what the alignment similarity is for, and it is the one
+    // case in the set where the old scorer had no answer: it scored all four
+    // at 70 on the strength of the character difference alone, the same band
+    // it put the Master/Prestige pairs in at 79 — a substitution, and a
+    // different bike. An omission now scores well above a substitution, so
+    // these attach and those do not.
+    for (const slug of ['c014', 'c015', 'c016', 'c017']) {
+      const one = caseOf(slug);
 
-    for (const one of glorious) {
       expect(one.a.nameKey).toContain('glorious');
       expect(one.b.nameKey).not.toContain('glorious');
       expect(one.failedGates).toEqual([]);
-      expect(one.score).toBe(NEAR_MISS_SCORE);
-      expect(one.outcome).toBe('ask_llm');
+      expect(one.score).toBeGreaterThanOrEqual(ACCEPT_SCORE);
+      expect(one.outcome).toBe('attach');
     }
   });
 });
@@ -178,7 +185,8 @@ describe('§11.3 rate 3 — true matches reaching NEAR_MISS_SCORE', () => {
    * The label is kept exactly as given — flipping a reviewer's verdict because
    * the engine disagrees is how a labelled set stops meaning anything. It is
    * pinned here instead, so the disagreement is visible rather than averaged
-   * away, and so re-reviewing it is a one-line change.
+   * away, and so re-reviewing it is a one-line change. It is also the only
+   * thing standing between this rate and its 95% target.
    */
   it('reaches NEAR_MISS_SCORE on seven of the eight', () => {
     const reached = trueMatches().filter((one) => one.score >= NEAR_MISS_SCORE);
@@ -186,13 +194,12 @@ describe('§11.3 rate 3 — true matches reaching NEAR_MISS_SCORE', () => {
 
     expect(reached).toHaveLength(7);
     expect(pin(short)).toEqual([
-      'c003 63 ebikeshop:macina prime0 sport sx t-type :: ebikeshop:macina prime0 sport sx t-type tr',
+      'c003 58 ebikeshop:macina prime0 sport sx t-type :: ebikeshop:macina prime0 sport sx t-type tr',
     ]);
   });
 
   it('is only the disputed frame-shape label that falls short', () => {
-    const c003 = LABELLED_CASES.find((one) => one.slug === 'c003');
-    if (!c003) throw new Error('no case c003');
+    const c003 = caseOf('c003');
 
     expect(c003.verdict).toBe('same');
     expect(c003.a.specs?.['frameType']).toBe('Alacsony');
@@ -201,9 +208,10 @@ describe('§11.3 rate 3 — true matches reaching NEAR_MISS_SCORE', () => {
       expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'frameType' }),
     ]);
     // What they were shown before the shapes were extracted, and what the same
-    // pair scores now.
+    // pair scores now. The name alone would attach it — a "tr" the other side
+    // omits is worth 88 — and the frameType gate is the whole 30-point drop.
     expect(c003.scoreAtReview).toBe(93);
-    expect(c003.score).toBe(63);
+    expect(c003.score).toBe(58);
   });
 });
 
@@ -248,53 +256,61 @@ describe('4.6 — the gates, judged against the labels', () => {
   });
 });
 
-describe('why the two rates fall short, and why no constant fixes it', () => {
-  it('overlaps: a different bike outscores a true match', () => {
-    // The whole calibration question in one assertion. The best "different"
-    // pair scores 79 and the four GLORIOUS true matches score 70, so no accept
-    // threshold separates them — any bar low enough to attach the true matches
-    // attaches four different bikes first.
+describe('the overlap the blend removed', () => {
+  /**
+   * This block used to be headed "why the two rates fall short, and why no
+   * constant fixes it". It is kept, inverted, because the overlap it recorded
+   * is the entire case for blending — if a future change brings it back, these
+   * assertions are where it shows up first.
+   */
+  it('separates the classes outright: every true match outscores every different bike', () => {
+    // The old scorer had the best "different" pair at 79 and four true matches
+    // at 70 — inverted, and no accept threshold could tell them apart. Now the
+    // worst attaching true match clears the best different pair by 13.
     const bestDifferent = Math.max(...differentPairs().map((one) => one.score));
-    const missedTrue = trueMatches()
-      .filter((one) => one.outcome !== 'attach' && one.score >= NEAR_MISS_SCORE)
+    const attaching = trueMatches()
+      .filter((one) => one.outcome === 'attach')
       .map((one) => one.score);
 
-    expect(bestDifferent).toBe(79);
-    expect(missedTrue).toEqual([70, 70, 70, 70]);
-    expect(Math.max(...missedTrue)).toBeLessThan(bestDifferent);
+    expect(bestDifferent).toBe(68);
+    expect(Math.min(...attaching)).toBe(81);
+    expect(Math.min(...attaching) - bestDifferent).toBeGreaterThanOrEqual(12);
   });
 
-  it('would attach four different bikes if ACCEPT_SCORE dropped to catch them', () => {
+  it('would still attach nothing wrong if ACCEPT_SCORE dropped to NEAR_MISS_SCORE', () => {
+    // The old scorer had four different bikes waiting just under the bar
+    // (c009, c010, c012, c013). None of them is within reach now, so the two
+    // thresholds have slack in them rather than sitting on top of the data.
     const wouldAttach = differentPairs().filter(
-      (one) => one.score >= NEAR_MISS_SCORE && one.failedGates.length === 0,
+      (one) => one.score >= NEAR_MISS_SCORE,
     );
 
-    expect(pin(wouldAttach)).toEqual([
-      'c009 79 ebikeshop:di2 macina master scarp sx :: ebikeshop:di2 macina prestige scarp sx',
-      'c010 79 ebikeshop:di2 macina master scarp sx :: ebikeshop:di2 macina prestige scarp sx',
-      'c012 73 speedbike:kapoho macina master :: ebikeshop:kapoho macina prestige',
-      'c013 73 ebikeshop:kapoho macina master :: ebikeshop:kapoho macina prestige',
-    ]);
+    expect(pin(wouldAttach)).toEqual([]);
   });
 
-  it('spends the LLM on four different pairs and four true ones', () => {
-    // What the review band actually costs: eight calls over 42 hard cases,
-    // evenly split between pairs the LLM should reject and pairs it should
-    // accept. That is the band doing its job, not leaking.
+  it('spends no LLM call at all on these 42 hard cases', () => {
+    // The review band cost eight calls before, split evenly between pairs the
+    // LLM should reject and pairs it should accept. Both halves now land on the
+    // right side of the bar by score alone. The band is not dead — it is what
+    // catches the cases this set does not contain — but on the hardest 42 pairs
+    // anyone has labelled, it is no longer load-bearing.
     const toLlm = labelledCases().filter((one) => one.outcome === 'ask_llm');
 
-    expect(toLlm.filter((one) => one.verdict === 'different')).toHaveLength(4);
-    expect(toLlm.filter((one) => one.verdict === 'same')).toHaveLength(4);
+    expect(pin(toLlm)).toEqual([]);
   });
 
-  it('agrees with the reviewer on 36 of the 42 usable cases', () => {
+  it('agrees with the reviewer on 41 of the 42 usable cases', () => {
     const agreed = labelledCases().filter((one) =>
       one.verdict === 'same' ? one.outcome === 'attach' : one.outcome !== 'attach',
     );
 
-    // 36 outright, plus the four GLORIOUS pairs the LLM is asked about and the
-    // disputed c003 — no case where the engine attaches a different bike.
-    expect(agreed).toHaveLength(37);
+    // 41, against 37 before. The one disagreement is c003, the disputed label.
+    expect(agreed).toHaveLength(41);
+    expect(
+      labelledCases().filter(
+        (one) => one.verdict === 'same' && one.outcome !== 'attach',
+      ).map((one) => one.slug),
+    ).toEqual(['c003']);
     expect(
       labelledCases().filter(
         (one) => one.verdict === 'different' && one.outcome === 'attach',

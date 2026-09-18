@@ -90,8 +90,13 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
             severity: 5,
           }),
         ]);
-        expect(scoreOfPair(left, right)).toBeGreaterThanOrEqual(ACCEPT_SCORE);
-        expect(outcomeOf(left, right)).toBe('attach');
+        // Each of these is one shop printing a token the other omits, which
+        // the name score now treats alike however long the rest of the name
+        // is — so every one of them sits within a point or two of the bar, and
+        // the matcher's 5 is what decides. The band is doing its job here
+        // rather than the severity being wrong: see the block below.
+        expect(scoreOfPair(left, right)).toBeGreaterThanOrEqual(NEAR_MISS_SCORE);
+        expect(outcomeOf(left, right)).not.toBe('not_found');
       },
     );
 
@@ -101,30 +106,48 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
       const agreeing = withSpecs(right, left.specs);
       const disagreeing = otherShopWith(right, left.specs, 'gearCount');
 
-      expect(scoreOfPair(left, agreeing)).toBe(90);
-      expect(scoreOfPair(left, disagreeing)).toBe(85);
+      expect(scoreOfPair(left, agreeing)).toBe(84);
+      expect(scoreOfPair(left, disagreeing)).toBe(79);
     });
   });
 
-  describe('a matcher spec is enough when the names are further apart', () => {
+  describe('what a matcher spec is and is not enough to decide', () => {
+    /**
+     * The severity has to be read against the name score's own spread, and the
+     * blend changed that spread. Under max(trigram, Levenshtein) an omitted
+     * token cost more the shorter the name was, so these pairs ran from 77 to
+     * 90 and 5 points landed somewhere different on each. They now cluster at
+     * 84–86, because one omitted token is one omitted token — so 5 points is
+     * the difference between attaching and asking, and nothing more.
+     *
+     * That is deliberate but tight, and it is the one place the blend put a
+     * decision on a knife edge. It is pinned here so a future change to
+     * GATE_SEVERITY or the blend weights has to look at it.
+     */
     it.each([
-      [SPEEDBIKE, 'kapoho macina master', EBIKESHOP, 'abs kapoho macina master', 78],
-      [SPEEDBIKE, '872 chacana lfc macina', EBIKESHOP, 'chacana lfc macina', 77],
+      [SPEEDBIKE, 'kapoho macina master', EBIKESHOP, 'abs kapoho macina master', 86],
+      [SPEEDBIKE, '872 chacana lfc macina', EBIKESHOP, 'chacana lfc macina', 85],
+      [SPEEDBIKE, '8973 kapoho macina', SPEEDBIKE, '8973 kapoho l macina', 84],
     ])(
-      '%s %s drops out of attaching to %s %s, to %i',
+      'puts %s %s against %s %s at %i on the name alone',
       (leftShop, leftKey, rightShop, rightKey, score) => {
         const left = listing(leftShop, leftKey);
-        const right = otherShopWith(
-          listing(rightShop, rightKey),
-          left.specs,
-          'gearCount',
-        );
+        const right = withSpecs(listing(rightShop, rightKey), left.specs);
 
         expect(scoreOfPair(left, right)).toBe(score);
-        expect(scoreOfPair(left, right)).toBeLessThan(ACCEPT_SCORE);
-        expect(outcomeOf(left, right)).toBe('ask_llm');
+        expect(gatesOf(left, right)).toEqual([]);
       },
     );
+
+    it('cannot rescue a pair whose names disagree rather than omit', () => {
+      // "master" against "prestige" is a substitution, not an omission: 65 on
+      // the name, and no arrangement of matcher specs brings that near the bar.
+      const left = listing(SPEEDBIKE, 'kapoho macina master');
+      const right = withSpecs(listing(EBIKESHOP, 'kapoho macina prestige'), left.specs);
+
+      expect(scoreOfPair(left, right)).toBe(65);
+      expect(outcomeOf(left, right)).toBe('not_found');
+    });
   });
 
   describe('a primary spec disagreeing always stops the merge', () => {
