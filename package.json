@@ -15,7 +15,11 @@
     "typeorm:create": "npm run typeorm migration:create ./libs/config/src/lib/migrations/migration",
     "typeorm:generate": "npm run typeorm migration:generate ./libs/config/src/lib/migrations/migration -- -d ./apps/api/typeorm.config.ts",
     "typeorm:migrate": "cd ./apps/api && npm run typeorm migration:run -- -d ./apps/api/typeorm.config.ts && cd ../..",
-    "typeorm:revert": "cd ./apps/api && npm run typeorm migration:revert -- -d ./apps/api/typeorm.config.ts && cd ../.."
+    "typeorm:revert": "cd ./apps/api && npm run typeorm migration:revert -- -d ./apps/api/typeorm.config.ts && cd ../..",
+    "seed:users:dev": "cross-env API_CONFIG_PATH=apps/api/src/config/config.yaml ts-node --project apps/api/tsconfig.app.json -r tsconfig-paths/register apps/api/src/scripts/seed-users.ts dev",
+    "seed:users:prod": "cross-env API_CONFIG_PATH=apps/api/src/config/config.yaml ts-node --project apps/api/tsconfig.app.json -r tsconfig-paths/register apps/api/src/scripts/seed-users.ts prod",
+    "seed:dev-data": "cross-env API_CONFIG_PATH=apps/api/src/config/config.yaml ts-node --project apps/api/tsconfig.app.json -r tsconfig-paths/register apps/api/src/scripts/seed-dev-data.ts",
+    "seed:dev": "npm run seed:users:dev && npm run seed:dev-data"
   },
   "private": true,
   "dependencies": {
@@ -113,6 +117,7 @@
     "triple-beam": "^1.4.1",
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
+    "tsconfig-paths": "^4.2.0",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.40.0",

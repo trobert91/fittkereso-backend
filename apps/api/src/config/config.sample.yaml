@@ -20,8 +20,17 @@ dataforseo:
   password: your-dataforseo-password
 
 app_settings:
+  app_name: api
   app_url: https://api.fittkereso.com
+  admin_url: http://localhost:3200
 
   api:
     api_key: fittkereso-test
     api_secret: testApiKey
+
+supabase:
+  url: https://your-project.supabase.co
+  # Publishable (anon) key - safe for user-facing sign-in calls.
+  api_key: sb_publishable_your-publishable-key
+  # Service-role key - grants auth.admin.*; backend only, never ship to a client.
+  secret_key: sb_secret_your-secret-key

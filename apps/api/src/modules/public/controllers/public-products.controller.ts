@@ -1,10 +1,11 @@
 import { Controller, Get, Param, SerializeOptions } from '@nestjs/common';
-import { SerializeGroup } from '@fittkereso-backend/utils';
+import { SerializeGroup, Public } from '@fittkereso-backend/utils';
 import { PublicProductsService } from '../services/public-products.service';
 import { ProductListDto } from '../dto/product-list.dto';
 import { ProductDetailDto } from '../dto/product-detail.dto';
 
 @Controller('v1/public/products')
+@Public()
 @SerializeOptions({ groups: [SerializeGroup.list, SerializeGroup.details] })
 export class PublicProductsController {
   constructor(private readonly productsService: PublicProductsService) {}

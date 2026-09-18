@@ -12,17 +12,19 @@ import { DataSourceOptions, DataSource } from 'typeorm';
 import { WithLengthColumnType } from 'typeorm/driver/types/ColumnTypes';
 import { ApiAuthModule } from './modules/api-auth/api-auth.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { EntityNotFoundExceptionFilter } from './exceptions/entity-not-found';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PublicModule } from './modules/public/public.module';
 import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
+import { AuthGuard, AuthModule, RoleGuard } from '@fittkereso-backend/auth';
 
 @Module({
   imports: [
     AppConfigModule,
     ApiAuthModule,
+    AuthModule,
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvVars: true,
@@ -85,6 +87,21 @@ import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
     PublicModule,
   ],
   providers: [
+    // Authentication is on by default for the whole HTTP surface; routes opt
+    // out with @Public(). Order matters - AuthGuard resolves the caller and
+    // RoleGuard then reads what it attached.
+    //
+    // API-only. apps/mcp and apps/product-collector import neither AuthModule
+    // nor AdminModule, register no APP_GUARD, and reach Postgres directly
+    // rather than over this HTTP surface, so they are unaffected.
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
+    },
     {
       provide: APP_FILTER,
       useClass: EntityNotFoundExceptionFilter,

@@ -14,7 +14,16 @@ module.exports = {
       compiler: 'tsc',
       main: './src/main.ts',
       tsConfig: './tsconfig.app.json',
-      assets: ['./src/config'],
+      assets: [
+        './src/config',
+        // EmailTemplateService reads these from __dirname/templates at runtime,
+        // so they must be copied next to main.js rather than bundled.
+        {
+          input: '../../libs/email/src/lib/templates',
+          glob: '**/*',
+          output: 'templates',
+        },
+      ],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

@@ -7,3 +7,4 @@ export * from './scrape-task-search.service';
 export * from './seller-search.service';
 export * from './offer-search.service';
 export * from './product-duplicate-pair-search.service';
+export * from './user-search.service';

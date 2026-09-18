@@ -3,9 +3,8 @@ import {
   Controller,
   Post,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import { ScrapeTask, UserRole } from '@fittkereso-backend/database';
 import {
   ScrapeTaskSearchParams,
@@ -19,8 +18,7 @@ import {
 import { SerializeGroup } from '@fittkereso-backend/utils';
 
 @Controller('admin-scrape-task')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminScrapeTaskController {
   constructor(
     private readonly searchService: ScrapeTaskSearchService,
@@ -28,6 +26,7 @@ export class AdminScrapeTaskController {
   ) {}
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

@@ -8,6 +8,7 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
     app_settings: Joi.object({
       app_name: Joi.string().required(),
       app_url: Joi.string().required(),
+      admin_url: Joi.string().required(),
       api: Joi.object({
         api_key: Joi.string().required(),
         api_secret: Joi.string().required(),
@@ -66,6 +67,7 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
     supabase: Joi.object({
       url: Joi.string().required(),
       api_key: Joi.string().required(),
+      secret_key: Joi.string().required(),
     }).required(),
 
     bunny: Joi.object({

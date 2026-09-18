@@ -7,9 +7,8 @@ import {
   Post,
   Put,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import {
   ProductSource,
   ProductSourceRepository,
@@ -31,8 +30,7 @@ import {
 } from '../dtos/product-source-sync.dto';
 
 @Controller('admin-product-source')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminProductSourceController {
   constructor(
     private readonly searchService: ProductSourceSearchService,
@@ -42,6 +40,7 @@ export class AdminProductSourceController {
   ) {}
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [
@@ -57,6 +56,7 @@ export class AdminProductSourceController {
   }
 
   @Get(':id')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

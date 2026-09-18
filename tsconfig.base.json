@@ -55,6 +55,7 @@
       "@fittkereso-backend/supabase": ["libs/supabase/src/index.ts"],
       "@fittkereso-backend/task": ["libs/task/src/index.ts"],
       "@fittkereso-backend/translation": ["libs/translation/src/index.ts"],
+      "@fittkereso-backend/user": ["libs/user/src/index.ts"],
       "@fittkereso-backend/utils": ["libs/utils/src/index.ts"],
       "@fittkereso-backend/zyte": ["libs/zyte/src/index.ts"]
     }

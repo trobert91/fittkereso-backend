@@ -1,6 +1,5 @@
 import { Global, Module } from '@nestjs/common';
 import { AppConfigService } from './services/app-config.service';
-import { AppSettingsConfigService } from './sub-configs/app-settings.config.service';
 import {
   PostgresConfigService,
   MongoConfigService,
@@ -15,6 +14,7 @@ import {
   SupabaseConfigService,
   BunnyConfigService,
   CategoryConfigService,
+  AppSettingsConfigService,
 } from '@fittkereso-backend/config';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 

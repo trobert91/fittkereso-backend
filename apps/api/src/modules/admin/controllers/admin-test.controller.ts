@@ -1,5 +1,5 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { Controller, Post } from '@nestjs/common';
+import { MinRole } from '@fittkereso-backend/auth';
 import {
   ProductModel,
   ProductModelRepository,
@@ -10,8 +10,7 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Controller('admin-test')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminTestController {
   constructor(
     private readonly productRepo: ProductModelRepository,

@@ -1,5 +1,5 @@
 import { Controller, Get, Query, SerializeOptions } from '@nestjs/common';
-import { SerializeGroup } from '@fittkereso-backend/utils';
+import { SerializeGroup, Public } from '@fittkereso-backend/utils';
 import { PublicAutocompleteService } from '../services/public-autocomplete.service';
 import { PublicSearchService } from '../services/public-search.service';
 import { SearchAnalyticsService } from '../services/search-analytics.service';
@@ -11,6 +11,7 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('v1/public/search')
+@Public()
 @SkipThrottle()
 @SerializeOptions({ groups: [SerializeGroup.list, SerializeGroup.details] })
 export class PublicSearchController {

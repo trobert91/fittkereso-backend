@@ -10,10 +10,9 @@ import {
   Put,
   SerializeOptions,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import {
   ProductAlias,
   ProductAliasRepository,
@@ -58,8 +57,7 @@ import { ResyncProductSourceDto } from '../dtos/resync-product-source.dto';
 import { ProductAliasDto } from '../dtos/product-alias.dto';
 
 @Controller('admin-product')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminProductController {
   constructor(
     private readonly searchService: ProductSearchService,
@@ -80,6 +78,7 @@ export class AdminProductController {
   ) {}
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchProducts(
     @Body() searchParams: ProductSearchParams,
@@ -90,6 +89,7 @@ export class AdminProductController {
   }
 
   @Get(':id')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -98,12 +98,12 @@ export class AdminProductController {
       SerializeGroup.details,
     ],
   })
-  @Roles([UserRole.admin])
   async getProduct(@Param('id') id: string) {
     return this.detailService.getProductById(id);
   }
 
   @Post(':id/offers/search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -123,7 +123,6 @@ export class AdminProductController {
   }
 
   @Put(':id')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -142,7 +141,6 @@ export class AdminProductController {
   }
 
   @Post(':id/update-manual-specs')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -164,7 +162,6 @@ export class AdminProductController {
   // 📸 Upload product image
   // ---------------------------------------------------
   @Post(':id/images')
-  @Roles([UserRole.admin])
   @UseInterceptors(FileInterceptor('file'))
   @SerializeOptions({
     groups: [
@@ -197,7 +194,6 @@ export class AdminProductController {
   // 🔢 Update image order
   // ---------------------------------------------------
   @Post(':id/image-order')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -216,7 +212,6 @@ export class AdminProductController {
   }
 
   @Delete(':id/images/:imageId')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -257,7 +252,6 @@ export class AdminProductController {
   // the same idempotent recompute every scrape/manual-edit/product-merge
   // already triggers, exposed as a standalone on-demand action.
   @Post(':id/merge-sources')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -288,7 +282,6 @@ export class AdminProductController {
   // ---------------------------------------------------
 
   @Post(':id/aliases')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -310,7 +303,6 @@ export class AdminProductController {
   }
 
   @Put(':id/aliases/:aliasId')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -341,7 +333,6 @@ export class AdminProductController {
   }
 
   @Delete(':id/aliases/:aliasId')
-  @Roles([UserRole.admin])
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,

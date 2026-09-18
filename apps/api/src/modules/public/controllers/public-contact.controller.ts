@@ -1,9 +1,11 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Public } from '@fittkereso-backend/utils';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { PublicContactService } from '../services/public-contact.service';
 import { ContactFormDto } from '../dto/contact-form.dto';
 
 @Controller('v1/public')
+@Public()
 @UseGuards(ThrottlerGuard)
 export class PublicContactController {
   constructor(private readonly contactService: PublicContactService) {}

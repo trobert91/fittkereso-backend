@@ -1,47 +1,53 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
-import { UserAuthService } from '../services/user-auth.service';
 import { Reflector } from '@nestjs/core';
-import { Roles } from '../decorators/roles.decorator';
-import { some } from 'lodash';
+import { Request } from 'express';
 import { UserRole } from '@fittkereso-backend/database';
+import { MinRole, ROLE_RANK } from '../decorators/roles.decorator';
+import { AuthenticatedUser } from '../models/auth-user';
 
+/**
+ * Registered globally, immediately after AuthGuard.
+ *
+ * It reads the user AuthGuard already attached rather than re-parsing the
+ * token, so a guarded request verifies its JWT and hits the database once
+ * rather than twice.
+ */
 @Injectable()
 export class RoleGuard implements CanActivate {
-  constructor(
-    private reflector: Reflector,
-    private readonly userAuthService: UserAuthService,
-  ) {}
+  constructor(private readonly reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request>();
+  canActivate(context: ExecutionContext): boolean {
+    // Handler first, then class: a handler-level @MinRole replaces the
+    // class-level one rather than merging with it.
+    const minRole = this.reflector.getAllAndOverride<UserRole | undefined>(
+      MinRole,
+      [context.getHandler(), context.getClass()],
+    );
 
-    const authHeader = req.headers['authorization'];
-    const token = authHeader?.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : req.cookies?.['access_token']; // fallback to cookie if available
-
-    if (!token) {
-      throw new UnauthorizedException('Missing access token');
-    }
-
-    const user = await this.userAuthService.getUser(token);
-    const roles = this.reflector.get<UserRole[]>(Roles, context.getHandler());
-    if (!roles) {
+    // Unannotated routes - @Public ones included - have nothing to check.
+    if (!minRole) {
       return true;
     }
 
-    if (some(roles, (role) => user.role !== role)) {
-      throw new UnauthorizedException('Missing required role');
+    const req = context.switchToHttp().getRequest<Request>();
+    const user = (req as Request & { user?: AuthenticatedUser }).user;
+
+    if (!user) {
+      // Only reachable if a route carries @MinRole and @Public at once, which
+      // is a contradiction worth failing on rather than quietly allowing.
+      throw new UnauthorizedException('Missing access token');
     }
 
-    // Attach the user to the request for downstream handlers
-    (req as any).user = user;
+    if (ROLE_RANK[user.role] < ROLE_RANK[minRole]) {
+      throw new ForbiddenException('Missing required role');
+    }
+
     return true;
   }
 }

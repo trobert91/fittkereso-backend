@@ -7,9 +7,8 @@ import {
   Put,
   Query,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import { ProductCategory, UserRole } from '@fittkereso-backend/database';
 import {
   CategoryUpdateDto,
@@ -26,8 +25,7 @@ import { SerializeGroup } from '@fittkereso-backend/utils';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 
 @Controller('admin-category')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminCategoryController {
   constructor(
     private readonly categoryUpdateService: ProductCategoryUpdateService,
@@ -37,6 +35,7 @@ export class AdminCategoryController {
   ) {}
 
   @Get(':id')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -45,7 +44,6 @@ export class AdminCategoryController {
       SerializeGroup.details,
     ],
   })
-  @Roles([UserRole.admin])
   async getCategory(
     @Param('id') id: string,
     @Query('includeConfig') includeConfig?: string,
@@ -55,6 +53,7 @@ export class AdminCategoryController {
   }
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })
@@ -86,7 +85,6 @@ export class AdminCategoryController {
       SerializeGroup.details,
     ],
   })
-  @Roles([UserRole.admin])
   async updateCategory(
     @Param('id') id: string,
     @Body() updateDto: CategoryUpdateDto,

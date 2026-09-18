@@ -3,9 +3,8 @@ import {
   Controller,
   Post,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import { UserRole } from '@fittkereso-backend/database';
 import {
   TaskSearchParams,
@@ -15,12 +14,12 @@ import {
 import { SerializeGroup } from '@fittkereso-backend/utils';
 
 @Controller('admin-task')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminTaskController {
   constructor(private readonly searchService: TaskSearchService) {}
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

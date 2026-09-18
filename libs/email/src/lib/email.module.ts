@@ -4,6 +4,7 @@ import { MailgunConfigService } from '@fittkereso-backend/config';
 import { EmailService } from './email.service';
 import { EmailTemplateService } from './email-template.service';
 import { ContactEmailService } from './contact-email.service';
+import { PasswordResetEmailService } from './password-reset-email.service';
 
 @Module({
   imports: [DynamicConfigModule],
@@ -12,7 +13,8 @@ import { ContactEmailService } from './contact-email.service';
     EmailService,
     EmailTemplateService,
     ContactEmailService,
+    PasswordResetEmailService,
   ],
-  exports: [ContactEmailService],
+  exports: [ContactEmailService, PasswordResetEmailService],
 })
 export class EmailModule {}

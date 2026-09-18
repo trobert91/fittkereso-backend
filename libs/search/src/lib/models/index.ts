@@ -26,3 +26,5 @@ export * from './offer-search-result';
 
 export * from './product-duplicate-pair-search-params';
 export * from './product-duplicate-pair-search-result';
+export * from './user-search-params';
+export * from './user-search-result';

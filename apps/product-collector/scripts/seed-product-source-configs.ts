@@ -4,6 +4,12 @@
  * libs/scrape-interpreter's fixtures directory (same files validated by
  * that library's test suite).
  *
+ * For a dev database this is the narrow, collector-side path: apps/api/src/
+ * scripts/seed-dev-data.ts (npm run seed:dev-data) seeds these same two sellers
+ * and sources from the same fixture files, alongside the brands and product
+ * category dev needs. The two source lists must stay in step - this one exists
+ * so the configs can be re-pushed without the api app.
+ *
  * Upserts by name, so it's safe to re-run. Every source resolves-or-creates
  * its `seller` spec into a Seller row and links it via ProductSource.seller
  * — this is the sole source of truth for which seller every offer scraped
@@ -43,6 +49,11 @@ interface SeedSellerSpec {
   name: string;
   slug: string;
   domains: string[];
+  // Nullable on the entity: unset means no seller-level cap, so only each
+  // ProductSource's own limits apply. Where both are set the seller's cap wins,
+  // across all of its sources combined.
+  maxConcurrent?: number;
+  requestsPerHour?: number;
 }
 
 interface SeedSourceSpec {
@@ -66,13 +77,13 @@ const SOURCES: SeedSourceSpec[] = [
     name: 'ebikeshop',
     configFile: 'ebikeshop.config.json',
     maxConcurrent: 2,
-    requestsPerHour: 60,
+    requestsPerHour: 180,
     priority: 10,
     fullSyncInterval: '7 days',
     incrementalSyncInterval: '1 day',
     seller: {
       name: 'ebikeshop.hu',
-      slug: 'ebikeshop',
+      slug: 'ebikeshop-hu',
       domains: ['ebikeshop.hu'],
     },
     // First-time source: keep scheduling off until a manual dry run (one
@@ -84,14 +95,16 @@ const SOURCES: SeedSourceSpec[] = [
     name: 'speedbike',
     configFile: 'speedbike.config.json',
     maxConcurrent: 2,
-    requestsPerHour: 60,
+    requestsPerHour: 120,
     priority: 10,
     fullSyncInterval: '7 days',
     incrementalSyncInterval: '1 day',
     seller: {
       name: 'speedbike.hu',
-      slug: 'speedbike',
+      slug: 'speedbike-hu',
       domains: ['speedbike.hu'],
+      maxConcurrent: 2,
+      requestsPerHour: 180,
     },
     // First-time source, also the first to use detailPage.postProcess —
     // keep scheduling off until a manual dry run confirms both the scrape
@@ -112,6 +125,8 @@ async function resolveOrCreateSeller(
   seller.slug = spec.slug;
   seller.domains = spec.domains;
   seller.type = SellerType.business;
+  seller.maxConcurrent = spec.maxConcurrent ?? null;
+  seller.requestsPerHour = spec.requestsPerHour ?? null;
   seller.verified = true;
   seller.active = true;
   return sellerRepo.save(seller);

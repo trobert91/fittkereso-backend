@@ -3,10 +3,24 @@ import { SupabaseConfigService } from '@fittkereso-backend/config';
 import { UserRole } from '@fittkereso-backend/database';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
+export interface SupabaseAppMetadata {
+  /** Advisory mirror of app_user.role - the backend never trusts this. */
+  role?: UserRole;
+  /** Advisory mirror of app_user.passwordChangeRequired. */
+  password_change_required?: boolean;
+}
+
 export interface DecodedToken {
   sub: string; // Supabase user ID
   email: string; // User email
-  user_role?: UserRole; // Custom metadata (optional)
+  /**
+   * Supabase puts app_metadata in the access token by default, which is what
+   * lets the admin frontend gate routes without an extra round trip. It is a
+   * mirror, not the source of truth: role is resolved from the local user row.
+   */
+  app_metadata?: SupabaseAppMetadata;
+  /** @deprecated Legacy custom claim; role now comes from the local user row. */
+  user_role?: UserRole;
 }
 
 @Injectable()

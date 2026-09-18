@@ -5,7 +5,7 @@ import {
   Query,
   SerializeOptions,
 } from '@nestjs/common';
-import { SerializeGroup } from '@fittkereso-backend/utils';
+import { SerializeGroup, Public } from '@fittkereso-backend/utils';
 import { PublicCategoriesService } from '../services/public-categories.service';
 import {
   CategoryListDto,
@@ -16,6 +16,7 @@ import { PaginatedProductResult } from '../dto/paginated-result.dto';
 import { ProductQueryDto } from '../dto/product-query.dto';
 
 @Controller('v1/public/categories')
+@Public()
 @SerializeOptions({ groups: [SerializeGroup.list, SerializeGroup.details] })
 export class PublicCategoriesController {
   constructor(private readonly categoriesService: PublicCategoriesService) {}

@@ -13,4 +13,9 @@ export class AppSettingsConfigService {
   get appUrl(): string {
     return this.configService.get<string>('app_settings.app_url')!;
   }
+
+  /** Origin of the admin frontend - used to build password-reset links. */
+  get adminUrl(): string {
+    return this.configService.get<string>('app_settings.admin_url')!;
+  }
 }

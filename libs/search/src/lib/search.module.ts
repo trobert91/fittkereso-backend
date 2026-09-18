@@ -9,6 +9,7 @@ import {
   SellerSearchService,
   TaskSearchService,
   OfferSearchService,
+  UserSearchService,
 } from './services';
 import { DatabaseModule } from '@fittkereso-backend/database';
 
@@ -25,6 +26,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
     SellerSearchService,
     TaskSearchService,
     OfferSearchService,
+    UserSearchService,
   ],
   exports: [
     BrandSearchService,
@@ -36,6 +38,7 @@ import { DatabaseModule } from '@fittkereso-backend/database';
     SellerSearchService,
     TaskSearchService,
     OfferSearchService,
+    UserSearchService,
   ],
 })
 export class SearchModule {}

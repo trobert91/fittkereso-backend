@@ -14,6 +14,8 @@ import { AdminProductSourceController } from './controllers/admin-product-source
 import { AdminProductDuplicateController } from './controllers/admin-product-duplicate.controller';
 import { AdminScrapeTaskController } from './controllers/admin-scrape-task.controller';
 import { AdminSellerController } from './controllers/admin-seller.controller';
+import { AdminUserController } from './controllers/admin-user.controller';
+import { UserModule } from '@fittkereso-backend/user';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { AdminSellerController } from './controllers/admin-seller.controller';
     ProductIdentityModule,
     SearchModule,
     TaskModule,
+    UserModule,
   ],
   controllers: [
     AdminBrandController,
@@ -34,6 +37,7 @@ import { AdminSellerController } from './controllers/admin-seller.controller';
     AdminSellerController,
     AdminTaskController,
     AdminTestController,
+    AdminUserController,
   ],
 })
 export class AdminModule {}

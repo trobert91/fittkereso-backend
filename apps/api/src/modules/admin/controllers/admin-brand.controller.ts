@@ -6,9 +6,8 @@ import {
   Post,
   Put,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import { UserRole } from '@fittkereso-backend/database';
 import {
   BrandCreateDto,
@@ -25,8 +24,7 @@ import {
 import { SerializeGroup } from '@fittkereso-backend/utils';
 
 @Controller('admin-brand')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminBrandController {
   constructor(
     private readonly searchService: BrandSearchService,
@@ -36,6 +34,7 @@ export class AdminBrandController {
   ) {}
 
   @Get(':id')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -49,6 +48,7 @@ export class AdminBrandController {
   }
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchBrands(
     @Body() searchParams: BrandSearchParams,

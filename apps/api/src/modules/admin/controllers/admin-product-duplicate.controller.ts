@@ -6,9 +6,8 @@ import {
   Param,
   Post,
   SerializeOptions,
-  UseGuards,
 } from '@nestjs/common';
-import { AuthGuard, RoleGuard, Roles } from '@fittkereso-backend/auth';
+import { MinRole } from '@fittkereso-backend/auth';
 import { ProductModel, UserRole } from '@fittkereso-backend/database';
 import { ProductImageDtoService } from '@fittkereso-backend/product';
 import {
@@ -27,8 +26,7 @@ import { ProductDuplicateScanDto } from '../dtos/product-duplicate-scan.dto';
 
 /** The Duplicates page: review pairs, dismiss them, merge them, rescan. */
 @Controller('admin-product-duplicate')
-@UseGuards(AuthGuard, RoleGuard)
-@Roles([UserRole.admin])
+@MinRole(UserRole.admin)
 export class AdminProductDuplicateController {
   constructor(
     private readonly searchService: ProductDuplicatePairSearchService,
@@ -38,6 +36,7 @@ export class AdminProductDuplicateController {
   ) {}
 
   @Post('search')
+  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

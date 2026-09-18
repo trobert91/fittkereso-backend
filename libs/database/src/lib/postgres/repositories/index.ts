@@ -15,3 +15,4 @@ export * from './billing-info-repository';
 export * from './offer-repository';
 export * from './price-history-repository';
 export * from './product-duplicate-pair-repository';
+export * from './user-repository';
