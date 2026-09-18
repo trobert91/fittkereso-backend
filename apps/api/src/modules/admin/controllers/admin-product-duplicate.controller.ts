@@ -95,6 +95,7 @@ export class AdminProductDuplicateController {
    * — `started: false` means one is already running.
    */
   @Post('scan')
+  @SerializeOptions({ strategy: 'exposeAll' })
   async scanForDuplicates(
     @Body() body: ProductDuplicateScanDto,
   ): Promise<{ pairs: number } | { started: boolean }> {
