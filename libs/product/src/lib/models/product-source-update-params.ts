@@ -12,9 +12,7 @@ export interface ProductSourceUpdateParams {
   maxConcurrent?: number;
   requestsPerHour?: number;
   fullSyncInterval?: string | null;
-  incrementalSyncInterval?: string | null;
   nextFullSyncAt?: string | null;
-  nextIncrementalSyncAt?: string | null;
   /**
    * Who is making this change, for the history rows it writes.
    *

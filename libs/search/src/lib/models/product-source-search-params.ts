@@ -42,9 +42,6 @@ export class ProductSourceSearchParams {
     'fullSyncInterval',
     'nextFullSyncAt',
     'lastFullSyncAt',
-    'incrementalSyncInterval',
-    'nextIncrementalSyncAt',
-    'lastIncrementalSyncAt',
     'createdAt',
     'updatedAt',
   ])
@@ -59,9 +56,6 @@ export class ProductSourceSearchParams {
     | 'fullSyncInterval'
     | 'nextFullSyncAt'
     | 'lastFullSyncAt'
-    | 'incrementalSyncInterval'
-    | 'nextIncrementalSyncAt'
-    | 'lastIncrementalSyncAt'
     | 'createdAt'
     | 'updatedAt';
 

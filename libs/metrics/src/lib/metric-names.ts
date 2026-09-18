@@ -53,25 +53,6 @@ export const DB_QUERY_DURATION_SECONDS = 'db_query_duration_seconds';
 export const RECAPTCHA_REJECTIONS_TOTAL = 'recaptcha_rejections_total';
 export const DYNAMIC_CONFIG_RELOADS_TOTAL = 'dynamic_config_reloads_total';
 
-// Incremental sync metrics
-export const INCREMENTAL_SYNC_TOTAL = 'incremental_sync_total';
-export const INCREMENTAL_SYNC_DURATION_SECONDS =
-  'incremental_sync_duration_seconds';
-export const INCREMENTAL_SYNC_KEYWORDS_SEARCHED_TOTAL =
-  'incremental_sync_keywords_searched_total';
-export const INCREMENTAL_SYNC_URLS_DISCOVERED_TOTAL =
-  'incremental_sync_urls_discovered_total';
-export const INCREMENTAL_SYNC_URLS_CLASSIFIED_TOTAL =
-  'incremental_sync_urls_classified_total';
-export const INCREMENTAL_SYNC_URLS_DEDUPLICATED_TOTAL =
-  'incremental_sync_urls_deduplicated_total';
-export const INCREMENTAL_SYNC_TASKS_CREATED_TOTAL =
-  'incremental_sync_tasks_created_total';
-
-// Exa API metrics
-export const EXA_API_CALL_TOTAL = 'exa_api_call_total';
-export const EXA_API_DURATION_SECONDS = 'exa_api_duration_seconds';
-
 // Full sync metrics
 export const FULL_SYNC_TOTAL = 'full_sync_total';
 export const FULL_SYNC_DURATION_SECONDS = 'full_sync_duration_seconds';

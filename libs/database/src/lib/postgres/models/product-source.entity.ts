@@ -92,16 +92,4 @@ export class ProductSource extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastFullSyncAt?: Date;
-
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Column({ type: 'text', nullable: true })
-  incrementalSyncInterval?: ms.StringValue | null;
-
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Column({ type: 'timestamptz', nullable: true })
-  nextIncrementalSyncAt?: Date | null;
-
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Column({ type: 'timestamptz', nullable: true })
-  lastIncrementalSyncAt?: Date;
 }

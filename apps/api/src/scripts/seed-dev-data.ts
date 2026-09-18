@@ -122,7 +122,6 @@ interface SeedSourceSpec {
   schedulingEnabled: boolean;
   processingEnabled: boolean;
   fullSyncInterval: string;
-  incrementalSyncInterval: string;
   seller: SeedSellerSpec;
 }
 
@@ -152,7 +151,6 @@ const SOURCES: SeedSourceSpec[] = [
     schedulingEnabled: false,
     processingEnabled: true,
     fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
     seller: {
       name: 'ebikeshop.hu',
       domains: ['ebikeshop.hu'],
@@ -167,7 +165,6 @@ const SOURCES: SeedSourceSpec[] = [
     schedulingEnabled: false,
     processingEnabled: true,
     fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
     seller: {
       name: 'speedbike.hu',
       domains: ['speedbike.hu'],
@@ -320,8 +317,6 @@ async function seedSources(app: INestApplicationContext): Promise<void> {
       source.schedulingEnabled = spec.schedulingEnabled;
       source.processingEnabled = spec.processingEnabled;
       source.fullSyncInterval = spec.fullSyncInterval as ms.StringValue;
-      source.incrementalSyncInterval =
-        spec.incrementalSyncInterval as ms.StringValue;
     }
 
     source.seller = await resolveOrCreateSeller(app, spec.seller);

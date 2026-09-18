@@ -217,7 +217,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'update_product_source',
     description:
-      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority, throttling (maxConcurrent, requestsPerHour), and full/incremental sync intervals (ms-compatible strings like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
+      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority, throttling (maxConcurrent, requestsPerHour), and the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to update'),
       name: z.string().min(1).optional(),
@@ -237,11 +237,6 @@ export class ProductSourceTools {
         .nullable()
         .optional()
         .describe('ms-compatible interval, e.g. "6h" or "1d"; null/empty clears it'),
-      incrementalSyncInterval: z
-        .string()
-        .nullable()
-        .optional()
-        .describe('ms-compatible interval, e.g. "30m" or "2h"; null/empty clears it'),
     }),
     annotations: { destructiveHint: false, idempotentHint: true },
   })
@@ -255,7 +250,6 @@ export class ProductSourceTools {
     maxConcurrent?: number;
     requestsPerHour?: number;
     fullSyncInterval?: string | null;
-    incrementalSyncInterval?: string | null;
   }): Promise<string> {
     try {
       const { productSourceId, ...params } = args;
@@ -505,8 +499,6 @@ export class ProductSourceTools {
     L.push(`- **Requests per hour**: ${source.requestsPerHour}`);
     L.push(`- **Full sync interval**: ${source.fullSyncInterval ?? '_not set_'}`);
     L.push(`- **Next full sync**: ${source.nextFullSyncAt?.toISOString() ?? '_not scheduled_'}`);
-    L.push(`- **Incremental sync interval**: ${source.incrementalSyncInterval ?? '_not set_'}`);
-    L.push(`- **Next incremental sync**: ${source.nextIncrementalSyncAt?.toISOString() ?? '_not scheduled_'}`);
     L.push(`- **Last run**: ${source.lastRunAt?.toISOString() ?? '_never_'}`);
     L.push('');
     L.push('## Config');

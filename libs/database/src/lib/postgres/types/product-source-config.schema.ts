@@ -168,38 +168,6 @@ export const PRODUCT_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
       },
     },
 
-    incrementalSync: {
-      type: 'object',
-      description:
-        'How the "what is new" pass finds recently published product pages, via Exa search rather than a crawl.',
-      properties: {
-        searchKeywords: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'One search is run per keyword, restricted to this source\'s domain.',
-        },
-        numResults: {
-          type: 'integer',
-          minimum: 1,
-          description: 'Results requested per keyword. Defaults to 40.',
-        },
-        urlClassify: {
-          type: 'object',
-          description: 'How a search result URL is recognised as a product detail page.',
-          properties: {
-            detailUrlPattern: {
-              type: 'string',
-              description:
-                'Regex a URL must match to be queued as a detail page. Compiled with `new RegExp`, so it must be a valid pattern.',
-            },
-          },
-          required: ['detailUrlPattern'],
-          additionalProperties: false,
-        },
-      },
-      additionalProperties: false,
-    },
-
     listPage: {
       type: 'object',
       description: 'How a category/list page is parsed.',

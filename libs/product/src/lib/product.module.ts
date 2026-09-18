@@ -3,7 +3,6 @@ import { DatabaseModule } from '@fittkereso-backend/database';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 import { StorageModule } from '@fittkereso-backend/storage';
 import { DataforseoModule } from '@fittkereso-backend/dataforseo';
-import { ExaModule } from '@fittkereso-backend/exa';
 import { ProductImageDtoService } from './services/product-image-dto.service';
 import { ProductSpecMergeService } from './services/product-spec/product-spec-merge.service';
 import { ProductSpecSortService } from './services/product-spec/product-spec-sort.service';
@@ -61,7 +60,6 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     DataforseoModule,
     DebugModule,
     DynamicConfigModule,
-    ExaModule,
     HttpModule,
     MetricsModule,
     AiModule,

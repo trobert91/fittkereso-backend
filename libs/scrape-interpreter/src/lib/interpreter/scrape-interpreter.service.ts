@@ -4,7 +4,6 @@ import {
   CategoryLookupCondition,
   ProductSourceConfig,
   ProductSpecs,
-  ScrapeQueueName,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { ScrapedProductSpec, WebLink } from '@fittkereso-backend/product';
@@ -218,20 +217,6 @@ export class ScrapeInterpreterService {
         ctx,
       )) as WebLink[]) ?? []
     );
-  }
-
-  public classifyIncrementalUrl(
-    url: string,
-    config: ProductSourceConfig,
-  ): { queue: ScrapeQueueName; url: string } | null {
-    const pattern = config.incrementalSync?.urlClassify?.detailUrlPattern;
-    if (!pattern) return null;
-
-    const regex = new RegExp(pattern);
-    if (regex.test(url)) {
-      return { queue: ScrapeQueueName.ScrapeProductDetails, url };
-    }
-    return null;
   }
 
   // `offerList` gates whether this source populates offers at all (empty ->

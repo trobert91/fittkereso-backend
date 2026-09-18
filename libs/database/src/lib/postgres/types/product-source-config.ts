@@ -11,14 +11,6 @@ export interface ProductSourceCategoryConfig {
   sourceTitle?: string;
 }
 
-export interface ProductSourceIncrementalSyncConfig {
-  searchKeywords?: string[];
-  numResults?: number;
-  urlClassify?: {
-    detailUrlPattern: string;
-  };
-}
-
 export interface ProductSourceListPageConfig {
   categoryName: ScrapeOperation[];
   categoryLinks: ScrapeOperation[];
@@ -157,7 +149,6 @@ export interface ProductSourceConfig {
   fullSyncStartUrl?: string;
   discovery?: ProductSourceDiscoveryConfig;
   categories?: Record<string, ProductSourceCategoryConfig>;
-  incrementalSync?: ProductSourceIncrementalSyncConfig;
   listPage: ProductSourceListPageConfig;
   detailPage: ProductSourceDetailPageConfig;
 }

@@ -5,10 +5,7 @@ import { TaskManagerService } from './task/task-manager.service';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { ScrapeTaskManagerService } from './scrape-task/scrape-task-manager.service';
 import { ScrapeTaskProcessorService } from './scrape-task/scrape-task-processor.service';
-import {
-  IncrementalSyncModule,
-  ProductScraperModule,
-} from '@fittkereso-backend/product-scraper';
+import { ProductScraperModule } from '@fittkereso-backend/product-scraper';
 import { ScrapeTaskQueueDepthService } from './scrape-task/scrape-task-queue-depth.service';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
@@ -17,7 +14,6 @@ import { ProductModule } from '@fittkereso-backend/product';
 @Module({
   imports: [
     DatabaseModule,
-    IncrementalSyncModule,
     DynamicConfigModule,
     ProductScraperModule,
     TaskModule,

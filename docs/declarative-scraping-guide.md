@@ -18,7 +18,7 @@ This is the root of everything. Each row is one scrapable source (today: ebikesh
 - `config: ProductSourceConfig` (jsonb) — the entire declarative definition of how to scrape this source: where to fetch from, how to discover products, how to parse list/detail pages, how to map specs. This is the payload the rest of the system interprets.
 - `seller?: Seller` — optional link if this source *is* a single seller's own storefront (nullable — an aggregator/reference source with no single owning seller would leave this unset; no such source is configured today).
 - `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs, unchanged from before.
-- `fullSyncInterval` / `nextFullSyncAt` / `incrementalSyncInterval` / `nextIncrementalSyncAt` — two independent cron-like schedules per source (full catalog crawl vs. incremental "what's new" search).
+- `fullSyncInterval` / `nextFullSyncAt` — the cron-like schedule for this source's full catalog crawl.
 
 **Why read this first:** everything downstream is either producing a `ProductSource` row, reading its `config`, or scheduling work against it.
 
@@ -36,7 +36,6 @@ interface ProductSourceConfig {
   fullSyncStartUrl?: string;
   discovery?: { mode: 'categoryTitleMatch' | 'brandNameMatch'; linkPipeline: ScrapeOperation[] };
   categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
-  incrementalSync?: { searchKeywords?: string[]; numResults?: number; urlClassify?: { detailUrlPattern: string } };
   listPage: { categoryName: ScrapeOperation[]; categoryLinks: ScrapeOperation[]; productLinks: ScrapeOperation[] };
   detailPage: {
     rawSpecs: ScrapeOperation[];
@@ -81,7 +80,7 @@ Ops read from and write to a **shared execution context** (`vars`), so a pipelin
 
 This is the new library that turns config + HTML into structured data. Read it in this order:
 
-1. **`scrape-interpreter.service.ts`** — the public facade. Four methods: `runListPage`, `runDetailPage`, `runDiscovery`, `classifyIncrementalUrl`. This is the only class the rest of the app calls into. Note the strict ordering inside `runDetailPage`: raw specs are extracted first, then category is resolved (because category rules can inspect specs — e.g. "headphones vs. headsets" depends on a spec value), then brand/model/images run (they can reference the resolved category name via `{{categoryName}}`).
+1. **`scrape-interpreter.service.ts`** — the public facade. Three methods: `runListPage`, `runDetailPage`, `runDiscovery`. This is the only class the rest of the app calls into. Note the strict ordering inside `runDetailPage`: raw specs are extracted first, then category is resolved (because category rules can inspect specs — e.g. "headphones vs. headsets" depends on a spec value), then brand/model/images run (they can reference the resolved category name via `{{categoryName}}`).
 2. **`services/scrape-pipeline-runner.service.ts`** — executes one `ScrapeOperation[]` array left-to-right against a context, threading `vars`. Also handles `PipelineHalt` — a couple of ops (`assertContains`, `filterByNonEmpty`) can short-circuit the *entire* pipeline early, not just their own step (mirrors an early `return` in the old hand-written code, e.g. "if this isn't page 1, produce no pagination links at all").
 3. **`services/scrape-op-registry.service.ts`** — a name → handler map. `ops/register-ops.ts` populates it at module init with every op's implementation function.
 4. **`ops/*.ts`** — the actual op implementations, grouped by kind: `selection-ops.ts`, `string-ops.ts`, `regex-ops.ts`, `filter-ops.ts`, `link-ops.ts`, `spec-table-ops.ts`, `image-ops.ts`, `value-map-ops.ts`, `control-ops.ts`.
@@ -135,9 +134,8 @@ These are the two services that actually get invoked per `ScrapeTask`. Both:
 **Files:**
 - `apps/product-collector/src/modules/queue-processor/scrape-task/scrape-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
 - `libs/product-scraper/src/lib/product-scraper/services/generic-product-source-sync.service.ts` — replaces what used to be one sync class pair per source (fetch-discovery-page + index-page). Fetches the discovery page (`config.fullSyncStartUrl ?? config.baseUrl`), calls `interpreter.runDiscovery(...)`, creates one `ScrapeProductList` task per discovered link.
-- `libs/product-scraper/src/lib/incremental-sync/incremental-sync.service.ts` — searches Exa for each of `config.incrementalSync.searchKeywords`, then classifies each result URL via `interpreter.classifyIncrementalUrl(url, config)` (regex from `config.incrementalSync.urlClassify.detailUrlPattern`) instead of a per-source `UrlClassifier` class.
 
-All three read `source.config`/`source.name` — none of them know or care which source they're looking at.
+Both read `source.config`/`source.name` — neither knows or cares which source it is looking at.
 
 ---
 
@@ -182,9 +180,8 @@ The one exception worth knowing about: **admin-entered specs** (via the product-
 cron (ProductSourceSyncScheduler, every minute)
   → finds a ProductSource due for sync, publishes a Task row
   → TaskManagerService (5s poll) claims it, hands to ProductSourceSyncListener
-  → ProductSourceSyncListener locks the ProductSource row, calls either:
-      - IncrementalSyncService.sync()          (Exa search + interpreter.classifyIncrementalUrl)
-      - GenericProductSourceSyncService.sync()  (fetch discovery page + interpreter.runDiscovery)
+  → ProductSourceSyncListener locks the ProductSource row, calls
+      GenericProductSourceSyncService.sync()  (fetch discovery page + interpreter.runDiscovery)
   → creates ScrapeProductList ScrapeTask row(s)
 
 ScrapeTaskManagerService (5s poll, separate loop)

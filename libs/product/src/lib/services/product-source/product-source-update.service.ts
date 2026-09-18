@@ -94,24 +94,10 @@ export class ProductSourceUpdateService {
       );
     }
 
-    if (params.incrementalSyncInterval !== undefined) {
-      source.incrementalSyncInterval = this.parseInterval(
-        params.incrementalSyncInterval,
-        'incrementalSyncInterval',
-      );
-    }
-
     if (params.nextFullSyncAt !== undefined) {
       source.nextFullSyncAt = this.parseDate(
         params.nextFullSyncAt,
         'nextFullSyncAt',
-      );
-    }
-
-    if (params.nextIncrementalSyncAt !== undefined) {
-      source.nextIncrementalSyncAt = this.parseDate(
-        params.nextIncrementalSyncAt,
-        'nextIncrementalSyncAt',
       );
     }
 

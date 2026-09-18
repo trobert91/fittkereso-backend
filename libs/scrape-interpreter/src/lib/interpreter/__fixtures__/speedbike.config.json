@@ -7,15 +7,6 @@
       "sourceTitle": "E-BIKE"
     }
   },
-  "incrementalSync": {
-    "searchKeywords": [
-      "elektromos kerékpár speedbike"
-    ],
-    "numResults": 40,
-    "urlClassify": {
-      "detailUrlPattern": "speedbike\\.hu\\/[^/?#]+-elektromos-[^/?#]*kerekpar[^/?#]*\\/?$"
-    }
-  },
   "listPage": {
     "categoryName": [
       {

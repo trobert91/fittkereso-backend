@@ -1,20 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import {
-  ProductSource,
-  ProductSourceRepository,
-  ProductSourceSyncMode,
-} from '@fittkereso-backend/database';
+import { ProductSource, ProductSourceRepository } from '@fittkereso-backend/database';
 import { SchedulerMetricsService } from '@fittkereso-backend/metrics';
 import { BaseScheduler, QueuePublisherService } from '@fittkereso-backend/task';
 import { nameOf } from '@fittkereso-backend/utils';
-import { Brackets } from 'typeorm';
 import ms from 'ms';
-
-interface SourceSyncEntry {
-  source: ProductSource;
-  dueModes: ProductSourceSyncMode[];
-}
 
 @Injectable()
 export class ProductSourceSyncScheduler extends BaseScheduler {
@@ -32,77 +22,30 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
   }
 
   async scheduleSourceSyncs(): Promise<void> {
-    const entries = await this.findSourcesToSync();
+    const sources = await this.findSourcesToSync();
 
-    for (const { source, dueModes } of entries) {
-      for (const syncMode of dueModes) {
-        await this.publisher.addProductSourceSyncTask({
-          productSourceId: source.id,
-          syncMode,
-        });
+    for (const source of sources) {
+      await this.publisher.addProductSourceSyncTask({
+        productSourceId: source.id,
+      });
 
-        if (syncMode === ProductSourceSyncMode.full) {
-          source.nextFullSyncAt = this.computeNextRun(source.fullSyncInterval);
-        } else {
-          source.nextIncrementalSyncAt = this.computeNextRun(
-            source.incrementalSyncInterval,
-          );
-        }
-      }
+      source.nextFullSyncAt = this.computeNextRun(source.fullSyncInterval);
     }
 
-    await this.repo.saveAll(entries.map((entry) => entry.source));
+    await this.repo.saveAll(sources);
   }
 
-  private async findSourcesToSync(): Promise<SourceSyncEntry[]> {
+  private async findSourcesToSync(): Promise<ProductSource[]> {
     const nextFullSyncAtColumn = `source.${nameOf<ProductSource>('nextFullSyncAt')}`;
-    const nextIncrementalSyncAtColumn = `source.${nameOf<ProductSource>('nextIncrementalSyncAt')}`;
-    const sources = await this.repo.repo
+
+    return this.repo.repo
       .createQueryBuilder('source')
       .where(`source.${nameOf<ProductSource>('schedulingEnabled')} = true`)
+      .andWhere(`source.${nameOf<ProductSource>('fullSyncInterval')} IS NOT NULL`)
       .andWhere(
-        new Brackets((qb) => {
-          qb.where(
-            new Brackets((sub) => {
-              sub
-                .where(
-                  `source.${nameOf<ProductSource>('fullSyncInterval')} IS NOT NULL`,
-                )
-                .andWhere(
-                  `(${nextFullSyncAtColumn} IS NULL OR ${nextFullSyncAtColumn} <= NOW())`,
-                );
-            }),
-          ).orWhere(
-            new Brackets((sub) => {
-              sub
-                .where(
-                  `source.${nameOf<ProductSource>('incrementalSyncInterval')} IS NOT NULL`,
-                )
-                .andWhere(
-                  `(${nextIncrementalSyncAtColumn} IS NULL OR ${nextIncrementalSyncAtColumn} <= NOW())`,
-                );
-            }),
-          );
-        }),
+        `(${nextFullSyncAtColumn} IS NULL OR ${nextFullSyncAtColumn} <= NOW())`,
       )
       .getMany();
-
-    return sources.map((source) => {
-      const dueModes: ProductSourceSyncMode[] = [];
-
-      const fullDue =
-        source.fullSyncInterval &&
-        (!source.nextFullSyncAt || source.nextFullSyncAt <= new Date());
-      if (fullDue) dueModes.push(ProductSourceSyncMode.full);
-
-      const incrementalDue =
-        source.incrementalSyncInterval &&
-        (!source.nextIncrementalSyncAt ||
-          source.nextIncrementalSyncAt <= new Date());
-      if (incrementalDue) dueModes.push(ProductSourceSyncMode.incremental);
-
-      return { source, dueModes };
-    });
   }
 
   private computeNextRun(interval?: ms.StringValue | null): Date {

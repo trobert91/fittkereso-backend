@@ -15,7 +15,6 @@ import {
   ProductSource,
   ProductSourceConfigValidatorService,
   ProductSourceRepository,
-  ProductSourceSyncMode,
   ProductSourceVersion,
   UserRole,
 } from '@fittkereso-backend/database';
@@ -244,7 +243,6 @@ export class AdminProductSourceController {
 
     await this.queuePublisher.addProductSourceSyncTask({
       productSourceId,
-      syncMode: ProductSourceSyncMode.full,
       categoryIds: body?.categoryIds,
       brandNames: body?.brandNames,
     });
@@ -256,39 +254,11 @@ export class AdminProductSourceController {
       source,
       'sync_triggered',
       {
-        mode: ProductSourceSyncMode.full,
+        mode: 'full',
         trigger: 'manual',
         categoryIds: body?.categoryIds ?? null,
         brandNames: body?.brandNames ?? null,
       },
-      actorFor(currentUser),
-    );
-
-    return { status: 'queued' };
-  }
-
-  @Post(':id/incremental-sync')
-  async triggerIncrementalSync(
-    @Param('id') productSourceId: string,
-    @CurrentUser() currentUser: AuthenticatedUser,
-  ): Promise<QueueStatusDto> {
-    const source = await this.productSourceRepo.findOne({
-      where: { id: productSourceId },
-    });
-
-    if (!source) {
-      throw new NotFoundException('Product source not found');
-    }
-
-    await this.queuePublisher.addProductSourceSyncTask({
-      productSourceId,
-      syncMode: ProductSourceSyncMode.incremental,
-    });
-
-    await this.versionService.recordAction(
-      source,
-      'sync_triggered',
-      { mode: ProductSourceSyncMode.incremental, trigger: 'manual' },
       actorFor(currentUser),
     );
 

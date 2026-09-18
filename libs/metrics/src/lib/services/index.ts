@@ -6,7 +6,6 @@ export * from './openai-metrics.service';
 export * from './ai-metrics.service';
 export * from './product-search-metrics.service';
 export * from './public-api-metrics.service';
-export * from './incremental-sync-metrics.service';
 export * from './product-collection-metrics.service';
 export * from './zyte-metrics.service';
 export * from './translation-metrics.service';

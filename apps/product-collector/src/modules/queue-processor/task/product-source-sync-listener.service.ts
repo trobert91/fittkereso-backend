@@ -5,16 +5,12 @@ import {
   ProductSourceConfigInvalidError,
   ProductSourceConfigValidatorService,
   ProductSourceRepository,
-  ProductSourceSyncMode,
   QueueName,
   systemActor,
 } from '@fittkereso-backend/database';
 import { ProductSourceVersionService } from '@fittkereso-backend/product';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import {
-  GenericProductSourceSyncService,
-  IncrementalSyncService,
-} from '@fittkereso-backend/product-scraper';
+import { GenericProductSourceSyncService } from '@fittkereso-backend/product-scraper';
 import { ProductSourceSyncMessage } from '@fittkereso-backend/task';
 import { isEmpty } from 'lodash';
 import { In } from 'typeorm';
@@ -27,7 +23,6 @@ export class ProductSourceSyncListener {
     private readonly sourceRepo: ProductSourceRepository,
     private readonly productCategoryRepo: ProductCategoryRepository,
     private readonly genericSyncService: GenericProductSourceSyncService,
-    private readonly incrementalSyncService: IncrementalSyncService,
     private readonly configValidator: ProductSourceConfigValidatorService,
     private readonly versionService: ProductSourceVersionService,
   ) {}
@@ -47,26 +42,21 @@ export class ProductSourceSyncListener {
           transaction,
         );
 
-        // Before any work is done, and before either sync mode is chosen: a
+        // Before any work is done: a
         // config that cannot be interpreted produces a sync that discovers
         // nothing, or worse, half a catalogue. Failing here means the reason
         // is on the task rather than surfacing later as an empty run.
         await this.assertConfigValid(entity);
 
-        if (message.syncMode === ProductSourceSyncMode.incremental) {
-          await this.incrementalSyncService.sync(entity);
-          entity.lastIncrementalSyncAt = new Date();
-        } else {
-          const sourceTitles = await this.resolveSourceTitles(
-            entity,
-            message.categoryIds,
-          );
-          await this.genericSyncService.sync(entity, {
-            sourceTitles,
-            brandNames: message.brandNames,
-          });
-          entity.lastFullSyncAt = new Date();
-        }
+        const sourceTitles = await this.resolveSourceTitles(
+          entity,
+          message.categoryIds,
+        );
+        await this.genericSyncService.sync(entity, {
+          sourceTitles,
+          brandNames: message.brandNames,
+        });
+        entity.lastFullSyncAt = new Date();
 
         entity.lastRunAt = new Date();
         await transaction.save(entity);

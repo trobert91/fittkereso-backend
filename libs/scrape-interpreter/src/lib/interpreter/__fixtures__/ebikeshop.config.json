@@ -7,15 +7,6 @@
       "sourceTitle": "Elektromos kerékpárok"
     }
   },
-  "incrementalSync": {
-    "searchKeywords": [
-      "elektromos kerékpár ebikeshop"
-    ],
-    "numResults": 40,
-    "urlClassify": {
-      "detailUrlPattern": "ebikeshop\\.hu\\/termek\\/[^/?#]+\\/?$"
-    }
-  },
   "listPage": {
     "categoryName": [
       {

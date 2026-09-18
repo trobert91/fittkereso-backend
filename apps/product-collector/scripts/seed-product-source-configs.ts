@@ -65,7 +65,6 @@ interface SeedSourceSpec {
   requestsPerHour: number;
   priority: number;
   fullSyncInterval: string;
-  incrementalSyncInterval: string;
   seller: SeedSellerSpec;
   // Only applied when creating the row for the first time (existing rows
   // keep whatever scheduling state an operator already set). Defaults to
@@ -82,7 +81,6 @@ const SOURCES: SeedSourceSpec[] = [
     requestsPerHour: 180,
     priority: 10,
     fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
     seller: {
       name: 'ebikeshop.hu',
       slug: 'ebikeshop-hu',
@@ -100,7 +98,6 @@ const SOURCES: SeedSourceSpec[] = [
     requestsPerHour: 120,
     priority: 10,
     fullSyncInterval: '7 days',
-    incrementalSyncInterval: '1 day',
     seller: {
       name: 'speedbike.hu',
       slug: 'speedbike-hu',
@@ -161,8 +158,6 @@ async function main(): Promise<void> {
         source.schedulingEnabled = spec.schedulingEnabled ?? true;
         source.processingEnabled = true;
         source.fullSyncInterval = spec.fullSyncInterval as ms.StringValue;
-        source.incrementalSyncInterval =
-          spec.incrementalSyncInterval as ms.StringValue;
       }
 
       source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);
