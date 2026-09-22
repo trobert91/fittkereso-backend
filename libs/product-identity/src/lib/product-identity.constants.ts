@@ -17,7 +17,7 @@ export const NEAR_MISS_SCORE = 70;
 export const GATE_SEVERITY: Record<IdentityGate, number> = {
   primarySpecMismatch: 30,
   modelNumberMismatch: 30,
-  matcherSpecMismatch: 5,
+  matcherSpecMismatch: 10,
 };
 
 /** Rows the recall query returns, name and alias rows together. */

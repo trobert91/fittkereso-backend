@@ -5,7 +5,7 @@ import type {
 } from '@fittkereso-backend/database';
 import { clamp, compact, isEmpty, isNil, sumBy, uniq } from 'lodash';
 import { GATE_SEVERITY } from './product-identity.constants';
-import { compareSpecValue } from './spec-values';
+import { compareSpecValue, type SpecValue } from './spec-values';
 import type { FailedGate } from './types';
 
 export interface GateInput {
@@ -43,6 +43,20 @@ export function scoreOf(baseScore: number, failedGates: FailedGate[]): number {
   return clamp(baseScore - sumBy(failedGates, (gate) => gate.severity), 1, 100);
 }
 
+/**
+ * Whether a spec carries a value a gate may compare. Beyond null/undefined, an
+ * empty string and a zero are absences a scraper wrote down: a label matched
+ * with nothing after it, or a number it could not parse. Neither contradicts
+ * anything, and a gate that read them as values would subtract for a spec the
+ * shop never published.
+ *
+ * A boolean `false` is a real value and stays one — a bike without ABS genuinely
+ * contradicts a bike with it.
+ */
+function isPresent(value: ProductSpecs[string]): value is SpecValue {
+  return !isNil(value) && value !== '' && value !== 0;
+}
+
 function specGate(
   gate: IdentityGate,
   key: string,
@@ -50,7 +64,7 @@ function specGate(
 ): FailedGate | undefined {
   const queryValue = querySpecs?.[key];
   const candidateValue = candidateSpecs?.[key];
-  if (isNil(queryValue) || isNil(candidateValue)) return undefined;
+  if (!isPresent(queryValue) || !isPresent(candidateValue)) return undefined;
 
   const result = compareSpecValue(
     queryValue,

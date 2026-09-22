@@ -62,7 +62,7 @@ function otherShopWith(
 }
 
 describe('case 3: same bike, different names, specs that do not quite agree', () => {
-  describe('a matcher spec disagreeing costs 5 and does not break the merge', () => {
+  describe('a matcher spec disagreeing costs 10 and does not break the merge', () => {
     it.each([
       [SPEEDBIKE, 'macina master scarp sx', EBIKESHOP, 'di2 macina master scarp sx'],
       [SPEEDBIKE, '8973 kapoho macina', SPEEDBIKE, '8973 kapoho l macina'],
@@ -87,27 +87,27 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
           expect.objectContaining({
             gate: 'matcherSpecMismatch',
             spec: 'gearCount',
-            severity: 5,
+            severity: 10,
           }),
         ]);
         // Each of these is one shop printing a token the other omits, which
         // the name score now treats alike however long the rest of the name
         // is — so every one of them sits within a point or two of the bar, and
-        // the matcher's 5 is what decides. The band is doing its job here
+        // the matcher's 10 is what decides. The band is doing its job here
         // rather than the severity being wrong: see the block below.
         expect(scoreOfPair(left, right)).toBeGreaterThanOrEqual(NEAR_MISS_SCORE);
         expect(outcomeOf(left, right)).not.toBe('not_found');
       },
     );
 
-    it('costs exactly five points and nothing more', () => {
+    it('costs exactly ten points and nothing more', () => {
       const left = listing(SPEEDBIKE, '8973 kapoho macina');
       const right = listing(SPEEDBIKE, '8973 kapoho l macina');
       const agreeing = withSpecs(right, left.specs);
       const disagreeing = otherShopWith(right, left.specs, 'gearCount');
 
       expect(scoreOfPair(left, agreeing)).toBe(84);
-      expect(scoreOfPair(left, disagreeing)).toBe(79);
+      expect(scoreOfPair(left, disagreeing)).toBe(74);
     });
   });
 

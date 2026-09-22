@@ -81,9 +81,9 @@ describe('applyGates', () => {
     ]);
   });
 
-  it('fails a matcher spec at severity 5', () => {
+  it('fails a matcher spec at severity 10', () => {
     expect(specGates({ motorPower: 250 }, { motorPower: 500 })).toEqual([
-      expect.objectContaining({ gate: 'matcherSpecMismatch', spec: 'motorPower', severity: 5 }),
+      expect.objectContaining({ gate: 'matcherSpecMismatch', spec: 'motorPower', severity: 10 }),
     ]);
   });
 
@@ -123,7 +123,7 @@ describe('applyGates', () => {
 
 describe('scoreOf', () => {
   it("subtracts every failed gate's severity", () => {
-    expect(identicalNameScore({ modelYear: 2023, motorPower: 250 }, { modelYear: 2024, motorPower: 500 })).toBe(65);
+    expect(identicalNameScore({ modelYear: 2023, motorPower: 250 }, { modelYear: 2024, motorPower: 500 })).toBe(60);
   });
 
   it('stays within 1–100', () => {
@@ -146,7 +146,7 @@ describe('scoreOf', () => {
       'identical, 3 matcher mismatches',
       { motorPower: 250, weight: 22, frameMaterial: 'Aluminium' },
       { motorPower: 500, weight: 30, frameMaterial: 'Carbon' },
-      85,
+      70,
     ],
     ['identical, modelYear differs', { modelYear: 2023 }, { modelYear: 2024 }, 70],
     [

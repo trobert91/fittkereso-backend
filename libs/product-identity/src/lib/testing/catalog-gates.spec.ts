@@ -47,7 +47,7 @@ describe('gates on the real KTM catalog', () => {
     const severities: Record<string, number> = {
       primarySpecMismatch: 30,
       modelNumberMismatch: 30,
-      matcherSpecMismatch: 5,
+      matcherSpecMismatch: 10,
     };
 
     for (const { query, candidate } of allScoredPairs()) {
@@ -107,7 +107,7 @@ describe('gates on the real KTM catalog', () => {
   });
 
   describe('matcher specs', () => {
-    it('costs only 5 when a matcher spec disagrees', () => {
+    it('costs only 10 when a matcher spec disagrees', () => {
       const pairs = allScoredPairs().filter(({ query, candidate }) =>
         gatesBetween(query, candidate).some(
           (gate) => gate.gate === 'matcherSpecMismatch',
@@ -117,7 +117,7 @@ describe('gates on the real KTM catalog', () => {
       expect(pairs.length).toBeGreaterThan(0);
       for (const { query, candidate } of pairs) {
         for (const gate of gatesBetween(query, candidate)) {
-          if (gate.gate === 'matcherSpecMismatch') expect(gate.severity).toBe(5);
+          if (gate.gate === 'matcherSpecMismatch') expect(gate.severity).toBe(10);
         }
       }
     });

@@ -84,14 +84,14 @@ describe('scoring the real KTM catalog', () => {
     });
 
     it('stacks a matcher spec on top of the model year', () => {
-      // 2025 vs 2026 and a 10-speed against a 12-speed: 100 − 30 − 5.
+      // 2025 vs 2026 and a 10-speed against a 12-speed: 100 − 30 − 10.
       const [a, b] = pairByKey('892 abs lfc macina team');
 
       expect(candidateOf(a, b).failedGates.map((gate) => gate.spec).sort()).toEqual([
         'gearCount',
         'modelYear',
       ]);
-      expect(scoreBetween(a, b)).toBe(65);
+      expect(scoreBetween(a, b)).toBe(60);
       expect(scoreBetween(a, b)).toBeLessThan(NEAR_MISS_SCORE);
     });
 

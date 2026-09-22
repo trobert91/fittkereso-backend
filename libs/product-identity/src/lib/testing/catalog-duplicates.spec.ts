@@ -91,7 +91,7 @@ describe('duplicate detection on the real KTM catalog', () => {
 
   it.each([
     ['810 belt city macina', 40],
-    ['892 abs lfc macina team', 65],
+    ['892 abs lfc macina team', 60],
   ])('writes nothing for %s, which the score rejects at %i', (nameKey, expected) => {
     const [a, b] = pairByKey(nameKey);
 
