@@ -1,57 +1,54 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ProductSourceRecordRepository,
-  ScrapeTaskRepository,
-  TaskStatus,
-} from '@fittkereso-backend/database';
+import { ScrapeTaskRepository, TaskStatus } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { isEmpty } from 'lodash';
+import { normalizeUrl } from '@fittkereso-backend/utils';
 
-export type DeduplicationReason = 'existing_product_source' | 'existing_task';
+export type DeduplicationReason = 'existing_task';
 
 export interface DeduplicationResult {
   isDuplicate: boolean;
   reason?: DeduplicationReason;
 }
 
+/**
+ * Stops two in-flight scrape tasks existing for the same URL.
+ *
+ * There used to be a second layer, checked first: any URL that already had a
+ * ProductSourceRecord was skipped permanently. That is precisely what made
+ * every run discovery-only — a listing was scraped once and then never
+ * revisited, so its price, stock and specs went stale forever.
+ *
+ * Refreshing is now decided per card by ListProductRefreshService, which either
+ * updates the offer in place or asks for a detail scrape. Either way "we
+ * already know this URL" is an argument for revisiting it, not against — so
+ * that layer had to go rather than be narrowed.
+ */
 @Injectable()
 export class ScrapeUrlDeduplicationService {
   private readonly logger = new CustomLogger(
     ScrapeUrlDeduplicationService.name,
   );
 
-  constructor(
-    private readonly sourceRecordRepo: ProductSourceRecordRepository,
-    private readonly scrapeTaskRepo: ScrapeTaskRepository,
-  ) {}
+  constructor(private readonly scrapeTaskRepo: ScrapeTaskRepository) {}
 
   public async isDuplicate(
-    url: string,
+    sourceId: string,
+    rawUrl: string,
     logContext?: Record<string, string>,
   ): Promise<DeduplicationResult> {
-    // Layer 1: permanent — URL already scraped into a product
-    const existingSource = await this.sourceRecordRepo.findByUrl(url);
-    if (existingSource) {
-      this.logger.debug(
-        `Skipped: URL already exists as product source on "${existingSource.model?.displayName}"`,
-        {
-          url,
-          productId: existingSource.model?.id,
-          reason: 'existing_product_source',
-          ...logContext,
-        },
-      );
-      return { isDuplicate: true, reason: 'existing_product_source' };
-    }
+    // Stored task URLs are normalized, so the probe has to be too — callers
+    // pass the URL straight off a scraped card, which is not.
+    const url = normalizeUrl(rawUrl);
 
-    // Layer 2: in-flight — task already queued/processing for this URL
-    const existingTask = await this.scrapeTaskRepo.findExistingUrl(url, [
+    const existingTask = await this.scrapeTaskRepo.findExistingUrl(sourceId, url, [
       TaskStatus.PENDING,
       TaskStatus.PROCESSING,
     ]);
+
     if (existingTask) {
-      this.logger.debug(`Skipped: in-flight task already exists for URL`, {
+      this.logger.debug('Skipped: in-flight task already exists for URL', {
         url,
+        sourceId,
         taskId: existingTask.id,
         taskStatus: existingTask.status,
         reason: 'existing_task',
@@ -61,39 +58,5 @@ export class ScrapeUrlDeduplicationService {
     }
 
     return { isDuplicate: false };
-  }
-
-  public async findDuplicateUrls(urls: string[]): Promise<Set<string>> {
-    if (isEmpty(urls)) return new Set();
-
-    // Layer 1: permanent — already scraped into products
-    const existingProductUrls =
-      await this.sourceRecordRepo.findExistingUrls(urls);
-
-    // Layer 2: in-flight — already queued/processing
-    const remainingUrls = urls.filter((url) => !existingProductUrls.has(url));
-    const existingTasks = await this.scrapeTaskRepo.findExistingUrls(
-      remainingUrls,
-      [TaskStatus.PENDING, TaskStatus.PROCESSING],
-    );
-    const existingTaskUrls = new Set(
-      existingTasks.map((task) => task.url.toLowerCase().replace(/\/+$/, '')),
-    );
-
-    if (existingProductUrls.size > 0) {
-      this.logger.debug(
-        `Batch dedup: ${existingProductUrls.size} URLs already exist as product sources`,
-        { urls: [...existingProductUrls] },
-      );
-    }
-
-    if (existingTaskUrls.size > 0) {
-      this.logger.debug(
-        `Batch dedup: ${existingTaskUrls.size} URLs have in-flight tasks`,
-        { urls: [...existingTaskUrls] },
-      );
-    }
-
-    return new Set([...existingProductUrls, ...existingTaskUrls]);
   }
 }

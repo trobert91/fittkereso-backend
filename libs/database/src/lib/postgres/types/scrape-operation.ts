@@ -45,6 +45,11 @@ export interface SelectAttrOp extends OpBase {
   op: 'selectAttr';
   selector: string;
   attr: string;
+  // vars key holding a cheerio selection to scope the query to — e.g. "item"
+  // inside a forEachItem pipeline. Without it the selector runs against the
+  // whole page, which is fine on a detail page with one product and silently
+  // wrong on a list page with 32.
+  within?: string;
   first?: boolean;
   trim?: boolean;
 }
@@ -475,6 +480,43 @@ export interface AssembleOfferOp extends OpBase {
   specs?: Record<string, ScrapeOperation[]>;
 }
 
+/**
+ * Reads a dotted path off the value currently flowing through the pipeline.
+ *
+ * The vocabulary had no way to do this: `parseJsonAttr` reads a path but only
+ * out of a DOM attribute, and `mapJsonArray` maps an array rather than the
+ * single item `forEachItem` binds. So a JSON-hydrated list page (ebikeshop's
+ * Inertia `props.products`) could not be read card by card — which is why its
+ * detail config re-reads `#app` from the DOM each time, something that works on
+ * a page with one product and cannot work on a list page with 32.
+ */
+export interface JsonPathOp extends OpBase {
+  op: 'jsonPath';
+  /** Dot path, e.g. "prices.priceSale". Empty/omitted yields the input itself. */
+  path?: string;
+  cast?: 'number' | 'string' | 'boolean';
+}
+
+/**
+ * Assembles one ScrapedListProduct from independent sub-pipelines run against
+ * the current item — the list-page counterpart to assembleOffer.
+ *
+ * Deliberately carries no specs: a list card is only ever used to refresh an
+ * already-known listing's price and availability, and anything not yet known
+ * gets a detail-page scrape which produces the real spec set.
+ */
+export interface AssembleListProductOp extends OpBase {
+  op: 'assembleListProduct';
+  /** Required — an item that yields no URL cannot be matched to a listing. */
+  url: ScrapeOperation[];
+  externalId?: ScrapeOperation[];
+  name?: ScrapeOperation[];
+  price?: ScrapeOperation[];
+  priceWithoutDiscount?: ScrapeOperation[];
+  currency?: ScrapeOperation[];
+  availability?: ScrapeOperation[];
+}
+
 export type ScrapeOperation =
   | SelectAllOp
   | SelectFirstOp
@@ -528,7 +570,9 @@ export type ScrapeOperation =
   | MapValueOp
   | BranchOp
   | ForEachItemOp
-  | AssembleOfferOp;
+  | AssembleOfferOp
+  | JsonPathOp
+  | AssembleListProductOp;
 
 // ─── Category slug resolution rules ────────────────────────────────────────
 

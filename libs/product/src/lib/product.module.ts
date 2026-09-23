@@ -47,6 +47,8 @@ import { ProductModelFactoryService } from './services/product-model-factory.ser
 import { SearchModule } from '@fittkereso-backend/search';
 import { BrandResolutionService } from './services/brand/brand-resolution.service';
 import { OfferMatchingService } from './services/offer/offer-matching.service';
+import { OfferFreshnessService } from './services/offer/offer-freshness.service';
+import { StaleOfferSweepService } from './services/offer/stale-offer-sweep.service';
 import { SellerCreateService } from './services/seller/seller-create.service';
 import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
@@ -105,6 +107,8 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     ProductSourcePostProcessMergeService,
     BrandResolutionService,
     OfferMatchingService,
+    OfferFreshnessService,
+    StaleOfferSweepService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,
@@ -146,6 +150,8 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     ProductSourcePostProcessMergeService,
     BrandResolutionService,
     OfferMatchingService,
+    OfferFreshnessService,
+    StaleOfferSweepService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,

@@ -18,7 +18,7 @@ export class OfferSearchParams {
   @IsOptional()
   @IsEnum([
     'price',
-    'lastSeenAt',
+    'lastSynced',
     'createdAt',
     'updatedAt',
     'availability',
@@ -26,7 +26,7 @@ export class OfferSearchParams {
   ])
   sort?:
     | 'price'
-    | 'lastSeenAt'
+    | 'lastSynced'
     | 'createdAt'
     | 'updatedAt'
     | 'availability'

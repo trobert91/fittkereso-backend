@@ -29,6 +29,7 @@ import { ProductNameMergeService } from '../product-name/product-name-merge.serv
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductDetailService } from '../product-detail.service';
+import { OfferFreshnessService } from '../offer/offer-freshness.service';
 
 interface MergeProductsParams {
   sourceId: string;
@@ -62,19 +63,41 @@ export class ProductMergeService {
     private readonly detailService: ProductDetailService,
     private readonly offerRepo: OfferRepository,
     private readonly duplicatePairRepo: ProductDuplicatePairRepository,
+    private readonly offerFreshness: OfferFreshnessService,
   ) {}
 
   /**
    * Denormalizes price/priceWithoutDiscount onto the model from its cheapest
-   * active Offer, so product listings can filter/sort by price without
+   * offer that is still within the freshness window (see OfferFreshnessService),
+   * so product listings can filter/sort by price without
    * joining Offers. Mutates `model` in place; the caller decides
    * whether/when to save. Safe to call whenever a model's offers may have
    * changed (fresh scrape, admin product merge reassigning Offer rows).
    */
   public async recomputePrice(model: ProductModel): Promise<ProductModel> {
-    const cheapest = await this.offerRepo.findCheapestActiveOffer(model.id);
-    model.price = cheapest?.price;
-    model.priceWithoutDiscount = cheapest?.priceWithoutDiscount;
+    // Scoped to offers still inside the freshness window. A listing that has
+    // gone stale must stop setting the product's headline price immediately,
+    // not linger until the sweep deletes it two weeks later — ProductModel.price
+    // is what the public listing sorts and filters on.
+    //
+    // Consequence worth knowing: once every offer on a model ages out, price
+    // goes null rather than keeping a knowingly-false value. But recomputePrice
+    // only runs on a scrape pass or an admin merge, so a model whose offers all
+    // go stale is not recomputed until something touches it — the stale sweep
+    // recomputes the models it affects for exactly this reason.
+    const cheapest = await this.offerRepo.findCheapestFreshOffer(
+      model.id,
+      this.offerFreshness.visibleCutoff(),
+    );
+    // `?? null`, NOT `?? undefined`. TypeORM's save() OMITS undefined-valued
+    // properties from the UPDATE, so assigning undefined here left the previous
+    // price in the column — this method could raise a price and could never
+    // clear one. The comment above claimed the opposite for months, and a model
+    // whose offers all aged out (or whose source was deleted) kept advertising
+    // a price for offers that no longer existed, in the column the public
+    // listing sorts and filters on.
+    model.price = cheapest?.price ?? null;
+    model.priceWithoutDiscount = cheapest?.priceWithoutDiscount ?? null;
     return model;
   }
 
@@ -226,11 +249,17 @@ export class ProductMergeService {
   /**
    * Moves EVERY source record to the target — none are dropped.
    *
-   * There is no unique constraint on (model, source); only `url` is unique. A
-   * source legitimately accumulates several records on one product (one per
-   * variant URL — see ProductScrapeUpdaterService's Path 4), so two records from
-   * the same source are two different listings, not a duplicate. Deleting one
-   * would destroy a real listing along with its `scrapedProduct` provenance.
+   * There is no unique constraint on (model, source); the unique is
+   * (source, url). A source legitimately accumulates several records on one
+   * product (one per variant URL — see ProductScrapeUpdaterService's Path 4),
+   * so two records from the same source are two different listings, not a
+   * duplicate. Deleting one would destroy a real listing along with its
+   * `scrapedProduct` provenance.
+   *
+   * Note this merge can legitimately put two records with the SAME url on one
+   * model, when they come from different sources covering the same webshop
+   * (a page scraper and an Árukereső feed). That is not a duplicate either:
+   * each holds its own source's view of the listing.
    *
    * Keeping them all is also what makes a merge reversible: the returned ids are
    * the complete set to split back out, and `mergeSources` reduces per-source

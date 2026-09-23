@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import {
-  ProductSourceConfig,
+  ScrapingSourceConfig,
   ScrapeTask,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
@@ -180,7 +180,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
 
   it('extracts brand/model/externalId/category/rawSpecs from the real page structure', async () => {
     const $ = cheerio.load(buildHtml());
-    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    const config = speedbikeConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -283,7 +283,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
       '<span class="price price_color product_table_price">3.045.957 Ft</span>',
     );
     const $ = cheerio.load(html);
-    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    const config = speedbikeConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -307,7 +307,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
         `href="http://schema.org/${schemaValue}"`,
       );
       const $ = cheerio.load(html);
-      const config = speedbikeConfig as unknown as ProductSourceConfig;
+      const config = speedbikeConfig as unknown as ScrapingSourceConfig;
       const result = await interpreter.runDetailPage(makeTask(), $, config);
       return result.rawOffers[0]?.availability;
     }
@@ -323,7 +323,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
   it('produces no offer when the page has no price block at all', async () => {
     const $ = cheerio.load(buildHtml());
     $('.product-page-price-wrapper').remove();
-    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    const config = speedbikeConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -332,7 +332,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
 
   it('deterministically maps the real page rawSpecs onto the current ebikes jsonSchema via specMapping', async () => {
     const $ = cheerio.load(buildHtml());
-    const config = speedbikeConfig as unknown as ProductSourceConfig;
+    const config = speedbikeConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 

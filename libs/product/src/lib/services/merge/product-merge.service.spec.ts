@@ -46,6 +46,7 @@ describe('ProductMergeService.moveOffers', () => {
       {} as any, // detailService
       {} as any, // offerRepo
       {} as any, // duplicatePairRepo
+      {} as any, // offerFreshness
     );
   });
 
@@ -179,6 +180,7 @@ describe('ProductMergeService.moveProductSourceRecords', () => {
       {} as any, // detailService
       {} as any, // offerRepo
       {} as any, // duplicatePairRepo
+      {} as any, // offerFreshness
     );
   });
 
@@ -253,6 +255,7 @@ describe('ProductMergeService.movePriceHistory', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // offerFreshness
     );
   });
 
@@ -315,6 +318,7 @@ describe('ProductMergeService.mergeProducts', () => {
       detailService as any, // detailService
       {} as any, // offerRepo
       duplicatePairRepo as any, // duplicatePairRepo
+      {} as any, // offerFreshness
     );
     const steps = Object.fromEntries(
       TRANSACTION_STEPS.map((step) => [
@@ -375,6 +379,7 @@ describe('ProductMergeService.mergeSources', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // offerFreshness
     );
   });
 
@@ -454,5 +459,51 @@ describe('ProductMergeService.mergeSources', () => {
 
     expect(model.specValid).toBe(false);
     expect(model.specErrors).toEqual({ weight: 'out of range' });
+  });
+});
+
+describe('ProductMergeService.recomputePrice', () => {
+  const build = (cheapest: unknown) =>
+    new ProductMergeService(
+      {} as any, // productRepo
+      {} as any, // specMergeService
+      {} as any, // specSortService
+      {} as any, // validatorService
+      {} as any, // nameMergeService
+      {} as any, // categoryConfigService
+      {} as any, // embeddingService
+      {} as any, // detailService
+      { findCheapestFreshOffer: jest.fn().mockResolvedValue(cheapest) } as any,
+      {} as any, // duplicatePairRepo
+      { visibleCutoff: () => new Date('2026-09-16') } as any,
+    );
+
+  it('denormalizes the cheapest fresh offer onto the model', async () => {
+    const service = build({ price: 199990, priceWithoutDiscount: 249990 });
+    const model = { id: 'model-1', price: 10, priceWithoutDiscount: 20 } as any;
+
+    await service.recomputePrice(model);
+
+    expect(model.price).toBe(199990);
+    expect(model.priceWithoutDiscount).toBe(249990);
+  });
+
+  // The failure this guards is silent and was live for months: TypeORM's save()
+  // OMITS undefined-valued properties from the UPDATE, so assigning `undefined`
+  // left the previous price in the column. This method could raise a price and
+  // could never clear one — so a model whose offers all aged out (or whose
+  // source was deleted) went on advertising a price for offers that no longer
+  // existed, in the column the public listing sorts and filters on.
+  it('clears the price with NULL, not undefined, when no fresh offer remains', async () => {
+    const service = build(null);
+    const model = { id: 'model-1', price: 199990, priceWithoutDiscount: 249990 } as any;
+
+    await service.recomputePrice(model);
+
+    expect(model.price).toBeNull();
+    expect(model.priceWithoutDiscount).toBeNull();
+    // Belt and braces: `undefined` is exactly the value that does not survive a
+    // save, so assert the distinction rather than just falsiness.
+    expect(model.price).not.toBeUndefined();
   });
 });

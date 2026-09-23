@@ -3,10 +3,17 @@ import { ProductSourceConfigValidatorService } from './product-source-config-val
 /** The smallest config the schema accepts. Each test mutates a clone of it. */
 const MINIMAL_CONFIG = {
   baseUrl: 'https://example.com',
+  startUrls: ['https://example.com/products'],
   listPage: {
     categoryName: [{ op: 'selectText', selector: 'h1', first: true }],
-    categoryLinks: [],
-    productLinks: [{ op: 'selectAll', selector: 'a.product' }],
+    items: [{ op: 'selectAll', selector: 'a.product' }],
+    itemMode: 'cheerio',
+    itemPipeline: [
+      {
+        op: 'assembleListProduct',
+        url: [{ op: 'selectAttr', selector: 'a', attr: 'href', within: 'item' }],
+      },
+    ],
   },
   detailPage: {
     rawSpecs: [{ op: 'selectAll', selector: 'tr' }],
@@ -37,22 +44,22 @@ describe('ProductSourceConfigValidatorService', () => {
   };
 
   const messageFor = (config: unknown): string => {
-    const problems = validator.problems(config);
+    const problems = validator.problems('scraping', config);
     return problems ? validator.format(problems) : '';
   };
 
   it('accepts a minimal valid config', () => {
-    expect(validator.problems(MINIMAL_CONFIG)).toBeNull();
+    expect(validator.problems('scraping', MINIMAL_CONFIG)).toBeNull();
   });
 
   it('rejects an unknown op name and names the offending value', () => {
     const message = messageFor(
       configWith((c) => {
-        c.listPage.productLinks[0].op = 'selectTxt';
+        c.listPage.items[0].op = 'selectTxt';
       }),
     );
 
-    expect(message).toContain('/listPage/productLinks/0/op');
+    expect(message).toContain('/listPage/items/0/op');
     expect(message).toContain('"selectTxt"');
   });
 
@@ -62,7 +69,7 @@ describe('ProductSourceConfigValidatorService', () => {
   it('rejects a misspelled parameter on an otherwise valid op', () => {
     const message = messageFor(
       configWith((c) => {
-        c.listPage.productLinks[0] = { op: 'selectAll', selectr: '.product' };
+        c.listPage.items[0] = { op: 'selectAll', selectr: '.product' };
       }),
     );
 
@@ -73,7 +80,7 @@ describe('ProductSourceConfigValidatorService', () => {
   it('rejects a missing required parameter', () => {
     const message = messageFor(
       configWith((c) => {
-        c.listPage.productLinks[0] = { op: 'selectAll' };
+        c.listPage.items[0] = { op: 'selectAll' };
       }),
     );
 
@@ -120,7 +127,7 @@ describe('ProductSourceConfigValidatorService', () => {
   it('does not list all allowed values for the op enum', () => {
     const message = messageFor(
       configWith((c) => {
-        c.listPage.productLinks[0].op = 'nope';
+        c.listPage.items[0].op = 'nope';
       }),
     );
 
@@ -207,7 +214,7 @@ describe('ProductSourceConfigValidatorService', () => {
   it('rejects a runtime data source outside the fixed set', () => {
     const message = messageFor(
       configWith((c) => {
-        c.listPage.productLinks[0] = {
+        c.listPage.items[0] = {
           op: 'matchAgainstRuntimeList',
           source: 'runtime:anything',
           field: 'title',
@@ -215,7 +222,7 @@ describe('ProductSourceConfigValidatorService', () => {
       }),
     );
 
-    expect(message).toContain('/listPage/productLinks/0/source');
+    expect(message).toContain('/listPage/items/0/source');
   });
 
   it('rejects an unknown spec extract mode', () => {
@@ -240,33 +247,33 @@ describe('ProductSourceConfigValidatorService', () => {
 
   describe('assertValid', () => {
     it('does not throw for a valid config', () => {
-      expect(() => validator.assertValid(MINIMAL_CONFIG)).not.toThrow();
+      expect(() => validator.assertValid('scraping', MINIMAL_CONFIG)).not.toThrow();
     });
 
     it('throws naming the bad path', () => {
       expect(() =>
-        validator.assertValid(
+        validator.assertValid('scraping',
           configWith((c) => {
-            c.listPage.productLinks[0].op = 'selectTxt';
+            c.listPage.items[0].op = 'selectTxt';
           }),
         ),
-      ).toThrow(/listPage\/productLinks\/0\/op/);
+      ).toThrow(/listPage\/items\/0\/op/);
     });
 
     it('rejects a non-object outright', () => {
-      expect(() => validator.assertValid('not a config')).toThrow();
-      expect(() => validator.assertValid(null)).toThrow();
+      expect(() => validator.assertValid('scraping', 'not a config')).toThrow();
+      expect(() => validator.assertValid('scraping', null)).toThrow();
     });
   });
 
   it('caps how many problems one report carries', () => {
-    const problems = validator.problems({ baseUrl: 'https://example.com' }) ?? [];
+    const problems = validator.problems('scraping', { baseUrl: 'https://example.com' }) ?? [];
 
     expect(problems.length).toBeGreaterThan(0);
     expect(problems.length).toBeLessThanOrEqual(11);
   });
 
   it('exposes the schema for the config editor', () => {
-    expect(validator.schema).toMatchObject({ type: 'object' });
+    expect(validator.schemaFor('scraping')).toMatchObject({ type: 'object' });
   });
 });

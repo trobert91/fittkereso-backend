@@ -11,6 +11,7 @@ import {
   ProductSourceRecord,
   ProductSourceRecordRepository,
   ScrapeTask,
+  OfferIdentityConflictError,
   ScrapeTaskRepository,
   Seller,
 } from '@fittkereso-backend/database';
@@ -24,6 +25,7 @@ import {
   nameOf,
   normalize,
   normalizeUrl,
+  slugFromUrl,
 } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -36,7 +38,8 @@ import {
   ProductNormalizerService,
   ProductSourceRecordUpdaterService,
 } from '@fittkereso-backend/product';
-import { ScrapedProduct } from '@fittkereso-backend/product';
+import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
+import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { compact, isEmpty, minBy, pick } from 'lodash';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
@@ -80,17 +83,17 @@ export class ProductScrapeUpdaterService {
   ) {}
 
   public async createOrUpdateProduct(
-    task: ScrapeTask,
+    context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
   ): Promise<ProductModel | undefined> {
     if (!scrapedProduct.category?.id) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
+        context.source.name,
         'skipped_no_category',
       );
       this.logger.warn('Skipping scrape — no category identified', {
-        taskId: task.id,
-        url: task.url,
+        taskId: context.task?.id,
+        url: context.url,
         displayName: scrapedProduct.displayName,
       });
       return undefined;
@@ -102,20 +105,20 @@ export class ProductScrapeUpdaterService {
       // Every offer belongs to its ProductSource's own seller — no per-offer
       // seller resolution needed. Path 2 keys its (seller, externalId)
       // lookup off this.
-      const seller = task.source.seller;
+      const seller = context.source.seller;
       const identity = await this.resolveProductIdentity(
-        task,
+        context,
         scrapedProduct,
         seller,
       );
       const persisted = await this.persistProduct({
-        task,
+        context,
         scrapedProduct,
         normalizedSourceName,
         identity,
       });
       await this.applyPostSaveSideEffects({
-        task,
+        context,
         scrapedProduct,
         model: persisted.model,
         sourceRecord: persisted.sourceRecord,
@@ -126,7 +129,7 @@ export class ProductScrapeUpdaterService {
       // do not fail the whole scraping if brand resolution fails
       if ((error as Error).message?.includes('Brand could not be identified')) {
         this.productMetricsService.productBrandResolutionFailed(
-          task.source.name,
+          context.source.name,
         );
         return undefined;
       }
@@ -150,14 +153,14 @@ export class ProductScrapeUpdaterService {
   }
 
   private async resolveProductIdentity(
-    task: ScrapeTask,
+    context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
     seller: Seller,
   ): Promise<ResolvedIdentity> {
     // Path 1: task already pinned to a product
-    if (task.product?.id) {
+    if (context.product?.id) {
       const model = await this.productRepo.findOneOrFail({
-        where: { id: task.product.id },
+        where: { id: context.product.id },
         relations: this.getProductRelations(),
       });
       return { model, isExistingMatch: true };
@@ -185,7 +188,7 @@ export class ProductScrapeUpdaterService {
         );
       if (existingOffer?.model) {
         this.productMetricsService.scrapeResolutionOutcome(
-          task.source.name,
+          context.source.name,
           'offer_external_id_hit',
         );
         return { model: existingOffer.model, isExistingMatch: true };
@@ -203,13 +206,13 @@ export class ProductScrapeUpdaterService {
     if (scrapedProduct.externalId) {
       const existingSource =
         await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
-          task.source.id,
+          context.source.id,
           scrapedProduct.externalId,
           this.getProductRelations(),
         );
       if (existingSource?.model) {
         this.productMetricsService.scrapeResolutionOutcome(
-          task.source.name,
+          context.source.name,
           'external_id_hit',
         );
         return { model: existingSource.model, isExistingMatch: true };
@@ -224,7 +227,9 @@ export class ProductScrapeUpdaterService {
     // is not inherently a false positive.
     const { productId, decision } = await this.listingMatch.match(
       scrapedProduct,
-      { taskId: task.id },
+      // Omitted rather than blank on the feed path: there is no task, and an
+      // empty taskId in the logs would read as a lost one.
+      context.task ? { taskId: context.task.id } : {},
     );
 
     if (productId) {
@@ -233,10 +238,10 @@ export class ProductScrapeUpdaterService {
         relations: this.getProductRelations(),
       });
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
+        context.source.name,
         decision.outcome === 'llm_identified' ? 'llm_identified' : 'identified',
       );
-      this.productMetricsService.productMatched(task.source.name);
+      this.productMetricsService.productMatched(context.source.name);
       return { model, isExistingMatch: true, decision };
     }
 
@@ -247,7 +252,7 @@ export class ProductScrapeUpdaterService {
     // scoring leaves the LLM undecided.
     if (decision.llm) {
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
+        context.source.name,
         'llm_declined',
       );
     }
@@ -256,22 +261,22 @@ export class ProductScrapeUpdaterService {
   }
 
   private async persistProduct(params: {
-    task: ScrapeTask;
+    context: ProductImportContext;
     scrapedProduct: ScrapedProduct;
     normalizedSourceName: string;
     identity: ResolvedIdentity;
   }): Promise<PersistResult> {
-    const { task, scrapedProduct, normalizedSourceName, identity } = params;
+    const { context, scrapedProduct, normalizedSourceName, identity } = params;
 
     let model = identity.model;
     if (!model) {
       model = await this.newProductModel(
-        task,
+        context,
         scrapedProduct,
         normalizedSourceName,
       );
       this.productMetricsService.scrapeResolutionOutcome(
-        task.source.name,
+        context.source.name,
         'created',
       );
     }
@@ -282,8 +287,8 @@ export class ProductScrapeUpdaterService {
       model,
       scrapedProduct,
       externalId: scrapedProduct.externalId,
-      source: task.source,
-      sourceUrl: task.url,
+      source: context.source,
+      sourceUrl: context.url,
       normalizedSourceName,
     });
 
@@ -296,28 +301,32 @@ export class ProductScrapeUpdaterService {
     saveOutcome.sourceRecord ??= sourceRecord;
 
     if (saveOutcome.created) {
-      this.productMetricsService.newProductCreated(task.source.name);
+      this.productMetricsService.newProductCreated(context.source.name);
     } else {
-      this.productMetricsService.productUpdated(task.source.name);
+      this.productMetricsService.productUpdated(context.source.name);
     }
 
-    task.product = saveOutcome.model;
-    if (identity.decision) {
-      task.identityDecision = identity.decision;
+    // Only the scrape path has a task to write back to; a feed run does not.
+    context.product = saveOutcome.model;
+    if (context.task) {
+      context.task.product = saveOutcome.model;
+      if (identity.decision) {
+        context.task.identityDecision = identity.decision;
+      }
+      await this.taskRepo.save(context.task);
     }
-    await this.taskRepo.save(task);
 
     return saveOutcome;
   }
 
   private async applyPostSaveSideEffects(params: {
-    task: ScrapeTask;
+    context: ProductImportContext;
     scrapedProduct: ScrapedProduct;
     model: ProductModel;
     sourceRecord?: ProductSourceRecord;
     identity: ResolvedIdentity;
   }): Promise<void> {
-    const { task, scrapedProduct, model, sourceRecord, identity } = params;
+    const { context, scrapedProduct, model, sourceRecord, identity } = params;
 
     if (!model.slug) {
       await this.generateProductSlug(model);
@@ -331,11 +340,11 @@ export class ProductScrapeUpdaterService {
       model,
       aliasCandidates,
       ProductAliasSource.scraped,
-      task.source?.id,
+      context.source?.id,
     );
     if (insertedCount > 0) {
       this.productMetricsService.productAliasCreated(
-        task.source.name,
+        context.source.name,
         insertedCount,
       );
     }
@@ -347,7 +356,7 @@ export class ProductScrapeUpdaterService {
     if (isEmpty(model.images)) {
       const firstImage = minBy(scrapedProduct.images ?? [], (img) => img.order);
       const newImages = firstImage
-        ? await this.imageCopyService.copyImagesFromSource(model, task.source, [
+        ? await this.imageCopyService.copyImagesFromSource(model, context.source, [
             firstImage.url,
           ])
         : [];
@@ -360,17 +369,17 @@ export class ProductScrapeUpdaterService {
           await this.productRepo.save(model);
 
           this.productMetricsService.productImagesCreated(
-            task.source.name,
+            context.source.name,
             newImages.length,
           );
         }
       }
     }
 
-    await this.createOrUpdateOffers(task, scrapedProduct, model, sourceRecord);
+    await this.createOrUpdateOffers(context, scrapedProduct, model, sourceRecord);
 
     if (identity.decision) {
-      await this.detectDuplicates(task, model);
+      await this.detectDuplicates(context, model);
     }
   }
 
@@ -382,14 +391,14 @@ export class ProductScrapeUpdaterService {
    * far less than a lost scrape.
    */
   private async detectDuplicates(
-    task: ScrapeTask,
+    context: ProductImportContext,
     model: ProductModel,
   ): Promise<void> {
     try {
       await this.duplicateService.detect(model.id, 'scrape');
     } catch (error) {
       this.logger.warn('Duplicate detection failed, continuing', {
-        taskId: task.id,
+        taskId: context.task?.id,
         productId: model.id,
         error,
       });
@@ -404,7 +413,7 @@ export class ProductScrapeUpdaterService {
   // sourceRecord (the ordinary single-offer-per-page case, and the
   // shared-URL multi-seller-table case).
   private async createOrUpdateOffers(
-    task: ScrapeTask,
+    context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
     model: ProductModel,
     primarySourceRecord: ProductSourceRecord | undefined,
@@ -415,7 +424,7 @@ export class ProductScrapeUpdaterService {
     if (!primarySourceRecord) {
       this.logger.warn(
         'No ProductSourceRecord resolved for this scrape, skipping offer upsert',
-        { taskId: task.id, url: task.url },
+        { taskId: context.task?.id, url: context.url },
       );
       return;
     }
@@ -442,7 +451,7 @@ export class ProductScrapeUpdaterService {
     // of which record originally created it.
     const preloadedOffers = await this.offerRepo.findAllByModelAndSource(
       model.id,
-      task.source.id,
+      context.source.id,
     );
 
     const upsertedOffers: Offer[] = [];
@@ -454,17 +463,30 @@ export class ProductScrapeUpdaterService {
     // is still live; only records this pass actually touched get their
     // unmatched offers deleted.
     const touchedSourceRecordIds = new Set<string>();
-    for (const scraped of offers!) {
+    // Resolved for the whole page at once, because uniqueness is a property of
+    // the SET, not of any one offer — see resolveOfferExternalIds.
+    const externalIds = this.resolveOfferExternalIds(context, offers!);
+
+    for (const [index, scraped] of offers!.entries()) {
       try {
         const normalizedScrapedUrl = scraped.url
           ? normalizeUrl(scraped.url)
           : undefined;
+        // Scoped to this task's source: `model.sources` spans every source, and
+        // record URLs are unique only per source, so a url-only match can
+        // return another source's record. That would both misattribute this
+        // offer's provenance and put the WRONG record id into
+        // touchedSourceRecordIds below — leaving this source's own genuinely
+        // stale offers permanently ineligible for the sweep.
         const sourceRecord = normalizedScrapedUrl
-          ? (model.sources?.find((s) => s.url === normalizedScrapedUrl) ??
-            primarySourceRecord)
+          ? (model.sources?.find(
+              (s) =>
+                s.source?.id === context.source.id &&
+                s.url === normalizedScrapedUrl,
+            ) ?? primarySourceRecord)
           : primarySourceRecord;
         touchedSourceRecordIds.add(sourceRecord.id);
-        const seller = task.source.seller;
+        const seller = context.source.seller;
         const existing = this.offerMatching.findMatch(
           preloadedOffers,
           scraped,
@@ -480,17 +502,40 @@ export class ProductScrapeUpdaterService {
           currency: scraped.currency,
           availability: scraped.availability,
           url: normalizedScrapedUrl,
-          externalId: scraped.externalId,
+          externalId: externalIds[index],
           locations: scraped.locations,
           specs: scraped.specs ?? pageOfferLevelSpecs,
         });
         upsertedOffers.push(offer);
       } catch (error) {
+        // An identity disagreement is not a flaky write — two sources have
+        // resolved different products for one seller listing, and one of them
+        // is wrong. It still must not abandon the rest of the page, but it is
+        // logged as an error and counted, because the alternative is a product
+        // quietly sitting with no offer and therefore no price.
+        if (error instanceof OfferIdentityConflictError) {
+          this.logger.error(
+            'Offer identity disagreement between sources — refusing to rebind the offer',
+            error,
+            {
+              taskId: context.task?.id,
+              url: context.url,
+              source: context.source.name,
+              ...error.details,
+            },
+          );
+          this.productMetricsService.offerIdentityConflict(
+            context.source.name,
+            'model_disagreement',
+          );
+          continue;
+        }
+
         // Do not fail the whole product scrape if one offer fails — mirrors
         // the existing brand-resolution-failure tolerance in this service.
         this.logger.warn('Failed to upsert offer, continuing', {
-          taskId: task.id,
-          url: task.url,
+          taskId: context.task?.id,
+          url: context.url,
           error,
         });
       }
@@ -519,6 +564,78 @@ export class ProductScrapeUpdaterService {
       await this.mergeService.recomputePrice(model);
       await this.productRepo.save(model);
     }
+  }
+
+  /**
+   * The `Offer.externalId` for every offer on this page, resolved together.
+   *
+   * Two jobs, and the second is why this cannot be done per offer.
+   *
+   * **The fallback.** A source-native id when there is one, otherwise the URL
+   * slug. Derived here, in shared code, rather than per config — that is what
+   * guarantees a scraping source and an Árukereső source for the same shop land
+   * on the same string, which is the whole mechanism by which two sources
+   * converge on one offer (the `(seller, externalId)` unique constraint).
+   *
+   * **The collision guard.** Uniqueness is a property of the set, not of any
+   * one offer. A page listing several size variants at one URL gives every one
+   * of them the same slug, and the unique constraint does not error on that —
+   * it keeps the last writer, so the page silently ends up with ONE offer where
+   * it should have four, and `upsertedOffers` holds the same id N times. Any
+   * value claimed by more than one offer is therefore dropped for all of them:
+   * an offer with no externalId falls back to OfferMatchingService within this
+   * source's own preload, which is how sources with no ids at all have always
+   * worked — strictly better than losing variants.
+   *
+   * A collision between SOURCE-NATIVE ids is a different thing from a collision
+   * between fallbacks — the first is a config emitting a group-level id where a
+   * variant-level one was needed, the second is just a page shape — so they are
+   * logged and counted separately.
+   */
+  private resolveOfferExternalIds(
+    context: ProductImportContext,
+    offers: ScrapedOffer[],
+  ): (string | undefined)[] {
+    const resolved = offers.map((scraped) => {
+      const native = scraped.externalId?.trim() || undefined;
+      const url = scraped.url ? normalizeUrl(scraped.url) : context.url;
+      return { value: native ?? slugFromUrl(url), native: !!native };
+    });
+
+    const counts = new Map<string, number>();
+    for (const { value } of resolved) {
+      if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+
+    const reported = new Set<string>();
+
+    return resolved.map(({ value, native }) => {
+      if (!value || (counts.get(value) ?? 0) === 1) return value;
+
+      const kind = native ? 'duplicate_external_id' : 'duplicate_slug_fallback';
+      if (!reported.has(value)) {
+        reported.add(value);
+        this.logger.error(
+          native
+            ? 'Several offers on one page share a source-native externalId — dropping it for all of them, because keeping it would collapse them into one Offer row. The source must emit a variant-level id.'
+            : 'Several offers on one page fall back to the same URL slug — dropping it for all of them, because keeping it would collapse them into one Offer row. This page needs per-offer externalIds.',
+          undefined,
+          {
+            taskId: context.task?.id,
+            url: context.url,
+            source: context.source.name,
+            externalId: value,
+            offers: counts.get(value),
+          },
+        );
+        this.productMetricsService.offerIdentityConflict(
+          context.source.name,
+          kind,
+        );
+      }
+
+      return undefined;
+    });
   }
 
   private async createNewAliases(
@@ -617,7 +734,7 @@ export class ProductScrapeUpdaterService {
   }
 
   private async newProductModel(
-    task: ScrapeTask,
+    context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
     normalizedSourceName: string,
   ): Promise<ProductModel> {
@@ -635,8 +752,8 @@ export class ProductScrapeUpdaterService {
         this.logger.warn(
           'Brand could not be identified, skipping product creation',
           {
-            taskId: task.id,
-            url: task.url,
+            taskId: context.task?.id,
+            url: context.url,
             displayName: scrapedProduct.displayName,
           },
         );

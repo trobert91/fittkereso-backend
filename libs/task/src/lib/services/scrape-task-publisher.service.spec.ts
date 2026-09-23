@@ -8,7 +8,7 @@ import {
 describe('ScrapeTaskPublisherService', () => {
   let service: ScrapeTaskPublisherService;
   let taskRepo: { save: jest.Mock; saveAll: jest.Mock; findExistingUrl: jest.Mock };
-  let sourceRecordRepo: { findByUrl: jest.Mock };
+  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
 
   const source = { id: 'source-1', name: 'speedbike' } as ProductSource;
 
@@ -19,7 +19,7 @@ describe('ScrapeTaskPublisherService', () => {
       findExistingUrl: jest.fn().mockResolvedValue(null),
     };
     sourceRecordRepo = {
-      findByUrl: jest.fn().mockResolvedValue(null),
+      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
     };
 
     service = new ScrapeTaskPublisherService(
@@ -67,7 +67,7 @@ describe('ScrapeTaskPublisherService', () => {
 
       expect(outcome).toEqual({ dispatched: false, reason: 'pending_task' });
       expect(taskRepo.save).not.toHaveBeenCalled();
-      expect(sourceRecordRepo.findByUrl).not.toHaveBeenCalled();
+      expect(sourceRecordRepo.findBySourceAndUrl).not.toHaveBeenCalled();
     });
 
     it('skips dispatch on a pending task regardless of how far in the future processedSince is', async () => {
@@ -80,11 +80,11 @@ describe('ScrapeTaskPublisherService', () => {
       });
 
       expect(outcome).toEqual({ dispatched: false, reason: 'pending_task' });
-      expect(sourceRecordRepo.findByUrl).not.toHaveBeenCalled();
+      expect(sourceRecordRepo.findBySourceAndUrl).not.toHaveBeenCalled();
     });
 
     it('skips dispatch when a ProductSourceRecord was already updated at/after processedSince', async () => {
-      sourceRecordRepo.findByUrl.mockResolvedValueOnce({
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({
         updatedAt: new Date('2026-08-20T00:00:00Z'),
       });
 
@@ -95,7 +95,7 @@ describe('ScrapeTaskPublisherService', () => {
     });
 
     it('dispatches when the existing ProductSourceRecord predates processedSince', async () => {
-      sourceRecordRepo.findByUrl.mockResolvedValueOnce({
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({
         updatedAt: new Date('2026-08-01T00:00:00Z'),
       });
 

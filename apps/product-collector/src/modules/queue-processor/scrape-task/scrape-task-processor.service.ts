@@ -70,7 +70,10 @@ export class ScrapeTaskProcessorService {
    * behind a backoff.
    */
   private async assertConfigValid(task: ScrapeTask): Promise<void> {
-    const problems = this.configValidator.problems(task.source.config);
+    const problems = this.configValidator.problems(
+      task.source.type,
+      task.source.config,
+    );
     if (!problems) {
       return;
     }

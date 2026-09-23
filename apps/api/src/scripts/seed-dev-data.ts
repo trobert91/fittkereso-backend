@@ -55,6 +55,7 @@ import {
   ProductCategory,
   ProductCategoryRepository,
   ProductSource,
+  ProductSourceType,
   ProductSourceConfig,
   ProductSourceRepository,
   Seller,
@@ -115,13 +116,15 @@ interface SeedSellerSpec {
 
 interface SeedSourceSpec {
   name: string;
+  /** Fixed at creation — the config format is bound to it. */
+  type: ProductSourceType;
   configFile: string;
   maxConcurrent: number;
   requestsPerHour: number;
   priority: number;
   schedulingEnabled: boolean;
   processingEnabled: boolean;
-  fullSyncInterval: string;
+  frequency: string;
   seller: SeedSellerSpec;
 }
 
@@ -133,38 +136,50 @@ interface SeedSourceSpec {
  * `detailPage.offers.sellerName` literal in its config, since scrape-time
  * seller resolution is by exact name.
  *
- * Do not add a second source for a site that already has one:
- * ProductSourceRecord.url is globally unique and deduplication runs across all
- * sources, so the newer source silently skips every URL the first one owns.
+ * A site may now have SEVERAL sources — ProductSourceRecord is unique on
+ * (source, url) rather than on url alone, and every URL-keyed lookup is
+ * source-scoped, so each source keeps its own records and the offers converge
+ * through the (seller, externalId) constraint. This used to say the opposite,
+ * and it was right at the time: a second source really did silently skip every
+ * URL the first one owned.
  */
 const SOURCES: SeedSourceSpec[] = [
   {
     name: 'ebikeshop',
+    type: 'scraping',
     configFile: 'ebikeshop.config.json',
     maxConcurrent: 2,
     requestsPerHour: 180,
     priority: 10,
-    // Scheduling stays off, as it is in dev: neither config has a `discovery`
-    // block, so a scheduled sync would do nothing anyway - runs are enqueued as
-    // list-page tasks by hand (see apps/product-collector/scripts/
-    // enqueue-ktm-catalog.ts). Processing is what lets the poller claim them.
+    // Scheduling stays off in dev: a scheduled run would walk the shop's whole
+    // catalogue on the next night tick. Runs are enqueued by hand instead (see
+    // apps/product-collector/scripts/enqueue-ktm-catalog.ts). Processing is
+    // what lets the poller claim them.
     schedulingEnabled: false,
     processingEnabled: true,
-    fullSyncInterval: '7 days',
+    frequency: '7 days',
     seller: {
       name: 'ebikeshop.hu',
       domains: ['ebikeshop.hu'],
     },
   },
   {
-    name: 'speedbike',
-    configFile: 'speedbike.config.json',
-    maxConcurrent: 2,
-    requestsPerHour: 120,
+    // speedbike is FEED-ONLY. Its scraping config still exists as a fixture —
+    // it is the table-based markup template the add-webshop skill points at,
+    // and its interpreter specs still run — but it is deliberately not seeded
+    // as a source: one Árukereső GET replaces thousands of paid page fetches
+    // for the same catalogue.
+    name: 'speedbike-arukereso',
+    type: 'arukereso',
+    configFile: 'speedbike-arukereso.config.json',
+    // A feed run makes exactly one HTTP request and enqueues no scrape tasks,
+    // so these caps govern nothing here.
+    maxConcurrent: 1,
+    requestsPerHour: 10,
     priority: 10,
     schedulingEnabled: false,
     processingEnabled: true,
-    fullSyncInterval: '7 days',
+    frequency: '1 day',
     seller: {
       name: 'speedbike.hu',
       domains: ['speedbike.hu'],
@@ -311,12 +326,15 @@ async function seedSources(app: INestApplicationContext): Promise<void> {
     const source = existing ?? new ProductSource();
     if (!existing) {
       source.name = spec.name;
+      // Fixed at creation and never changed afterwards — the config format is
+      // type-bound, so a type change would reinterpret a stored document.
+      source.type = spec.type;
       source.maxConcurrent = spec.maxConcurrent;
       source.requestsPerHour = spec.requestsPerHour;
       source.priority = spec.priority;
       source.schedulingEnabled = spec.schedulingEnabled;
       source.processingEnabled = spec.processingEnabled;
-      source.fullSyncInterval = spec.fullSyncInterval as ms.StringValue;
+      source.frequency = spec.frequency as ms.StringValue;
     }
 
     source.seller = await resolveOrCreateSeller(app, spec.seller);

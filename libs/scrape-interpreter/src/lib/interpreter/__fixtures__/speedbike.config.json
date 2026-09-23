@@ -1,6 +1,9 @@
 {
   "baseUrl": "https://speedbike.hu",
-  "fullSyncStartUrl": "https://speedbike.hu/elektromos-kerekpar",
+  "maxItems": 10,
+  "startUrls": [
+    "https://speedbike.hu/elektromos-kerekpar"
+  ],
   "categories": {
     "ebikes": {
       "enabled": true,
@@ -16,21 +19,61 @@
         "trim": true
       }
     ],
-    "categoryLinks": [],
-    "productLinks": [
+    "items": [
       {
         "op": "selectAll",
-        "selector": ".snapshot-list-item.list_prouctname",
-        "as": "boxes"
-      },
+        "selector": ".product-snapshot"
+      }
+    ],
+    "itemMode": "cheerio",
+    "itemPipeline": [
       {
-        "op": "extractLinkFromBox",
-        "on": "boxes",
-        "linkSelector": "a.list-productname-link",
-        "first": true,
-        "titleFrom": [
-          "attr:title",
-          "text"
+        "op": "assembleListProduct",
+        "url": [
+          {
+            "op": "selectAttr",
+            "selector": "a.list-productname-link",
+            "attr": "href",
+            "within": "item",
+            "first": true
+          }
+        ],
+        "name": [
+          {
+            "op": "selectFirst",
+            "selector": "a.list-productname-link",
+            "within": "item"
+          },
+          {
+            "op": "selectText",
+            "trim": true
+          }
+        ],
+        "price": [
+          {
+            "op": "selectFirst",
+            "selector": ".list_prouctprice .price",
+            "within": "item"
+          },
+          {
+            "op": "selectText",
+            "trim": true
+          },
+          {
+            "op": "stripPattern",
+            "pattern": "[^0-9]",
+            "flags": "g"
+          },
+          {
+            "op": "jsonPath",
+            "cast": "number"
+          }
+        ],
+        "currency": [
+          {
+            "op": "literal",
+            "value": "HUF"
+          }
         ]
       }
     ]

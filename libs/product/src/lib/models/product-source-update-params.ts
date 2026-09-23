@@ -1,6 +1,13 @@
-import { ProductSourceActor, ProductSourceConfig } from '@fittkereso-backend/database';
+import {
+  ProductSourceActor,
+  ProductSourceConfig,
+  ProductSourceType,
+} from '@fittkereso-backend/database';
 
 export interface ProductSourceUpdateParams {
+  /** Create-only — supplying a different value is rejected. Present so the
+   *  rejection is explicit rather than a silent no-op. */
+  type?: ProductSourceType;
   name?: string;
   sellerId?: string;
   config?: ProductSourceConfig;
@@ -11,8 +18,8 @@ export interface ProductSourceUpdateParams {
   priority?: number;
   maxConcurrent?: number;
   requestsPerHour?: number;
-  fullSyncInterval?: string | null;
-  nextFullSyncAt?: string | null;
+  frequency?: string | null;
+  nextRunAt?: string | null;
   /**
    * Who is making this change, for the history rows it writes.
    *

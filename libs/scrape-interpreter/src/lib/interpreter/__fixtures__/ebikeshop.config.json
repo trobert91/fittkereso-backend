@@ -1,6 +1,9 @@
 {
   "baseUrl": "https://ebikeshop.hu",
-  "fullSyncStartUrl": "https://ebikeshop.hu/termekek/elektromos-kerekparok",
+  "maxItems": 10,
+  "startUrls": [
+    "https://ebikeshop.hu/termekek/elektromos-kerekparok"
+  ],
   "categories": {
     "ebikes": {
       "enabled": true,
@@ -16,8 +19,18 @@
         "path": "props.meta.h1Title"
       }
     ],
-    "categoryLinks": [],
-    "productLinks": [
+    "pagination": {
+      "urlTemplate": "{{startUrl}}?page={{page}}",
+      "pageCount": [
+        {
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.lastPage"
+        }
+      ]
+    },
+    "items": [
       {
         "op": "parseJsonAttr",
         "selector": "#app",
@@ -30,17 +43,70 @@
         "on": "products",
         "path": "isUsed",
         "equals": false
-      },
+      }
+    ],
+    "itemMode": "json",
+    "itemPipeline": [
       {
-        "op": "mapJsonArray",
-        "fields": {
-          "url": {
+        "op": "assembleListProduct",
+        "url": [
+          {
+            "op": "jsonPath",
             "path": "showPageUrl"
-          },
-          "title": {
+          }
+        ],
+        "externalId": [
+          {
+            "op": "jsonPath",
+            "path": "productCode"
+          }
+        ],
+        "name": [
+          {
+            "op": "jsonPath",
             "path": "productName"
           }
-        }
+        ],
+        "price": [
+          {
+            "op": "jsonPath",
+            "path": "prices.priceSale",
+            "cast": "number"
+          }
+        ],
+        "priceWithoutDiscount": [
+          {
+            "op": "jsonPath",
+            "on": "item",
+            "path": "prices.sale",
+            "cast": "boolean",
+            "as": "onSale"
+          },
+          {
+            "op": "branch",
+            "condition": {
+              "equals": {
+                "value": "onSale",
+                "to": true
+              }
+            },
+            "ifTrue": [
+              {
+                "op": "jsonPath",
+                "on": "item",
+                "path": "prices.price",
+                "cast": "number"
+              }
+            ],
+            "ifFalse": []
+          }
+        ],
+        "currency": [
+          {
+            "op": "literal",
+            "value": "HUF"
+          }
+        ]
       }
     ]
   },

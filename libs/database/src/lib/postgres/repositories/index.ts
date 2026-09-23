@@ -15,6 +15,7 @@ export * from './translation-cache.repository';
 export * from './seller-repository';
 export * from './billing-info-repository';
 export * from './offer-repository';
+export * from './offer-identity-conflict.error';
 export * from './price-history-repository';
 export * from './product-duplicate-pair-repository';
 export * from './user-repository';

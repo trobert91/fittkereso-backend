@@ -15,6 +15,9 @@ import { ProductSpecs } from '../../models/product-spec';
 
 @Entity()
 @Index([nameOf<Offer>('model'), nameOf<Offer>('condition')])
+// Serves the product-detail freshness query: this model's offers, filtered by
+// lastSynced against the visibility cutoff.
+@Index([nameOf<Offer>('model'), nameOf<Offer>('lastSynced')])
 @Unique([nameOf<Offer>('seller'), nameOf<Offer>('externalId')])
 export class Offer extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
@@ -69,14 +72,30 @@ export class Offer extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   url?: string;
 
+  /**
+   * Stock status, when the source gives grounds for one at all.
+   *
+   * Nullable, and null is distinct from `unknown`. Null means no source has
+   * given us any basis for a stock claim; `unknown` means a source DID report
+   * something and it was a value we could not map onto one of the four states —
+   * the second is a config bug worth fixing, the first is not. Neither should
+   * be read as "in stock".
+   *
+   * What counts as grounds depends on the importer, and the two differ for a
+   * real reason. A scraped product page exists whether or not the thing is
+   * orderable, so silence there is genuinely an absence of information. A feed
+   * is generated from what the shop is currently offering, so a product's mere
+   * presence in it means it can be bought — which is why the Árukereső importer
+   * defaults to `in_stock` and only departs from it when the feed says
+   * otherwise (Árukereső's documented `DeliveryTime: "NO"`).
+   */
   @Expose({ groups: [SerializeGroup.list] })
   @Column({
     type: 'enum',
     enum: OfferAvailability,
-    nullable: false,
-    default: OfferAvailability.unknown,
+    nullable: true,
   })
-  availability: OfferAvailability;
+  availability?: OfferAvailability | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'varchar', nullable: true })
@@ -91,9 +110,26 @@ export class Offer extends BasePostgresEntity {
   @Column({ type: 'jsonb', nullable: true })
   locations?: string[];
 
+  /**
+   * When an import run last confirmed this offer on the source.
+   *
+   * The single freshness signal in the system: the public site shows offers
+   * synced within `offers.freshnessDays` (7), and StaleOfferSweepService
+   * hard-deletes those untouched for `offers.deleteAfterDays` (14). Time-based
+   * staleness is deliberately the whole mechanism — there are no miss counters
+   * and no delisting sweep; a source that stops seeing a product simply stops
+   * stamping it.
+   *
+   * Nullable, and null reads as "not confirmed recently": such rows are hidden
+   * from the site but never swept, because `lastSynced < cutoff` is false for
+   * NULL. That is what makes rows written before this column existed safe.
+   *
+   * Do NOT gate visibility on `active` instead — nothing in production ever
+   * sets it to false, so every `active = true` guard is a no-op.
+   */
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Column({ type: 'timestamptz', nullable: false })
-  lastSeenAt: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSynced?: Date | null;
 
   @Expose({ groups: [SerializeGroup.adminList] })
   @Index()

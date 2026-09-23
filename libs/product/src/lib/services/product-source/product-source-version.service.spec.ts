@@ -2,17 +2,24 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   ProductSourceConfigValidatorService,
   type ProductSource,
-  type ProductSourceConfig,
+  type ScrapingSourceConfig,
   type ProductSourceVersion,
 } from '@fittkereso-backend/database';
 import { ProductSourceVersionService } from './product-source-version.service';
 
 const CONFIG = {
   baseUrl: 'https://example.com',
+  startUrls: ['https://example.com/products'],
   listPage: {
     categoryName: [{ op: 'selectText', selector: 'h1' }],
-    categoryLinks: [],
-    productLinks: [{ op: 'selectAll', selector: 'a.product' }],
+    items: [{ op: 'selectAll', selector: 'a.product' }],
+    itemMode: 'cheerio',
+    itemPipeline: [
+      {
+        op: 'assembleListProduct',
+        url: [{ op: 'selectAttr', selector: 'a', attr: 'href', within: 'item' }],
+      },
+    ],
   },
   detailPage: {
     rawSpecs: [{ op: 'selectAll', selector: 'tr' }],
@@ -25,9 +32,14 @@ const CONFIG = {
     images: [{ op: 'extractAttrList', attr: 'src' }],
     specMapping: { ebikes: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] } },
   },
-} as unknown as ProductSourceConfig;
+} as unknown as ScrapingSourceConfig;
 
-const SOURCE = { id: 'source-1', name: 'speedbike', config: CONFIG } as ProductSource;
+const SOURCE = {
+  id: 'source-1',
+  name: 'speedbike',
+  type: 'scraping' as const,
+  config: CONFIG,
+} as ProductSource;
 
 const ACTOR = { type: 'user' as const, userId: 'user-1', label: 'admin@example.com' };
 const SYSTEM_ACTOR = { type: 'system' as const, label: 'seed' };
@@ -144,7 +156,7 @@ describe('ProductSourceVersionService', () => {
 
     it('refuses a config that does not match the schema', async () => {
       const broken = JSON.parse(JSON.stringify(CONFIG));
-      broken.listPage.productLinks[0].op = 'selectTxt';
+      broken.listPage.items[0].op = 'selectTxt';
 
       await expect(service.addVersion(SOURCE.id, broken, { actor: ACTOR })).rejects.toThrow(
         /selectTxt/,
@@ -166,8 +178,9 @@ describe('ProductSourceVersionService', () => {
       const reordered = {
         detailPage: CONFIG.detailPage,
         listPage: CONFIG.listPage,
+        startUrls: CONFIG.startUrls,
         baseUrl: CONFIG.baseUrl,
-      } as unknown as ProductSourceConfig;
+      } as unknown as ScrapingSourceConfig;
       versionRepo.findCurrent.mockResolvedValue({ version: 3, config: CONFIG });
 
       await expect(
@@ -201,7 +214,7 @@ describe('ProductSourceVersionService', () => {
     const OLD_CONFIG = {
       ...CONFIG,
       baseUrl: 'https://old.example.com',
-    } as ProductSourceConfig;
+    } as ScrapingSourceConfig;
 
     beforeEach(() => {
       versionRepo.findByVersion.mockResolvedValue({

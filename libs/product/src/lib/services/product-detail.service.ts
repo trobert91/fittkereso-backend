@@ -38,7 +38,10 @@ export class ProductDetailService {
       ],
       order: {
         scrapeTasks: { createdAt: 'DESC' },
-        offers: { lastSeenAt: 'DESC' },
+        // NULLS LAST because lastSynced is nullable: Postgres sorts NULLs
+        // first on DESC, which would float never-synced offers above every
+        // freshly confirmed one.
+        offers: { lastSynced: { direction: 'DESC', nulls: 'LAST' } },
       },
     });
 

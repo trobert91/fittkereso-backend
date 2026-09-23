@@ -7,6 +7,8 @@ import {
   ProductSourceRepository,
   SellerRepository,
   systemActor,
+  PRODUCT_SOURCE_TYPES,
+  ProductSourceType,
 } from '@fittkereso-backend/database';
 import {
   ProductSourceUpdateParams,
@@ -38,11 +40,23 @@ export class ProductSourceTools {
   @Tool({
     name: 'get_product_source_config_schema',
     description:
-      'Get the JSON Schema that every ProductSourceConfig is validated against. It documents the whole config shape and every scrape operation, including each op\'s required and optional parameters. Read this BEFORE hand-writing or editing a config — update_product_source rejects anything that does not match it, and copying the shape from an existing config only shows the ops that config happens to use.',
+      'Get the JSON Schema a ProductSource config is validated against. There is one schema PER SOURCE TYPE — "scraping" (startUrls, listPage, detailPage pipelines) and "arukereso" (feedUrl, field mapping) share no keys — so pass the type you are writing. Omit it to get every schema keyed by type. Documents the whole config shape and every scrape operation with its required and optional parameters. Read this BEFORE hand-writing or editing a config: update_product_source rejects anything that does not match, and copying the shape from an existing config only shows the ops that config happens to use.',
+    parameters: z.object({
+      type: z
+        .enum(PRODUCT_SOURCE_TYPES)
+        .optional()
+        .describe('Which type\'s schema to return. Omit for all of them.'),
+    }),
     annotations: { readOnlyHint: true, idempotentHint: true },
   })
-  async getProductSourceConfigSchema(): Promise<string> {
-    return JSON.stringify(this.configValidator.schema, null, 2);
+  async getProductSourceConfigSchema(args: {
+    type?: ProductSourceType;
+  }): Promise<string> {
+    const schema = args?.type
+      ? this.configValidator.schemaFor(args.type)
+      : this.configValidator.allSchemas;
+
+    return JSON.stringify(schema, null, 2);
   }
 
   @Tool({
@@ -74,7 +88,7 @@ export class ProductSourceTools {
         continue;
       }
 
-      const problems = this.configValidator.problems(source.config);
+      const problems = this.configValidator.problems(source.type, source.config);
       if (!problems) continue;
 
       invalid += 1;
@@ -94,6 +108,11 @@ export class ProductSourceTools {
     description:
       'Check a ProductSourceConfig against the config schema WITHOUT saving anything. Use it while drafting, so a structural mistake is found before update_product_source refuses the write. Reports every problem with the JSON path it is at.',
     parameters: z.object({
+      type: z
+        .enum(PRODUCT_SOURCE_TYPES)
+        .describe(
+          'Which schema to check against — the config shape is type-bound, so a scraping config checked as "arukereso" fails on every key.',
+        ),
       config: z
         .record(z.string(), z.any())
         .describe('The complete ProductSourceConfig JSON object to check.'),
@@ -101,9 +120,10 @@ export class ProductSourceTools {
     annotations: { readOnlyHint: true, idempotentHint: true },
   })
   async validateProductSourceConfig(args: {
+    type: ProductSourceType;
     config: Record<string, unknown>;
   }): Promise<string> {
-    const problems = this.configValidator.problems(args.config);
+    const problems = this.configValidator.problems(args.type, args.config);
 
     if (!problems) {
       return 'Valid — this config matches the product source config schema.';
@@ -179,6 +199,7 @@ export class ProductSourceTools {
       L.push(
         `- Scheduling: ${source.schedulingEnabled ? 'on' : 'off'} · Processing: ${source.processingEnabled ? 'on' : 'off'}`,
       );
+      L.push(`- Type: ${source.type}`);
       L.push(`- Priority: ${source.priority}`);
       L.push(`- Base URL: ${source.config?.baseUrl ?? '_not set_'}`);
       L.push('');
@@ -196,22 +217,29 @@ export class ProductSourceTools {
   @Tool({
     name: 'create_product_source_for_seller',
     description:
-      'Create a new ProductSource for a seller. Only takes a name — the created source starts with scheduling and processing both disabled, and an empty config. Use update_product_source afterward to fill in the config (baseUrl, scrape-operation pipelines, etc.) and enable scheduling/processing once it is ready.',
+      'Create a new ProductSource for a seller. Takes a name and a type — the created source starts with scheduling and processing both disabled, and an empty config. The type decides which config format the source uses and CANNOT be changed afterwards, so pick it deliberately: "scraping" drives page pipelines (startUrls, listPage, detailPage), "arukereso" drives a product-feed mapping (feedUrl, mapping). One seller may have several sources of different types. Use update_product_source afterward to fill in the config and enable scheduling/processing once it is ready.',
     parameters: z.object({
       sellerId: z.string().describe('Seller UUID to attach the new source to'),
       name: z.string().min(1).describe('Unique name for the product source'),
+      type: z
+        .enum(PRODUCT_SOURCE_TYPES)
+        .describe(
+          'Import type — "scraping" or "arukereso". Create-only: it cannot be changed later, because each type has its own config format.',
+        ),
     }),
     annotations: { destructiveHint: false, idempotentHint: false },
   })
   async createProductSourceForSeller(args: {
     sellerId: string;
     name: string;
+    type: ProductSourceType;
   }): Promise<string> {
     const source = await this.createService.createForSeller(args.sellerId, {
       name: args.name,
+      type: args.type,
     });
 
-    return `Product source "${source.name}" created (${source.id}) for seller ${args.sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
+    return `Product source "${source.name}" created (${source.id}, type "${source.type}") for seller ${args.sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
   }
 
   @Tool({
@@ -232,7 +260,7 @@ export class ProductSourceTools {
       priority: z.number().int().min(0).optional(),
       maxConcurrent: z.number().int().min(1).optional(),
       requestsPerHour: z.number().int().min(1).optional(),
-      fullSyncInterval: z
+      frequency: z
         .string()
         .nullable()
         .optional()
@@ -249,7 +277,7 @@ export class ProductSourceTools {
     priority?: number;
     maxConcurrent?: number;
     requestsPerHour?: number;
-    fullSyncInterval?: string | null;
+    frequency?: string | null;
   }): Promise<string> {
     try {
       const { productSourceId, ...params } = args;
@@ -491,14 +519,15 @@ export class ProductSourceTools {
     const L: string[] = [];
     L.push(`# Product Source: ${source.name}`);
     L.push(`- **ID**: ${source.id}`);
+    L.push(`- **Type**: ${source.type}`);
     L.push(`- **Seller**: ${source.seller?.name ?? '_none_'} ${source.seller ? `(${source.seller.id})` : ''}`);
     L.push(`- **Scheduling enabled**: ${source.schedulingEnabled}`);
     L.push(`- **Processing enabled**: ${source.processingEnabled}`);
     L.push(`- **Priority**: ${source.priority}`);
     L.push(`- **Max concurrent**: ${source.maxConcurrent}`);
     L.push(`- **Requests per hour**: ${source.requestsPerHour}`);
-    L.push(`- **Full sync interval**: ${source.fullSyncInterval ?? '_not set_'}`);
-    L.push(`- **Next full sync**: ${source.nextFullSyncAt?.toISOString() ?? '_not scheduled_'}`);
+    L.push(`- **Frequency**: ${source.frequency ?? '_not set_'}`);
+    L.push(`- **Next run**: ${source.nextRunAt?.toISOString() ?? '_not scheduled_'}`);
     L.push(`- **Last run**: ${source.lastRunAt?.toISOString() ?? '_never_'}`);
     L.push('');
     L.push('## Config');

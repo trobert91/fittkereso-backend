@@ -1,1 +1,1 @@
-export * from './product-source-sync-service.interface';
+export * from './product-source-importer.interface';

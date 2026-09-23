@@ -138,7 +138,8 @@ export class ProductSourceVersionService {
 
     // Before anything is written: a version that could never run must not
     // enter the history, where a later restore could put it back into force.
-    this.configValidator.assertValid(config);
+    // Validated against THIS source's type — the config shape is type-bound.
+    this.configValidator.assertValid(source.type, config);
 
     const current = await this.versionRepo.findCurrent(sourceId);
     if (current && canonical(current.config) === canonical(config)) {

@@ -56,10 +56,23 @@ export class ProductSourceRecordUpdaterService {
     // Ensure sources loaded
     model.sources = model.sources ?? [];
 
-    // Find existing source entry by URL, or create a new one
+    // Find THIS source's existing entry by URL, or create a new one.
+    //
+    // The source filter is load-bearing, not defensive. `model.sources` is
+    // loaded across every source (see ProductScrapeUpdaterService.
+    // getProductRelations), and ProductSourceRecord.url is unique only per
+    // source — so once two sources cover one webshop, a url-only match returns
+    // the OTHER source's row. Everything below then overwrites its
+    // scrapedProduct, both spec hashes, externalId and specValid, while
+    // `source.source` is assigned on create only (further down), so the row
+    // stays attributed to the source whose data was just destroyed. The specs
+    // are then merged under the wrong source's priority, and this source never
+    // gets a record of its own.
+    const belongsToThisSource = (s: ProductSourceRecord) =>
+      s.source?.id === newSource?.id;
     let source = sourceUrl
-      ? model.sources.find((s) => s.url === sourceUrl)
-      : model.sources.find((s) => s.source?.id === newSource?.id && !s.url);
+      ? model.sources.find((s) => belongsToThisSource(s) && s.url === sourceUrl)
+      : model.sources.find((s) => belongsToThisSource(s) && !s.url);
 
     // `scrapedProduct.specs` is absent (whether `scrapedProduct` itself is
     // undefined, e.g. a manual edit with no re-scrape, or defined without

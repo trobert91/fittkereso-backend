@@ -2,6 +2,7 @@ export * from './product-category-config';
 export * from './product-source-config';
 export * from './product-source-actor';
 export * from './product-source-action';
+export * from './product-source-type';
 export * from './scrape-operation';
 export * from './scrape-operation.schema';
 export * from './product-source-config.schema';

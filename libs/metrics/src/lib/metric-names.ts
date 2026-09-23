@@ -65,6 +65,11 @@ export const FULL_SYNC_LIST_TASKS_CREATED_TOTAL =
 export const ZYTE_SCRAPE_TOTAL = 'zyte_scrape_total';
 export const ZYTE_SCRAPE_DURATION_SECONDS = 'zyte_scrape_duration_seconds';
 
+// Native (unpaid) fetching, kept as its own series so 'did this source stop
+// costing us Zyte requests?' is a query rather than an inference.
+export const NATIVE_SCRAPE_TOTAL = 'native_scrape_total';
+export const NATIVE_SCRAPE_DURATION_SECONDS = 'native_scrape_duration_seconds';
+
 // Scrape task queue depth
 export const SCRAPE_TASK_QUEUE_DEPTH = 'scrape_task_queue_depth';
 
@@ -82,6 +87,16 @@ export const PRODUCT_ALIAS_CREATED_TOTAL = 'product_alias_created_total';
 export const PRODUCT_BRAND_RESOLUTION_FAILED_TOTAL =
   'product_brand_resolution_failed_total';
 export const SCRAPE_RESOLUTION_OUTCOME_TOTAL = 'scrape_resolution_outcome_total';
+/**
+ * Two things claiming one offer identity.
+ *
+ * Its own series because every kind it counts fails SILENTLY — the unique
+ * constraint on (seller, externalId) does not error on a collision, it just
+ * keeps the last writer. Without a counter, lost variants and cross-source
+ * identity disagreements are invisible until somebody notices a product has
+ * one offer where it used to have four.
+ */
+export const OFFER_IDENTITY_CONFLICT_TOTAL = 'offer_identity_conflict_total';
 
 // Detail page extraction metrics
 export const DETAIL_EXTRACTION_OUTCOME_TOTAL =

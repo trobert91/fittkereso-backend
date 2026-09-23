@@ -41,6 +41,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
 
   it('skips extraction entirely when scrapedProduct is undefined and a matching source row already exists', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
+      source,
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
       offerSpecsHash: 'abc123',
@@ -89,6 +90,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
 
   it('re-writes the row when the caller supplies a new productSpecsHash, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
+      source,
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
       productSpecsHash: hashSpecs({ weight: 22 }),
@@ -165,6 +167,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     // not be treated as "new data to write", or it wipes the existing row's
     // specs with {}.
     const existingSource: Partial<ProductSourceRecord> = {
+      source,
       url: 'https://speedbike.hu/product-1',
       scrapedProduct: { specs: { weight: 22 } },
       offerSpecsHash: 'abc123',
@@ -187,6 +190,53 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(result).toBe(existingSource);
     expect(existingSource.scrapedProduct?.specs).toEqual({ weight: 22 });
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
+  });
+
+  it('never writes through another source\'s record for the same URL', async () => {
+    // One webshop can be covered by several ProductSources (a page scraper and
+    // an Árukereső feed), and ProductSourceRecord.url is unique only per
+    // source — so `model.sources`, which is loaded across ALL sources, can hold
+    // two rows with this same URL.
+    //
+    // Matching on url alone picked whichever came first. Source B then
+    // overwrote source A's scrapedProduct, hashes and externalId, while the row
+    // stayed attributed to A (source.source is assigned on create only). A's
+    // data was silently replaced by B's under A's merge priority, and B never
+    // got a record of its own. This is the regression guard for that.
+    const otherSourcesRecord: Partial<ProductSourceRecord> = {
+      source: { id: 'source-2', name: 'speedbike-arukereso' } as any,
+      url: 'https://speedbike.hu/product-1',
+      scrapedProduct: { specs: { weight: 99 } },
+      offerSpecsHash: 'other-offer-hash',
+      productSpecsHash: 'other-product-hash',
+      externalId: 'other-external-id',
+      lastUpdated: new Date('2026-01-01'),
+    };
+    const model = makeModel(otherSourcesRecord);
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source, // source-1
+      scrapedProduct: {
+        model: 'Macina Scarp',
+        specs: { weight: 23 },
+      } as any,
+      externalId: 'my-external-id',
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    // A second, independent record — not a write through the other source's.
+    expect(result).not.toBe(otherSourcesRecord);
+    expect(model.sources).toHaveLength(2);
+    expect(result?.source).toBe(source);
+
+    // The other source's row is untouched in every field this call would have
+    // overwritten.
+    expect(otherSourcesRecord.scrapedProduct?.specs).toEqual({ weight: 99 });
+    expect(otherSourcesRecord.offerSpecsHash).toBe('other-offer-hash');
+    expect(otherSourcesRecord.productSpecsHash).toBe('other-product-hash');
+    expect(otherSourcesRecord.externalId).toBe('other-external-id');
+    expect(otherSourcesRecord.lastUpdated).toEqual(new Date('2026-01-01'));
   });
 
   it('sets both hashes to undefined when scrapedProduct has no offerLevelDeterministicSpecs/productLevelDeterministicSpecs', async () => {

@@ -34,7 +34,11 @@ export class ScrapeRunTools {
     description:
       'Manually enqueue a single ScrapeTask for a ProductSource, bypassing the normal cron scheduler — the fastest way to test a new or edited ProductSourceConfig against one real URL without waiting for/enabling scheduling. Queue "scrape-product-list" for a list/category page (produces more list + detail tasks once processed) or "scrape-product-details" for a single product detail page. The task runs asynchronously on the next queue-worker poll (~5s) — call get_scrape_task afterward to see the result.',
     parameters: z.object({
-      productSourceId: z.string().describe('ProductSource UUID'),
+      productSourceId: z
+        .string()
+        .describe(
+          "ProductSource UUID the task belongs to. A webshop may have several sources (a page scraper and a feed, say), so this decides which one — it is no longer inferred from the URL. Must be a \"scraping\" source: a feed source has no page pipelines.",
+        ),
       queue: z
         .nativeEnum(ScrapeQueueName)
         .describe('"scrape-product-list" or "scrape-product-details"'),
@@ -51,6 +55,10 @@ export class ScrapeRunTools {
       const task = await this.scrapeTaskCreator.create({
         queue: args.queue,
         url: args.url,
+        // Honoured rather than ignored: the source used to be inferred from the
+        // URL's domain, which silently picked one arbitrary row once a webshop
+        // had more than one source.
+        productSourceId: args.productSourceId,
       });
 
       return `Enqueued ${task.queue} task ${task.id} for "${task.url}" (status: ${task.status}). Call get_scrape_task with taskId "${task.id}" in a few seconds to see the result.`;
@@ -123,7 +131,7 @@ export class ScrapeRunTools {
             ? ` (was ${offer.priceWithoutDiscount} ${offer.currency})`
             : '';
           L.push(
-            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · lastSeenAt: ${offer.lastSeenAt?.toISOString?.() ?? ''}`,
+            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability ?? '_not reported_'} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · lastSynced: ${offer.lastSynced?.toISOString?.() ?? ''}`,
           );
         }
       } else if (task.queue === ScrapeQueueName.ScrapeProductDetails) {

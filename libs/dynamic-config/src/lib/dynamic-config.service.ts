@@ -24,6 +24,14 @@ export class DynamicConfigService {
     return this.fileLoader.getData().debug;
   }
 
+  get import(): DynamicConfigData['import'] {
+    return this.fileLoader.getData().import;
+  }
+
+  get offers(): DynamicConfigData['offers'] {
+    return this.fileLoader.getData().offers;
+  }
+
   get scheduling(): DynamicConfigData['scheduling'] {
     return this.fileLoader.getData().scheduling;
   }

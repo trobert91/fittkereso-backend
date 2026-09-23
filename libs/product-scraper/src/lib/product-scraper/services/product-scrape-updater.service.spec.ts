@@ -1,3 +1,4 @@
+import { contextFromTask } from '../../interfaces/product-import-context.interface';
 import {
   Brand,
   OfferRepository,
@@ -161,7 +162,7 @@ describe('ProductScrapeUpdaterService', () => {
         .fn()
         .mockResolvedValue(null),
       findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
-      findByUrl: jest.fn().mockResolvedValue(null),
+      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSourceRecordUpdater = {
@@ -187,6 +188,7 @@ describe('ProductScrapeUpdaterService', () => {
       productImagesCreated: jest.fn(),
       productBrandResolutionFailed: jest.fn(),
       scrapeResolutionOutcome: jest.fn(),
+      offerIdentityConflict: jest.fn(),
     } as unknown as jest.Mocked<ProductMetricsService>;
 
     mockProductNormalizer = {
@@ -257,7 +259,7 @@ describe('ProductScrapeUpdaterService', () => {
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(existingModel);
     mockProductRepo.save.mockResolvedValue(existingModel);
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(existingModel.productCategory).toBe(originalCategory);
     expect(existingModel.productCategory?.slug).toBe('keyboards');
@@ -300,7 +302,7 @@ describe('ProductScrapeUpdaterService', () => {
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(otherVariant);
     mockProductRepo.save.mockResolvedValue(otherVariant);
 
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
+    const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(result?.id).toBe('model-variant-b');
     expect(mockListingMatch.match).toHaveBeenCalledWith(scrapedProduct, {
@@ -337,7 +339,7 @@ describe('ProductScrapeUpdaterService', () => {
     mockProductRepo.findOneOrFail.mockResolvedValueOnce(chosen);
     mockProductRepo.save.mockResolvedValue(chosen);
 
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
+    const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(result?.id).toBe('model-1');
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
@@ -367,7 +369,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
@@ -390,7 +392,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
       'arukereso',
@@ -418,7 +420,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(task.identityDecision).toEqual({
       outcome: 'created',
@@ -441,7 +443,7 @@ describe('ProductScrapeUpdaterService', () => {
         return model;
       });
 
-      await service.createOrUpdateProduct(task, scrapedProduct);
+      await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
       expect(mockDuplicateService.detect).toHaveBeenCalledWith(
         'model-detect',
@@ -459,7 +461,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockProductRepo.findOneOrFail.mockResolvedValueOnce(existingModel);
       mockProductRepo.save.mockResolvedValue(existingModel);
 
-      await service.createOrUpdateProduct(task, makeScrapedProduct());
+      await service.createOrUpdateProduct(contextFromTask(task), makeScrapedProduct());
 
       expect(mockListingMatch.match).not.toHaveBeenCalled();
       expect(mockDuplicateService.detect).not.toHaveBeenCalled();
@@ -480,7 +482,7 @@ describe('ProductScrapeUpdaterService', () => {
         return model;
       });
 
-      const result = await service.createOrUpdateProduct(task, scrapedProduct);
+      const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
       expect(result?.id).toBe('model-detect-fails');
     });
@@ -501,7 +503,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockMergeService.mergeSources).toHaveBeenCalledWith(
       expect.anything(),
@@ -530,7 +532,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockListingMatch.match).toHaveBeenCalledWith(scrapedProduct, {
       taskId: task.id,
@@ -547,7 +549,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
@@ -563,7 +565,7 @@ describe('ProductScrapeUpdaterService', () => {
       return model;
     });
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
@@ -590,7 +592,7 @@ describe('ProductScrapeUpdaterService', () => {
     });
     mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -626,11 +628,112 @@ describe('ProductScrapeUpdaterService', () => {
       .mockRejectedValueOnce(new Error('offer upsert failed'))
       .mockResolvedValueOnce({} as never);
 
-    const result = await service.createOrUpdateProduct(task, scrapedProduct);
+    const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(result).toBeDefined();
     expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(2);
     expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
+  });
+
+  describe('offer identity', () => {
+    const upsertedExternalIds = () =>
+      mockOfferRepo.upsertFromScrape.mock.calls.map(
+        (call) => (call[0] as { externalId?: string }).externalId,
+      );
+
+    const runWithOffers = async (offers: unknown[]) => {
+      const task = makeTask();
+      mockProductRepo.findOne.mockResolvedValueOnce(null);
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = 'model-offer-identity';
+        return model;
+      });
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(task),
+        makeScrapedProduct({ offers: offers as never }),
+      );
+    };
+
+    // The fallback is what makes a scraping source and an Árukereső source for
+    // one shop land on the same identity — it is derived here, in shared code,
+    // rather than per config, precisely so the two cannot drift apart.
+    it('falls back to the URL slug when a source emits no externalId', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/kerekpar/ktm-macina' },
+      ]);
+
+      expect(upsertedExternalIds()).toEqual(['kerekpar/ktm-macina']);
+    });
+
+    it('prefers a source-native externalId over the slug', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/kerekpar/ktm-macina', externalId: 'sku-1' },
+      ]);
+
+      expect(upsertedExternalIds()).toEqual(['sku-1']);
+    });
+
+    // The failure this guard exists for, and it is completely silent without
+    // it: Offer is @Unique([seller, externalId]), so three variants sharing one
+    // URL would each conflict onto the same row and the page would end up with
+    // ONE offer instead of three — no error, no log, just missing variants.
+    it('drops a slug fallback shared by several offers rather than collapsing them', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/ktm-macina' },
+        { price: 2000, url: 'https://alza.hu/ktm-macina' },
+        { price: 3000, url: 'https://alza.hu/ktm-macina' },
+      ]);
+
+      expect(upsertedExternalIds()).toEqual([undefined, undefined, undefined]);
+      expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(3);
+    });
+
+    it('drops a source-native externalId shared by several offers too', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/a', externalId: 'group-sku' },
+        { price: 2000, url: 'https://alza.hu/b', externalId: 'group-sku' },
+      ]);
+
+      expect(upsertedExternalIds()).toEqual([undefined, undefined]);
+    });
+
+    // A collision must not punish the offers that are fine.
+    it('keeps the unique ids on a page where only some collide', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/a', externalId: 'shared' },
+        { price: 2000, url: 'https://alza.hu/b', externalId: 'shared' },
+        { price: 3000, url: 'https://alza.hu/c', externalId: 'its-own' },
+      ]);
+
+      expect(upsertedExternalIds()).toEqual([undefined, undefined, 'its-own']);
+    });
+
+    it('counts a collision once per colliding value, by kind', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/a', externalId: 'group-sku' },
+        { price: 2000, url: 'https://alza.hu/b', externalId: 'group-sku' },
+      ]);
+
+      expect(mockMetricsService.offerIdentityConflict).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.offerIdentityConflict).toHaveBeenCalledWith(
+        expect.any(String),
+        'duplicate_external_id',
+      );
+    });
+
+    it('distinguishes a slug collision from a native-id collision', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://alza.hu/ktm-macina' },
+        { price: 2000, url: 'https://alza.hu/ktm-macina' },
+      ]);
+
+      expect(mockMetricsService.offerIdentityConflict).toHaveBeenCalledWith(
+        expect.any(String),
+        'duplicate_slug_fallback',
+      );
+    });
   });
 
   // Regression: a scrape of one variant URL (e.g. ebikeshop's 53cm frame-size
@@ -691,7 +794,7 @@ describe('ProductScrapeUpdaterService', () => {
       offer53cmExisting as never,
     );
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
   });
@@ -738,7 +841,7 @@ describe('ProductScrapeUpdaterService', () => {
       id: 'offer-53cm-new',
     } as never);
 
-    await service.createOrUpdateProduct(task, scrapedProduct);
+    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith([
       'offer-53cm-stale',

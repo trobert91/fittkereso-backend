@@ -39,9 +39,8 @@ export class ProductSourceSearchParams {
     'maxConcurrent',
     'requestsPerHour',
     'lastRunAt',
-    'fullSyncInterval',
-    'nextFullSyncAt',
-    'lastFullSyncAt',
+    'frequency',
+    'nextRunAt',
     'createdAt',
     'updatedAt',
   ])
@@ -53,9 +52,8 @@ export class ProductSourceSearchParams {
     | 'maxConcurrent'
     | 'requestsPerHour'
     | 'lastRunAt'
-    | 'fullSyncInterval'
-    | 'nextFullSyncAt'
-    | 'lastFullSyncAt'
+    | 'frequency'
+    | 'nextRunAt'
     | 'createdAt'
     | 'updatedAt';
 

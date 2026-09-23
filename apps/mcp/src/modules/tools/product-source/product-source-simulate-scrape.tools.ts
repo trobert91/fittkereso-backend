@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { ProductSourceConfig, ProductSourceRepository } from '@fittkereso-backend/database';
+import {
+  isScrapingConfig,
+  ProductSourceRepository,
+  ScrapingSourceConfig,
+} from '@fittkereso-backend/database';
 import {
   ProductSourceSimulationResult,
   ProductSourceSimulationService,
@@ -44,17 +48,19 @@ export class ProductSourceSimulateScrapeTools {
     config?: Record<string, unknown>;
     productSourceId?: string;
   }): Promise<string> {
-    let config: ProductSourceConfig;
+    let config: ScrapingSourceConfig;
     if (args.productSourceId) {
       const source = await this.productSourceRepo.findOneOrFail({
         where: { id: args.productSourceId },
       });
-      if (!source.config?.detailPage) {
-        return `Product source ${args.productSourceId} has no detailPage config yet — nothing to simulate.`;
+      // This tool simulates DETAIL-PAGE scraping, which only a scraping source
+      // has. An Árukereső source maps feed rows instead and has no page to run.
+      if (!isScrapingConfig(source.config) || !source.config.detailPage) {
+        return `Product source ${args.productSourceId} is not a scraping source with a detailPage config — nothing to simulate.`;
       }
       config = source.config;
     } else {
-      config = args.config as unknown as ProductSourceConfig;
+      config = args.config as unknown as ScrapingSourceConfig;
       if (!config?.detailPage) {
         return 'The given config has no detailPage pipeline — nothing to simulate.';
       }

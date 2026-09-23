@@ -30,6 +30,7 @@ export type JsonSchemaFragment = Record<string, unknown>;
 export const SCRAPE_OPERATION_NAMES = [
   'appendSuffix',
   'appendSyntheticSpec',
+  'assembleListProduct',
   'assembleOffer',
   'assertContains',
   'branch',
@@ -59,6 +60,7 @@ export const SCRAPE_OPERATION_NAMES = [
   'generatePaginationLinks',
   'identity',
   'isEmpty',
+  'jsonPath',
   'literal',
   'mapJsonArray',
   'mapSpecValue',
@@ -164,6 +166,9 @@ const OP_PARAMS: Record<
     properties: {
       selector: str('CSS selector to query.'),
       attr: str('Attribute name to read, e.g. "href".'),
+      within: str(
+        'vars key holding a cheerio selection to scope the query to — e.g. "item" inside a forEachItem pipeline. Without it the selector runs against the whole page, which is fine on a detail page with one product and silently wrong on a list page with many.',
+      ),
       first: bool('Take only the first match.'),
       trim: bool('Trim surrounding whitespace.'),
     },
@@ -736,6 +741,36 @@ const OP_PARAMS: Record<
       skipEmptyResults: bool('Drop items whose pipeline yields nothing. Defaults to true.'),
     },
     required: ['itemMode', 'itemPipeline'],
+  },
+  jsonPath: {
+    description:
+      "Read a dotted path off the value currently flowing through the pipeline — the single item a forEachItem binds, typically. Use this to read fields off a JSON list card; parseJsonAttr only reads out of a DOM attribute, and mapJsonArray maps an array rather than one item. Omit `path` to cast the current value in place.",
+    properties: {
+      path: str('Dot path into the current value, e.g. "prices.priceSale". Omit to use the value itself.'),
+      cast: {
+        type: 'string',
+        enum: ['number', 'string', 'boolean'],
+        description:
+          'Coerce the resolved value. "boolean" treats the strings "", "false" and "0" as false, unlike Boolean().',
+      },
+    },
+    required: [],
+  },
+  assembleListProduct: {
+    description:
+      'Assemble one list-page product from independent sub-pipelines run against the item-scoped context — the list-page counterpart to assembleOffer. Yields nothing when `url` does not resolve, since without it the item cannot be matched to a stored listing. Carries no specs by design: a known listing only has its price/availability refreshed, and an unknown one gets a detail scrape anyway.',
+    properties: {
+      url: pipeline('Sub-pipeline producing the product URL. Required for the item to be kept.'),
+      externalId: pipeline('Sub-pipeline producing the source-native id, when the card exposes one.'),
+      name: pipeline('Sub-pipeline producing the product name.'),
+      price: pipeline('Sub-pipeline producing the current price.'),
+      priceWithoutDiscount: pipeline('Sub-pipeline producing the pre-discount price.'),
+      currency: pipeline('Sub-pipeline producing the currency code.'),
+      availability: pipeline(
+        'Sub-pipeline producing the availability. Omit when the card does not expose stock — absence leaves the stored value untouched, whereas a resolved-but-unrecognised value is dropped rather than written as "unknown".',
+      ),
+    },
+    required: ['url'],
   },
   assembleOffer: {
     description:

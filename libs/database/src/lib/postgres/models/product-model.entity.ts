@@ -147,12 +147,12 @@ export class ProductModel extends BasePostgresEntity {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   @Index()
   @Expose({ groups: [SerializeGroup.list] })
-  price?: number;
+  price?: number | null;
 
   /** Mirrors that same cheapest active Offer's priceWithoutDiscount. */
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   @Expose({ groups: [SerializeGroup.list] })
-  priceWithoutDiscount?: number;
+  priceWithoutDiscount?: number | null;
 
   @OneToMany(() => PriceHistory, (priceHistory) => priceHistory.model)
   @Expose({ groups: [SerializeGroup.details] })

@@ -1,0 +1,462 @@
+{
+  "baseUrl": "https://speedbike.hu",
+  "maxItems": 10,
+  "feedUrl": "https://speedbike.hu/api/?route=export/feed&id=arukereso",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "E-BIKE"
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "splitAndTake",
+        "separator": " > ",
+        "index": 1,
+        "trim": true
+      }
+    ],
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "E-BIKE"
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "identifier"
+    },
+    "brand": {
+      "field": "manufacturer"
+    },
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "availability": {
+      "field": "delivery_time",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": {
+      "field": "category"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    }
+  },
+  "specMapping": {
+    "ebikes": {
+      "mappings": [
+        {
+          "key": "frameType",
+          "labels": [
+            "Váztípus"
+          ]
+        },
+        {
+          "key": "gender",
+          "labels": [
+            "Váztípus"
+          ]
+        },
+        {
+          "key": "usageType",
+          "labels": [
+            "Felhasználás módja"
+          ]
+        },
+        {
+          "key": "batteryPosition",
+          "labels": [
+            "Akku elhelyezkedése",
+            "Akkumulátor elhelyezkedése"
+          ]
+        },
+        {
+          "key": "drivetrain",
+          "labels": [
+            "Erőátvitel"
+          ]
+        },
+        {
+          "key": "suspension",
+          "labels": [
+            "Rugózás"
+          ]
+        },
+        {
+          "key": "brakeType",
+          "labels": [
+            "Fékfajta",
+            "Féktípus"
+          ]
+        },
+        {
+          "key": "gearType",
+          "labels": [
+            "Váltó típusa"
+          ]
+        },
+        {
+          "key": "batteryCapacity",
+          "labels": [
+            "wattora",
+            "Akku kapacitás",
+            "Akkumulátor kapacitása"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "torque",
+          "labels": [
+            "Nyomaték",
+            "Motor nyomaték"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "motorPosition",
+          "labels": [
+            "Motor elhelyezkedése"
+          ]
+        },
+        {
+          "key": "motorPower",
+          "labels": [
+            "Motor teljesítménye"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "topSpeed",
+          "labels": [
+            "Maximális rásegítés",
+            "Maximális sebesség",
+            "Motoros rásegítés sebessége"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "range",
+          "labels": [
+            "Hatótávolság"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "chargingTime",
+          "labels": [
+            "Töltési idő"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "display",
+          "labels": [
+            "Kijelző",
+            "Kijelzővel rendelkezik"
+          ]
+        },
+        {
+          "key": "maxLoad",
+          "labels": [
+            "Maximális terhelhetőség"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "weight",
+          "labels": [
+            "Tömeg",
+            "Súly"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "waterResistance",
+          "labels": [
+            "Védettségi szint",
+            "Vízállóság"
+          ]
+        },
+        {
+          "key": "smartConnectivity",
+          "labels": [
+            "Applikáció",
+            "GPS követés"
+          ]
+        },
+        {
+          "key": "gpsModule",
+          "labels": [
+            "GPS modul"
+          ]
+        },
+        {
+          "key": "abs",
+          "labels": [
+            "ABS"
+          ]
+        },
+        {
+          "key": "frameModel",
+          "labels": [
+            "Váz"
+          ]
+        },
+        {
+          "key": "forkModel",
+          "labels": [
+            "Villa"
+          ]
+        },
+        {
+          "key": "rearShockModel",
+          "labels": [
+            "Lengéscsillapító"
+          ]
+        },
+        {
+          "key": "ebikeSystem",
+          "labels": [
+            "E-System"
+          ]
+        },
+        {
+          "key": "motorModel",
+          "labels": [
+            "Motor"
+          ]
+        },
+        {
+          "key": "batteryModel",
+          "labels": [
+            "Akkumulátor"
+          ]
+        },
+        {
+          "key": "batteryLock",
+          "labels": [
+            "Akku zár"
+          ]
+        },
+        {
+          "key": "chargerModel",
+          "labels": [
+            "Töltő"
+          ]
+        },
+        {
+          "key": "rearDerailleur",
+          "labels": [
+            "Hátsó váltó"
+          ]
+        },
+        {
+          "key": "frontDerailleur",
+          "labels": [
+            "Első váltó"
+          ]
+        },
+        {
+          "key": "shifter",
+          "labels": [
+            "Váltókar jobb",
+            "Váltókar bal"
+          ]
+        },
+        {
+          "key": "crankset",
+          "labels": [
+            "Hajtókar"
+          ]
+        },
+        {
+          "key": "bottomBracket",
+          "labels": [
+            "Középcsapágy"
+          ]
+        },
+        {
+          "key": "chainring",
+          "labels": [
+            "Lánckerék"
+          ]
+        },
+        {
+          "key": "cassette",
+          "labels": [
+            "Fogaskoszorú"
+          ]
+        },
+        {
+          "key": "chain",
+          "labels": [
+            "Lánc"
+          ]
+        },
+        {
+          "key": "brakeModel",
+          "labels": [
+            "Első fék",
+            "Hátsó fék"
+          ]
+        },
+        {
+          "key": "rotorModel",
+          "labels": [
+            "Első féktárcsa",
+            "Hátsó féktárcsa"
+          ]
+        },
+        {
+          "key": "wheelset",
+          "labels": [
+            "Első kerék",
+            "Hátsó kerék"
+          ]
+        },
+        {
+          "key": "rimModel",
+          "labels": [
+            "Első felni",
+            "Hátsó felni"
+          ]
+        },
+        {
+          "key": "hubModel",
+          "labels": [
+            "Első agy",
+            "Hátsó agy"
+          ]
+        },
+        {
+          "key": "spokes",
+          "labels": [
+            "Első küllők",
+            "Hátsó küllők"
+          ]
+        },
+        {
+          "key": "tireModel",
+          "labels": [
+            "Első gumi",
+            "Hátsó gumi"
+          ]
+        },
+        {
+          "key": "grips",
+          "labels": [
+            "Markolat"
+          ]
+        },
+        {
+          "key": "handlebar",
+          "labels": [
+            "Kormány"
+          ]
+        },
+        {
+          "key": "stem",
+          "labels": [
+            "Kormányszár"
+          ]
+        },
+        {
+          "key": "headset",
+          "labels": [
+            "Kormánycsapágy"
+          ]
+        },
+        {
+          "key": "saddle",
+          "labels": [
+            "Nyereg"
+          ]
+        },
+        {
+          "key": "seatpost",
+          "labels": [
+            "Nyeregcső"
+          ]
+        },
+        {
+          "key": "seatClamp",
+          "labels": [
+            "Nyeregbilincs"
+          ]
+        },
+        {
+          "key": "pedals",
+          "labels": [
+            "Pedál"
+          ]
+        },
+        {
+          "key": "rack",
+          "labels": [
+            "Hordozó"
+          ]
+        },
+        {
+          "key": "lighting",
+          "labels": [
+            "Első lámpa",
+            "Hátsó lámpa"
+          ]
+        },
+        {
+          "key": "fenders",
+          "labels": [
+            "Első sárvédő",
+            "Hátsó sárvédő"
+          ]
+        },
+        {
+          "key": "chainGuard",
+          "labels": [
+            "Láncvédő"
+          ]
+        },
+        {
+          "key": "kickstand",
+          "labels": [
+            "Kitámasztó"
+          ]
+        }
+      ]
+    }
+  },
+  "postProcess": {
+    "enabled": true
+  }
+}

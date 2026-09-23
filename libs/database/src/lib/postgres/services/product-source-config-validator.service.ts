@@ -1,6 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import Ajv2020, { ErrorObject, ValidateFunction } from 'ajv/dist/2020';
-import { PRODUCT_SOURCE_CONFIG_SCHEMA } from '../types/product-source-config.schema';
+import {
+  ARUKERESO_SOURCE_CONFIG_SCHEMA,
+  SCRAPING_SOURCE_CONFIG_SCHEMA,
+} from '../types/product-source-config.schema';
+import {
+  PRODUCT_SOURCE_TYPES,
+  ProductSourceType,
+} from '../types/product-source-type';
 import { JsonSchemaFragment } from '../types/scrape-operation.schema';
 
 /** One thing wrong with a config, at the path it is wrong at. */
@@ -42,7 +49,9 @@ const MAX_LISTED_ALLOWED_VALUES = 8;
 @Injectable()
 export class ProductSourceConfigValidatorService {
   private readonly ajv: Ajv2020;
-  private readonly validator: ValidateFunction;
+  /** One compiled validator per source type — the two shapes share no keys. */
+  private readonly validators: Record<ProductSourceType, ValidateFunction>;
+  private readonly schemas: Record<ProductSourceType, JsonSchemaFragment>;
 
   constructor() {
     // `strict: false` for the reason every other ajv in this repo uses it:
@@ -52,12 +61,29 @@ export class ProductSourceConfigValidatorService {
     // `verbose` so each error carries the value that failed — without it an
     // "must be equal to one of the allowed values" cannot name the bad op.
     this.ajv = new Ajv2020({ allErrors: true, strict: false, verbose: true });
-    this.validator = this.ajv.compile(PRODUCT_SOURCE_CONFIG_SCHEMA);
+    this.schemas = {
+      scraping: SCRAPING_SOURCE_CONFIG_SCHEMA,
+      arukereso: ARUKERESO_SOURCE_CONFIG_SCHEMA,
+    };
+
+    this.validators = {
+      scraping: this.ajv.compile(SCRAPING_SOURCE_CONFIG_SCHEMA),
+      arukereso: this.ajv.compile(ARUKERESO_SOURCE_CONFIG_SCHEMA),
+    };
   }
 
-  /** The schema itself, for the admin config editor and the MCP tools. */
-  public get schema(): JsonSchemaFragment {
-    return PRODUCT_SOURCE_CONFIG_SCHEMA;
+  /**
+   * The schema for one source type, for the admin config editor and the MCP
+   * tools. Which one applies is decided by ProductSource.type, which is fixed
+   * at creation.
+   */
+  public schemaFor(type: ProductSourceType): JsonSchemaFragment {
+    return this.schemas[type];
+  }
+
+  /** Every schema, keyed by type — for tools that document all of them. */
+  public get allSchemas(): Record<ProductSourceType, JsonSchemaFragment> {
+    return this.schemas;
   }
 
   /**
@@ -66,20 +92,37 @@ export class ProductSourceConfigValidatorService {
    * The non-throwing form. Callers that must not throw — the run-time guards,
    * the audit tool — use this and decide for themselves what a problem means.
    */
-  public problems(config: unknown): ProductSourceConfigProblem[] | null {
-    if (this.validator(config)) {
+  public problems(
+    type: ProductSourceType,
+    config: unknown,
+  ): ProductSourceConfigProblem[] | null {
+    const validator = this.validators[type];
+
+    if (!validator) {
+      return [
+        {
+          path: '(root)',
+          message:
+            `Unknown product source type "${type}" — expected one of ` +
+            `${PRODUCT_SOURCE_TYPES.join(', ')}.`,
+        },
+      ];
+    }
+
+    if (validator(config)) {
       return null;
     }
 
-    return this.summarise(this.validator.errors ?? []);
+    return this.summarise(validator.errors ?? []);
   }
 
   /** The throwing form, for the write path. */
-  public assertValid(config: unknown): void {
-    const problems = this.problems(config);
+  public assertValid(type: ProductSourceType, config: unknown): void {
+    const problems = this.problems(type, config);
     if (problems) {
       throw new BadRequestException(
-        `The product source config is not valid: ${this.format(problems)}`,
+        `The ${type} product source config is not valid: ` +
+          this.format(problems),
       );
     }
   }

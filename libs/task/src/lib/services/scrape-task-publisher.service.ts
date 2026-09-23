@@ -58,17 +58,23 @@ export class ScrapeTaskPublisherService {
     });
   }
 
-  // Creates a ScrapeTask for `url` unless one is already pending/processing
-  // for it (checked first, independent of `processedSince` — we never want
-  // two in-flight tasks for the same URL regardless of age) or a
-  // ProductSourceRecord for it was already updated at/after `processedSince`.
+  // Creates a ScrapeTask for `url` unless this source already has one
+  // pending/processing for it (checked first, independent of `processedSince` —
+  // we never want two in-flight tasks for one URL on one source, regardless of
+  // age) or a ProductSourceRecord for it was already updated at/after
+  // `processedSince`.
+  //
+  // Both checks are source-scoped, for the same reason: another source's
+  // in-flight task, or another source's recently-updated record, says nothing
+  // about whether THIS source needs to visit the URL. Each source keeps its own
+  // ProductSourceRecord per URL.
   public async dispatchIfNeeded(
     params: DispatchScrapeTaskParams,
   ): Promise<DispatchOutcome> {
     const { source, queue, processedSince } = params;
     const normalizedUrl = normalizeUrl(params.url);
 
-    const pending = await this.taskRepo.findExistingUrl(normalizedUrl, [
+    const pending = await this.taskRepo.findExistingUrl(source.id, normalizedUrl, [
       TaskStatus.PENDING,
       TaskStatus.PROCESSING,
     ]);
@@ -80,7 +86,14 @@ export class ScrapeTaskPublisherService {
       return { dispatched: false, reason: 'pending_task' };
     }
 
-    const existingRecord = await this.sourceRecordRepo.findByUrl(normalizedUrl);
+    // Source-scoped: another source having recently processed this URL says
+    // nothing about whether THIS source needs to. Unscoped, one source
+    // scraping a URL inside its interval would block every other source of
+    // the same shop from ever dispatching it.
+    const existingRecord = await this.sourceRecordRepo.findBySourceAndUrl(
+      source.id,
+      normalizedUrl,
+    );
     if (existingRecord?.updatedAt && existingRecord.updatedAt >= processedSince) {
       this.logger.debug('Dispatch skipped — record already processed since cutoff', {
         url: normalizedUrl,

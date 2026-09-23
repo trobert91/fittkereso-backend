@@ -1,8 +1,8 @@
 /**
- * One-time idempotent seed for the ProductSource.config JSONB rows
- * (ebikeshop, speedbike), reading the hand-authored config JSON from
- * libs/scrape-interpreter's fixtures directory (same files validated by
- * that library's test suite).
+ * One-time idempotent seed for the ProductSource.config JSONB rows —
+ * ebikeshop (scraping) and speedbike-arukereso (feed) — reading the
+ * hand-authored config JSON from libs/scrape-interpreter's fixtures directory
+ * (the same files validated by that library's test suite).
  *
  * For a dev database this is the narrow, collector-side path: apps/api/src/
  * scripts/seed-dev-data.ts (npm run seed:dev-data) seeds these same two sellers
@@ -33,6 +33,7 @@ import {
   ProductSource,
   ProductSourceConfig,
   ProductSourceRepository,
+  ProductSourceType,
   Seller,
   SellerRepository,
   SellerType,
@@ -60,11 +61,13 @@ interface SeedSellerSpec {
 
 interface SeedSourceSpec {
   name: string;
+  /** Fixed at creation — the config format is type-bound. */
+  type: ProductSourceType;
   configFile: string;
   maxConcurrent: number;
   requestsPerHour: number;
   priority: number;
-  fullSyncInterval: string;
+  frequency: string;
   seller: SeedSellerSpec;
   // Only applied when creating the row for the first time (existing rows
   // keep whatever scheduling state an operator already set). Defaults to
@@ -76,11 +79,12 @@ interface SeedSourceSpec {
 const SOURCES: SeedSourceSpec[] = [
   {
     name: 'ebikeshop',
+    type: 'scraping',
     configFile: 'ebikeshop.config.json',
     maxConcurrent: 2,
     requestsPerHour: 180,
     priority: 10,
-    fullSyncInterval: '7 days',
+    frequency: '7 days',
     seller: {
       name: 'ebikeshop.hu',
       slug: 'ebikeshop-hu',
@@ -92,12 +96,27 @@ const SOURCES: SeedSourceSpec[] = [
     schedulingEnabled: false,
   },
   {
-    name: 'speedbike',
-    configFile: 'speedbike.config.json',
-    maxConcurrent: 2,
-    requestsPerHour: 120,
+    // speedbike is FEED-ONLY — its scraping source is deliberately not seeded.
+    // `speedbike.config.json` stays as a fixture (the table-based markup
+    // template the add-webshop skill points at, with its interpreter specs
+    // still running), but one Árukereső GET replaces thousands of paid page
+    // fetches for the same catalogue.
+    //
+    // The arrangement is still the one ProductSourceRecord's composite unique
+    // exists for: a seller may carry several sources, records stay per-source,
+    // and offers converge through the (seller, externalId) constraint.
+    name: 'speedbike-arukereso',
+    type: 'arukereso',
+    configFile: 'speedbike-arukereso.config.json',
+    // A feed run makes exactly one HTTP request and enqueues no scrape tasks,
+    // so these caps govern nothing here. Set low rather than copied from the
+    // scraping source, so the row does not imply a fetch budget it never uses.
+    maxConcurrent: 1,
+    requestsPerHour: 10,
     priority: 10,
-    fullSyncInterval: '7 days',
+    // Nightly: one native GET costs nothing, and the LLM post-process is
+    // skipped for every product whose specs did not change.
+    frequency: '1 day',
     seller: {
       name: 'speedbike.hu',
       slug: 'speedbike-hu',
@@ -105,9 +124,8 @@ const SOURCES: SeedSourceSpec[] = [
       maxConcurrent: 2,
       requestsPerHour: 180,
     },
-    // First-time source, also the first to use detailPage.postProcess —
-    // keep scheduling off until a manual dry run confirms both the scrape
-    // config and the LLM post-process pass behave as expected end to end.
+    // Off until a manual dry run confirms the mapping, the category gate and
+    // the identity keying behave as expected against the live feed.
     schedulingEnabled: false,
   },
 ];
@@ -152,12 +170,15 @@ async function main(): Promise<void> {
       const source = existing ?? new ProductSource();
       if (!existing) {
         source.name = spec.name;
+        // Fixed at creation and never changed afterwards — the config format
+        // is type-bound, so a type change would reinterpret a stored document.
+        source.type = spec.type;
         source.maxConcurrent = spec.maxConcurrent;
         source.requestsPerHour = spec.requestsPerHour;
         source.priority = spec.priority;
         source.schedulingEnabled = spec.schedulingEnabled ?? true;
         source.processingEnabled = true;
-        source.fullSyncInterval = spec.fullSyncInterval as ms.StringValue;
+        source.frequency = spec.frequency as ms.StringValue;
       }
 
       source.seller = await resolveOrCreateSeller(sellerRepo, spec.seller);

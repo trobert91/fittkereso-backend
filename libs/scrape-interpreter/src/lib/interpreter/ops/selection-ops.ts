@@ -45,9 +45,8 @@ export const selectText: OpHandler<SelectTextOp> = (ctx, input, op) => {
 };
 
 export const selectAttr: OpHandler<SelectAttrOp> = (ctx, _input, op) => {
-  const selection = op.first
-    ? ctx.$(op.selector).first()
-    : ctx.$(op.selector);
+  const scoped = findInScope(ctx, op.selector, op.within);
+  const selection = op.first ? scoped.first() : scoped;
   const value = selection.attr(op.attr);
   if (value === undefined) return undefined;
   return op.trim === false ? value : value.trim();

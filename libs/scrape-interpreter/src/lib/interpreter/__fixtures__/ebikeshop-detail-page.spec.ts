@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ProductSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from '../scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
@@ -178,7 +178,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
   it('extracts brand/model/category/rawSpecs/images/offers from the JSON hydration payload', async () => {
     const $ = cheerio.load(buildHtml());
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -223,7 +223,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     data.props.product.manufacturer = null;
     data.props.product.legalManufacturerName = 'Riese & Müller GmbH';
     const $ = cheerio.load(buildHtml({ data }));
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -234,7 +234,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
     data.props.product.prices = { price: 4099000, priceSale: 3699000, sale: true };
     const $ = cheerio.load(buildHtml({ data, jsonLdPrice: 3699000 }));
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -244,7 +244,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
   it('omits priceWithoutDiscount when prices.sale is false', async () => {
     const $ = cheerio.load(buildHtml());
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -259,7 +259,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
         storeNames: ['Törökbálinti raktár', 'Törökbálint'],
       }),
     );
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -276,7 +276,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const $ = cheerio.load(
       buildHtml({ jsonLdAvailability: 'OutOfStock', storeNames: [] }),
     );
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
@@ -292,7 +292,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const $ = cheerio.load(
       buildHtml({ jsonLdAvailability: 'PreOrder', storeNames: ['Gyártói készlet'] }),
     );
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 

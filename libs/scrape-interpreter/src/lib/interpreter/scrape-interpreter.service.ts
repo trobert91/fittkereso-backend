@@ -1,20 +1,23 @@
 import { Injectable } from '@nestjs/common';
+import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 import {
   CategoryLookupCondition,
-  ProductSourceConfig,
+  ScrapingSourceConfig,
   ProductSpecs,
+  ScrapeOperation,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { ScrapedProductSpec, WebLink } from '@fittkereso-backend/product';
+import { ScrapedListProduct } from '@fittkereso-backend/database';
 import { ScrapePipelineRunnerService } from './services/scrape-pipeline-runner.service';
 import { RuntimeDataProviderService } from './services/runtime-data-provider.service';
 import { ScrapeExecutionContext } from './interfaces/scrape-execution-context.interface';
 
 export interface ListPageResult {
   categoryName?: string;
-  categoryLinks: WebLink[];
-  productLinks: WebLink[];
+  /** The product cards on this page. */
+  products: ScrapedListProduct[];
 }
 
 export interface RawOfferRecord {
@@ -52,7 +55,7 @@ export class ScrapeInterpreterService {
   private makeContext(
     task: ScrapeTask,
     $: CheerioAPI,
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
     opts: Record<string, unknown> = {},
   ): ScrapeExecutionContext {
     return {
@@ -65,10 +68,86 @@ export class ScrapeInterpreterService {
     };
   }
 
+  /**
+   * Run an arbitrary configured pipeline against a page.
+   *
+   * For pipelines that belong to a source's config but not to any one page
+   * role — `categoryLinks` and `listPage.pagination.pageCount`, both of which
+   * ScrapingImportService evaluates once per run rather than per task.
+   */
+  public async runPipeline(
+    pipeline: ScrapeOperation[],
+    task: ScrapeTask,
+    $: CheerioAPI,
+    config: ScrapingSourceConfig,
+  ): Promise<unknown> {
+    return this.runner.run(pipeline, this.makeContext(task, $, config));
+  }
+
+  /**
+   * Run a pipeline over a plain value, with no page behind it.
+   *
+   * What the Árukereső importer needs: a feed field is already a string, so its
+   * mapping pipeline is a value transform (`regexCapture`, `mapValue`,
+   * `splitAndTake`) rather than a DOM query. The context still carries a
+   * CheerioAPI because every op signature expects one — an empty document, so
+   * a DOM op that somehow reaches here selects nothing instead of throwing.
+   *
+   * `vars.baseUrl` is seeded for the same reason it is on the page paths: ops
+   * like `resolveUrl` read it, and a feed's relative image URLs need it.
+   */
+  public async runValuePipeline(
+    pipeline: ScrapeOperation[],
+    input: unknown,
+    opts: { baseUrl?: string; vars?: Record<string, unknown> } = {},
+  ): Promise<unknown> {
+    const ctx: ScrapeExecutionContext = {
+      $: cheerio.load(''),
+      html: '',
+      // No task exists on a feed run — nothing in a value pipeline reads it,
+      // and inventing a throwaway ScrapeTask row to satisfy a type would put
+      // fake work in a table the workers poll.
+      task: undefined as unknown as ScrapeTask,
+      vars: { baseUrl: opts.baseUrl, ...(opts.vars ?? {}) },
+      runtime: this.runtime,
+      opts: {},
+    };
+
+    return this.runner.run(pipeline, ctx, input);
+  }
+
+  /**
+   * Resolve a category slug from declarative lookup rules — first match wins.
+   *
+   * Public because both page and feed paths need exactly these semantics: a
+   * shop that is both scraped and fed can then share its slugLookup rules
+   * verbatim, and `specValueIncludes` works against a feed's attribute pairs
+   * just as it does against a page's spec table.
+   */
+  public resolveCategoryFromRules(
+    rules: {
+      when: CategoryLookupCondition;
+      slug: string;
+      unless?: CategoryLookupCondition;
+    }[],
+    rawLabel: string | undefined,
+    rawSpecs: ScrapedProductSpec[] = [],
+  ): string | undefined {
+    return this.resolveCategorySlug(rules, rawLabel, rawSpecs);
+  }
+
+  /**
+   * Parse ONE list page into its product cards.
+   *
+   * Deliberately has no power to enqueue anything: category expansion and
+   * pagination are both resolved once, up front, by ScrapingImportService. That
+   * is what makes the old re-emission bug — every page re-emitting the whole
+   * page range — structurally impossible rather than merely guarded against.
+   */
   public async runListPage(
     task: ScrapeTask,
     $: CheerioAPI,
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
   ): Promise<ListPageResult> {
     const ctx = this.makeContext(task, $, config);
 
@@ -77,25 +156,27 @@ export class ScrapeInterpreterService {
       ctx,
     )) as string | undefined;
 
-    const categoryLinks =
-      ((await this.runner.run(
-        config.listPage.categoryLinks,
-        ctx,
-      )) as WebLink[]) ?? [];
+    const items = await this.runner.run(config.listPage.items, ctx);
 
-    const productLinks =
-      ((await this.runner.run(
-        config.listPage.productLinks,
-        ctx,
-      )) as WebLink[]) ?? [];
+    const products = ((await this.runner.run(
+      [
+        {
+          op: 'forEachItem',
+          itemMode: config.listPage.itemMode,
+          itemPipeline: config.listPage.itemPipeline,
+        },
+      ],
+      ctx,
+      items,
+    )) ?? []) as ScrapedListProduct[];
 
-    return { categoryName, categoryLinks, productLinks };
+    return { categoryName, products };
   }
 
   public async runDetailPage(
     task: ScrapeTask,
     $: CheerioAPI,
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
   ): Promise<DetailPageResult> {
     const ctx = this.makeContext(task, $, config);
 
@@ -198,27 +279,6 @@ export class ScrapeInterpreterService {
     };
   }
 
-  public async runDiscovery(
-    task: ScrapeTask,
-    $: CheerioAPI,
-    config: ProductSourceConfig,
-    opts: { sourceTitles?: string[]; brandNames?: string[] } = {},
-  ): Promise<WebLink[]> {
-    if (!config.discovery) return [];
-
-    const ctx = this.makeContext(task, $, config, {
-      sourceTitles: opts.sourceTitles ?? [],
-      brandNames: opts.brandNames ?? [],
-    });
-
-    return (
-      ((await this.runner.run(
-        config.discovery.linkPipeline,
-        ctx,
-      )) as WebLink[]) ?? []
-    );
-  }
-
   // `offerList` gates whether this source populates offers at all (empty ->
   // opted out). Each entry is run through offersConfig.itemPipeline (which
   // must terminate in an assembleOffer op) via the forEachItem op, so a
@@ -227,7 +287,7 @@ export class ScrapeInterpreterService {
   // multi-seller aggregator page).
   private async runDetailPageOffers(
     ctx: ScrapeExecutionContext,
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
   ): Promise<RawOfferRecord[]> {
     const offersConfig = config.detailPage.offers;
     if (!offersConfig || !offersConfig.offerList?.length) return [];

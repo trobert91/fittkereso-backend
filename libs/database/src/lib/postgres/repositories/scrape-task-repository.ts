@@ -297,15 +297,26 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
     return { candidateCount: candidates.length, blocked };
   }
 
+  /**
+   * An in-flight task for this URL, belonging to THIS source.
+   *
+   * `sourceId` is required rather than optional so every call site has to
+   * decide. Unscoped, a webshop's second source could never get a task for a
+   * URL its first source happens to have in flight — and it would not fail, it
+   * would just silently create nothing, which is the kind of gap that shows up
+   * weeks later as "that source imports about half the catalogue".
+   */
   async findExistingUrl(
+    sourceId: string,
     url: string,
     statuses: TaskStatus[],
   ): Promise<ScrapeTask | null> {
-    const tasks = await this.findExistingUrls([url], statuses);
+    const tasks = await this.findExistingUrls(sourceId, [url], statuses);
     return tasks[0] ?? null;
   }
 
   async findExistingUrls(
+    sourceId: string,
     urls: string[],
     statuses: TaskStatus[],
   ): Promise<ScrapeTask[]> {
@@ -326,6 +337,9 @@ export class ScrapeTaskRepository extends BasePostgresRepository<ScrapeTask> {
       )
       .andWhere(`task.${nameOf<ScrapeTask>('status')} IN (:...statuses)`, {
         statuses,
+      })
+      .andWhere(`task.${nameOf<ScrapeTask>('source')} = :sourceId`, {
+        sourceId,
       })
       .getMany();
   }

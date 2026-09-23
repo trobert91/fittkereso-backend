@@ -7,6 +7,7 @@ import {
   ProductModelRepository,
   ProductSourceRepository,
   type ProductCategoryConfig,
+  isScrapingConfig,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { generateSlug } from '@fittkereso-backend/utils';
@@ -330,7 +331,11 @@ export class CategoryTools {
     const result: Record<string, { mappings?: unknown[]; calculated?: unknown[] }> = {};
 
     for (const source of sources) {
-      const mapping = source.config?.detailPage?.specMapping?.[slug];
+      // Only scraping configs carry detailPage spec mappings; an Árukereső
+      // source maps its specs from feed attributes instead.
+      const mapping = isScrapingConfig(source.config)
+        ? source.config.detailPage?.specMapping?.[slug]
+        : undefined;
       if (mapping) {
         result[source.name] = mapping;
       }

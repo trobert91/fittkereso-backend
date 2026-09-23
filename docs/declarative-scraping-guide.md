@@ -4,6 +4,8 @@
 
 Scraping used to be hardcoded per source (a TypeScript class per site, dispatched via `source.type` switch statements). It's now data-driven: every source's fetch/parse/map behavior lives in one JSONB column (`ProductSource.config`), interpreted at runtime by a single generic engine (`libs/scrape-interpreter`). Adding a new source is (in principle) inserting a row, not writing code.
 
+> **A second import type landed after this guide was written.** `ProductSource.type` is `'scraping' | 'arukereso'` — see §1 and §10, both of which used to say the type column was gone. Everything below describes the `scraping` type unless it says otherwise; an `arukereso` source imports a product feed instead of walking pages, with its own config shape and no page pipelines at all.
+
 This guide is a reading order. Each section names the file(s) to open, what they do, and how they connect to the next one. Read top to bottom and you'll have traced one full scrape from "cron fires" to "row saved in Postgres."
 
 ---
@@ -12,13 +14,14 @@ This guide is a reading order. Each section names the file(s) to open, what they
 
 **File:** `libs/database/src/lib/postgres/models/product-source.entity.ts`
 
-This is the root of everything. Each row is one scrapable source (today: ebikeshop, speedbike — both single-seller storefronts). Key fields:
+This is the root of everything. Each row is one importable source (today: `ebikeshop` scraping pages, `speedbike-arukereso` importing a feed). **One webshop may have several sources** — `ProductSourceRecord` is unique on `(source, url)` and every URL-keyed lookup is source-scoped, so each source keeps its own records; the offers converge through `Offer`'s `(seller, externalId)` unique constraint. Key fields:
 
-- `name` — the source's identity. There is **no more `type` enum** — `name` is now the only discriminator, used everywhere for logging/metrics/lookups.
-- `config: ProductSourceConfig` (jsonb) — the entire declarative definition of how to scrape this source: where to fetch from, how to discover products, how to parse list/detail pages, how to map specs. This is the payload the rest of the system interprets.
-- `seller?: Seller` — optional link if this source *is* a single seller's own storefront (nullable — an aggregator/reference source with no single owning seller would leave this unset; no such source is configured today).
-- `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs, unchanged from before.
-- `fullSyncInterval` / `nextFullSyncAt` — the cron-like schedule for this source's full catalog crawl.
+- `name` — the source's identity, and the label on every log line and metric.
+- `type` — `'scraping'` or `'arukereso'`. **Fixed at creation**: the config format is bound to it, the two shapes share no keys, and `ProductSourceUpdateService` refuses an update that changes it. It selects both the config schema and the importer.
+- `config: ProductSourceConfig` (jsonb) — the entire declarative definition. Which shape it takes is decided by `type`, so it is a discriminated pair rather than one document with a mode flag.
+- `seller: Seller` — the storefront every offer from this source belongs to. Non-nullable; there is no per-offer seller in the pipeline.
+- `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs. On a feed source they govern nothing: a feed run is one HTTP GET and enqueues no tasks.
+- `frequency` / `nextRunAt` — how often this source runs, and when it is next due. Runs are **started overnight, 02:00–06:00 Europe/Budapest**; `nextRunAt` is always snapped into that window, with jitter so ten shops do not all start at 02:00.
 
 **Why read this first:** everything downstream is either producing a `ProductSource` row, reading its `config`, or scheduling work against it.
 
@@ -30,13 +33,25 @@ This is the root of everything. Each row is one scrapable source (today: ebikesh
 
 This is the TypeScript type for the JSONB blob. Its top-level shape:
 
+`ProductSourceConfig` is a **discriminated pair selected by `ProductSource.type`**, not a union inside the document — the type lives on the entity, so repeating it in the config would be a second claim about the same fact.
+
+### `type: 'scraping'`
+
 ```ts
-interface ProductSourceConfig {
+interface ScrapingSourceConfig {
   baseUrl: string;
-  fullSyncStartUrl?: string;
-  discovery?: { mode: 'categoryTitleMatch' | 'brandNameMatch'; linkPipeline: ScrapeOperation[] };
+  startUrls: string[];            // replaced fullSyncStartUrl + the old `discovery` block
+  categoryLinks?: ScrapeOperation[];  // only when a start URL is a hub page
   categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
-  listPage: { categoryName: ScrapeOperation[]; categoryLinks: ScrapeOperation[]; productLinks: ScrapeOperation[] };
+  listPage: {
+    categoryName: ScrapeOperation[];
+    // Evaluated ONCE per run by the importer against page 1, never by a list
+    // page itself — see §7.
+    pagination?: { urlTemplate: string; pageCount: ScrapeOperation[] };
+    items: ScrapeOperation[];
+    itemMode: 'cheerio' | 'json';
+    itemPipeline: ScrapeOperation[];  // terminates in assembleListProduct
+  };
   detailPage: {
     rawSpecs: ScrapeOperation[];
     category: { breadcrumbOrSource: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
@@ -52,9 +67,30 @@ interface ProductSourceConfig {
 }
 ```
 
-Everything under `listPage`/`detailPage`/`discovery` is a **pipeline** — an ordered array of operations (`ScrapeOperation[]`) that gets executed against the fetched HTML. That op vocabulary is the next thing to understand.
+Everything under `listPage`/`detailPage` is a **pipeline** — an ordered array of operations (`ScrapeOperation[]`) that gets executed against the fetched HTML. That op vocabulary is the next thing to understand.
 
-**See the real thing:** `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/ebikeshop.config.json` and `speedbike.config.json` — the two actual production configs, each showing a different markup style (`ebikeshop.hu` is JSON-hydration/Inertia `data-page`, `speedbike.hu` is classic `<table>` spec extraction).
+### `type: 'arukereso'`
+
+```ts
+interface ArukeresoSourceConfig {
+  baseUrl: string;
+  feedUrl: string;                 // fetched over plain HTTP, never through the paid scraper
+  format?: 'auto' | 'xml' | 'csv';
+  csv?: { delimiter?: 'auto' | ',' | ';' | '\t' };
+  categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
+  category: { labelFrom?: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
+  mapping: Record<ArukeresoMappingTarget, { field?: string; pipeline?: ScrapeOperation[] }>;
+  specMapping?: Record<string, SourceSpecConfig>;  // same shape as detailPage.specMapping
+  postProcess?: ProductSourcePostProcessConfig;    // the same block, read by the same service
+}
+```
+
+Small on purpose: `field` does the addressing and the op pipeline does the transforming, which is why this type needs **no scrape ops of its own**. The mapping targets are a closed set (`ARUKERESO_MAPPING_TARGETS`) asserted by the schema, so a typo'd target is refused rather than silently ignored. `category` is required here though its scraping counterpart is optional — a feed is the whole catalogue, so a source that cannot categorise an item can import nothing at all.
+
+**See the real thing:**
+- `__fixtures__/ebikeshop.config.json` — scraping, JSON-hydration/Inertia `data-page` markup.
+- `__fixtures__/speedbike.config.json` — scraping, classic `<table>` spec extraction. Kept as a style template; speedbike itself is feed-only, so this config has no source row.
+- `__fixtures__/speedbike-arukereso.config.json` — the feed config, reusing that file's 58 spec mappings unchanged, because a feed's `attribute_name` labels are the same labels the shop's own spec table uses.
 
 ---
 
@@ -133,9 +169,12 @@ These are the two services that actually get invoked per `ScrapeTask`. Both:
 
 **Files:**
 - `apps/product-collector/src/modules/queue-processor/scrape-task/scrape-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
-- `libs/product-scraper/src/lib/product-scraper/services/generic-product-source-sync.service.ts` — replaces what used to be one sync class pair per source (fetch-discovery-page + index-page). Fetches the discovery page (`config.fullSyncStartUrl ?? config.baseUrl`), calls `interpreter.runDiscovery(...)`, creates one `ScrapeProductList` task per discovered link.
+- `libs/product-scraper/src/lib/product-scraper/services/scraping-import.service.ts` — the `scraping` importer. Replaced `GenericProductSourceSyncService`, whose whole job was running a `config.discovery` block to *find* start URLs; neither live config ever had one, so a "full sync" silently did nothing. `startUrls` names them outright.
+- `libs/product-scraper/src/lib/arukereso/arukereso-import.service.ts` — the `arukereso` importer, resolved through `ProductSourceImporterRegistry` by `source.type`.
 
-Both read `source.config`/`source.name` — neither knows or cares which source it is looking at.
+**Category expansion and pagination are resolved once per run, by the importer — never by a list page.** That is not a style preference: `generatePaginationLinks` had no page-1 guard and task creation did not dedupe, so a self-paginating listing re-emitted its whole page range from every page it landed on. Both live configs had to leave `categoryLinks` empty to work around it. A list-page task is now a pure "parse the items here" unit with no power to enqueue more pages, which makes that whole class of bug structurally impossible rather than guarded against.
+
+The task processor reads `source.config` and does not know which source it is looking at; the importers are selected by `source.type` and nothing else.
 
 ---
 
@@ -149,7 +188,14 @@ This service was already the persistence core before this change and is mostly u
 2. `persistProduct` — create or update the `ProductModel`, write the per-source `ProductModelSource` row (now via `source: ProductSource` FK instead of a `type` enum — see step 10), re-merge specs across all sources by `ProductSource.priority`.
 3. `applyPostSaveSideEffects` — slug generation, alias insertion, image copying to Bunny CDN, and (new) **`createOrUpdateOffers`**.
 
-**`createOrUpdateOffers`** (new): if `scrapedProduct.offers` is populated, for each entry it takes the seller from the task's own `ProductSource.seller` and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSeenAt`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
+**`createOrUpdateOffers`**: if `scrapedProduct.offers` is populated, for each entry it takes the seller from the source's own `ProductSource.seller` and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSynced`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
+
+Two things here are load-bearing and easy to miss, because **the `(seller, externalId)` unique constraint does not error on a collision — it keeps the last writer**:
+
+- **`externalId` is resolved for the whole page at once.** A source-native id when there is one, otherwise the URL slug (derived in shared code, so a scraping source and a feed source for one shop land on the same string — that is how they converge on one offer). Any value claimed by more than one offer on the page is dropped for all of them: otherwise three size variants at one URL would collapse into ONE offer row, with nothing logged.
+- **The conflict branch is cross-source adoption, not rare concurrency.** Offers are preloaded per *source*, so a second source importing a listing the first already owns cannot see that row, conflicts on insert, and adopts it. If the two sources resolved *different* products for the listing, it throws `OfferIdentityConflictError` rather than rebinding (which would silently move a listing) or leaving it (which would silently strand the other model with no offer, hence no price).
+
+Both feed `offer_identity_conflict_total{source,kind}`.
 
 Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup. Seller is never scraped per offer — every offer belongs to its `ProductSource.seller`.
 
@@ -164,9 +210,19 @@ Not everything moved into the JSONB config. Two things were deliberately left al
 
 ---
 
-## 10. The one structural fix threaded through everything: no more `ProductSourceType`
+## 10. `ProductSourceType`, twice — and they are not the same thing
 
-There used to be a 3-value enum (`arukereso | displaySpecs | manual`) used as an identity/grouping key in several places. It's gone. Wherever code used to switch or group on `.type`, it now uses either:
+**Read this if §1's `type` field surprised you.** There have been two different things called `ProductSourceType`, and conflating them will send you in the wrong direction.
+
+The **old** one was a 3-value enum (`arukereso | displaySpecs | manual`) used as an identity/grouping key — "which kind of thing produced this data". It is gone, and the rest of this section is about that removal.
+
+The **current** one is `'scraping' | 'arukereso'` and answers a different question: **which importer runs this source, and therefore which shape its config takes**. It is not a grouping key and nothing switches on it for identity — the importer registry resolves it once (`ProductSourceImporterRegistry`), the config validator dispatches the right JSON Schema off it, and that is all. It is fixed at creation because the stored config would otherwise be reinterpreted under a format that shares none of its keys.
+
+That the old name came back for a new meaning is unfortunate. The distinguishing test: the old type grouped *rows by origin*, the new type selects *code by config format*.
+
+---
+
+Wherever code used to switch or group on the OLD `.type`, it now uses either:
 - the actual `ProductSource` row (via a new FK — `ProductModelSource.source`, `Offer.source`), or
 - `ProductSource.name` as a plain string (for Prometheus metric labels — cardinality stays bounded because sources are added deliberately, not per-request).
 
@@ -177,37 +233,58 @@ The one exception worth knowing about: **admin-entered specs** (via the product-
 ## Putting it together — one full trace, source-agnostic
 
 ```
-cron (ProductSourceSyncScheduler, every minute)
-  → finds a ProductSource due for sync, publishes a Task row
+cron (ProductSourceSyncScheduler, every 10 min between 02:00–05:59 Europe/Budapest)
+  → finds ProductSources due (schedulingEnabled, frequency set, nextRunAt passed)
+  → advances nextRunAt at ENQUEUE time, publishes a Task row
   → TaskManagerService (5s poll) claims it, hands to ProductSourceSyncListener
-  → ProductSourceSyncListener locks the ProductSource row, calls
-      GenericProductSourceSyncService.sync()  (fetch discovery page + interpreter.runDiscovery)
-  → creates ScrapeProductList ScrapeTask row(s)
+  → validates the config against the schema for source.type, then
+      ProductSourceImporterRegistry.get(source.type).import(source)
 
-ScrapeTaskManagerService (5s poll, separate loop)
-  → claims a ScrapeTask, hands to ScrapeTaskProcessorService
-  → routes by task.queue:
+  ── type 'scraping' ──────────────────────────────────────────────
+  ScrapingImportService
+    → resolves startUrls → category URLs (categoryLinks, once) → EVERY page
+      (pagination.pageCount against page 1, once) and enqueues one
+      ScrapeProductList task per page. Then returns; the poller does the rest.
+
+  ── type 'arukereso' ─────────────────────────────────────────────
+  ArukeresoImportService
+    → one native GET, streamed through ArukeresoFeedParserService, mapped per
+      item and persisted inline. Enqueues nothing; there is no page to walk.
+
+ScrapeTaskManagerService (5s poll, separate loop) — scraping only
+  → claims a ScrapeTask, routes by task.queue:
       ScrapeProductList    → ProductListPageScraperService.scrapeListPage(task)
-                                → fetch HTML, interpreter.runListPage(task, $, task.source.config)
-                                → creates more ScrapeProductList (pagination) + ScrapeProductDetails tasks
-      ScrapeProductDetails  → ProductDetailsPageScraperService.scrapeProductDetailsPage(task)
-                                → fetch HTML, interpreter.runDetailPage(task, $, task.source.config)
-                                → resolve category entity, translate specs, SpecExtractionService.extractSpecs()
-                                → assemble ScrapedProduct
-                                → ProductScrapeUpdaterService.createOrUpdateProduct(task, scrapedProduct)
-                                    → resolve/create ProductModel, write ProductModelSource, merge specs
-                                    → slug, aliases, images
-                                    → createOrUpdateOffers
+                                → interpreter.runListPage → ScrapedListProduct[]
+                                → per card, ListProductRefreshService decides:
+                                    refresh the offer in place (no detail fetch
+                                    spent), or enqueue ScrapeProductDetails.
+                                → enqueues NO further list pages, by design
+      ScrapeProductDetails → ProductDetailsPageScraperService
+                                → interpreter.runDetailPage, spec extraction,
+                                  SpecPostProcessService (hash-skipped when
+                                  nothing changed)
+                                → ScrapedProduct
+
+  ── both types converge here ─────────────────────────────────────
+  ProductScrapeUpdaterService.createOrUpdateProduct(context, scrapedProduct)
+    → resolve/create ProductModel, write ProductSourceRecord, merge specs
+    → slug, aliases, images
+    → createOrUpdateOffers (externalId resolved per page, offers stamped
+      with lastSynced)
 ```
 
-Every arrow in that diagram is source-agnostic — the only thing that varies between ebikeshop and speedbike is the JSON sitting in `ProductSource.config`.
+Everything below the converge line is import-agnostic: identity resolution, merge, spec validation and offer upsert cannot tell whether a product arrived as HTML or as a feed row. That is what `ProductImportContext` is for — the persistence path used to take a `ScrapeTask`, and a feed run has none.
 
 ---
 
 ## If you want to add a new source
 
-1. Author a new `ProductSourceConfig` JSON (copy the shape from `ebikeshop.config.json` or `speedbike.config.json` depending on whether the new source's markup is JSON-hydration/Inertia-style or classic server-rendered `<table>` spec markup).
-2. Write golden-fixture tests for it under `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/`, following the pattern in step 5.
-3. If (and only if) the source needs a genuinely new kind of DOM pattern the current ~35 ops can't express, add a new op: type in `scrape-operation.ts`, handler in the matching `ops/*.ts` file, registration in `ops/register-ops.ts`.
-4. Insert a `ProductSource` row with the new config (see `apps/product-collector/scripts/seed-product-source-configs.ts` for the pattern).
-5. No other code changes needed — the scheduler, task managers, scraper services, and persistence layer all already work off `source.config`/`source.name`.
+**Use the `add-webshop` skill** (`.claude/skills/add-webshop/`) — it is the maintained procedure, with a plan/execute split and a human review gate between them. In outline:
+
+0. **Decide the type first.** Probe for a feed before assuming you must scrape: `curl -o /dev/null -w '%{http_code}' 'https://<shop>/api/?route=export/feed&id=arukereso'` (ShopRenter's pattern — 200 enabled, 405 disabled, 401 password-protected). One GET beats thousands of paid page fetches. The type cannot be changed afterwards.
+1. Author the config for that type, against the schema `get_product_source_config_schema({ type })` returns. Copy the closest fixture: `ebikeshop.config.json` (JSON-hydration markup), `speedbike.config.json` (classic `<table>`), `speedbike-arukereso.config.json` (feed).
+2. Write golden-fixture tests under `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/`, and add the config to `config-validation.spec.ts` — that spec is the pre-deploy gate.
+3. Only if the source needs a DOM pattern the current 53 ops cannot express, add one: type in `scrape-operation.ts`, handler in `ops/*.ts`, registration in `ops/register-ops.ts`, name in `SCRAPE_OPERATION_NAMES` (a spec asserts those two agree in both directions).
+4. Create the `ProductSource` row with its `type` (see `seed-product-source-configs.ts`), scheduling off.
+5. Dry-run it: `simulate_product_source_import({ productSourceId })` reports what a run would do without writing anything — for a feed, how much survives the category gate and whether the chosen `externalId` is unique across it; for a scraping source, the page walk and the per-card refresh-vs-detail-fetch split. Enable scheduling only once that looks right.
+6. No other code changes needed — scheduler, task managers, importers and persistence all work off `source.type`/`source.config`.

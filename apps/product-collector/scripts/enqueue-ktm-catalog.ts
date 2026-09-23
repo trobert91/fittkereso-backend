@@ -1,26 +1,24 @@
 /**
- * Enqueues the KTM e-bike catalog list pages for speedbike.hu and
- * ebikeshop.hu, so a KTM catalog can be built on demand without waiting for
- * (or enabling) either source's cron schedule.
+ * Enqueues the KTM e-bike catalog list pages for ebikeshop.hu, so a KTM catalog
+ * can be built on demand without waiting for (or enabling) the source's cron
+ * schedule.
  *
- * Why the pages are enumerated here rather than followed from the pages
- * themselves: `listPage.categoryLinks` is empty in both configs. The
- * interpreter's `generatePaginationLinks` has no "only on page 1" guard and
- * `ProductListPageScraperService.createCategoryTasks` doesn't dedupe, so a
- * self-paginating list page re-emits the whole page range from every page it
- * lands on — page 1 spawns pages 2..N, each of which spawns 2..N again.
- * Enumerating here keeps the page count exact and lets `--pages` cap a run.
+ * Why the pages are enumerated here rather than by the importer: this is a
+ * BRAND-SCOPED run, which no source config expresses — a config's `startUrls`
+ * cover the whole catalogue. `ScrapingImportService` does enumerate pages
+ * properly for a real run (once per run, up front), so this script is for
+ * narrow manual passes only, not a workaround for the importer.
  *
- * Each list page yields ~30 (speedbike) / 32 (ebikeshop) detail tasks, and
- * every task is a paid Zyte fetch plus an LLM post-process pass, rate limited
- * to `ProductSource.requestsPerHour` (60). Start small and widen.
+ * Each list page yields ~32 detail tasks, and every task is a paid Zyte fetch
+ * plus an LLM post-process pass, rate limited to
+ * `ProductSource.requestsPerHour`. Start small and widen.
  *
  * Usage (from the repo root):
  *   PRODUCT_COLLECTOR_CONFIG_PATH=apps/product-collector/src/config/config.yaml \
  *     npx ts-node --project apps/product-collector/tsconfig.app.json \
  *     -r tsconfig-paths/register \
  *     apps/product-collector/scripts/enqueue-ktm-catalog.ts \
- *     [--pages=N] [--from=N] [--source=speedbike|ebikeshop|all]
+ *     [--pages=N] [--from=N] [--source=ebikeshop|all]
  *
  * `--from` widens an already-scraped catalog without paying for the pages
  * already done: nothing dedupes list tasks, so re-running from page 1 refetches
@@ -43,18 +41,12 @@ interface CatalogSource {
   urlOf: (page: number) => string;
 }
 
-const SPEEDBIKE_KTM_EBIKES =
-  'https://speedbike.hu/index.php?route=filter&filter=category|1087/manufacturer|268';
-
+// speedbike is gone from this list: it is FEED-ONLY now, and a feed cannot be
+// scoped to one brand — it is the whole catalogue in one document, imported by
+// a full sync rather than by enqueued list pages. Its filter URL was
+// `index.php?route=filter&filter=category|1087/manufacturer|268` (1087 =
+// E-BIKE, 268 = KTM) if a scraping source for it is ever recreated.
 const SOURCES: CatalogSource[] = [
-  {
-    // category|1087 is E-BIKE, manufacturer|268 is KTM — the filter is the
-    // only way speedbike scopes a listing to one brand. 153 products, 30/page.
-    name: 'speedbike',
-    totalPages: 6,
-    urlOf: (page) =>
-      page === 1 ? SPEEDBIKE_KTM_EBIKES : `${SPEEDBIKE_KTM_EBIKES}&page=${page}`,
-  },
   {
     // ebikeshop's manufacturer page is already e-bikes only (the shop sells
     // nothing else), so it needs no category filter. 463 products, 32/page.

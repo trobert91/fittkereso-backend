@@ -128,7 +128,7 @@ export class EntityTools {
                 ? ` · locations=${offer.locations.join(', ')}`
                 : '';
             L.push(
-              `  - ${offer.seller?.name ?? '?'} · ${offer.price} ${offer.currency} · ${offer.availability} · externalId=${offer.externalId ?? '(none)'} · active=${offer.active}${locationsSuffix}`,
+              `  - ${offer.seller?.name ?? '?'} · ${offer.price} ${offer.currency} · ${offer.availability ?? '(not reported)'} · externalId=${offer.externalId ?? '(none)'} · active=${offer.active}${locationsSuffix}`,
             );
           }
         } else {
@@ -145,7 +145,7 @@ export class EntityTools {
       for (const offer of offers) {
         L.push(`### ${offer.seller?.name ?? '(no seller)'} — ${offer.price} ${offer.currency}`);
         L.push(`- **ID**: ${offer.id}`);
-        L.push(`- **Availability**: ${offer.availability}`);
+        L.push(`- **Availability**: ${offer.availability ?? '(not reported by the source)'}`);
         L.push(`- **Condition**: ${offer.condition}`);
         L.push(`- **URL**: ${offer.url ?? '(none)'}`);
         L.push(`- **External ID**: ${offer.externalId ?? '(none)'}`);
@@ -153,7 +153,7 @@ export class EntityTools {
           `- **Source Record**: ${offer.sourceRecord?.url ?? offer.sourceRecord?.id ?? '(none)'}`,
         );
         L.push(`- **Active**: ${offer.active}`);
-        L.push(`- **Last Seen At**: ${offer.lastSeenAt?.toISOString?.() ?? offer.lastSeenAt}`);
+        L.push(`- **Last Synced**: ${offer.lastSynced?.toISOString?.() ?? offer.lastSynced}`);
         if (offer.locations && offer.locations.length > 0) {
           L.push(`- **Locations**: ${offer.locations.join(', ')}`);
         }

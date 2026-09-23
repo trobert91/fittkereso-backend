@@ -33,6 +33,9 @@ export class SellerProductSourceCreateService {
 
     const source = new ProductSource();
     source.name = dto.name;
+    // Set once, here. The config format is type-bound and the update service
+    // refuses to change it — see ProductSource.type.
+    source.type = dto.type;
     source.seller = seller;
     source.schedulingEnabled = false;
     source.processingEnabled = false;

@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ProductSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from './scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from './services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from './services/scrape-op-registry.service';
@@ -29,96 +29,60 @@ describe('ScrapeInterpreterService', () => {
   });
 
   describe('runListPage', () => {
-    it('extracts category name, product links filtered by brand prefix, and pagination links', async () => {
+    it('extracts the category name and one ScrapedListProduct per card', async () => {
       const html = `
         <h1 class="category-title">Monitor</h1>
-        <div class="category-navbar"><span class="product-num">51 termék, 1. oldal</span></div>
         <div class="list-view">
-          <div class="product-box" data-akpid="123">
-            <a href="/asus-pg34-p123" title="ASUS PG34"></a>
+          <div class="product-box">
+            <a class="name" href="/asus-pg34-p123">ASUS PG34</a>
+            <span class="price">129 900 Ft</span>
           </div>
-          <div class="product-box" data-akpid="456">
-            <a href="/unknown-brand-p456" title="UnknownBrand X1"></a>
-          </div>
-          <div class="product-box" data-akpid="789-PADS">
-            <a href="/asus-pads-p789" title="ASUS Pads"></a>
+          <div class="product-box">
+            <a class="name" href="/dell-u2720-p456">Dell U2720</a>
+            <span class="price">99 900 Ft</span>
           </div>
         </div>
       `;
       const $ = cheerio.load(html);
 
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://www.arukereso.hu',
+        startUrls: ['https://www.arukereso.hu/monitorok'],
         listPage: {
           categoryName: [
             { op: 'selectText', selector: 'h1.category-title', first: true, trim: true },
           ],
-          categoryLinks: [
+          items: [{ op: 'selectAll', selector: '.product-box' }],
+          itemMode: 'cheerio',
+          itemPipeline: [
             {
-              op: 'selectText',
-              selector: '.category-navbar .product-num',
-              trim: true,
-              as: 'productNumText',
-            },
-            {
-              op: 'assertContains',
-              value: 'productNumText',
-              substring: ', 1. oldal',
-              onFail: 'returnEmpty',
-            },
-            {
-              op: 'regexCapture',
-              value: 'productNumText',
-              pattern: '(\\d+)\\s*termék',
-              group: 1,
-              cast: 'number',
-              as: 'totalProducts',
-            },
-            { op: 'computePages', totalItems: 'totalProducts', perPage: 25, as: 'totalPages' },
-            {
-              op: 'buildBaseUrl',
-              from: 'task.url',
-              stripQuery: true,
-              trimTrailingSlash: true,
-              as: 'baseUrl',
-            },
-            {
-              op: 'generatePaginationLinks',
-              totalPages: 'totalPages',
-              startPage: 2,
-              baseUrl: 'baseUrl',
-              urlTemplate: '{baseUrl}/?start={(page-1)*25}',
-              titleTemplate: 'Page {page}',
-            },
-          ],
-          productLinks: [
-            { op: 'selectAll', selector: '.list-view .product-box', as: 'boxes' },
-            { op: 'filterByAttrAbsent', on: 'boxes', attr: 'data-akpid', as: 'boxes' },
-            {
-              op: 'filterByAttrSuffix',
-              on: 'boxes',
-              attr: 'data-akpid',
-              excludeSuffix: '-PADS',
-              as: 'boxes',
-            },
-            {
-              op: 'extractLinkFromBox',
-              on: 'boxes',
-              linkSelector: 'a',
-              first: true,
-              titleFrom: ['attr:title', 'text'],
-            },
-            {
-              op: 'filterByBrandPrefix',
-              source: 'runtime:brandCache',
-              field: 'title',
-              caseInsensitive: true,
+              op: 'assembleListProduct',
+              url: [
+                {
+                  op: 'selectAttr',
+                  selector: 'a.name',
+                  attr: 'href',
+                  within: 'item',
+                  first: true,
+                },
+              ],
+              name: [
+                { op: 'selectFirst', selector: 'a.name', within: 'item' },
+                { op: 'selectText', trim: true },
+              ],
+              price: [
+                { op: 'selectFirst', selector: '.price', within: 'item' },
+                { op: 'selectText', trim: true },
+                { op: 'stripPattern', pattern: '[^0-9]', flags: 'g' },
+                { op: 'jsonPath', cast: 'number' },
+              ],
+              currency: [{ op: 'literal', value: 'HUF' }],
             },
           ],
         },
         detailPage: {
           rawSpecs: [],
-          category: { breadcrumbOrSource: [], slugLookup: [] },
+          category: { breadcrumbOrSource: [], slugLookup: [{ when: { always: true }, slug: 'monitors' }] },
           brand: [],
           model: [],
           images: [],
@@ -129,19 +93,82 @@ describe('ScrapeInterpreterService', () => {
       const result = await interpreter.runListPage(makeTask(), $, config);
 
       expect(result.categoryName).toBe('Monitor');
-      expect(result.productLinks).toEqual([
-        { url: '/asus-pg34-p123', title: 'ASUS PG34' },
-      ]);
-      expect(result.categoryLinks).toEqual([
+      expect(result.products).toEqual([
         {
-          url: 'https://www.arukereso.hu/monitorok/asus-pg34-p12345/?start=25',
-          title: 'Page 2',
+          url: '/asus-pg34-p123',
+          name: 'ASUS PG34',
+          price: 129900,
+          currency: 'HUF',
+          externalId: undefined,
+          priceWithoutDiscount: undefined,
+          availability: undefined,
         },
         {
-          url: 'https://www.arukereso.hu/monitorok/asus-pg34-p12345/?start=50',
-          title: 'Page 3',
+          url: '/dell-u2720-p456',
+          name: 'Dell U2720',
+          price: 99900,
+          currency: 'HUF',
+          externalId: undefined,
+          priceWithoutDiscount: undefined,
+          availability: undefined,
         },
       ]);
+    });
+
+    // A card that yields no URL cannot be matched to a stored listing, so it
+    // can neither refresh an offer nor be enqueued for a detail scrape.
+    it('drops cards that yield no URL', async () => {
+      const html = `
+        <div class="list-view">
+          <div class="product-box"><a class="name" href="/real-p1">Real</a></div>
+          <div class="product-box"><span>no anchor here</span></div>
+        </div>
+      `;
+      const $ = cheerio.load(html);
+
+      const config: ScrapingSourceConfig = {
+        baseUrl: 'https://www.arukereso.hu',
+        startUrls: ['https://www.arukereso.hu/monitorok'],
+        listPage: {
+          categoryName: [],
+          items: [{ op: 'selectAll', selector: '.product-box' }],
+          itemMode: 'cheerio',
+          itemPipeline: [
+            {
+              op: 'assembleListProduct',
+              url: [
+                {
+                  op: 'selectAttr',
+                  selector: 'a.name',
+                  attr: 'href',
+                  within: 'item',
+                  first: true,
+                },
+              ],
+            },
+          ],
+        },
+        detailPage: {
+          rawSpecs: [],
+          category: { breadcrumbOrSource: [], slugLookup: [{ when: { always: true }, slug: 'monitors' }] },
+          brand: [],
+          model: [],
+          images: [],
+          specMapping: {},
+        },
+      };
+
+      const result = await interpreter.runListPage(makeTask(), $, config);
+
+      expect(result.products).toEqual([{
+        url: '/real-p1',
+        name: undefined,
+        price: undefined,
+        currency: undefined,
+        externalId: undefined,
+        priceWithoutDiscount: undefined,
+        availability: undefined,
+      }]);
     });
   });
 
@@ -159,9 +186,10 @@ describe('ScrapeInterpreterService', () => {
       `;
       const $ = cheerio.load(html);
 
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://www.arukereso.hu',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://www.arukereso.hu/monitorok'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           rawSpecs: [
             {
@@ -262,9 +290,10 @@ describe('ScrapeInterpreterService', () => {
       // test from the rest of the (already-covered) op vocabulary.
       const buildConfig = (
         specs: { name: string; values: string[] }[],
-      ): ProductSourceConfig => ({
+      ): ScrapingSourceConfig => ({
         baseUrl: 'https://www.arukereso.hu',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://www.arukereso.hu/monitorok'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           rawSpecs: [{ op: 'returnFixture', fixture: 'specs' } as never],
           category: {
@@ -279,7 +308,7 @@ describe('ScrapeInterpreterService', () => {
           specMapping: {},
         },
         __fixtures: { specs, breadcrumb: 'fülhallgató, fejhallgató' },
-      } as unknown as ProductSourceConfig);
+      } as unknown as ScrapingSourceConfig);
 
       const stubRegistry = new ScrapeOpRegistryService();
       const stubRunner = new ScrapePipelineRunnerService(stubRegistry);
@@ -331,9 +360,10 @@ describe('ScrapeInterpreterService', () => {
         <div id="app" data-page='{"props":{"product":{"stocks":[{"inStock":true}],"prices":{"price":3879000},"productCode":"1260040108"}}}'></div>
       `);
 
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://ebikeshop.hu',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://ebikeshop.hu/termekek'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           ...baseDetailPage(),
           offers: {
@@ -393,9 +423,10 @@ describe('ScrapeInterpreterService', () => {
 
     it('returns no offers when offers config is absent', async () => {
       const $ = cheerio.load('<div></div>');
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://ebikeshop.hu',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://ebikeshop.hu/termekek'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: baseDetailPage(),
       };
 
@@ -407,9 +438,10 @@ describe('ScrapeInterpreterService', () => {
       const $ = cheerio.load(`
         <div id="app" data-page='{"props":{"stocks":[{"inStock":true}]}}'></div>
       `);
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://ebikeshop.hu',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://ebikeshop.hu/termekek'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           ...baseDetailPage(),
           offers: {
@@ -449,9 +481,10 @@ describe('ScrapeInterpreterService', () => {
         </div>
       `);
 
-      const config: ProductSourceConfig = {
+      const config: ScrapingSourceConfig = {
         baseUrl: 'https://aggregator.example',
-        listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+        startUrls: ['https://aggregator.example/list'],
+        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           ...baseDetailPage(),
           offers: {

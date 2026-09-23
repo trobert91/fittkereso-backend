@@ -1,20 +1,37 @@
 import { SourceSpecConfig } from './product-category-config';
 import { CategoryLookupRule, ScrapeOperation } from './scrape-operation';
 
-export interface ProductSourceDiscoveryConfig {
-  mode: 'categoryTitleMatch' | 'brandNameMatch';
-  linkPipeline: ScrapeOperation[];
-}
 
 export interface ProductSourceCategoryConfig {
   enabled: boolean;
   sourceTitle?: string;
 }
 
+export interface ProductSourcePaginationConfig {
+  /** Supports {{baseUrl}}, {{startUrl}} and {{page}}. */
+  urlTemplate: string;
+  /** Pipeline run against page 1 yielding the total page count. */
+  pageCount: ScrapeOperation[];
+}
+
 export interface ProductSourceListPageConfig {
   categoryName: ScrapeOperation[];
-  categoryLinks: ScrapeOperation[];
-  productLinks: ScrapeOperation[];
+  /**
+   * How to enumerate the remaining pages of a listing. Omit for a listing that
+   * fits on one page.
+   *
+   * Evaluated ONCE, by the importer, against page 1 — never by a list page
+   * itself. A list-page task is a pure "parse the items here" unit with no
+   * power to enqueue more pages, which is what makes the old re-emission bug
+   * (every page re-emitting the whole range) structurally impossible rather
+   * than merely guarded against.
+   */
+  pagination?: ProductSourcePaginationConfig;
+  /** Pipeline yielding the array of product cards on the page. */
+  items: ScrapeOperation[];
+  itemMode: 'cheerio' | 'json';
+  /** Run once per card; must terminate in an assembleListProduct op. */
+  itemPipeline: ScrapeOperation[];
 }
 
 export interface ProductSourceOffersConfig {
@@ -144,11 +161,268 @@ export interface ProductSourceDetailPageConfig {
   postProcess?: ProductSourcePostProcessConfig;
 }
 
-export interface ProductSourceConfig {
+/**
+ * Config for `type: 'scraping'` — page pipelines.
+ *
+ * `startUrls` replaces the old `fullSyncStartUrl` + `discovery` pair. Discovery
+ * existed to *find* start URLs by matching category titles or brand names on a
+ * hub page; naming them outright is both simpler and the only thing either live
+ * source ever wanted. Neither had a `discovery` block, which is why full sync
+ * silently did nothing.
+ */
+export interface ScrapingSourceConfig {
   baseUrl: string;
-  fullSyncStartUrl?: string;
-  discovery?: ProductSourceDiscoveryConfig;
+  /** Where each import run begins. At least one. */
+  startUrls: string[];
+  /**
+   * How to expand a start URL into category URLs, for a hub page rather than a
+   * listing. Optional — a start URL that is already a listing needs none.
+   *
+   * Walked ONCE per run, by the importer, for the same reason pagination is.
+   */
+  categoryLinks?: ScrapeOperation[];
   categories?: Record<string, ProductSourceCategoryConfig>;
+  /**
+   * Hard ceiling on how many items one run imports. Unset means no ceiling,
+   * which is what a production source wants.
+   *
+   * **On a scraping source this caps items PER LIST PAGE**, not per run, and
+   * that is a real limitation rather than a choice: each list page is its own
+   * independently scheduled ScrapeTask, so there is no run-scoped counter for
+   * them to share. To keep the cap meaningful for its actual purpose — a small
+   * test set — setting it also makes the importer enumerate only the FIRST page
+   * of each listing, since walking 42 pages to take 10 items is not what
+   * anybody means by this.
+   */
+  maxItems?: number;
+  /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
+  filter?: ProductSourceFilterConfig;
   listPage: ProductSourceListPageConfig;
   detailPage: ProductSourceDetailPageConfig;
+}
+
+/**
+ * One test against one field.
+ *
+ * Give exactly one operator. They are separate keys rather than an
+ * `{ op, value }` pair because that is how the rest of this config reads
+ * (`CategoryLookupCondition` does the same), and because it lets the schema
+ * type each operator's value — `in` takes an array, `gte` takes a number.
+ */
+export interface ProductSourceFilterCondition {
+  /**
+   * Which field to test.
+   *
+   * For an `arukereso` source: ANY feed column, matched the same way `mapping`
+   * matches — case-insensitively with `_`, `-` and spaces stripped — plus
+   * `attribute:<name>` to test one of the feed's attribute pairs.
+   *
+   * For a `scraping` source: any field of the list card (`name`, `url`,
+   * `price`, `externalId`, `availability`, …), because that is where filtering
+   * is worth doing — a card rejected here is a paid detail fetch not spent.
+   */
+  field: string;
+  equals?: string;
+  notEquals?: string;
+  contains?: string;
+  notContains?: string;
+  /** Regular expression, tested against the whole value. */
+  matches?: string;
+  in?: string[];
+  notIn?: string[];
+  gt?: number;
+  gte?: number;
+  lt?: number;
+  lte?: number;
+  /** `true` matches only an absent/empty field; `false` only a present one. */
+  isEmpty?: boolean;
+}
+
+/**
+ * Narrows an import to a subset of what the source offers.
+ *
+ * Built for assembling a small, *representative* test set — "just the KTMs", or
+ * "only bikes over 500k" — without hand-picking URLs or editing the source's
+ * real config. It is a filter on what gets imported, not on what gets fetched:
+ * the feed still downloads whole, and a list page is still parsed whole.
+ *
+ * Leaving it unset imports everything, which is what a production source wants.
+ */
+export interface ProductSourceFilterConfig {
+  /** Whether every condition must hold, or just one. Default: `all`. */
+  match?: 'all' | 'any';
+  /** Default: false — string comparisons ignore case, which is almost always meant. */
+  caseSensitive?: boolean;
+  conditions: ProductSourceFilterCondition[];
+}
+
+/**
+ * The complete set of things a feed field can be mapped onto.
+ *
+ * Closed, and asserted by the config schema, because a mapping key the importer
+ * does not read would sit in the config looking effective while doing nothing —
+ * a failure a config author cannot see from the outside. Adding a target means
+ * adding it here and teaching the importer to read it, in that order.
+ */
+export const ARUKERESO_MAPPING_TARGETS = [
+  /** Source-native id (sku, identifier). Falls back to the URL slug when absent. */
+  'externalId',
+  'brand',
+  /**
+   * The listing title. Becomes `originalName` verbatim, and `model` after the
+   * post-process pass cleans it — a feed's `name` is the shop's full marketing
+   * title, so the raw value is rarely a usable model name on its own.
+   */
+  'name',
+  /** The product page URL — ProductSourceRecord identity and the offer's link. */
+  'url',
+  'price',
+  'priceWithoutDiscount',
+  'currency',
+  /** Mapped onto OfferAvailability; anything unrecognised becomes `unknown`. */
+  'availability',
+  /** Primary image, or a list of them when the pipeline yields an array. */
+  'imageUrl',
+  'description',
+  /** The raw category value that `category.labelFrom` and slugLookup consume. */
+  'categoryLabel',
+  'aliases',
+  'releaseYear',
+] as const;
+
+export type ArukeresoMappingTarget = (typeof ARUKERESO_MAPPING_TARGETS)[number];
+
+/** How one Árukereső feed field maps onto a target field. */
+export interface ArukeresoFieldMapping {
+  /**
+   * Feed field name, seeding the pipeline's input. Matched case-insensitively
+   * with `_`, `-` and spaces stripped, because at least three spelling families
+   * exist in the wild for the same fields — official PascalCase (`ProductUrl`),
+   * the docs' own lowercase CSV headers (`producturl`) and ShopRenter's
+   * snake_case (`product_url`).
+   *
+   * Optional only when a `pipeline` needs no input — a `literal` supplying a
+   * currency code the feed format has no field for, say. Naming an unrelated
+   * field just to satisfy the grammar would read as a dependency that is not
+   * one.
+   */
+  field?: string;
+  /** Optional transform, using the same op vocabulary as scraping configs. */
+  pipeline?: ScrapeOperation[];
+}
+
+/**
+ * Config for `type: 'arukereso'` — a product feed.
+ *
+ * `field` does the addressing and the op pipeline does the transforming, which
+ * is why this type needs no ops of its own.
+ */
+export interface ArukeresoSourceConfig {
+  baseUrl: string;
+  /** The feed URL. Fetched over plain HTTP — never through the paid scraper. */
+  feedUrl: string;
+  /** 'auto' sniffs the content type and the first bytes. */
+  format?: 'auto' | 'xml' | 'csv';
+  csv?: {
+    /** 'auto' detects between comma, semicolon and tab from the header row. */
+    delimiter?: 'auto' | ',' | ';' | '\t';
+  };
+  categories?: Record<string, ProductSourceCategoryConfig>;
+  /**
+   * Resolves the feed's category path to one of our category slugs.
+   *
+   * Required, unlike the scraping shape's optional pieces: a feed is the whole
+   * catalog, so a source that cannot categorise an item cannot import anything
+   * at all. Use an `always` rule for a single-category shop.
+   */
+  category: {
+    /** Pipeline turning the raw category value into a matchable label. */
+    labelFrom?: ScrapeOperation[];
+    slugLookup: CategoryLookupRule[];
+  };
+  /**
+   * Hard ceiling on how many items one run imports. Unset means no ceiling,
+   * which is what a production source wants.
+   *
+   * A feed run is a single in-process pass, so here the cap is exactly what it
+   * says: the run stops importing after this many products. Counted in items
+   * IMPORTED, not items seen — a cap of 10 alongside a `filter` yields ten
+   * matching products, not ten attempts. The feed is still downloaded whole;
+   * this bounds the expensive half (LLM post-processing and writes), not the
+   * cheap one.
+   */
+  maxItems?: number;
+  /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
+  filter?: ProductSourceFilterConfig;
+  mapping: Record<string, ArukeresoFieldMapping>;
+  /** Keyed by category slug, exactly as detailPage.specMapping is. */
+  specMapping?: Record<string, SourceSpecConfig>;
+  /**
+   * The LLM post-processing pass, identical in meaning to
+   * `detailPage.postProcess` and read by the same service.
+   *
+   * A feed needs it at least as much as a page does: Árukereső's `name` field
+   * is the shop's full marketing title, so without post-processing every feed
+   * product's `model` is that whole string — which is exactly the input
+   * identity resolution is worst at.
+   */
+  postProcess?: ProductSourcePostProcessConfig;
+}
+
+/**
+ * The stored `ProductSource.config`. Which shape applies is decided by
+ * `ProductSource.type`, which is fixed at creation — the two share no keys, so
+ * reading one as the other yields nothing rather than something subtly wrong.
+ */
+export type ProductSourceConfig = ScrapingSourceConfig | ArukeresoSourceConfig;
+
+/**
+ * Narrow a stored config to the scraping shape.
+ *
+ * Config shape is decided by ProductSource.type, which TypeScript cannot see
+ * through `source.config` alone — so scraping-only code (the whole detail-page
+ * pipeline, the interpreter's list/detail runners) asks for the narrowing
+ * explicitly rather than casting. Throwing is right: reaching detail-page code
+ * with a feed source is a wiring bug, and the two shapes share no keys, so
+ * carrying on would read `undefined` for everything.
+ */
+export function asScrapingConfig(
+  config: ProductSourceConfig,
+  sourceLabel?: string,
+): ScrapingSourceConfig {
+  if (!isScrapingConfig(config)) {
+    throw new Error(
+      `Expected a scraping config${sourceLabel ? ` for "${sourceLabel}"` : ''}, ` +
+        `but this source's config is not one. Check ProductSource.type.`,
+    );
+  }
+  return config;
+}
+
+/** Narrow a stored config to the Árukereső shape. See asScrapingConfig. */
+export function asArukeresoConfig(
+  config: ProductSourceConfig,
+  sourceLabel?: string,
+): ArukeresoSourceConfig {
+  if (!isArukeresoConfig(config)) {
+    throw new Error(
+      `Expected an Árukereső config${sourceLabel ? ` for "${sourceLabel}"` : ''}, ` +
+        `but this source's config is not one. Check ProductSource.type.`,
+    );
+  }
+  return config;
+}
+
+/** Structural test — `listPage` exists only on the scraping shape. */
+export function isScrapingConfig(
+  config: ProductSourceConfig | undefined | null,
+): config is ScrapingSourceConfig {
+  return !!config && 'listPage' in config;
+}
+
+/** Structural test — `feedUrl` exists only on the Árukereső shape. */
+export function isArukeresoConfig(
+  config: ProductSourceConfig | undefined | null,
+): config is ArukeresoSourceConfig {
+  return !!config && 'feedUrl' in config;
 }

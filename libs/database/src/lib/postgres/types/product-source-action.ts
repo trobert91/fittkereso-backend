@@ -38,6 +38,17 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
   'processing_changed',
   /** The owning seller changed. Payload: { from, to, fromLabel, toLabel }. */
   'seller_changed',
+  /**
+   * An import run finished. Payload: { type, itemsSeen, productsCreated,
+   * offersUpdated, detailTasksEnqueued, skipped, failed, durationMs }.
+   *
+   * A feed run batches thousands of items in-process with no ScrapeTask row per
+   * item, so without this the run leaves no trace anywhere. Per-item failures
+   * are counted and sampled into the payload rather than written one row each.
+   */
+  'import_run_completed',
+  /** An import run threw. Payload: { type, error, durationMs }. */
+  'import_run_failed',
 ] as const;
 
 export type ProductSourceActionType = (typeof PRODUCT_SOURCE_ACTION_TYPES)[number];

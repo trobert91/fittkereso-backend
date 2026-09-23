@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import {
   OfferAvailability,
   ProductCategory,
-  ProductSourceConfig,
+  ScrapingSourceConfig,
   ScrapeTask,
   SourceSpecConfig,
 } from '@fittkereso-backend/database';
@@ -111,7 +111,7 @@ export class ProductSourceSimulationService {
 
   public async simulateDetailPageScrape(
     url: string,
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
   ): Promise<ProductSourceSimulationResult> {
     const warnings: string[] = [];
     const errors: string[] = [];
@@ -326,7 +326,7 @@ export class ProductSourceSimulationService {
     return (await this.runtime.getCategoryBySlug(slug)) ?? undefined;
   }
 
-  private buildFakeTask(url: string, config: ProductSourceConfig): ScrapeTask {
+  private buildFakeTask(url: string, config: ScrapingSourceConfig): ScrapeTask {
     // Only `task.url` is read by the interpreter ops (see link-ops buildBaseUrl);
     // task.force/task.source/task.product are irrelevant here since we never
     // call ProductScrapeUpdaterService. Cast rather than constructing a real
@@ -362,7 +362,7 @@ export class ProductSourceSimulationService {
   }
 
   private async buildTranslator(
-    config: ProductSourceConfig,
+    config: ScrapingSourceConfig,
     rawSpecs: ScrapedProductSpec[],
     sourceConfig: SourceSpecConfig | undefined,
     categoryName: string,

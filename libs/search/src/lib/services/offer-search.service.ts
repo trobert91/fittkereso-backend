@@ -15,7 +15,7 @@ export class OfferSearchService {
   public async search(params: OfferSearchParams): Promise<OfferSearchResult> {
     const finalParams = {
       ...params,
-      sort: params.sort ?? 'lastSeenAt',
+      sort: params.sort ?? 'lastSynced',
       order: params.order ?? 'DESC',
     };
 

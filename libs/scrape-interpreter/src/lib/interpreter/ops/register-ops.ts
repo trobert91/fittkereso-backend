@@ -66,6 +66,7 @@ import { makeMapSpecValue, mapValue } from './value-map-ops';
 import { makeBranch } from './control-ops';
 import { makeForEachItem } from './iteration-ops';
 import { makeAssembleOffer } from './offer-ops';
+import { jsonPath, makeAssembleListProduct } from './list-product-ops';
 
 // Registers every op handler in the vocabulary. Ops that need to recursively
 // run a sub-pipeline (branch, extractLinkFromBox, appendSyntheticSpec,
@@ -142,4 +143,10 @@ export function registerOps(
 
   registry.register('forEachItem', makeForEachItem(runner));
   registry.register('assembleOffer', makeAssembleOffer(runner));
+
+  registry.register('jsonPath', jsonPath);
+  registry.register(
+    'assembleListProduct',
+    makeAssembleListProduct(runner),
+  );
 }

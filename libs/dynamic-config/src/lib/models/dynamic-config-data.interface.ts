@@ -35,6 +35,63 @@ export interface DynamicConfigData {
     traceEnabled?: boolean;
   };
 
+  /**
+   * Offer freshness — the whole delisting mechanism.
+   *
+   * An import run stamps Offer.lastSynced; nothing else marks an offer gone.
+   * So a source that stops seeing a product simply stops stamping it, and the
+   * offer first disappears from the site and is then deleted. There are no
+   * miss counters and no separate gone-sweep.
+   *
+   * deleteAfterDays must stay comfortably larger than freshnessDays: the gap is
+   * the grace period in which a source can be broken, paused or mid-backfill
+   * without its catalog being destroyed.
+   */
+  offers?: {
+    /** Offers synced within this many days are publicly visible. Default: 7 */
+    freshnessDays?: number;
+    /** Offers not synced for this many days are hard-deleted. Default: 14 */
+    deleteAfterDays?: number;
+    /**
+     * Whether the sweep actually deletes. Default: FALSE.
+     *
+     * Ships off because the sweep's whole premise is that imports are running:
+     * an offer is only "gone" because a run that DID happen stopped confirming
+     * it. Point it at an estate where nothing is importing — a fresh
+     * environment, a source with no `frequency` set, a paused catalog — and
+     * every offer ages out and is destroyed on a schedule, with the absence of
+     * evidence read as evidence of absence.
+     *
+     * With this off the sweep still runs and logs exactly what it WOULD delete,
+     * which is the number to watch before turning it on.
+     */
+    deletionEnabled?: boolean;
+  };
+
+  /** Import behaviour shared across every scraping source. */
+  import?: {
+    /**
+     * Which ScrapedListProduct fields a list card must carry before an
+     * ALREADY-KNOWN listing can be refreshed from it without opening its
+     * detail page.
+     *
+     * This is the cost control: every item that satisfies the set is a paid
+     * detail fetch not spent. It is global config rather than a constant
+     * because the trade-off is a judgement call that differs per shop and is
+     * worth being able to make without a deploy — e.g. ebikeshop's cards carry
+     * prices but no stock, so with `availability` in the set every one of its
+     * items falls through to a detail scrape and the saving is zero; dropping
+     * it buys 1334 fetches → 42 at the cost of availability going stale
+     * between full detail passes.
+     *
+     * Unknown listings always get a detail scrape regardless — specs, brand and
+     * model only exist there.
+     *
+     * Default: ['url', 'price', 'availability']
+     */
+    listRefreshRequiredFields?: string[];
+  };
+
   // Scheduling configuration
 
   scheduling?: {
@@ -305,6 +362,49 @@ export const dynamicConfigSchema = {
         cacheTtlDays: { type: 'number', minimum: 1, default: 365 },
         maxBatchSize: { type: 'number', minimum: 1, maximum: 500, default: 50 },
         dictionary: { type: 'object' },
+      },
+    },
+    offers: {
+      type: 'object',
+      description:
+        'Offer freshness. Offer.lastSynced is stamped by every import run and is the only delisting signal — an offer that stops being stamped goes invisible, then is deleted.',
+      properties: {
+        freshnessDays: {
+          type: 'number',
+          minimum: 1,
+          maximum: 365,
+          description:
+            'Offers synced within this many days are publicly visible. Default: 7',
+          default: 7,
+        },
+        deleteAfterDays: {
+          type: 'number',
+          minimum: 1,
+          maximum: 365,
+          description:
+            'Offers not synced for this many days are hard-deleted. Must be greater than freshnessDays — the gap is the grace period for a broken or paused source. Default: 14',
+          default: 14,
+        },
+        deletionEnabled: {
+          type: 'boolean',
+          description:
+            'Whether the stale-offer sweep actually deletes. Ships FALSE: the sweep assumes imports are running, so on an estate where nothing imports (no frequency set, a paused source, a fresh environment) it would destroy every offer on a schedule. While off it still runs and logs what it would delete. Default: false',
+          default: false,
+        },
+      },
+    },
+    import: {
+      type: 'object',
+      description:
+        'Import behaviour shared across every scraping source.',
+      properties: {
+        listRefreshRequiredFields: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'ScrapedListProduct fields a list card must carry before an already-known listing is refreshed from it instead of re-scraping its detail page. Every item that satisfies this set is a paid fetch not spent. Default: ["url","price","availability"]',
+          default: ['url', 'price', 'availability'],
+        },
       },
     },
     adminContactEmail: {

@@ -1,0 +1,174 @@
+import { Injectable } from '@nestjs/common';
+import { Tool } from '@rekog/mcp-nest';
+import { z } from 'zod';
+import { ProductSourceRepository } from '@fittkereso-backend/database';
+import {
+  ProductSourceImportSimulationResult,
+  ProductSourceImportSimulationService,
+} from '@fittkereso-backend/product-scraper';
+
+@Injectable()
+export class ProductSourceSimulateImportTools {
+  constructor(
+    private readonly simulation: ProductSourceImportSimulationService,
+    private readonly productSourceRepo: ProductSourceRepository,
+  ) {}
+
+  @Tool({
+    name: 'simulate_product_source_import',
+    description:
+      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ScrapeTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For an "arukereso" source: fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), and fully maps the first few items into ScrapedProducts. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID to simulate a run for'),
+      listUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          'Scraping sources only: which list page to parse. Defaults to the first page the run would enqueue — pass one explicitly to check a typical listing rather than the first.',
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe(
+          'How many items to preview in full. Default 5. For a feed this is the only part that spends LLM calls; the whole-feed counts are free either way.',
+        ),
+      categorySlugs: z
+        .array(z.string())
+        .optional()
+        .describe('Narrow the run to these category slugs, as a manual trigger would.'),
+    }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false },
+  })
+  async simulateProductSourceImport(args: {
+    productSourceId: string;
+    listUrl?: string;
+    limit?: number;
+    categorySlugs?: string[];
+  }): Promise<string> {
+    const source = await this.productSourceRepo.findOne({
+      where: { id: args.productSourceId },
+      relations: ['seller'],
+    });
+    if (!source) {
+      return `No ProductSource found with id ${args.productSourceId}.`;
+    }
+
+    try {
+      const result = await this.simulation.simulate(source, {
+        listUrl: args.listUrl,
+        limit: args.limit,
+        categorySlugs: args.categorySlugs,
+      });
+      return this.format(result);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Import simulation failed: ${message}`;
+    }
+  }
+
+  private format(result: ProductSourceImportSimulationResult): string {
+    const L: string[] = [];
+    L.push(`# Import Simulation: ${result.sourceName} (type "${result.type}")`);
+    L.push('_Nothing was queued, fetched into the database, or written._');
+    L.push('');
+
+    if (result.errors.length) {
+      L.push('## Errors (this run would not work as configured)');
+      for (const error of result.errors) L.push(`- ${error}`);
+      L.push('');
+    }
+    if (result.warnings.length) {
+      L.push('## Warnings');
+      for (const warning of result.warnings) L.push(`- ${warning}`);
+      L.push('');
+    }
+
+    if (result.arukereso) this.formatFeed(result.arukereso, L);
+    if (result.scraping) this.formatScraping(result.scraping, L);
+
+    return L.join('\n');
+  }
+
+  private formatFeed(
+    feed: NonNullable<ProductSourceImportSimulationResult['arukereso']>,
+    L: string[],
+  ): void {
+    L.push('## Feed');
+    L.push(`- **url**: ${feed.feedUrl}`);
+    L.push(`- **format**: ${feed.format}`);
+    L.push(`- **items parsed**: ${feed.itemsParsed}`);
+    L.push(
+      `- **attribute pairs dropped**: ${feed.attributesSkipped} (each was missing a name or a value)`,
+    );
+    L.push('');
+
+    L.push('## What would be imported');
+    L.push(`- **would import**: ${feed.wouldImport}`);
+    L.push(`- **would skip**: ${feed.wouldSkip}`);
+    for (const [reason, count] of Object.entries(feed.skipReasons).sort(
+      (a, b) => (b[1] as number) - (a[1] as number),
+    )) {
+      L.push(`  - ${reason}: ${count}`);
+    }
+    L.push('');
+
+    L.push('## Identity');
+    L.push(`- **distinct externalIds**: ${feed.distinctExternalIds}`);
+    L.push(
+      `- **items with no externalId**: ${feed.itemsWithoutExternalId} (would fall back to the URL slug)`,
+    );
+    L.push(`- **DUPLICATED externalIds**: ${feed.duplicateExternalIds.length}`);
+    for (const duplicate of feed.duplicateExternalIds) {
+      L.push(`  - \`${duplicate.externalId}\` x${duplicate.count}`);
+    }
+    L.push('');
+
+    L.push(`## Mapped previews (${feed.products.length})`);
+    L.push('```json');
+    L.push(JSON.stringify(feed.products, null, 2));
+    L.push('```');
+  }
+
+  private formatScraping(
+    scraping: NonNullable<ProductSourceImportSimulationResult['scraping']>,
+    L: string[],
+  ): void {
+    L.push('## The page walk');
+    L.push(`- **startUrls**: ${scraping.startUrls.length}`);
+    L.push(`- **category URLs resolved**: ${scraping.categoryUrls.length}`);
+    L.push(
+      `- **list pages that would be enqueued**: ${scraping.pageUrls.length}`,
+    );
+    for (const url of scraping.pageUrls.slice(0, 10)) L.push(`  - ${url}`);
+    if (scraping.pageUrls.length > 10) {
+      L.push(`  - …and ${scraping.pageUrls.length - 10} more`);
+    }
+    L.push('');
+
+    L.push(`## List page parsed: ${scraping.listPageParsed}`);
+    if (scraping.categoryName) {
+      L.push(`- **categoryName**: ${scraping.categoryName}`);
+    }
+    L.push(`- **minimum set**: ${scraping.requiredFields.join(', ')}`);
+    L.push(
+      `- **would refresh in place**: ${scraping.wouldRefreshInline} (no detail fetch spent)`,
+    );
+    L.push(`- **would cost a detail fetch**: ${scraping.wouldScrapeDetail}`);
+    L.push('');
+
+    L.push('## Per-card decisions');
+    for (const decision of scraping.decisions) {
+      L.push(
+        `- ${decision.wouldScrapeDetail ? 'DETAIL FETCH' : 'refresh'} — ${decision.url}`,
+      );
+      L.push(`  - ${decision.reason}`);
+      L.push(
+        `  - known=${decision.known} price=${decision.price ?? '_none_'} availability=${decision.availability ?? '_none_'} externalId=${decision.externalId ?? '_none_'}`,
+      );
+    }
+  }
+}

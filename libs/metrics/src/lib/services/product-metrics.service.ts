@@ -3,6 +3,7 @@ import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
   NEW_PRODUCT_CREATED,
+  OFFER_IDENTITY_CONFLICT_TOTAL,
   PRODUCT_ALIAS_CREATED_TOTAL,
   PRODUCT_BRAND_RESOLUTION_FAILED_TOTAL,
   PRODUCT_IMAGE_COPY_TOTAL,
@@ -37,6 +38,20 @@ export type ScrapeResolutionOutcome =
    *  measures how often scoring leaves the LLM undecided. */
   | 'llm_declined';
 
+/**
+ * How two things came to claim one offer identity.
+ *
+ * All three end the same way — one Offer row where there should be several, or
+ * a listing bound to the wrong product — and none of them throws.
+ */
+export type OfferIdentityConflictKind =
+  /** Two sources resolved DIFFERENT ProductModels for one (seller, externalId). */
+  | 'model_disagreement'
+  /** One page yielded several offers sharing a source-native externalId. */
+  | 'duplicate_external_id'
+  /** One page yielded several offers whose URL slug fallback collided. */
+  | 'duplicate_slug_fallback';
+
 @Injectable()
 export class ProductMetricsService {
   private readonly newProductCounter: client.Counter<string>;
@@ -49,6 +64,7 @@ export class ProductMetricsService {
   private readonly productSourceSpecValidationFailedCounter: client.Counter<string>;
   private readonly productImageCopyCounter: client.Counter<string>;
   private readonly scrapeResolutionOutcomeCounter: client.Counter<string>;
+  private readonly offerIdentityConflictCounter: client.Counter<string>;
 
   constructor(private readonly prometheusService: PrometheusService) {
     this.newProductCounter = new client.Counter({
@@ -111,6 +127,12 @@ export class ProductMetricsService {
       labelNames: ['source', 'result'],
       registers: [this.prometheusService.register],
     });
+    this.offerIdentityConflictCounter = new client.Counter({
+      name: OFFER_IDENTITY_CONFLICT_TOTAL,
+      help: 'Offers whose identity collided with another, by kind and source',
+      labelNames: ['source', 'kind'],
+      registers: [this.prometheusService.register],
+    });
   }
 
   newProductCreated(source: string): void {
@@ -158,5 +180,9 @@ export class ProductMetricsService {
     result: ScrapeResolutionOutcome,
   ): void {
     this.scrapeResolutionOutcomeCounter.inc({ source, result });
+  }
+
+  offerIdentityConflict(source: string, kind: OfferIdentityConflictKind): void {
+    this.offerIdentityConflictCounter.inc({ source, kind });
   }
 }

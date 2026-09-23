@@ -10,6 +10,7 @@ import { McpModule } from '@rekog/mcp-nest';
 import { ProductSourceTools } from './product-source.tools';
 import { ProductSourceConfigGeneratorTools } from './product-source-config-generator.tools';
 import { ProductSourceSimulateScrapeTools } from './product-source-simulate-scrape.tools';
+import { ProductSourceSimulateImportTools } from './product-source-simulate-import.tools';
 import { SellerTools } from './seller.tools';
 import { ScrapeRunTools } from './scrape-run.tools';
 
@@ -27,6 +28,7 @@ import { ScrapeRunTools } from './scrape-run.tools';
         ProductSourceTools,
         ProductSourceConfigGeneratorTools,
         ProductSourceSimulateScrapeTools,
+        ProductSourceSimulateImportTools,
         SellerTools,
         ScrapeRunTools,
       ],
@@ -37,6 +39,7 @@ import { ScrapeRunTools } from './scrape-run.tools';
     ProductSourceTools,
     ProductSourceConfigGeneratorTools,
     ProductSourceSimulateScrapeTools,
+    ProductSourceSimulateImportTools,
     SellerTools,
     ScrapeRunTools,
   ],

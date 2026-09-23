@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
@@ -10,6 +10,9 @@ import { Offer } from './offer.entity';
 @Entity()
 @Index(['model', 'source'])
 @Index(['source', 'productSpecsHash'])
+// One record per (source, url). Manual/admin rows carry source: null and no
+// url; Postgres treats NULLs as distinct, so they are unconstrained here.
+@Unique(['source', 'url'])
 export class ProductSourceRecord extends BasePostgresEntity {
   /** The product this listing currently sits on. Exposed to `adminList` because
    *  the resolution review queue's whole job is showing where a listing ended
@@ -26,8 +29,24 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Index()
   source?: ProductSource | null;
 
-  @Index({ unique: true })
-  @Column({ type: 'varchar', nullable: true, unique: true })
+  /**
+   * This listing's URL, normalized (see normalizeUrl).
+   *
+   * Unique PER SOURCE, not globally — one webshop may be covered by several
+   * ProductSources (a page scraper and an Árukereső feed, say), and both
+   * legitimately hold a record for the same product page, each with its own
+   * provenance in `scrapedProduct` and its own spec hashes. A global unique
+   * made the second source unable to store anything it had already seen.
+   *
+   * Consequence for callers: every URL lookup here must be source-scoped
+   * (findBySourceAndUrl). A bare url match can return another source's row, and
+   * writing through it silently overwrites that source's data.
+   *
+   * The plain index is deliberate and separate: the composite unique below
+   * leads with sourceId, so it cannot serve a url-only predicate.
+   */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   url?: string;
 

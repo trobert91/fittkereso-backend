@@ -46,6 +46,19 @@ export class ProductSourceUpdateService {
       throw new NotFoundException('Product source not found');
     }
 
+    // `type` is create-only. The two config formats share no keys, so
+    // reinterpreting a stored config under a different type reads the wrong
+    // ones — and the config validator dispatches on this value, so a flipped
+    // type would either fail validation or silently validate the wrong shape.
+    // Rejecting a no-op assignment too, so callers that echo the whole entity
+    // back don't learn to rely on it being ignored.
+    if (params.type !== undefined && params.type !== source.type) {
+      throw new BadRequestException(
+        `A product source's type cannot be changed (it is "${source.type}"). ` +
+          `Create a new source of type "${params.type}" for this seller instead.`,
+      );
+    }
+
     if (params.name !== undefined) {
       source.name = params.name.trim();
     }
@@ -87,17 +100,17 @@ export class ProductSourceUpdateService {
       source.requestsPerHour = params.requestsPerHour;
     }
 
-    if (params.fullSyncInterval !== undefined) {
-      source.fullSyncInterval = this.parseInterval(
-        params.fullSyncInterval,
-        'fullSyncInterval',
+    if (params.frequency !== undefined) {
+      source.frequency = this.parseInterval(
+        params.frequency,
+        'frequency',
       );
     }
 
-    if (params.nextFullSyncAt !== undefined) {
-      source.nextFullSyncAt = this.parseDate(
-        params.nextFullSyncAt,
-        'nextFullSyncAt',
+    if (params.nextRunAt !== undefined) {
+      source.nextRunAt = this.parseDate(
+        params.nextRunAt,
+        'nextRunAt',
       );
     }
 

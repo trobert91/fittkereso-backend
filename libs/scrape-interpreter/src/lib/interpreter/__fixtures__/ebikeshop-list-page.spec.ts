@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ProductSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from '../scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
@@ -19,25 +19,35 @@ const EBIKESHOP_LIST_PAGE_DATA = {
     lastPage: 20,
     currentPage: 1,
     products: [
+      // Not discounted: sale=false, so priceSale equals price and there is no
+      // pre-discount value to carry.
       {
         showPageUrl:
           'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
         productName:
           "KTM MACINA SCARP SX EXONICX T-TYPE 48cm &#39;26 narancs elektromos kerékpár",
+        productCode: 'KTM-EXONIC-48',
+        prices: { price: 2465991, priceSale: 2465991, sale: false, vat: 27 },
         isUsed: false,
         manufacturer: { title: 'KTM', slug: 'ktm' },
       },
+      // Discounted: sale=true, so the original price becomes
+      // priceWithoutDiscount and priceSale becomes the current price.
       {
         showPageUrl:
           'https://ebikeshop.hu/termek/rm-nevo5-gt-vario-hs-us50-cm-26-kek-elektromos-kerekpar-800wh-kiox500-zar-taskaval',
         productName:
           "RM Nevo5 GT vario HS US50 cm &#39;26 kék elektromos kerékpár (800Wh, Kiox500, Zár táskával)",
+        productCode: 'RM-NEVO5-US50',
+        prices: { price: 1899000, priceSale: 1699000, sale: true, vat: 27 },
         isUsed: false,
         manufacturer: null,
       },
       {
         showPageUrl: 'https://ebikeshop.hu/termek/used-bike-example',
         productName: 'Used Test Bike elektromos kerékpár',
+        productCode: 'USED-1',
+        prices: { price: 500000, priceSale: 500000, sale: false, vat: 27 },
         isUsed: true,
         manufacturer: { title: 'TestBrand', slug: 'testbrand' },
       },
@@ -75,31 +85,55 @@ describe('ebikeshop list page — declarative config golden fixture', () => {
     interpreter = new ScrapeInterpreterService(runner, runtime as never);
   });
 
-  it('extracts category name, pagination links, and product links with used bikes filtered out', async () => {
+  it('extracts category name and product cards with used bikes filtered out', async () => {
     const $ = cheerio.load(buildHtml());
-    const config = ebikeshopConfig as unknown as ProductSourceConfig;
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
     const result = await interpreter.runListPage(makeTask(), $, config);
 
     expect(result.categoryName).toBe('Elektromos kerékpárok');
 
-    expect(result.productLinks).toEqual([
+    // Cards now carry price and identity, not just a link — which is what lets
+    // an already-known listing be refreshed without opening its detail page.
+    expect(result.products).toEqual([
       {
         url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
-        title: "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár",
+        name: "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár",
+        // Same field detailPage.offers reads for externalId, so a list refresh
+        // updates the very offer a detail scrape created.
+        externalId: 'KTM-EXONIC-48',
+        price: 2465991,
+        // Not on sale, so no pre-discount price.
+        priceWithoutDiscount: undefined,
+        currency: 'HUF',
+        // props.products carries no stock at all — the detail page derives
+        // availability from an "Üzletek" store list that only exists there.
+        // Absent rather than `unknown`, so a refresh cannot degrade it.
+        availability: undefined,
       },
       {
         url: 'https://ebikeshop.hu/termek/rm-nevo5-gt-vario-hs-us50-cm-26-kek-elektromos-kerekpar-800wh-kiox500-zar-taskaval',
-        title: "RM Nevo5 GT vario HS US50 cm '26 kék elektromos kerékpár (800Wh, Kiox500, Zár táskával)",
+        name: "RM Nevo5 GT vario HS US50 cm '26 kék elektromos kerékpár (800Wh, Kiox500, Zár táskával)",
+        externalId: 'RM-NEVO5-US50',
+        price: 1699000,
+        priceWithoutDiscount: 1899000,
+        currency: 'HUF',
+        availability: undefined,
       },
     ]);
+  });
 
-    // The config emits no pagination: `generatePaginationLinks` has no
-    // "only on page 1" guard and createCategoryTasks doesn't dedupe, so
-    // self-pagination re-emitted pages 2..20 from every page it landed on —
-    // page 1 spawning 19 list tasks, each spawning 19 more. Page ranges are
-    // enumerated by apps/product-collector/scripts/enqueue-ktm-catalog.ts
-    // instead, which also makes a run's page count exact.
-    expect(result.categoryLinks).toEqual([]);
+  // Parsing a list page can no longer enqueue anything. Category expansion and
+  // pagination are resolved once per run by ScrapingImportService, which is what
+  // makes a self-paginating listing structurally unable to re-emit its own page
+  // range — previously page 1 spawned 19 list tasks and each of those spawned 19
+  // more, so both live configs had to leave categoryLinks empty as a workaround.
+  it('returns only products — a list page cannot emit further list pages', async () => {
+    const $ = cheerio.load(buildHtml());
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
+
+    const result = await interpreter.runListPage(makeTask(), $, config);
+
+    expect(Object.keys(result).sort()).toEqual(['categoryName', 'products']);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -12,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser, MinRole } from '@fittkereso-backend/auth';
 import {
+  isProductSourceType,
+  PRODUCT_SOURCE_TYPES,
   ProductSource,
   ProductSourceConfigValidatorService,
   ProductSourceRepository,
@@ -87,8 +90,25 @@ export class AdminProductSourceController {
   @Get('config-schema')
   @MinRole(UserRole.user)
   @SerializeOptions({ strategy: 'exposeAll' })
-  getConfigSchema(): Record<string, unknown> {
-    return this.configValidator.schema;
+  getConfigSchema(
+    @Query('type') type?: string,
+  ): Record<string, unknown> {
+    // A source's config shape is decided by its type, so the editor must ask
+    // for the right one. Without a type, every schema is returned keyed by
+    // type — the editor can then pick, and nothing has to guess a default that
+    // would silently validate the wrong shape.
+    if (!type) {
+      return this.configValidator.allSchemas as unknown as Record<string, unknown>;
+    }
+
+    if (!isProductSourceType(type)) {
+      throw new BadRequestException(
+        `Unknown product source type "${type}" — expected one of ` +
+          `${PRODUCT_SOURCE_TYPES.join(', ')}.`,
+      );
+    }
+
+    return this.configValidator.schemaFor(type) as Record<string, unknown>;
   }
 
   @Get(':id')

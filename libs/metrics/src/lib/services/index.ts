@@ -10,3 +10,4 @@ export * from './product-collection-metrics.service';
 export * from './zyte-metrics.service';
 export * from './translation-metrics.service';
 export * from './product-scraping-metrics.service';
+export * from './native-scraper-metrics.service';

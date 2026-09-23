@@ -21,6 +21,17 @@ export class ScrapeTaskCreateDto {
   @IsString()
   url: string;
 
+  /**
+   * Which source this task belongs to.
+   *
+   * Optional, but the only reliable answer once a webshop has several sources:
+   * without it the source is resolved from the URL's domain, which is refused
+   * rather than guessed when more than one scraping source shares it.
+   */
+  @IsOptional()
+  @IsUUID()
+  productSourceId?: string;
+
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;

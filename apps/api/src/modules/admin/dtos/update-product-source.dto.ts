@@ -53,12 +53,12 @@ export class UpdateProductSourceDto {
 
   @IsOptional()
   @IsString()
-  fullSyncInterval?: string | null;
+  frequency?: string | null;
 
   // Scheduler inputs, not audit fields: ProductSourceSyncScheduler treats a
   // null/past value as "due now", so clearing it forces the next cron tick to
   // queue a sync. The last*/lastRunAt timestamps stay read-only.
   @IsOptional()
   @IsDateString()
-  nextFullSyncAt?: string | null;
+  nextRunAt?: string | null;
 }

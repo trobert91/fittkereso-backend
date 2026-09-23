@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
-import { isEmpty } from 'lodash';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
@@ -25,9 +24,25 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     );
   }
 
-  async findByUrl(url: string): Promise<ProductSourceRecord | null> {
+  /**
+   * Find this source's record for a URL.
+   *
+   * Source-scoped deliberately, and there is no unscoped variant: several
+   * ProductSources can cover one webshop (a page scraper plus an Árukereső
+   * feed), so `url` alone identifies a product page, not a record. A bare url
+   * match would hand one source another source's row — and writing through it
+   * overwrites that source's specs, hashes and externalId while the row stays
+   * attributed to its original owner.
+   *
+   * `url` is expected normalized (see normalizeUrl); the column is written
+   * that way by ProductSourceRecordUpdaterService.
+   */
+  async findBySourceAndUrl(
+    sourceId: string,
+    url: string,
+  ): Promise<ProductSourceRecord | null> {
     return this.repo.findOne({
-      where: { url },
+      where: { source: { id: sourceId }, url },
       relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
     });
   }
@@ -102,19 +117,5 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       },
       order: { lastUpdated: 'DESC' },
     });
-  }
-
-  async findExistingUrls(urls: string[]): Promise<Set<string>> {
-    if (isEmpty(urls)) return new Set();
-
-    const results = await this.repo
-      .createQueryBuilder('source')
-      .select(`source.${nameOf<ProductSourceRecord>('url')}`)
-      .where(`source.${nameOf<ProductSourceRecord>('url')} IN (:...urls)`, {
-        urls,
-      })
-      .getMany();
-
-    return new Set(results.map((source) => source.url!));
   }
 }
