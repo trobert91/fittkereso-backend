@@ -10,31 +10,38 @@ import { isEmpty, omit, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
 
 /**
- * TEMPORARY EXPERIMENT (2026-08-29): swapped from 'deepseek-v4-flash' to
- * OpenAI's gpt-5.6-luna, to compare cost/accuracy against the DeepSeek
- * baseline established earlier this session on the same two sources
- * (ebikeshop, speedbike). Revert to 'deepseek-v4-flash' once compared.
+ * gpt-6-luna since 2026-09-23, replacing gpt-5.6-luna (itself swapped in from
+ * 'deepseek-v4-flash' on 2026-08-29). Chosen from a side-by-side replay of 24
+ * logged production prompts at high effort: ~74% cheaper per listing
+ * ($0.0014 vs $0.0053 for offer-identity + model-spec), mostly from using
+ * about half the reasoning tokens on model-spec at 42% of the output price.
+ * On its own it omitted component-implied inferences the model-spec call
+ * exists for (see buildModelSpecSystemPrompt's "categorical or yes/no" rule,
+ * added for exactly this); with that rule its recall on those fields matched
+ * gpt-5.6-luna's.
  */
-const DEFAULT_MODEL = 'gpt-5.6-luna';
+const DEFAULT_MODEL = 'gpt-6-luna';
 
 /**
  * Reasoning is left ON by default because the pass genuinely depends on it:
  * most sources publish a free-text OEM component list, and canonical fields
  * (motorPosition from a Bosch `BDU*` code, seatpostType from "FOX Transfer",
  * tubeless from a `TLE`/`TLR` token, equipment booleans from blank rows) exist
- * only as inferences over that text. Not sent explicitly — DeepSeek's
- * reasoning models already default to thinking enabled
- * (api-docs.deepseek.com/guides/thinking_mode), so omitting the field relies
- * on that default rather than re-asserting it. Confirmed necessary by a
- * direct `thinking: false` experiment (2026-08-29): cost dropped ~85%, but
+ * only as inferences over that text. `thinking` is not sent explicitly: the
+ * default OpenAI reasoning models always reason (only `effort` tunes how
+ * much), and DeepSeek's reasoning models default to thinking enabled
+ * (api-docs.deepseek.com/guides/thinking_mode). Confirmed necessary by a
+ * direct DeepSeek `thinking: false` experiment (2026-08-29): cost dropped ~85%, but
  * the model-spec call fabricated data — e.g. copying the motor model string
  * verbatim into unrelated forkModel/rearShockModel/seatpost fields with a
  * fabricated `forkTravel: 0`/`rearTravel: 0`, and silently dropping a
  * weight correction (25 -> 25.9) that every reasoning-on run got right.
  * Sources with an already-normalized spec table (no free-text inference
- * needed) should set `thinking: false` per-source instead, which also
- * suppresses `effort` (see runContributionCall) since DeepSeek has no
- * "disabled reasoning at a specific effort" state.
+ * needed) should lower `effort` per-source instead. On a DeepSeek model,
+ * `thinking: false` also works and suppresses `effort` (see
+ * runContributionCall) since DeepSeek has no "disabled reasoning at a
+ * specific effort" state; OpenAI ignores `thinking`, so there it only drops
+ * effort back to the model's default.
  *
  * Both calls default to high effort. model-spec reconciles the full
  * non-offer-level field set (~50-90 fields) against deterministicSpecs/
@@ -48,7 +55,10 @@ const DEFAULT_MODEL = 'gpt-5.6-luna';
  * kept in `model` instead of extracted to `color` (2026-08-29, product
  * a0517278-d003-42e3-9826-1c0b35daa019). Bumped to high alongside a prompt
  * fix for that specific case; revisit if high doesn't clear misses like it
- * either.
+ * either. Re-checked on gpt-6-luna (2026-09-23): medium dropped even more
+ * inference fields than high, and xhigh doubled model-spec cost while
+ * recovering only part of them — so high stays, with the prompt carrying
+ * the rest.
  */
 const DEFAULT_OFFER_IDENTITY_EFFORT = 'high';
 const DEFAULT_MODEL_SPECS_EFFORT = 'high';
@@ -468,6 +478,11 @@ export class ProductSourcePostProcessService {
       `Rules:\n` +
       `- The user message has a "deterministicSpecs" object (already mapped to canonical field names by a label-matching pass), a "rawModel" string, and, when available, a "rawSpecs" array — the source's full, unmapped spec table (label/value rows exactly as scraped, sometimes grouped under a "section", sometimes carrying their own per-row free-text "description" instead of a single value).\n` +
       `- deterministicSpecs is already merged in automatically after your response — you never need to repeat a value that's already correct there. Only include a key in your "specs" output when your value is NEW (the field is missing or empty in deterministicSpecs) or a CORRECTION (rawSpecs/rawModel clearly gives a more precise/different value than what deterministicSpecs has). If deterministicSpecs already has the right value for a field, omit that key entirely — do not echo it back.\n` +
+      // gpt-6-luna omits these inferences without this nudge (~half of them
+      // on the 2026-09-23 replay). The "never numbers" sentence is what
+      // stopped it from filling motorPower/torque from its own knowledge of
+      // a named drive unit.
+      `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it: e.g. a Bosch Performance Line / BDU drive unit is a mid-drive motor (motorPosition), a Shimano shifter/derailleur without Di2 is mechanical shiftingActuation while Di2/AXS is electronic, a stated 25 km/h assist limit means pedelecClass "Pedelec", a named display or remote (Purion, Kiox, LED Remote, Mini Remote) means display true, and "Smart System" components mean smartConnectivity true. An equipment row that is present in rawSpecs but has no value (e.g. "Első sárvédő" with empty values) means that item is not included. This never extends to numbers: never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
       `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
       `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated (e.g. "a váz felső csövéből egyszerűen eltávolítható akkumulátor" clearly states batteryRemovable=true) — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
       `- For a spec field with "allowed values" listed above: if the source gives a value for that field, you MUST translate/normalize it to one of those exact Hungarian strings (never invent a new label, never leave it untranslated) — but only when the source value genuinely describes that field's own concept. A source value describing a *different* concept (e.g. a riding-discipline/category term like "All Mountain" when the field asks for frame geometry, or a gendered variant like "Cross férfi" when a category-only enum value like "Cross Trekking" fits better) must be routed to whichever field it actually matches, or dropped if no field fits — never force it into an enum value it doesn't really mean just because the field has no other value to offer. If nothing in the input specifically describes what the field is asking about, omit the key.\n` +

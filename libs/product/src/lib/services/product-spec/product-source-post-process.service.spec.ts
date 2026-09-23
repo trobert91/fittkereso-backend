@@ -270,7 +270,7 @@ describe('ProductSourcePostProcessService', () => {
       expect(userMessage.offerLevelSpecs).toBeUndefined();
     });
 
-    it('defaults to gpt-5.6-luna when no model override is given', async () => {
+    it('defaults to gpt-6-luna when no model override is given', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
@@ -281,7 +281,26 @@ describe('ProductSourcePostProcessService', () => {
       });
 
       expect(aiChat.createChat).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gpt-5.6-luna' }),
+        expect.objectContaining({ model: 'gpt-6-luna' }),
+      );
+    });
+
+    it('tells the LLM that component-implied categorical values count as evidence, but never numbers from its own knowledge', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processModelSpecs({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        offerLevelSpecs: [],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain(
+        'A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present',
+      );
+      expect(systemPrompt).toContain(
+        'never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component',
       );
     });
 

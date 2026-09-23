@@ -27,7 +27,7 @@ type OpenAiChatBody = Omit<
 };
 
 function isReasoningModel(model: string): boolean {
-  return /^o[1-9]/.test(model) || /^gpt-5/.test(model);
+  return /^o[1-9]/.test(model) || /^gpt-[5-9]/.test(model);
 }
 
 @Injectable()

@@ -10,7 +10,7 @@ export class AiChatTools {
   @Tool({
     name: 'test_ai_chat',
     description:
-      "Run a one-shot AI chat against the production AiChatService for prompt testing. Returns the model's response plus cost, token usage, execution time, and the chatId for follow-up log inspection. Use this when drafting or tuning a prompt to see how a specific model will behave before wiring it into the pipeline. Note: gpt-5* models do not support temperature — the tool forces temperature=1 for those models regardless of what is passed in, matching pipeline behavior.",
+      "Run a one-shot AI chat against the production AiChatService for prompt testing. Returns the model's response plus cost, token usage, execution time, and the chatId for follow-up log inspection. Use this when drafting or tuning a prompt to see how a specific model will behave before wiring it into the pipeline. Note: gpt-5+ models do not support temperature — the tool forces temperature=1 for those models regardless of what is passed in, matching pipeline behavior.",
     parameters: z.object({
       messages: z
         .array(
@@ -34,7 +34,7 @@ export class AiChatTools {
         .max(2)
         .optional()
         .describe(
-          'Sampling temperature. Ignored for gpt-5* models — the tool forces 1.',
+          'Sampling temperature. Ignored for gpt-5+ models — the tool forces 1.',
         ),
       maxTokens: z
         .number()
@@ -42,6 +42,12 @@ export class AiChatTools {
         .positive()
         .optional()
         .describe('Maximum output tokens.'),
+      effort: z
+        .string()
+        .optional()
+        .describe(
+          'Reasoning effort (e.g. "low", "medium", "high"), forwarded to the provider as-is — matches the pipeline\'s per-call effort. Ignored with a warning on non-reasoning models.',
+        ),
       schema: z
         .record(z.string(), z.any())
         .optional()
@@ -68,11 +74,12 @@ export class AiChatTools {
     model: string;
     temperature?: number;
     maxTokens?: number;
+    effort?: string;
     schema?: Record<string, unknown>;
     schemaName?: string;
     costLabel?: string;
   }): Promise<string> {
-    const isGpt5 = args.model.startsWith('gpt-5');
+    const isGpt5 = /^gpt-[5-9]/.test(args.model);
     const temperature = isGpt5 ? 1 : args.temperature;
 
     const request: AiChatRequest = {
@@ -80,6 +87,7 @@ export class AiChatTools {
       messages: args.messages,
       ...(temperature !== undefined && { temperature }),
       ...(args.maxTokens !== undefined && { maxTokens: args.maxTokens }),
+      ...(args.effort !== undefined && { effort: args.effort }),
       ...(args.schema !== undefined && { schema: args.schema }),
       ...(args.schemaName !== undefined && { schemaName: args.schemaName }),
       costLabel: args.costLabel ?? 'mcp-test',
@@ -118,7 +126,7 @@ export class AiChatTools {
     );
     if (gpt5TemperatureOverridden && userSuppliedTemperature !== undefined) {
       L.push(
-        `- **note**: temperature=${userSuppliedTemperature} was overridden to 1 (gpt-5* models do not accept custom temperatures).`,
+        `- **note**: temperature=${userSuppliedTemperature} was overridden to 1 (gpt-5+ models do not accept custom temperatures).`,
       );
     }
     L.push('');
