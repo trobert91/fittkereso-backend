@@ -15,6 +15,7 @@ export const validateConfigOrThrowError = (yamlConfig: Record<string, any>) => {
       run_migrations: Joi.boolean().required(),
       ssl: Joi.boolean().required(),
       logging: Joi.boolean().required(),
+      pool_size: Joi.number().integer().min(1).optional(),
     }).required(),
 
     logging: Joi.object({

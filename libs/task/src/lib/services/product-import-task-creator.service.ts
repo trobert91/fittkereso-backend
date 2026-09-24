@@ -1,37 +1,45 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  MANUAL_IMPORT_TASK_PRIORITY,
   ProductModel,
   ProductSource,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTask,
+  ProductImportTaskRepository,
   ProductSourceRepository,
   ProductModelRepository,
+  ProductImportTaskKind,
 } from '@fittkereso-backend/database';
 import { domainFromUrl, nameOf } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { ScrapeTaskCreateDto } from '../models/scrape-task-create.dto';
-import { ScrapeTaskPublisherService } from './scrape-task-publisher.service';
+import { ProductImportTaskCreateDto } from '../models/product-import-task-create.dto';
+import { ProductImportTaskPublisherService } from './product-import-task-publisher.service';
 import { isNil } from 'lodash';
 
 @Injectable()
-export class ScrapeTaskCreatorService {
-  private readonly logger = new CustomLogger(ScrapeTaskCreatorService.name);
+export class ProductImportTaskCreatorService {
+  private readonly logger = new CustomLogger(ProductImportTaskCreatorService.name);
 
   constructor(
-    private readonly scrapeTaskRepository: ScrapeTaskRepository,
+    private readonly importTaskRepository: ProductImportTaskRepository,
     private readonly productSourceRepository: ProductSourceRepository,
     private readonly productModelRepository: ProductModelRepository,
-    private readonly scrapeTaskPublisherService: ScrapeTaskPublisherService,
+    private readonly importTaskPublisherService: ProductImportTaskPublisherService,
   ) {}
 
-  public async create(dto: ScrapeTaskCreateDto): Promise<ScrapeTask> {
+  public async create(dto: ProductImportTaskCreateDto): Promise<ProductImportTask> {
+    // A feed row's task carries the row itself, which only a feed run has.
+    if (dto.kind === ProductImportTaskKind.FeedEntry) {
+      throw new BadRequestException(
+        'Feed entry tasks are queued by their feed run. To import one feed listing again, resync it from its product.',
+      );
+    }
     const source = await this.resolveSource(dto);
 
     let product: ProductModel | undefined;
     if (dto.productId) {
       const found = await this.productModelRepository.findById(dto.productId);
       if (isNil(found)) {
-        this.logger.warn('Cannot create scrape task — product not found', {
+        this.logger.warn('Cannot create import task — product not found', {
           productId: dto.productId,
           sourceId: source.id,
         });
@@ -40,10 +48,12 @@ export class ScrapeTaskCreatorService {
       product = found;
     }
 
-    const task = new ScrapeTask();
-    task.queue = dto.queue;
+    const task = new ProductImportTask();
+    task.kind = dto.kind;
     task.source = source;
     task.url = dto.url;
+    // Created by a person (admin or MCP), so ahead of any run's own tasks.
+    task.priority = dto.priority ?? MANUAL_IMPORT_TASK_PRIORITY;
 
     if (product) {
       task.product = product;
@@ -53,15 +63,15 @@ export class ScrapeTaskCreatorService {
       task.scheduledAt = new Date(dto.scheduledAt);
     }
 
-    await this.scrapeTaskPublisherService.addTask(task);
+    await this.importTaskPublisherService.addTask(task);
 
-    // processingEnabled=false on the source silently blocks the poller's
-    // claim query (ScrapeTaskRepository.fetchNextScrapeTask) — surfacing it
-    // here means a caller doesn't have to wait for the poller to eventually
-    // log the same thing on an idle tick.
-    this.logger.log('Scrape task created', {
+    // processingEnabled=false on the source silently keeps the scheduler's
+    // claim (ProductImportTaskRepository.claimBatch) off this task — surfacing
+    // it here means a caller doesn't have to wonder why it never starts.
+    this.logger.log('Import task created', {
       taskId: task.id,
-      queue: task.queue,
+      kind: task.kind,
+      priority: task.priority,
       url: task.url,
       sourceId: source.id,
       sourceName: source.name,
@@ -72,12 +82,12 @@ export class ScrapeTaskCreatorService {
       willBePickedUpImmediately: source.processingEnabled && !task.scheduledAt,
     });
 
-    return this.scrapeTaskRepository.findOneOrFail({
+    return this.importTaskRepository.findOneOrFail({
       where: { id: task.id },
       relations: [
-        nameOf<ScrapeTask>('source'),
-        nameOf<ScrapeTask>('product'),
-        `${nameOf<ScrapeTask>('product')}.${nameOf<ProductModel>('brand')}`,
+        nameOf<ProductImportTask>('source'),
+        nameOf<ProductImportTask>('product'),
+        `${nameOf<ProductImportTask>('product')}.${nameOf<ProductModel>('brand')}`,
       ],
     });
   }
@@ -91,9 +101,9 @@ export class ScrapeTaskCreatorService {
    * which is a silent wrong answer rather than an error.
    *
    * Without one, the domain still resolves — but only when it is unambiguous
-   * among the sources a scrape task can actually belong to.
+   * among the sources an import task can actually belong to.
    */
-  private async resolveSource(dto: ScrapeTaskCreateDto): Promise<ProductSource> {
+  private async resolveSource(dto: ProductImportTaskCreateDto): Promise<ProductSource> {
     if (dto.productSourceId) {
       const source = await this.productSourceRepository.findOne({
         where: { id: dto.productSourceId },
@@ -110,15 +120,15 @@ export class ScrapeTaskCreatorService {
     const domain = domainFromUrl(dto.url);
     const all = await this.productSourceRepository.findAllByDomain(domain);
 
-    // A ScrapeTask fetches and parses a page, which only a scraping source
+    // A ProductImportTask fetches and parses a page, which only a scraping source
     // knows how to do — a feed source has no page pipelines at all, and a task
     // pointed at one fails later, in a worker, with a config-narrowing error.
     const candidates = all.filter((source) => source.type === 'scraping');
 
     if (candidates.length === 0) {
       this.logger.warn(
-        'Cannot create scrape task — no scraping product source matches URL domain',
-        { domain, queue: dto.queue, url: dto.url, sourcesOnDomain: all.length },
+        'Cannot create import task — no scraping product source matches URL domain',
+        { domain, kind: dto.kind, url: dto.url, sourcesOnDomain: all.length },
       );
       throw new NotFoundException(
         all.length === 0
@@ -142,7 +152,7 @@ export class ScrapeTaskCreatorService {
     if (source.type !== 'scraping') {
       throw new BadRequestException(
         `Product source "${source.name}" is of type "${source.type}", which imports a feed rather than ` +
-          `scraping pages — it has no page pipelines, so a scrape task for it could never run. ` +
+          `scraping pages — it has no page pipelines, so an import task for it could never run. ` +
           `Use simulate_product_source_import or a full sync to exercise it instead.`,
       );
     }

@@ -10,7 +10,7 @@
  * Column names are read from the live table rather than from the entity, so a
  * generated INSERT cannot drift from the schema it has to restore into.
  *
- * What it does NOT restore: the ProductSourceRecords, Offers and ScrapeTasks
+ * What it does NOT restore: the ProductSourceRecords, Offers and ProductImportTasks
  * that hang off the source. Those are re-derivable by running the source again,
  * which is the whole point of having the config back, and dumping them would
  * turn a reviewable file into a database export. The counts it prints say

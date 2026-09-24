@@ -1,2 +1,2 @@
 export * from './messages';
-export * from './scrape-task-create.dto';
+export * from './product-import-task-create.dto';

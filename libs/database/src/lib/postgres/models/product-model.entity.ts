@@ -15,7 +15,7 @@ import { Brand } from './brand.entity';
 import { OrderedSpec, ProductSpecs } from '../../models/product-spec';
 import { ProductSourceRecord } from './product-source-record.entity';
 import { ProductImage } from './product-image.entity';
-import { ScrapeTask } from './scrape-task.entity';
+import { ProductImportTask } from './product-import-task.entity';
 import { Offer } from './offer.entity';
 import { PriceHistory } from './price-history.entity';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
@@ -113,9 +113,9 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.details] })
   images: ProductImage[];
 
-  @OneToMany(() => ScrapeTask, (task) => task.product)
+  @OneToMany(() => ProductImportTask, (task) => task.product)
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  scrapeTasks?: ScrapeTask[];
+  importTasks?: ProductImportTask[];
 
   @Index({ unique: true })
   @Column({ type: 'varchar', nullable: true })

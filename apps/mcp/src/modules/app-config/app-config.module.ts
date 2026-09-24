@@ -11,6 +11,7 @@ import {
   ZyteConfigService,
   DataForSeoConfigService,
   BunnyConfigService,
+  TaskConfigService,
 } from '@fittkereso-backend/config';
 
 @Global()
@@ -28,6 +29,7 @@ import {
     ZyteConfigService,
     DataForSeoConfigService,
     BunnyConfigService,
+    TaskConfigService,
   ],
   exports: [
     AppConfigService,
@@ -41,6 +43,7 @@ import {
     ZyteConfigService,
     DataForSeoConfigService,
     BunnyConfigService,
+    TaskConfigService,
   ],
 })
 export class AppConfigModule {}

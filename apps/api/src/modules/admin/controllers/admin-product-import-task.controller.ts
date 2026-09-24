@@ -5,24 +5,24 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import { MinRole } from '@fittkereso-backend/auth';
-import { ScrapeTask, UserRole } from '@fittkereso-backend/database';
+import { ProductImportTask, UserRole } from '@fittkereso-backend/database';
 import {
-  ScrapeTaskSearchParams,
-  ScrapeTaskSearchResult,
-  ScrapeTaskSearchService,
+  ProductImportTaskSearchParams,
+  ProductImportTaskSearchResult,
+  ProductImportTaskSearchService,
 } from '@fittkereso-backend/search';
 import {
-  ScrapeTaskCreateDto,
-  ScrapeTaskCreatorService,
+  ProductImportTaskCreateDto,
+  ProductImportTaskCreatorService,
 } from '@fittkereso-backend/task';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 
-@Controller('admin-scrape-task')
+@Controller('admin-product-import-task')
 @MinRole(UserRole.admin)
-export class AdminScrapeTaskController {
+export class AdminProductImportTaskController {
   constructor(
-    private readonly searchService: ScrapeTaskSearchService,
-    private readonly scrapeTaskCreatorService: ScrapeTaskCreatorService,
+    private readonly searchService: ProductImportTaskSearchService,
+    private readonly importTaskCreatorService: ProductImportTaskCreatorService,
   ) {}
 
   @Post('search')
@@ -35,9 +35,9 @@ export class AdminScrapeTaskController {
       SerializeGroup.adminDetails,
     ],
   })
-  async searchScrapeTasks(
-    @Body() searchParams: ScrapeTaskSearchParams,
-  ): Promise<ScrapeTaskSearchResult> {
+  async searchImportTasks(
+    @Body() searchParams: ProductImportTaskSearchParams,
+  ): Promise<ProductImportTaskSearchResult> {
     return this.searchService.search(searchParams);
   }
 
@@ -50,9 +50,9 @@ export class AdminScrapeTaskController {
       SerializeGroup.adminDetails,
     ],
   })
-  async createScrapeTask(
-    @Body() createDto: ScrapeTaskCreateDto,
-  ): Promise<ScrapeTask> {
-    return this.scrapeTaskCreatorService.create(createDto);
+  async createImportTask(
+    @Body() createDto: ProductImportTaskCreateDto,
+  ): Promise<ProductImportTask> {
+    return this.importTaskCreatorService.create(createDto);
   }
 }

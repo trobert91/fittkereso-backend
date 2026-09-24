@@ -6,7 +6,7 @@ import {
   ScrapingSourceConfig,
   ProductSpecs,
   ScrapeOperation,
-  ScrapeTask,
+  ProductImportTask,
 } from '@fittkereso-backend/database';
 import { ScrapedProductSpec, WebLink } from '@fittkereso-backend/product';
 import { ScrapedListProduct } from '@fittkereso-backend/database';
@@ -57,7 +57,7 @@ export class ScrapeInterpreterService {
   ) {}
 
   private makeContext(
-    task: ScrapeTask,
+    task: ProductImportTask,
     $: CheerioAPI,
     config: ScrapingSourceConfig,
     opts: Record<string, unknown> = {},
@@ -81,7 +81,7 @@ export class ScrapeInterpreterService {
    */
   public async runPipeline(
     pipeline: ScrapeOperation[],
-    task: ScrapeTask,
+    task: ProductImportTask,
     $: CheerioAPI,
     config: ScrapingSourceConfig,
   ): Promise<unknown> {
@@ -109,9 +109,9 @@ export class ScrapeInterpreterService {
       $: cheerio.load(''),
       html: '',
       // No task exists on a feed run — nothing in a value pipeline reads it,
-      // and inventing a throwaway ScrapeTask row to satisfy a type would put
+      // and inventing a throwaway ProductImportTask row to satisfy a type would put
       // fake work in a table the workers poll.
-      task: undefined as unknown as ScrapeTask,
+      task: undefined as unknown as ProductImportTask,
       vars: { baseUrl: opts.baseUrl, ...(opts.vars ?? {}) },
       runtime: this.runtime,
       opts: {},
@@ -149,7 +149,7 @@ export class ScrapeInterpreterService {
    * page range — structurally impossible rather than merely guarded against.
    */
   public async runListPage(
-    task: ScrapeTask,
+    task: ProductImportTask,
     $: CheerioAPI,
     config: ScrapingSourceConfig,
   ): Promise<ListPageResult> {
@@ -178,7 +178,7 @@ export class ScrapeInterpreterService {
   }
 
   public async runDetailPage(
-    task: ScrapeTask,
+    task: ProductImportTask,
     $: CheerioAPI,
     config: ScrapingSourceConfig,
   ): Promise<DetailPageResult> {

@@ -189,7 +189,7 @@ export interface ProductSourceDetailPageConfig {
    * ProductDetailsPageScraperService fetches each of these synchronously
    * within the same scrape and folds their offers into one combined
    * ScrapedProduct before a single createOrUpdateProduct call — no separate
-   * ScrapeTask is queued. Each fetched sibling still gets its own
+   * ProductImportTask is queued. Each fetched sibling still gets its own
    * ProductSourceRecord (one per URL) under the same resolved ProductModel.
    * Absent/empty for the overwhelming majority of sources.
    */
@@ -225,7 +225,7 @@ export interface ScrapingSourceConfig {
    *
    * **On a scraping source this caps items PER LIST PAGE**, not per run, and
    * that is a real limitation rather than a choice: each list page is its own
-   * independently scheduled ScrapeTask, so there is no run-scoped counter for
+   * independently scheduled ProductImportTask, so there is no run-scoped counter for
    * them to share. To keep the cap meaningful for its actual purpose — a small
    * test set — setting it also makes the importer enumerate only the FIRST page
    * of each listing, since walking 42 pages to take 10 items is not what

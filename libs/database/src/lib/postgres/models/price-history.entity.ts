@@ -14,9 +14,13 @@ import { OfferCondition } from '../types/offer-condition';
 ])
 export class PriceHistory extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
+  // `disable`: saving a ProductModel with a loaded, stale priceHistory array must
+  // never detach a row another writer attached meanwhile. TypeORM's default
+  // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.priceHistory, {
     nullable: false,
     onDelete: 'CASCADE',
+    orphanedRowAction: 'disable',
   })
   @Index()
   model: ProductModel;

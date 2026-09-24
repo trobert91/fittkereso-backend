@@ -459,7 +459,7 @@
         "y": 18
       },
       "id": 102,
-      "title": "Scrape Tasks",
+      "title": "Import Tasks",
       "type": "row"
     },
     {
@@ -551,20 +551,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "increase(scrape_task_started_total{app=~\"$app\"}[$__interval])",
+          "expr": "increase(product_import_task_started_total{app=~\"$app\"}[$__interval])",
           "legendFormat": "{{source_type}} (started)",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "increase(scrape_task_finished_total{app=~\"$app\"}[$__interval])",
+          "expr": "increase(product_import_task_finished_total{app=~\"$app\"}[$__interval])",
           "legendFormat": "{{source_type}} (finished)",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Scrape Task Throughput",
+      "title": "Import Task Throughput",
       "type": "timeseries"
     },
     {
@@ -657,13 +657,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "increase(scrape_task_failed_total{app=~\"$app\"}[$__interval])",
+          "expr": "increase(product_import_task_failed_total{app=~\"$app\"}[$__interval])",
           "legendFormat": "{{source_type}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Scrape Task Failures",
+      "title": "Import Task Failures",
       "type": "timeseries"
     },
     {
@@ -755,20 +755,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "scrape_task_duration_seconds{app=~\"$app\", quantile=\"0.5\"}",
+          "expr": "product_import_task_duration_seconds{app=~\"$app\", quantile=\"0.5\"}",
           "legendFormat": "{{source_type}} p50",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "scrape_task_duration_seconds{app=~\"$app\", quantile=\"0.9\"}",
+          "expr": "product_import_task_duration_seconds{app=~\"$app\", quantile=\"0.9\"}",
           "legendFormat": "{{source_type}} p90",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Scrape Task Duration (p50 / p90)",
+      "title": "Import Task Duration (p50 / p90)",
       "type": "timeseries"
     },
     {

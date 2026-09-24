@@ -47,6 +47,7 @@ describe('ProductSplitService', () => {
   let modelFactory: { createShell: jest.Mock };
   let queryBuilder: ReturnType<typeof makeQueryBuilder>;
   let manager: any;
+  let locks: { withLocks: jest.Mock };
 
   beforeEach(() => {
     queryBuilder = makeQueryBuilder();
@@ -76,13 +77,56 @@ describe('ProductSplitService', () => {
       createShell: jest.fn().mockResolvedValue({ displayName: 'Cube' }),
     };
 
+    locks = {
+      withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()),
+    };
+
     service = new ProductSplitService(
       productRepo as unknown as ProductModelRepository,
       sourceRecordRepo as unknown as ProductSourceRecordRepository,
       mergeService as unknown as ProductMergeService,
       modelFactory as unknown as ProductModelFactoryService,
       { createProductEmbedding: jest.fn() } as unknown as ProductEmbeddingService,
+      locks as never,
     );
+  });
+
+  it('holds the origin and new product locks for the move and both recomputes', async () => {
+    const order: string[] = [];
+    locks.withLocks.mockImplementation(async (_keys: unknown, work: () => Promise<unknown>) => {
+      order.push('lock');
+      await work();
+      order.push('unlock');
+    });
+    productRepo.repo.manager.connection.transaction.mockImplementation(async (cb: any) => {
+      order.push('move');
+      return cb(manager);
+    });
+    productRepo.findOne.mockImplementation(async () => {
+      order.push('recompute');
+      return null;
+    });
+
+    await service.splitIntoNewProduct({ sourceRecordIds: ['record-1'], reason: 'test' });
+
+    const [keys] = locks.withLocks.mock.calls[0];
+    expect(keys).toEqual([
+      { namespace: 1, id: 'product-1' },
+      { namespace: 1, id: expect.any(String) },
+    ]);
+    expect(keys[1].id).not.toBe('product-1');
+    expect(order).toEqual(['lock', 'move', 'recompute', 'recompute', 'unlock']);
+  });
+
+  it('refuses a split whose listings moved while it waited for the lock', async () => {
+    sourceRecordRepo.find
+      .mockResolvedValueOnce([makeRecord()])
+      .mockResolvedValueOnce([makeRecord({ model: { id: 'product-9' } as any })]);
+
+    await expect(
+      service.splitIntoNewProduct({ sourceRecordIds: ['record-1'], reason: 'test' }),
+    ).rejects.toThrow(/moved to another product/);
+    expect(productRepo.repo.manager.connection.transaction).not.toHaveBeenCalled();
   });
 
   it('rejects an empty set of listings', async () => {
@@ -158,7 +202,7 @@ describe('ProductSplitService', () => {
       reason: 'test',
     });
 
-    // source records + offers + scrape tasks + price history
+    // source records + offers + import tasks + price history
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(4);
     expect(queryBuilder.set).toHaveBeenCalledWith(
       expect.objectContaining({ model: { id: 'product-new' } }),

@@ -47,6 +47,7 @@ describe('ProductMergeService.moveOffers', () => {
       {} as any, // offerRepo
       {} as any, // duplicatePairRepo
       {} as any, // offerFreshness
+      {} as any, // locks
     );
   });
 
@@ -181,6 +182,7 @@ describe('ProductMergeService.moveProductSourceRecords', () => {
       {} as any, // offerRepo
       {} as any, // duplicatePairRepo
       {} as any, // offerFreshness
+      {} as any, // locks
     );
   });
 
@@ -256,6 +258,7 @@ describe('ProductMergeService.movePriceHistory', () => {
       {} as any,
       {} as any,
       {} as any, // offerFreshness
+      {} as any, // locks
     );
   });
 
@@ -280,7 +283,7 @@ describe('ProductMergeService.mergeProducts', () => {
     'moveOffers',
     'createAliasesFromSource',
     'moveProductAliases',
-    'moveScrapeTasks',
+    'moveImportTasks',
     'movePriceHistory',
     'deleteSourceProduct',
   ];
@@ -306,6 +309,7 @@ describe('ProductMergeService.mergeProducts', () => {
     };
     const duplicatePairRepo = { carryDismissalsForMerge: jest.fn().mockResolvedValue(0) };
     const detailService = { getProductById: jest.fn().mockResolvedValue({ id: 'target-1' }) };
+    const locks = { withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()) };
 
     const service = new ProductMergeService(
       productRepo as any, // productRepo
@@ -319,6 +323,7 @@ describe('ProductMergeService.mergeProducts', () => {
       {} as any, // offerRepo
       duplicatePairRepo as any, // duplicatePairRepo
       {} as any, // offerFreshness
+      locks as any, // locks
     );
     const steps = Object.fromEntries(
       TRANSACTION_STEPS.map((step) => [
@@ -341,6 +346,64 @@ describe('ProductMergeService.mergeProducts', () => {
     expect(carryOrder).toBeGreaterThan(steps['movePriceHistory'].mock.invocationCallOrder[0]);
     expect(carryOrder).toBeLessThan(steps['deleteSourceProduct'].mock.invocationCallOrder[0]);
     expect(steps['deleteSourceProduct']).toHaveBeenCalledWith(manager, 'source-1');
+  });
+
+  it('holds both products\' locks for the whole merge, the recompute included', async () => {
+    const order: string[] = [];
+    const productRepo = {
+      repo: {
+        manager: {
+          connection: {
+            transaction: jest.fn(async (work: (m: unknown) => Promise<void>) => {
+              order.push('transaction');
+              await work({});
+            }),
+          },
+        },
+      },
+    };
+    const locks = {
+      withLocks: jest.fn(async (keys: unknown, work: () => Promise<unknown>) => {
+        order.push('lock');
+        const result = await work();
+        order.push('unlock');
+        return result;
+      }),
+    };
+    const service = new ProductMergeService(
+      productRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { getProductById: jest.fn().mockResolvedValue({ id: 'target-1' }) } as any,
+      {} as any,
+      { carryDismissalsForMerge: jest.fn().mockResolvedValue(0) } as any,
+      {} as any,
+      locks as any,
+    );
+    for (const step of TRANSACTION_STEPS) {
+      jest.spyOn(service as any, step).mockResolvedValue([]);
+    }
+    jest
+      .spyOn(service as any, 'loadProductForMerge')
+      .mockImplementation(async (_manager, id) => ({ id }));
+    jest.spyOn(service as any, 'postMergeUpdates').mockImplementation(async () => {
+      order.push('recompute');
+    });
+
+    await service.mergeProducts({ sourceId: 'source-1', targetId: 'target-1' });
+
+    expect(locks.withLocks).toHaveBeenCalledWith(
+      [
+        { namespace: 1, id: 'source-1' },
+        { namespace: 1, id: 'target-1' },
+      ],
+      expect.any(Function),
+    );
+    expect(order).toEqual(['lock', 'transaction', 'recompute', 'unlock']);
   });
 });
 
@@ -380,6 +443,7 @@ describe('ProductMergeService.mergeSources', () => {
       {} as any,
       {} as any,
       {} as any, // offerFreshness
+      {} as any, // locks
     );
   });
 
@@ -476,6 +540,7 @@ describe('ProductMergeService.recomputePrice', () => {
       { findCheapestFreshOffer: jest.fn().mockResolvedValue(cheapest) } as any,
       {} as any, // duplicatePairRepo
       { visibleCutoff: () => new Date('2026-09-16') } as any,
+      {} as any, // locks
     );
 
   it('denormalizes the cheapest fresh offer onto the model', async () => {

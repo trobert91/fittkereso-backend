@@ -9,9 +9,9 @@ export interface ImportRunOptions {
  * What one import run observed. Recorded on the source's own timeline as an
  * `import_run_completed` action.
  *
- * A feed run batches thousands of items in-process with no ScrapeTask per item,
- * so without this summary it would leave no trace anywhere. Per-item failures
- * are counted here rather than written one row each.
+ * A run only queues work — tasks import the products afterwards — so this is
+ * the run's own trace: what it read, what it confirmed in place, what it
+ * queued. Per-item failures are counted here rather than written one row each.
  */
 export interface ImportRunSummary {
   /** Items the source offered — feed rows, or product cards across list pages. */
@@ -20,8 +20,14 @@ export interface ImportRunSummary {
   detailTasksEnqueued: number;
   /** List-page tasks enqueued. Scraping only. */
   listTasksEnqueued: number;
-  /** Offers refreshed in place, without a detail scrape. */
+  /** Feed rows queued as new feed_entry tasks: new, changed, or missing their offer. Feed only. */
+  feedTasksEnqueued: number;
+  /** Still-pending feed_entry tasks whose row changed, given the new row instead. Feed only. */
+  tasksReplaced: number;
+  /** Offers refreshed in place — an unchanged feed row, say — without any task. */
   offersUpdated: number;
+  /** Feed rows sharing a URL with an earlier row: the last one wins. Feed only. */
+  duplicateUrls: number;
   /** Items deliberately not imported (category gate, missing identity). */
   skipped: number;
   /** Items that errored. A few is normal; a lot means the config has rotted. */
@@ -32,7 +38,10 @@ export const emptyImportRunSummary = (): ImportRunSummary => ({
   itemsSeen: 0,
   detailTasksEnqueued: 0,
   listTasksEnqueued: 0,
+  feedTasksEnqueued: 0,
+  tasksReplaced: 0,
   offersUpdated: 0,
+  duplicateUrls: 0,
   skipped: 0,
   failed: 0,
 });
@@ -40,11 +49,14 @@ export const emptyImportRunSummary = (): ImportRunSummary => ({
 /**
  * One import type's entry point.
  *
- * The two implementations differ in where the work happens, not in contract:
- * scraping fans out into ScrapeTasks and returns as soon as they are queued,
- * while an Árukereső feed completes inline. Both produce ScrapedProducts and
- * hand them to the same downstream persistence path — identity resolution,
- * merge, offer upsert and spec validation are shared and unaware of either.
+ * Both implementations only queue ProductImportTasks and return: scraping
+ * queues its list pages, a feed run its new or changed rows. The tasks then
+ * produce ScrapedProducts for the same downstream persistence path — identity
+ * resolution, merge, offer upsert and spec validation are shared and unaware
+ * of either.
+ *
+ * `source` must arrive with its `seller` loaded: a feed run looks up the
+ * existing offers of its rows by (seller, externalId).
  */
 export interface ProductSourceImporter {
   readonly type: ProductSourceType;

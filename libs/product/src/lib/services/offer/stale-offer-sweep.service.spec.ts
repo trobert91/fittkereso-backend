@@ -5,6 +5,7 @@ describe('StaleOfferSweepService', () => {
   let offerRepo: { findStaleForDeletion: jest.Mock; deleteByIds: jest.Mock };
   let productRepo: { findOne: jest.Mock; save: jest.Mock };
   let mergeService: { recomputePrice: jest.Mock };
+  let locks: { withLocks: jest.Mock };
   let freshness: {
     deleteCutoff: jest.Mock;
     deleteAfterDays: number;
@@ -31,6 +32,9 @@ describe('StaleOfferSweepService', () => {
       save: jest.fn().mockResolvedValue(undefined),
     };
     mergeService = { recomputePrice: jest.fn().mockResolvedValue(undefined) };
+    locks = {
+      withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()),
+    };
     freshness = {
       deleteCutoff: jest.fn().mockReturnValue(CUTOFF),
       deleteAfterDays: 14,
@@ -42,7 +46,17 @@ describe('StaleOfferSweepService', () => {
       productRepo as never,
       freshness as never,
       mergeService as never,
+      locks as never,
     );
+  });
+
+  it('recomputes each product under its own lock', async () => {
+    await service.sweep();
+
+    expect(locks.withLocks.mock.calls.map(([keys]) => keys)).toEqual([
+      [{ namespace: 1, id: 'model-1' }],
+      [{ namespace: 1, id: 'model-2' }],
+    ]);
   });
 
   it('deletes stale offers and recomputes each affected product once', async () => {

@@ -5,6 +5,7 @@ import {
   IDENTITY_EXTRACTION_TOTAL,
   IDENTITY_KEY_CONFLICT_TOTAL,
   IDENTITY_KEY_DISAGREEMENT_TOTAL,
+  IDENTITY_RECHECK_ATTACHED_TOTAL,
   IDENTITY_SPEC_ROWS_MATCHED,
   NEW_PRODUCT_CREATED,
   OFFER_GTIN_TOTAL,
@@ -77,6 +78,9 @@ export type IdentityResolvedVia =
   | 'gtin'
   | 'mpn';
 
+/** Which tier of the brand-lock re-check found the product a concurrent import created. */
+export type IdentityRecheckVia = IdentityResolvedVia | 'name';
+
 /** What happened to one listing's identity extraction. */
 export type IdentityExtractionResult = 'extracted' | 'reused' | 'failed' | 'disabled';
 
@@ -105,6 +109,7 @@ export class ProductMetricsService {
   private readonly offerGtinCounter: client.Counter<string>;
   private readonly identityKeyConflictCounter: client.Counter<string>;
   private readonly identityKeyDisagreementCounter: client.Counter<string>;
+  private readonly identityRecheckAttachedCounter: client.Counter<string>;
   private readonly identityExtractionCounter: client.Counter<string>;
   private readonly identitySpecRowsHistogram: client.Histogram<string>;
   private readonly specUnificationCounter: client.Counter<string>;
@@ -192,6 +197,12 @@ export class ProductMetricsService {
       name: IDENTITY_KEY_DISAGREEMENT_TOTAL,
       help: 'Listings whose later identifier tiers point at another product than the one resolved',
       labelNames: ['source', 'resolved_via', 'via'],
+      registers: [this.prometheusService.register],
+    });
+    this.identityRecheckAttachedCounter = new client.Counter({
+      name: IDENTITY_RECHECK_ATTACHED_TOTAL,
+      help: 'Listings about to create a product that attached to one a concurrent import had just created, by tier',
+      labelNames: ['source', 'via'],
       registers: [this.prometheusService.register],
     });
     this.identityExtractionCounter = new client.Counter({
@@ -284,6 +295,10 @@ export class ProductMetricsService {
     via: 'sibling' | 'gtin' | 'mpn',
   ): void {
     this.identityKeyDisagreementCounter.inc({ source, resolved_via: resolvedVia, via });
+  }
+
+  identityRecheckAttached(source: string, via: IdentityRecheckVia): void {
+    this.identityRecheckAttachedCounter.inc({ source, via });
   }
 
   identityExtraction(source: string, result: IdentityExtractionResult): void {

@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import {
   ProductSource,
-  ScrapeQueueName,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTaskKind,
+  ProductImportTask,
+  ProductImportTaskRepository,
   TaskStatus,
 } from '@fittkereso-backend/database';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
@@ -12,27 +12,29 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
-export class ScrapeTaskQueueDepthService {
-  private readonly logger = new CustomLogger(ScrapeTaskQueueDepthService.name);
+export class ProductImportTaskQueueDepthService {
+  private readonly logger = new CustomLogger(ProductImportTaskQueueDepthService.name);
 
   constructor(
-    private readonly scrapeTaskRepository: ScrapeTaskRepository,
+    private readonly importTaskRepository: ProductImportTaskRepository,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
   ) {}
 
   @Interval(30000)
   async recordQueueDepth(): Promise<void> {
     try {
-      const queueColumn = `task.${nameOf<ScrapeTask>('queue')}`;
-      const statusColumn = `task.${nameOf<ScrapeTask>('status')}`;
+      const kindColumn = `task.${nameOf<ProductImportTask>('kind')}`;
+      const statusColumn = `task.${nameOf<ProductImportTask>('status')}`;
+      const priorityColumn = `task.${nameOf<ProductImportTask>('priority')}`;
       const sourceNameColumn = `source.${nameOf<ProductSource>('name')}`;
-      const counts = await this.scrapeTaskRepository.repo
+      const counts = await this.importTaskRepository.repo
         .createQueryBuilder('task')
-        .select(queueColumn, 'queue')
+        .select(kindColumn, 'kind')
         .addSelect(sourceNameColumn, 'source_type')
         .addSelect(statusColumn, 'status')
+        .addSelect(priorityColumn, 'priority')
         .addSelect('COUNT(*)::int', 'count')
-        .innerJoin(`task.${nameOf<ScrapeTask>('source')}`, 'source')
+        .innerJoin(`task.${nameOf<ProductImportTask>('source')}`, 'source')
         .where(`${statusColumn} IN (:...statuses)`, {
           statuses: [
             TaskStatus.PENDING,
@@ -40,13 +42,15 @@ export class ScrapeTaskQueueDepthService {
             TaskStatus.FAILED,
           ],
         })
-        .groupBy(queueColumn)
+        .groupBy(kindColumn)
         .addGroupBy(sourceNameColumn)
         .addGroupBy(statusColumn)
+        .addGroupBy(priorityColumn)
         .getRawMany<{
-          queue: ScrapeQueueName;
+          kind: ProductImportTaskKind;
           source_type: string;
           status: string;
+          priority: number;
           count: number;
         }>();
 
@@ -54,9 +58,10 @@ export class ScrapeTaskQueueDepthService {
 
       for (const row of counts) {
         this.productCollectionMetrics.setQueueDepth(
-          row.queue,
+          row.kind,
           row.source_type,
           row.status,
+          row.priority,
           row.count,
         );
       }

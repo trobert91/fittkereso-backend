@@ -18,9 +18,13 @@ export class ProductSourceRecord extends BasePostgresEntity {
    *  the resolution review queue's whole job is showing where a listing ended
    *  up — a merge can move it after the decision was recorded. */
   @Expose({ groups: [SerializeGroup.adminList] })
+  // `disable`: saving a ProductModel with a loaded, stale sources array must
+  // never detach a row another writer attached meanwhile. TypeORM's default
+  // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.sources, {
     nullable: false,
     onDelete: 'CASCADE',
+    orphanedRowAction: 'disable',
   })
   model: ProductModel;
 
@@ -100,6 +104,16 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   productSpecsHash?: string;
+
+  /**
+   * An Árukereső listing's feed row as last imported, hashed after mapping
+   * (see feedRowHash). A feed run compares each row against it: the same hash
+   * only refreshes the listing's offer in place, anything else becomes an
+   * import task. Null for scraped listings.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  feedRowHash?: string | null;
 
   /**
    * Source-native listing identifier (SKU/model code/slug), stable across URL

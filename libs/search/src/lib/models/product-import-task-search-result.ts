@@ -1,14 +1,14 @@
 import {
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
   TaskStatus,
 } from '@fittkereso-backend/database';
 import { BasePageResult } from './base-page-result';
 
-export class ScrapeTaskSearchResult extends BasePageResult<ScrapeTask> {
+export class ProductImportTaskSearchResult extends BasePageResult<ProductImportTask> {
   statuses?: TaskStatus[];
 
-  queues?: ScrapeQueueName[];
+  kinds?: ProductImportTaskKind[];
 
   sourceIds?: string[];
 }

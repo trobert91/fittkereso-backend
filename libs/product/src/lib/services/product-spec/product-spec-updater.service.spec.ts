@@ -42,6 +42,7 @@ describe('ProductSpecUpdaterService.updateManualSpecs', () => {
       mergeService as any,
       validatorService as any,
       categoryConfigService as any,
+      { withLocks: (_keys: unknown, work: () => Promise<unknown>) => work() } as any,
     );
   });
 
@@ -161,6 +162,7 @@ describe('ProductSpecUpdaterService.updateManualSpecs (real validator)', () => {
       mergeService as any,
       new ProductSpecValidatorService(),
       categoryConfigService as any,
+      { withLocks: (_keys: unknown, work: () => Promise<unknown>) => work() } as any,
     );
   });
 

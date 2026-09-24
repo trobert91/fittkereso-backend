@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import {
   asScrapingConfig,
+  DEFAULT_IMPORT_TASK_PRIORITY,
   ProductSource,
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
   ScrapingSourceConfig,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
-import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { ProductImportTaskPublisherService } from '@fittkereso-backend/task';
 import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import { WebLink } from '@fittkereso-backend/product';
@@ -50,7 +51,7 @@ export class ScrapingImportService implements ProductSourceImporter {
   constructor(
     private readonly scraperService: ScraperService,
     private readonly interpreter: ScrapeInterpreterService,
-    private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
+    private readonly importTaskPublisher: ProductImportTaskPublisherService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
   ) {}
 
@@ -245,11 +246,12 @@ export class ScrapingImportService implements ProductSourceImporter {
 
     await Promise.all(
       validUrls.map((url) => {
-        const task = new ScrapeTask();
-        task.queue = ScrapeQueueName.ScrapeProductList;
+        const task = new ProductImportTask();
+        task.kind = ProductImportTaskKind.ListPage;
         task.source = source;
         task.url = url;
-        return this.scrapeTaskPublisher.addTask(task);
+        task.priority = DEFAULT_IMPORT_TASK_PRIORITY;
+        return this.importTaskPublisher.addTask(task);
       }),
     );
 
@@ -262,11 +264,11 @@ export class ScrapingImportService implements ProductSourceImporter {
   }
 
   /**
-   * The interpreter keys its context off a ScrapeTask, but these pipelines run
+   * The interpreter keys its context off a ProductImportTask, but these pipelines run
    * outside any task — this run is what creates them.
    */
-  private fakeTask(source: ProductSource, url: string): ScrapeTask {
-    return { id: 'import', url, source } as ScrapeTask;
+  private fakeTask(source: ProductSource, url: string): ProductImportTask {
+    return { id: 'import', url, source } as ProductImportTask;
   }
 
   private recordDuration(source: ProductSource, startTime: number): void {

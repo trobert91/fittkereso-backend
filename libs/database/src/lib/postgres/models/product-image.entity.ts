@@ -7,9 +7,13 @@ import { ProductSource } from './product-source.entity';
 
 @Entity()
 export class ProductImage extends BasePostgresEntity {
+  // `disable`: saving a ProductModel with a loaded, stale images array must
+  // never detach a row another writer attached meanwhile. TypeORM's default
+  // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.images, {
     nullable: false,
     onDelete: 'CASCADE',
+    orphanedRowAction: 'disable',
   })
   model: ProductModel;
 

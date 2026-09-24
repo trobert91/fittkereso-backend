@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import {
+  AdvisoryLockService,
+  brandLock,
+  productLock,
   Offer,
   OfferRepository,
   ProductAlias,
@@ -10,9 +14,8 @@ import {
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
-  ScrapeTask,
   OfferIdentityConflictError,
-  ScrapeTaskRepository,
+  ProductImportTaskRepository,
   Seller,
 } from '@fittkereso-backend/database';
 import type { ListingMatchDecision } from '@fittkereso-backend/database';
@@ -49,7 +52,9 @@ import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { compact, isEmpty, minBy, pick } from 'lodash';
 import { SpecPostProcessService } from './spec-post-process.service';
+import { offerExternalIdOf } from './offer-external-id';
 import {
+  IdentityRecheckVia,
   IdentityResolvedVia,
   ProductMetricsService,
 } from '@fittkereso-backend/metrics';
@@ -90,10 +95,34 @@ interface HistoryHit {
   >;
 }
 
-interface PersistResult {
+/** Everything the locked write of one listing needs. */
+interface ListingWrite {
+  context: ProductImportContext;
+  /** What the identity extraction produced: the input of every identity decision. */
+  extracted: ScrapedProduct;
+  /** The listing as stored: the extraction, unified when this source is new to the product. */
+  listing: ScrapedProduct;
+  normalizedSourceName: string;
+  identifiers: OfferIdentifiers[];
+}
+
+/** The product a listing was written to, and the identity it was written under. */
+interface WrittenListing {
   model: ProductModel;
+  identity: ResolvedIdentity;
   created: boolean;
-  sourceRecord?: ProductSourceRecord;
+}
+
+/** The identity decision repeated under the brand's lock. */
+interface Recheck {
+  keyMatches: KeyMatch[];
+  keyGates: Record<string, FailedGate[]>;
+  /** The product a concurrent import created meanwhile, when one was found. */
+  found?: {
+    productId: string;
+    via: IdentityRecheckVia;
+    decision?: ListingMatchDecision;
+  };
 }
 
 @Injectable()
@@ -105,7 +134,7 @@ export class ProductScrapeUpdaterService {
     private readonly duplicateService: ProductDuplicateService,
     private readonly modelFactory: ProductModelFactoryService,
     private readonly productRepo: ProductModelRepository,
-    private readonly taskRepo: ScrapeTaskRepository,
+    private readonly taskRepo: ProductImportTaskRepository,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly sourceRecordUpdater: ProductSourceRecordUpdaterService,
@@ -119,6 +148,7 @@ export class ProductScrapeUpdaterService {
     private readonly keyLookup: ProductKeyLookupService,
     private readonly brandResolution: BrandResolutionService,
     private readonly specPostProcess: SpecPostProcessService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -179,22 +209,27 @@ export class ProductScrapeUpdaterService {
         brandResolved,
       );
 
-      const normalizedSourceName = this.buildNormalizedSourceName(listing);
-      const persisted = await this.persistProduct({
+      // Everything above only reads (and calls the LLM). Everything below
+      // writes, under the lock of the product it writes to.
+      const write: ListingWrite = {
         context,
-        scrapedProduct: listing,
-        normalizedSourceName,
-        identity,
-      });
-      await this.applyPostSaveSideEffects({
-        context,
-        scrapedProduct: listing,
-        model: persisted.model,
-        sourceRecord: persisted.sourceRecord,
-        identity,
+        extracted,
+        listing,
+        normalizedSourceName: this.buildNormalizedSourceName(listing),
         identifiers,
-      });
-      return persisted.model;
+      };
+      const written = identity.model
+        ? await this.attachToProduct(write, identity, identity.model.id)
+        : await this.createProduct(write, identity);
+
+      // Outside the locks: both only add pair rows, with ON CONFLICT.
+      if (written.identity.decision) {
+        await this.detectDuplicates(context, written.model);
+      }
+      // After name-based detection, so where both found the same pair the
+      // identifier — the stronger evidence — is what the pair shows.
+      await this.recordKeyPairs(context, written.model, written.identity);
+      return written.model;
     } catch (error) {
       // do not fail the whole scraping if brand resolution fails
       if ((error as Error).message?.includes('Brand could not be identified')) {
@@ -252,23 +287,11 @@ export class ProductScrapeUpdaterService {
     );
     const brandId = brand?.entity?.id;
     const brandResolved = !!brandId;
-    const keyMatches = await this.keyLookup.lookup({
-      sourceId: context.source.id,
-      // The listing's own id is its history, not a sibling of itself.
-      siblingIds: (scrapedProduct.siblingExternalIds ?? []).filter(
-        (id) => id !== scrapedProduct.externalId,
-      ),
-      gtins: compact(identifiers.map((identifier) => identifier.gtin)),
-      mpns: compact(identifiers.map((identifier) => identifier.mpn)),
+    const { keyMatches, verdict, keyGates } = await this.lookupKeys(
+      context,
+      scrapedProduct,
+      identifiers,
       brandId,
-    });
-    const { verdict, failedGates: keyGates } = await this.keyLookup.decide(
-      keyMatches,
-      {
-        brandId,
-        specs: scrapedProduct.specs,
-        categorySlug: scrapedProduct.category.slug,
-      },
     );
 
     if (history) {
@@ -322,7 +345,7 @@ export class ProductScrapeUpdaterService {
     // inherently a false positive.
     const { productId, decision } = await this.listingMatch.match(
       scrapedProduct,
-      // Omitted rather than blank on the feed path: there is no task, and an
+      // Omitted rather than blank without a task (scripts, simulations): an
       // empty taskId in the logs would read as a lost one.
       context.task ? { taskId: context.task.id } : {},
     );
@@ -359,6 +382,37 @@ export class ProductScrapeUpdaterService {
       identity: { isExistingMatch: false, decision, keyMatches, keyGates },
       brandResolved,
     };
+  }
+
+  /**
+   * Every product one of the listing's identifiers points at, and whether the
+   * first tier that found one lets the listing attach to it.
+   */
+  private async lookupKeys(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
+    identifiers: OfferIdentifiers[],
+    brandId: string | undefined,
+  ) {
+    const keyMatches = await this.keyLookup.lookup({
+      sourceId: context.source.id,
+      // The listing's own id is its history, not a sibling of itself.
+      siblingIds: (scrapedProduct.siblingExternalIds ?? []).filter(
+        (id) => id !== scrapedProduct.externalId,
+      ),
+      gtins: compact(identifiers.map((identifier) => identifier.gtin)),
+      mpns: compact(identifiers.map((identifier) => identifier.mpn)),
+      brandId,
+    });
+    const { verdict, failedGates: keyGates } = await this.keyLookup.decide(
+      keyMatches,
+      {
+        brandId,
+        specs: scrapedProduct.specs,
+        categorySlug: scrapedProduct.category.slug,
+      },
+    );
+    return { keyMatches, verdict, keyGates };
   }
 
   /**
@@ -533,87 +587,270 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  private async persistProduct(params: {
-    context: ProductImportContext;
-    scrapedProduct: ScrapedProduct;
-    normalizedSourceName: string;
-    identity: ResolvedIdentity;
-  }): Promise<PersistResult> {
-    const { context, scrapedProduct, normalizedSourceName, identity } = params;
-
-    let model = identity.model;
-    if (!model) {
-      model = await this.newProductModel(
-        context,
-        scrapedProduct,
-        normalizedSourceName,
+  /**
+   * Writes the listing onto an existing product, under the product's lock.
+   *
+   * Identity was decided before the lock, on a copy of the product that may
+   * be seconds old by now. It is loaded again under the lock, so nothing
+   * another import wrote since — a listing, an offer, a split that moved a
+   * record away — is saved over or re-bound.
+   */
+  private async attachToProduct(
+    write: ListingWrite,
+    identity: ResolvedIdentity,
+    productId: string,
+  ): Promise<WrittenListing> {
+    const model = await this.locks.withLocks([productLock(productId)], async () => {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
+      const sourceRecord = await this.writeListing(write, model, identity);
+      await this.copyFirstImage(write, model);
+      await this.createOrUpdateOffers(
+        write.context,
+        write.listing,
+        model,
+        sourceRecord,
+        write.identifiers,
       );
+      return model;
+    });
+    return { model, identity, created: false };
+  }
+
+  /**
+   * Creates the product the listing resolved to none of.
+   *
+   * Two listings of one new bike (two sizes, or two shops) imported at once
+   * both decide to create it. Creation is therefore serialized per brand, and
+   * each creator re-checks under the brand's lock, with the same
+   * deterministic tiers and no LLM: the second finds what the first created
+   * and attaches to it. The lock is held until the offers are written,
+   * because the GTIN and MPN tiers find a product through its offers.
+   */
+  private async createProduct(
+    write: ListingWrite,
+    identity: ResolvedIdentity,
+  ): Promise<WrittenListing> {
+    const { context } = write;
+    // Before any lock: the shell costs an embedding call, thrown away when
+    // the re-check attaches.
+    const shell = await this.newProductModel(
+      context,
+      write.listing,
+      write.normalizedSourceName,
+    );
+
+    const written = await this.locks.withLocks(
+      [brandLock(shell.brand.id)],
+      async () => {
+        const recheck = await this.recheckIdentity(write, shell.brand.id);
+        const rechecked: ResolvedIdentity = {
+          ...identity,
+          keyMatches: recheck.keyMatches,
+          keyGates: recheck.keyGates,
+        };
+        if (!recheck.found) {
+          return this.insertProduct(write, rechecked, shell);
+        }
+
+        this.productMetricsService.identityRecheckAttached(
+          context.source.name,
+          recheck.found.via,
+        );
+        this.logger.log(
+          'A concurrent import created this product first — attaching instead of creating',
+          {
+            taskId: context.task?.id,
+            url: context.url,
+            source: context.source.name,
+            productId: recheck.found.productId,
+            via: recheck.found.via,
+          },
+        );
+        return this.attachToProduct(
+          write,
+          {
+            ...rechecked,
+            isExistingMatch: true,
+            decision: recheck.found.decision,
+          },
+          recheck.found.productId,
+        );
+      },
+    );
+
+    if (written.created) {
+      // After the brand's lock: the copy is an upload, and nothing about the
+      // brand depends on it. Re-loaded, because a listing that attached since
+      // may have brought the product its image already.
+      await this.locks.withLocks([productLock(written.model.id)], async () => {
+        const model = await this.productRepo.findOneOrFail({
+          where: { id: written.model.id },
+          relations: this.getProductRelations(),
+        });
+        await this.copyFirstImage(write, model);
+      });
+    }
+    return written;
+  }
+
+  /**
+   * The identity decision again, under the brand's lock: the listing's own
+   * history, its identifiers, then name matching without the LLM. Queries
+   * only, no calls. It finds what a concurrent import of the same bike
+   * created after this listing decided to create one.
+   */
+  private async recheckIdentity(
+    write: ListingWrite,
+    brandId: string,
+  ): Promise<Recheck> {
+    const { context, extracted, identifiers } = write;
+    const history = await this.resolveFromHistory(
+      context,
+      extracted,
+      context.source.seller,
+    );
+    const { keyMatches, verdict, keyGates } = await this.lookupKeys(
+      context,
+      extracted,
+      identifiers,
+      brandId,
+    );
+
+    if (history) {
+      return {
+        keyMatches,
+        keyGates,
+        found: { productId: history.model.id, via: history.via },
+      };
+    }
+    if (verdict.kind === 'attach') {
       this.productMetricsService.scrapeResolutionOutcome(
         context.source.name,
-        'created',
+        `${verdict.via}_hit`,
       );
+      return {
+        keyMatches,
+        keyGates,
+        found: { productId: verdict.productId, via: verdict.via },
+      };
     }
 
-    this.applyScrapedProductDetails(model, scrapedProduct);
+    const { productId, decision } = await this.listingMatch.match(
+      extracted,
+      context.task ? { taskId: context.task.id } : {},
+      { llm: false },
+    );
+    if (!productId) {
+      return { keyMatches, keyGates };
+    }
+    this.productMetricsService.scrapeResolutionOutcome(
+      context.source.name,
+      'identified',
+    );
+    return {
+      keyMatches,
+      keyGates,
+      found: { productId, via: 'name', decision },
+    };
+  }
+
+  /**
+   * Inserts the new product with the listing's record, aliases and offers,
+   * under the brand's lock and its own. The id is chosen here rather than by
+   * the insert, because the product's lock is keyed by it.
+   */
+  private async insertProduct(
+    write: ListingWrite,
+    identity: ResolvedIdentity,
+    shell: ProductModel,
+  ): Promise<WrittenListing> {
+    const id = randomUUID();
+    return this.locks.withLocks([productLock(id)], async () => {
+      const sourceRecord = await this.writeListing(write, shell, identity, id);
+      this.productMetricsService.scrapeResolutionOutcome(
+        write.context.source.name,
+        'created',
+      );
+      await this.createOrUpdateOffers(
+        write.context,
+        write.listing,
+        shell,
+        sourceRecord,
+        write.identifiers,
+      );
+      return { model: shell, identity, created: true };
+    });
+  }
+
+  /**
+   * The listing's record, the product's specs and names recomputed from all
+   * its records, the save, and the listing's aliases. Runs under the
+   * product's lock, on a product loaded under it or on the new one.
+   *
+   * `newId` marks a product being created. It is assigned only after the name
+   * merge, which inserts aliases for products that already have a row and
+   * skips a product without an id.
+   */
+  private async writeListing(
+    write: ListingWrite,
+    model: ProductModel,
+    identity: ResolvedIdentity,
+    newId?: string,
+  ): Promise<ProductSourceRecord | undefined> {
+    const { context, listing, normalizedSourceName } = write;
+
+    this.applyScrapedProductDetails(model, listing);
 
     const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
       model,
-      scrapedProduct,
-      externalId: scrapedProduct.externalId,
+      scrapedProduct: listing,
+      externalId: listing.externalId,
       source: context.source,
       sourceUrl: context.url,
       normalizedSourceName,
+      feedRowHash: context.feedRowHash,
     });
 
     // model.productCategory may only be the { id } stub set by
     // newProductModel/applyScrapedProductDetails — pass the slug explicitly
     // from ScrapedProduct.category, which is always fully populated.
-    await this.mergeService.mergeSources(model, scrapedProduct.category.slug);
+    await this.mergeService.mergeSources(model, listing.category.slug);
 
-    const saveOutcome = await this.saveProductModel({ model });
-    saveOutcome.sourceRecord ??= sourceRecord;
+    if (newId) {
+      model.id = newId;
+    }
+    // Before the save, so a new product is inserted with its slug in one
+    // statement.
+    if (!model.slug) {
+      await this.generateProductSlug(model);
+    }
+    await this.productRepo.save(model);
 
-    if (saveOutcome.created) {
+    if (newId) {
       this.productMetricsService.newProductCreated(context.source.name);
     } else {
       this.productMetricsService.productUpdated(context.source.name);
     }
 
-    // Only the scrape path has a task to write back to; a feed run does not.
-    context.product = saveOutcome.model;
+    // Every import runs in a task now; only scripts and simulations call without.
+    context.product = model;
     if (context.task) {
-      context.task.product = saveOutcome.model;
+      context.task.product = model;
       if (identity.decision) {
         context.task.identityDecision = identity.decision;
       }
       await this.taskRepo.save(context.task);
     }
 
-    return saveOutcome;
-  }
-
-  private async applyPostSaveSideEffects(params: {
-    context: ProductImportContext;
-    scrapedProduct: ScrapedProduct;
-    model: ProductModel;
-    sourceRecord?: ProductSourceRecord;
-    identity: ResolvedIdentity;
-    identifiers: OfferIdentifiers[];
-  }): Promise<void> {
-    const { context, scrapedProduct, model, sourceRecord, identity, identifiers } =
-      params;
-
-    if (!model.slug) {
-      await this.generateProductSlug(model);
-      await this.productRepo.save(model);
-    }
-
-    // Save source-provided aliases (e.g. DisplaySpecs "Model alias" list,
-    // Árukereső parenthesized part numbers). Must run after save so new products have an id.
-    const aliasCandidates = [...(scrapedProduct.aliases ?? [])];
+    // Source-provided aliases (e.g. DisplaySpecs "Model alias" list,
+    // Árukereső parenthesized part numbers). After the save, so a new
+    // product has its row.
     const insertedCount = await this.createNewAliases(
       model,
-      aliasCandidates,
+      [...(listing.aliases ?? [])],
       ProductAliasSource.scraped,
       context.source?.id,
     );
@@ -624,47 +861,42 @@ export class ProductScrapeUpdaterService {
       );
     }
 
-    // Only the first source scraped for a product supplies its image — once
-    // model.images is non-empty, later sources' images are never copied or
-    // considered, by design (single main image per product, not a
-    // multi-source gallery).
-    if (isEmpty(model.images)) {
-      const firstImage = minBy(scrapedProduct.images ?? [], (img) => img.order);
-      const newImages = firstImage
-        ? await this.imageCopyService.copyImagesFromSource(model, context.source, [
-            firstImage.url,
-          ])
-        : [];
-      model.images = [...(model.images ?? []), ...newImages];
+    return sourceRecord;
+  }
 
-      if (!model.mainImage) {
-        const mainImage = minBy(model.images ?? [], (img) => img.order);
-        if (mainImage) {
-          model.mainImage = mainImage;
-          await this.productRepo.save(model);
+  /**
+   * Only the first source scraped for a product supplies its image — once
+   * model.images is non-empty, later sources' images are never copied or
+   * considered, by design (single main image per product, not a multi-source
+   * gallery).
+   */
+  private async copyFirstImage(
+    write: ListingWrite,
+    model: ProductModel,
+  ): Promise<void> {
+    if (!isEmpty(model.images)) return;
 
-          this.productMetricsService.productImagesCreated(
-            context.source.name,
-            newImages.length,
-          );
-        }
+    const { context, listing } = write;
+    const firstImage = minBy(listing.images ?? [], (img) => img.order);
+    const newImages = firstImage
+      ? await this.imageCopyService.copyImagesFromSource(model, context.source, [
+          firstImage.url,
+        ])
+      : [];
+    model.images = [...(model.images ?? []), ...newImages];
+
+    if (!model.mainImage) {
+      const mainImage = minBy(model.images ?? [], (img) => img.order);
+      if (mainImage) {
+        model.mainImage = mainImage;
+        await this.productRepo.save(model);
+
+        this.productMetricsService.productImagesCreated(
+          context.source.name,
+          newImages.length,
+        );
       }
     }
-
-    await this.createOrUpdateOffers(
-      context,
-      scrapedProduct,
-      model,
-      sourceRecord,
-      identifiers,
-    );
-
-    if (identity.decision) {
-      await this.detectDuplicates(context, model);
-    }
-    // After name-based detection, so where both found the same pair the
-    // identifier — the stronger evidence — is what the pair shows.
-    await this.recordKeyPairs(context, model, identity);
   }
 
   /**
@@ -770,7 +1002,7 @@ export class ProductScrapeUpdaterService {
     // the only records whose offers this pass is entitled to judge as
     // stale. A scrape of one variant URL never visits a sibling variant's
     // own page (each variant is now its own independently scheduled
-    // ScrapeTask), so it has no way to know whether that sibling's own offer
+    // ProductImportTask), so it has no way to know whether that sibling's own offer
     // is still live; only records this pass actually touched get their
     // unmatched offers deleted.
     const touchedSourceRecordIds = new Set<string>();
@@ -909,11 +1141,9 @@ export class ProductScrapeUpdaterService {
     context: ProductImportContext,
     offers: ScrapedOffer[],
   ): (string | undefined)[] {
-    const resolved = offers.map((scraped) => {
-      const native = scraped.externalId?.trim() || undefined;
-      const url = scraped.url ? normalizeUrl(scraped.url) : context.url;
-      return { value: native ?? slugFromUrl(url), native: !!native };
-    });
+    const resolved = offers.map((scraped) =>
+      offerExternalIdOf(scraped, context.url),
+    );
 
     const counts = new Map<string, number>();
     for (const { value } of resolved) {
@@ -1011,18 +1241,6 @@ export class ProductScrapeUpdaterService {
       .execute();
 
     return result.generatedMaps.length || result.identifiers.length;
-  }
-
-  private async saveProductModel(params: {
-    model: ProductModel;
-  }): Promise<PersistResult> {
-    const { model } = params;
-    const isNewModel = !model.id;
-
-    return {
-      model: await this.productRepo.save(model),
-      created: isNewModel,
-    };
   }
 
   private applyScrapedProductDetails(

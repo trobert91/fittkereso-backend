@@ -24,6 +24,8 @@ export class PostgresConfigService implements TypeOrmOptionsFactory {
       entities: entityList,
       synchronize: this.sync,
       logging: this.logging,
+      // Unset: the driver's default of 10. See the getter.
+      ...(this.poolSize ? { poolSize: this.poolSize } : {}),
       autoLoadEntities: true,
       migrations: this.migrationsEnabled
         ? [
@@ -73,6 +75,16 @@ export class PostgresConfigService implements TypeOrmOptionsFactory {
   }
   get logging(): boolean {
     return this.configService.get<boolean>('postgres.logging')!;
+  }
+
+  /**
+   * Most connections the pool opens. The product collector needs far more than
+   * the default: each concurrent import holds one for its advisory lock on top
+   * of the ones it queries with, and an import waiting for a lock still holds
+   * its connection.
+   */
+  get poolSize(): number | undefined {
+    return this.configService.get<number>('postgres.pool_size');
   }
 
   get migrationsEnabled(): boolean {

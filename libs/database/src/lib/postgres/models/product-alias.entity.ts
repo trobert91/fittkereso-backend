@@ -11,8 +11,12 @@ export enum ProductAliasSource {
   manual = 'manual',
 }
 
+// Unique, so the scraper's ON CONFLICT DO NOTHING insert actually dedupes: one
+// alias string once per product, while several products may share it.
 @Entity()
-@Index([nameOf<ProductAlias>('model'), nameOf<ProductAlias>('alias')])
+@Index([nameOf<ProductAlias>('model'), nameOf<ProductAlias>('alias')], {
+  unique: true,
+})
 export class ProductAlias extends BasePostgresEntity {
   @Index()
   // Trigram index for candidate recall. TypeORM can't declare a GIN operator
@@ -36,9 +40,13 @@ export class ProductAlias extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   region?: string;
 
+  // `disable`: saving a ProductModel with a loaded, stale aliases array must
+  // never detach a row another writer attached meanwhile. TypeORM's default
+  // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.aliases, {
     onDelete: 'CASCADE',
     nullable: false,
+    orphanedRowAction: 'disable',
   })
   model: ProductModel;
 

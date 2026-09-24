@@ -2,7 +2,7 @@ import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
-import { ScrapeTask } from './scrape-task.entity';
+import { ProductImportTask } from './product-import-task.entity';
 import { Seller } from './seller.entity';
 import { ProductSourceConfig } from '../types/product-source-config';
 import { ProductSourceType } from '../types/product-source-type';
@@ -43,8 +43,8 @@ export class ProductSource extends BasePostgresEntity {
   @Transform(transfromExposeAll())
   config: ProductSourceConfig;
 
-  @OneToMany(() => ScrapeTask, (task) => task.source)
-  tasks: ScrapeTask[];
+  @OneToMany(() => ProductImportTask, (task) => task.source)
+  importTasks: ProductImportTask[];
 
   /**
    * The config history and the audit trail, newest first.

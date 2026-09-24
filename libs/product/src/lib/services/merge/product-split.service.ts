@@ -3,14 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import {
+  AdvisoryLockService,
   Offer,
   PriceHistory,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
-  ScrapeTask,
+  ProductImportTask,
+  productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -49,6 +52,7 @@ export class ProductSplitService {
     private readonly mergeService: ProductMergeService,
     private readonly modelFactory: ProductModelFactoryService,
     private readonly embeddingService: ProductEmbeddingService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   public async splitIntoNewProduct(
@@ -62,8 +66,44 @@ export class ProductSplitService {
 
     const records = await this.loadRecords(sourceRecordIds);
     const originId = this.assertSingleOrigin(records);
+    // Before the lock: the shell costs an embedding call.
     const newModel = await this.buildNewModel(records);
+    // Chosen here rather than by the insert, so the new product is locked
+    // before it exists.
+    newModel.id = randomUUID();
 
+    // The origin's lock and the new product's, for the move and both
+    // recomputes. An import attaching to the origin meanwhile would otherwise
+    // save a copy loaded before the move, and re-bind the listings back.
+    await this.locks.withLocks(
+      [productLock(originId), productLock(newModel.id)],
+      async () => {
+        // A merge or split may have moved the records while this one waited.
+        if (this.assertSingleOrigin(await this.loadRecords(sourceRecordIds)) !== originId) {
+          throw new BadRequestException(
+            'The source records moved to another product while the split waited; retry it',
+          );
+        }
+        await this.moveLocked(sourceRecordIds, records, originId, newModel, reason);
+
+        // Both products changed shape — the new one gained every source it
+        // has, the old one lost some. Best-effort like postMergeUpdates: the
+        // structural move already succeeded and is what matters.
+        await this.recomputeProduct(newModel.id);
+        await this.recomputeProduct(originId);
+      },
+    );
+
+    return this.productRepo.findOneOrFail({ where: { id: newModel.id } });
+  }
+
+  private async moveLocked(
+    sourceRecordIds: string[],
+    records: ProductSourceRecord[],
+    originId: string,
+    newModel: ProductModel,
+    reason: string,
+  ): Promise<void> {
     await this.productRepo.repo.manager.connection.transaction(
       async (manager) => {
         const saved = await manager.save(newModel);
@@ -71,7 +111,7 @@ export class ProductSplitService {
 
         await this.moveSourceRecords(manager, sourceRecordIds, saved.id);
         await this.moveOffers(manager, sourceRecordIds, saved.id);
-        await this.moveScrapeTasks(manager, records, originId, saved.id);
+        await this.moveImportTasks(manager, records, originId, saved.id);
         await this.movePriceHistory(manager, sourceRecordIds, saved.id);
 
         this.logger.log('Product split transaction completed', {
@@ -82,14 +122,6 @@ export class ProductSplitService {
         });
       },
     );
-
-    // Both products changed shape — the new one gained every source it has, the
-    // old one lost some. Best-effort like postMergeUpdates: the structural move
-    // already succeeded and is what matters.
-    await this.recomputeProduct(newModel.id);
-    await this.recomputeProduct(originId);
-
-    return this.productRepo.findOneOrFail({ where: { id: newModel.id } });
   }
 
   private async loadRecords(ids: string[]): Promise<ProductSourceRecord[]> {
@@ -196,9 +228,9 @@ export class ProductSplitService {
     });
   }
 
-  // ScrapeTask has no sourceRecord FK, so correlate by URL — the same identity
+  // ProductImportTask has no sourceRecord FK, so correlate by URL — the same identity
   // the scraper itself uses to recognize an already-known listing.
-  private async moveScrapeTasks(
+  private async moveImportTasks(
     manager: EntityManager,
     records: ProductSourceRecord[],
     originId: string,
@@ -211,13 +243,13 @@ export class ProductSplitService {
 
     const result = await manager
       .createQueryBuilder()
-      .update(ScrapeTask)
+      .update(ProductImportTask)
       .set({ product: { id: newModelId } })
       .where('"productId" = :originId', { originId })
       .andWhere('url IN (:...urls)', { urls })
       .execute();
 
-    this.logger.debug('Moved scrape tasks to split product', {
+    this.logger.debug('Moved import tasks to split product', {
       count: result.affected,
     });
   }

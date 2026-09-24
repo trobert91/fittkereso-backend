@@ -19,8 +19,8 @@ import {
   ProductImage,
   ProductImageRepository,
   ProductSourceRepository,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTask,
+  ProductImportTaskRepository,
 } from './postgres';
 import { ProductSource } from './postgres/models/product-source.entity';
 import { TranslationCache } from './postgres/models/translation-cache.entity';
@@ -38,6 +38,7 @@ import { ProductDuplicatePairRepository } from './postgres/repositories/product-
 import { User } from './postgres/models/user.entity';
 import { UserRepository } from './postgres/repositories/user-repository';
 import { ProductSourceConfigValidatorService } from './postgres/services/product-source-config-validator.service';
+import { AdvisoryLockService } from './postgres/services/advisory-lock.service';
 import { ProductSourceVersion } from './postgres/models/product-source-version.entity';
 import { ProductSourceVersionRepository } from './postgres/repositories/product-source-version-repository';
 import { ProductSourceAction } from './postgres/models/product-source-action.entity';
@@ -53,7 +54,7 @@ export const entityList = [
   ProductEmbedding,
   ProductImage,
   ProductSource,
-  ScrapeTask,
+  ProductImportTask,
   Task,
   TranslationCache,
   Seller,
@@ -77,7 +78,7 @@ export const entityList = [
     ProductSourceRecordRepository,
     ProductImageRepository,
     ProductSourceRepository,
-    ScrapeTaskRepository,
+    ProductImportTaskRepository,
     TaskRepository,
     TranslationCacheRepository,
     SellerRepository,
@@ -87,6 +88,7 @@ export const entityList = [
     ProductDuplicatePairRepository,
     UserRepository,
     ProductSourceConfigValidatorService,
+    AdvisoryLockService,
     ProductSourceVersionRepository,
     ProductSourceActionRepository,
   ],
@@ -99,7 +101,7 @@ export const entityList = [
     ProductSourceRecordRepository,
     ProductImageRepository,
     ProductSourceRepository,
-    ScrapeTaskRepository,
+    ProductImportTaskRepository,
     TaskRepository,
     TranslationCacheRepository,
     SellerRepository,
@@ -109,6 +111,7 @@ export const entityList = [
     ProductDuplicatePairRepository,
     UserRepository,
     ProductSourceConfigValidatorService,
+    AdvisoryLockService,
     ProductSourceVersionRepository,
     ProductSourceActionRepository,
   ],

@@ -24,6 +24,11 @@ export interface ListingMatchResult {
   decision: ListingMatchDecision;
 }
 
+export interface ListingMatchOptions {
+  /** False: never ask the LLM about near-misses; they become a new product. */
+  llm?: boolean;
+}
+
 /**
  * Scrape-time listing matching: attach the listing to a stored product, ask the
  * LLM about the near-misses, or leave it to be created. Writes nothing — the
@@ -38,9 +43,16 @@ export class ListingMatchService {
     private readonly llmService: ListingMatchLlmService,
   ) {}
 
+  /**
+   * `options.llm: false` keeps the decision deterministic whatever
+   * LLM_ENABLED says: the scraper's re-check under its brand lock must not
+   * spend a call, or wait on one, while every other import of the brand waits
+   * on it.
+   */
   public async match(
     scrapedProduct: ScrapedProduct,
     logContext?: Record<string, string>,
+    options: ListingMatchOptions = {},
   ): Promise<ListingMatchResult> {
     const brand = await this.brandResolution.resolve(
       scrapedProduct.brand,
@@ -67,7 +79,7 @@ export class ListingMatchService {
 
     // Nothing close enough to be worth a call, or the check is turned off: a
     // new product either way, which is what the LLM declining would give.
-    if (choice.kind === 'not_found' || !LLM_ENABLED) {
+    if (choice.kind === 'not_found' || !LLM_ENABLED || options.llm === false) {
       return this.resultOf({ outcome: 'created', query, candidates });
     }
 
@@ -106,7 +118,7 @@ export class ListingMatchService {
         outcome,
         nameKey: query.nameKey,
         // Already best first from the finder; only the top few are worth
-        // storing on every scrape task.
+        // storing on every import task.
         candidates: take(candidates, LISTING_DECISION_CANDIDATES).map(
           snapshotOf,
         ),

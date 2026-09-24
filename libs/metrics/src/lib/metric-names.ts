@@ -7,10 +7,12 @@ export const TASK_FINISHED_TOTAL = 'task_finished_total';
 export const TASK_FAILED_TOTAL = 'task_failed_total';
 export const TASK_DURATION_SECONDS = 'task_duration_seconds';
 
-export const SCRAPE_TASK_STARTED_TOTAL = 'scrape_task_started_total';
-export const SCRAPE_TASK_FINISHED_TOTAL = 'scrape_task_finished_total';
-export const SCRAPE_TASK_FAILED_TOTAL = 'scrape_task_failed_total';
-export const SCRAPE_TASK_DURATION_SECONDS = 'scrape_task_duration_seconds';
+export const PRODUCT_IMPORT_TASK_STARTED_TOTAL = 'product_import_task_started_total';
+export const PRODUCT_IMPORT_TASK_FINISHED_TOTAL = 'product_import_task_finished_total';
+export const PRODUCT_IMPORT_TASK_FAILED_TOTAL = 'product_import_task_failed_total';
+export const PRODUCT_IMPORT_TASK_DURATION_SECONDS = 'product_import_task_duration_seconds';
+/** Import tasks this collector is running right now: every tick adds up to a batch. */
+export const PRODUCT_IMPORT_TASK_IN_FLIGHT = 'product_import_task_in_flight';
 
 export const NEW_PRODUCT_CREATED = 'new_product_created_total';
 export const PRODUCT_UPDATED = 'product_updated_total';
@@ -70,8 +72,14 @@ export const ZYTE_SCRAPE_DURATION_SECONDS = 'zyte_scrape_duration_seconds';
 export const NATIVE_SCRAPE_TOTAL = 'native_scrape_total';
 export const NATIVE_SCRAPE_DURATION_SECONDS = 'native_scrape_duration_seconds';
 
-// Scrape task queue depth
-export const SCRAPE_TASK_QUEUE_DEPTH = 'scrape_task_queue_depth';
+// Import task queue depth
+export const PRODUCT_IMPORT_TASK_QUEUE_DEPTH = 'product_import_task_queue_depth';
+/**
+ * A queued feed row its task no longer imports, by reason: the source's config
+ * changed between the feed run and the task (a category turned off, a filter
+ * tightened). A steady rate means runs queue rows the config then rejects.
+ */
+export const FEED_ENTRY_SKIPPED_TOTAL = 'feed_entry_skipped_total';
 
 // List page scraper metrics
 export const LIST_PAGE_PRODUCTS_FOUND_TOTAL =
@@ -119,6 +127,13 @@ export const IDENTITY_KEY_CONFLICT_TOTAL = 'identity_key_conflict_total';
  * where it was resolved; the pair it opens is the duplicate to merge.
  */
 export const IDENTITY_KEY_DISAGREEMENT_TOTAL = 'identity_key_disagreement_total';
+/**
+ * A listing that resolved to "create a product", then, re-checked under its
+ * brand's lock, found the product a concurrent import had just created, and
+ * attached to it instead. By the tier that found it. Every count here is a
+ * duplicate product that parallel imports would otherwise have made.
+ */
+export const IDENTITY_RECHECK_ATTACHED_TOTAL = 'identity_recheck_attached_total';
 /**
  * The LLM identity extraction, per listing: extracted fresh, reused because
  * the listing's input did not change, failed (the listing continues on its

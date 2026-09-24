@@ -20,6 +20,9 @@ import { QueueProcessorModule } from './modules/queue-processor/queue-processor.
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { isSchedulerWorker } from '@fittkereso-backend/utils';
+import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+
+const COLLECTOR_DEFAULT_POOL_SIZE = 50;
 
 @Module({
   imports: [
@@ -39,7 +42,16 @@ import { isSchedulerWorker } from '@fittkereso-backend/utils';
             'DataSourceOptions are required for postgres connection',
           );
         }
-        const dataSource = new DataSource(config);
+        // Concurrent imports hold a connection each for their product lock on
+        // top of the ones they query with, so the collector's pool is sized
+        // well above the driver's default of 10 unless postgres.pool_size
+        // says otherwise.
+        const dataSource = new DataSource({
+          ...config,
+          poolSize:
+            (config as PostgresConnectionOptions).poolSize ??
+            COLLECTOR_DEFAULT_POOL_SIZE,
+        } as DataSourceOptions);
 
         // Add pgvector support
         dataSource.driver.supportedDataTypes.push(

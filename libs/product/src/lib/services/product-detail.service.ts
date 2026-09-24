@@ -4,7 +4,7 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
-  ScrapeTask,
+  ProductImportTask,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -33,11 +33,11 @@ export class ProductDetailService {
         `sources.${nameOf<ProductSourceRecord>('offers')}.${nameOf<Offer>('seller')}`,
         nameOf<ProductModel>('offers'),
         `${nameOf<ProductModel>('offers')}.${nameOf<Offer>('seller')}`,
-        nameOf<ProductModel>('scrapeTasks'),
-        `scrapeTasks.${nameOf<ScrapeTask>('source')}`,
+        nameOf<ProductModel>('importTasks'),
+        `importTasks.${nameOf<ProductImportTask>('source')}`,
       ],
       order: {
-        scrapeTasks: { createdAt: 'DESC' },
+        importTasks: { createdAt: 'DESC' },
         // NULLS LAST because lastSynced is nullable: Postgres sorts NULLs
         // first on DESC, which would float never-synced offers above every
         // freshly confirmed one.

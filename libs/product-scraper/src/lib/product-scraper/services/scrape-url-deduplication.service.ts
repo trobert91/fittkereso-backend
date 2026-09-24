@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ScrapeTaskRepository, TaskStatus } from '@fittkereso-backend/database';
+import { ProductImportTaskRepository, TaskStatus } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { normalizeUrl } from '@fittkereso-backend/utils';
 
@@ -11,7 +11,7 @@ export interface DeduplicationResult {
 }
 
 /**
- * Stops two in-flight scrape tasks existing for the same URL.
+ * Stops two in-flight import tasks existing for the same URL.
  *
  * There used to be a second layer, checked first: any URL that already had a
  * ProductSourceRecord was skipped permanently. That is precisely what made
@@ -29,7 +29,7 @@ export class ScrapeUrlDeduplicationService {
     ScrapeUrlDeduplicationService.name,
   );
 
-  constructor(private readonly scrapeTaskRepo: ScrapeTaskRepository) {}
+  constructor(private readonly importTaskRepo: ProductImportTaskRepository) {}
 
   public async isDuplicate(
     sourceId: string,
@@ -40,7 +40,7 @@ export class ScrapeUrlDeduplicationService {
     // pass the URL straight off a scraped card, which is not.
     const url = normalizeUrl(rawUrl);
 
-    const existingTask = await this.scrapeTaskRepo.findExistingUrl(sourceId, url, [
+    const existingTask = await this.importTaskRepo.findExistingUrl(sourceId, url, [
       TaskStatus.PENDING,
       TaskStatus.PROCESSING,
     ]);

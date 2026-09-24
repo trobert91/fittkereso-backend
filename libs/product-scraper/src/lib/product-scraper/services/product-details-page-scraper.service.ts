@@ -1,7 +1,7 @@
 import {
   OfferAvailability,
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
   SourceSpecConfig,
   asScrapingConfig,
 } from '@fittkereso-backend/database';
@@ -10,7 +10,7 @@ import * as cheerio from 'cheerio';
 import { Injectable } from '@nestjs/common';
 import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
 import { contextFromTask } from '../../interfaces/product-import-context.interface';
-import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { ProductImportTaskPublisherService } from '@fittkereso-backend/task';
 import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -57,10 +57,10 @@ export class ProductDetailsPageScraperService {
     private readonly specExtraction: SpecExtractionService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
-    private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
+    private readonly importTaskPublisher: ProductImportTaskPublisherService,
   ) {}
 
-  public async scrapeProductDetailsPage(task: ScrapeTask): Promise<void> {
+  public async scrapeProductDetailsPage(task: ProductImportTask): Promise<void> {
     const sourceName = task.source.name;
     const startTime = Date.now();
 
@@ -95,7 +95,7 @@ export class ProductDetailsPageScraperService {
       await this.dispatchVariantTasks(task, extracted);
       const { scrapedProduct } = extracted;
 
-      // contextFromTask, not the task itself: ScrapeTask structurally satisfies
+      // contextFromTask, not the task itself: ProductImportTask structurally satisfies
       // ProductImportContext, so passing it directly compiles fine but leaves
       // context.task undefined — and the task writeback silently stops.
       const result = await this.productUpdaterService.createOrUpdateProduct(
@@ -144,14 +144,14 @@ export class ProductDetailsPageScraperService {
   // Cross-page variant-link following. Rather than fetching every sibling
   // variant page inline within this task (the old behavior), each distinct
   // variant URL is dispatched as its own independently scheduled
-  // ScrapeTask — it gets picked up, scraped, and resolved back to this same
+  // ProductImportTask — it gets picked up, scraped, and resolved back to this same
   // product on its own schedule, going through the normal pipeline's
   // scheduling/concurrency/retry/metrics machinery instead of bypassing it.
   // Multiple `offerLinks` entries pointing at the same URL (e.g. several
   // offer anchors on the page linking to one shared variant page) count as
   // one variant, not several — dedup by normalized URL before dispatching.
   private async dispatchVariantTasks(
-    task: ScrapeTask,
+    task: ProductImportTask,
     primary: ExtractedPage,
   ): Promise<void> {
     if (primary.offerLinks.length === 0) {
@@ -168,10 +168,11 @@ export class ProductDetailsPageScraperService {
     for (const link of distinctLinks) {
       const variantUrl = normalizeUrl(link.url);
       try {
-        const outcome = await this.scrapeTaskPublisher.dispatchIfNeeded({
+        const outcome = await this.importTaskPublisher.dispatchIfNeeded({
           url: variantUrl,
           source: task.source,
-          queue: ScrapeQueueName.ScrapeProductDetails,
+          kind: ProductImportTaskKind.DetailPage,
+          priority: task.priority,
           processedSince,
         });
         let reason: string | undefined;
@@ -197,7 +198,7 @@ export class ProductDetailsPageScraperService {
   }
 
   private async extractProduct(
-    task: ScrapeTask,
+    task: ProductImportTask,
     $: cheerio.CheerioAPI,
   ): Promise<ExtractedPage | null> {
     const config = asScrapingConfig(task.source.config, task.source.name);
@@ -388,7 +389,7 @@ export class ProductDetailsPageScraperService {
   }
 
   private async buildTranslator(
-    task: ScrapeTask,
+    task: ProductImportTask,
     rawSpecs: ScrapedProductSpec[],
     sourceConfig: SourceSpecConfig | undefined,
     categoryName: string,

@@ -14,6 +14,9 @@ postgres:
   sync: true
   run_migrations: true
   ssl: false
+  # Optional. The collector defaults to 50: every concurrent import holds a
+  # connection for its product lock on top of the ones it queries with.
+  # pool_size: 50
 
 app_settings:
   app_url: https://app.fittkereso.com

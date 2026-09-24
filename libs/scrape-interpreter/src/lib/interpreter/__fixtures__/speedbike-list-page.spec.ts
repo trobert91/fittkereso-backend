@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ProductImportTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from '../scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
@@ -53,11 +53,11 @@ function buildHtml(): string {
     </html>`;
 }
 
-function makeTask(): ScrapeTask {
+function makeTask(): ProductImportTask {
   return {
     id: 'task-1',
     url: 'https://speedbike.hu/index.php?route=filter&filter=category|1087/manufacturer|268',
-  } as ScrapeTask;
+  } as ProductImportTask;
 }
 
 describe('speedbike.hu list page — declarative config golden fixture', () => {

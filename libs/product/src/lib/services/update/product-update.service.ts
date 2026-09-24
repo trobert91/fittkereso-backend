@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ProductModelUpdateDto } from '../../models/product-update.dto';
 import {
+  AdvisoryLockService,
   BrandRepository,
   ProductModel,
   ProductModelRepository,
+  productLock,
 } from '@fittkereso-backend/database';
 import { generateSlug, nameOf } from '@fittkereso-backend/utils';
 import { ProductUpdateMapperService } from './product-update-mapper.service';
@@ -14,18 +16,23 @@ export class ProductUpdateService {
     private readonly productRepo: ProductModelRepository,
     private readonly brandRepo: BrandRepository,
     private readonly mapper: ProductUpdateMapperService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   public async updateProduct(
     id: string,
     dto: ProductModelUpdateDto,
   ): Promise<ProductModel> {
-    const product = await this.getProductById(id);
-    await this.mapper.mapDtoToEntity(dto, product);
+    // Under the product's lock, so an import writing to it meanwhile is not
+    // overwritten with a copy loaded before.
+    return this.locks.withLocks([productLock(id)], async () => {
+      const product = await this.getProductById(id);
+      await this.mapper.mapDtoToEntity(dto, product);
 
-    await this.generateSlug(product);
+      await this.generateSlug(product);
 
-    return this.productRepo.save(product);
+      return this.productRepo.save(product);
+    });
   }
 
   private async generateSlug(entity: ProductModel): Promise<void> {

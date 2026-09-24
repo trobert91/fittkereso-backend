@@ -1,12 +1,12 @@
-import { ScrapeTaskPublisherService } from './scrape-task-publisher.service';
+import { ProductImportTaskPublisherService } from './product-import-task-publisher.service';
 import {
   ProductSource,
-  ScrapeQueueName,
+  ProductImportTaskKind,
   TaskStatus,
 } from '@fittkereso-backend/database';
 
-describe('ScrapeTaskPublisherService', () => {
-  let service: ScrapeTaskPublisherService;
+describe('ProductImportTaskPublisherService', () => {
+  let service: ProductImportTaskPublisherService;
   let taskRepo: { save: jest.Mock; saveAll: jest.Mock; findExistingUrl: jest.Mock };
   let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
 
@@ -22,7 +22,7 @@ describe('ScrapeTaskPublisherService', () => {
       findBySourceAndUrl: jest.fn().mockResolvedValue(null),
     };
 
-    service = new ScrapeTaskPublisherService(
+    service = new ProductImportTaskPublisherService(
       taskRepo as any,
       sourceRecordRepo as any,
     );
@@ -43,7 +43,7 @@ describe('ScrapeTaskPublisherService', () => {
     const baseParams = {
       url: 'https://speedbike.hu/product/1-red/',
       source,
-      queue: ScrapeQueueName.ScrapeProductDetails,
+      kind: ProductImportTaskKind.DetailPage,
       processedSince: new Date('2026-08-19T00:00:00Z'),
     };
 
@@ -54,10 +54,18 @@ describe('ScrapeTaskPublisherService', () => {
       expect(taskRepo.save).toHaveBeenCalledTimes(1);
       const [savedTask] = taskRepo.save.mock.calls[0];
       expect(savedTask.url).toBe('https://speedbike.hu/product/1-red');
-      expect(savedTask.queue).toBe(ScrapeQueueName.ScrapeProductDetails);
+      expect(savedTask.kind).toBe(ProductImportTaskKind.DetailPage);
       expect(savedTask.source).toBe(source);
       expect(savedTask.status).toBe(TaskStatus.PENDING);
       expect(savedTask.product).toBeUndefined();
+    });
+
+    it("dispatches at the dispatching task's priority, or a run's default", async () => {
+      await service.dispatchIfNeeded({ ...baseParams, priority: 90 });
+      await service.dispatchIfNeeded({ ...baseParams, url: 'https://speedbike.hu/product/2' });
+
+      expect(taskRepo.save.mock.calls[0][0].priority).toBe(90);
+      expect(taskRepo.save.mock.calls[1][0].priority).toBe(50);
     });
 
     it('skips dispatch when a pending task already exists for the URL', async () => {

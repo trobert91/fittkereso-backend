@@ -37,9 +37,10 @@ export class ProductSourceSyncScheduler extends BaseScheduler {
    * `waitForCompletion` skips a tick while the previous one is still running,
    * which removes any need for a re-entrancy flag.
    *
-   * This gates when runs are STARTED, not when they finish: scrape tasks keep
-   * draining past 06:00 on the ordinary 5-second poller. Gating the poller too
-   * would stretch a cold first import of a large shop across many nights.
+   * This gates when runs are STARTED, not when they finish: import tasks keep
+   * draining past 06:00 on the import task scheduler, which runs around the
+   * clock. Gating it too would stretch a cold first import of a large shop
+   * across many nights.
    */
   @Cron(`*/10 ${IMPORT_WINDOW_START_HOUR}-${IMPORT_WINDOW_END_HOUR - 1} * * *`, {
     timeZone: IMPORT_WINDOW_TIMEZONE,

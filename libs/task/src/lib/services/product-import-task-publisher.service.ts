@@ -1,23 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import {
+  DEFAULT_IMPORT_TASK_PRIORITY,
   TaskStatus,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTask,
+  ProductImportTaskRepository,
   ProductSourceRecordRepository,
   ProductSource,
-  ScrapeQueueName,
+  ProductImportTaskKind,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { normalizeUrl } from '@fittkereso-backend/utils';
 
 export type DispatchOutcome =
-  | { dispatched: true; task: ScrapeTask }
+  | { dispatched: true; task: ProductImportTask }
   | { dispatched: false; reason: 'pending_task' | 'recently_processed' };
 
-export interface DispatchScrapeTaskParams {
+export interface DispatchProductImportTaskParams {
   url: string;
   source: ProductSource;
-  queue: ScrapeQueueName;
+  kind: ProductImportTaskKind;
+  /** The dispatching task's own, so a person's resync fans out at its priority. */
+  priority?: number;
   // Skip dispatch if a ProductSourceRecord for this URL already has
   // updatedAt >= processedSince. Only consulted once the URL is confirmed to
   // have no pending/processing task — see dispatchIfNeeded.
@@ -25,40 +28,41 @@ export interface DispatchScrapeTaskParams {
 }
 
 @Injectable()
-export class ScrapeTaskPublisherService {
-  private readonly logger = new CustomLogger(ScrapeTaskPublisherService.name);
+export class ProductImportTaskPublisherService {
+  private readonly logger = new CustomLogger(ProductImportTaskPublisherService.name);
 
   constructor(
-    private readonly taskRepo: ScrapeTaskRepository,
+    private readonly taskRepo: ProductImportTaskRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
-  public async addTask(task: ScrapeTask) {
+  public async addTask(task: ProductImportTask) {
     task.status = TaskStatus.PENDING;
 
     await this.taskRepo.save(task);
 
-    this.logger.debug('Published scrape task', {
+    this.logger.debug('Published import task', {
       taskId: task.id,
-      queue: task.queue,
+      kind: task.kind,
+      priority: task.priority,
       url: task.url,
       sourceId: task.source?.id,
     });
   }
 
-  public async addTasks(tasks: ScrapeTask[]) {
+  public async addTasks(tasks: ProductImportTask[]) {
     tasks.forEach((task) => (task.status = TaskStatus.PENDING));
 
     await this.taskRepo.saveAll(tasks);
 
-    this.logger.debug(`Published ${tasks.length} scrape task(s)`, {
+    this.logger.debug(`Published ${tasks.length} import task(s)`, {
       count: tasks.length,
-      queues: [...new Set(tasks.map((task) => task.queue))],
+      kinds: [...new Set(tasks.map((task) => task.kind))],
       sourceIds: [...new Set(tasks.map((task) => task.source?.id).filter(Boolean))],
     });
   }
 
-  // Creates a ScrapeTask for `url` unless this source already has one
+  // Creates a ProductImportTask for `url` unless this source already has one
   // pending/processing for it (checked first, independent of `processedSince` —
   // we never want two in-flight tasks for one URL on one source, regardless of
   // age) or a ProductSourceRecord for it was already updated at/after
@@ -69,9 +73,9 @@ export class ScrapeTaskPublisherService {
   // about whether THIS source needs to visit the URL. Each source keeps its own
   // ProductSourceRecord per URL.
   public async dispatchIfNeeded(
-    params: DispatchScrapeTaskParams,
+    params: DispatchProductImportTaskParams,
   ): Promise<DispatchOutcome> {
-    const { source, queue, processedSince } = params;
+    const { source, kind, priority, processedSince } = params;
     const normalizedUrl = normalizeUrl(params.url);
 
     const pending = await this.taskRepo.findExistingUrl(source.id, normalizedUrl, [
@@ -103,9 +107,10 @@ export class ScrapeTaskPublisherService {
       return { dispatched: false, reason: 'recently_processed' };
     }
 
-    const task = new ScrapeTask();
+    const task = new ProductImportTask();
     task.url = normalizedUrl;
-    task.queue = queue;
+    task.kind = kind;
+    task.priority = priority ?? DEFAULT_IMPORT_TASK_PRIORITY;
     task.source = source;
     // task.product intentionally left unset — the dispatched task resolves
     // its own product identity when it runs (source+externalId), it is not

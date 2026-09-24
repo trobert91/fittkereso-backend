@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
+  AdvisoryLockService,
   OfferRepository,
   ProductModel,
   ProductModelRepository,
+  productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { OfferFreshnessService } from './offer-freshness.service';
@@ -47,6 +49,7 @@ export class StaleOfferSweepService {
     private readonly productRepo: ProductModelRepository,
     private readonly offerFreshness: OfferFreshnessService,
     private readonly mergeService: ProductMergeService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   public async sweep(): Promise<StaleOfferSweepResult> {
@@ -121,20 +124,28 @@ export class StaleOfferSweepService {
    * advertising that offer's price indefinitely.
    *
    * One product failing must not abandon the rest — each is independent.
+   * Each is reloaded and saved under its lock, so an import writing to it
+   * meanwhile is not overwritten with a copy loaded before.
    */
   private async recomputeAffectedModels(modelIds: string[]): Promise<number> {
     let recomputed = 0;
 
     for (const modelId of modelIds) {
       try {
-        const model = await this.productRepo.findOne({
-          where: { id: modelId },
-        });
-        if (!model) continue;
+        const found = await this.locks.withLocks(
+          [productLock(modelId)],
+          async () => {
+            const model = await this.productRepo.findOne({
+              where: { id: modelId },
+            });
+            if (!model) return false;
 
-        await this.mergeService.recomputePrice(model);
-        await this.productRepo.save(model as ProductModel);
-        recomputed += 1;
+            await this.mergeService.recomputePrice(model);
+            await this.productRepo.save(model as ProductModel);
+            return true;
+          },
+        );
+        if (found) recomputed += 1;
       } catch (error) {
         this.logger.error('Failed to recompute price after sweep', error, {
           modelId,

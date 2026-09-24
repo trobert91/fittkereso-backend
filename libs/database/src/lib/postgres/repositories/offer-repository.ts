@@ -244,6 +244,40 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   }
 
   /**
+   * What a feed run needs to refresh a seller's offers in place: which of
+   * these externalIds already have an offer, on which product, and when each
+   * was last confirmed.
+   */
+  async findSyncStates(
+    sellerId: string,
+    externalIds: string[],
+  ): Promise<
+    { id: string; externalId: string; modelId: string; lastSynced: Date | null }[]
+  > {
+    if (externalIds.length === 0) return [];
+    const offers = await this.repo.find({
+      where: { seller: { id: sellerId }, externalId: In(externalIds) },
+      relations: { model: true },
+      select: { id: true, externalId: true, lastSynced: true, model: { id: true } },
+    });
+    return offers.map((offer) => ({
+      id: offer.id,
+      externalId: offer.externalId as string,
+      modelId: offer.model.id,
+      lastSynced: offer.lastSynced ?? null,
+    }));
+  }
+
+  /** Confirms these offers as seen now: what an unchanged feed row amounts to. */
+  async stampSynced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.repo.update(
+      { id: In(ids) },
+      { lastSynced: () => 'NOW()', active: true },
+    );
+  }
+
+  /**
    * Which products have an offer carrying one of these GTINs, at any seller.
    *
    * Across sellers on purpose: a GTIN names one sellable item everywhere, so

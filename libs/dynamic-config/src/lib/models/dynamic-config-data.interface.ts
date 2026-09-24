@@ -97,8 +97,19 @@ export interface DynamicConfigData {
   scheduling?: {
     /** Minutes before a PROCESSING task is considered stale and eligible for re-pickup. Default: 240 (4 hours) */
     staleTaskTimeoutMinutes?: number;
-    /** Minutes before a PROCESSING scrape task is considered stale and eligible for re-pickup. Default: 240 (4 hours) */
-    staleScrapeTaskTimeoutMinutes?: number;
+    /** Minutes before a PROCESSING import task is considered stale and eligible for re-pickup. Default: 240 (4 hours) */
+    staleImportTaskTimeoutMinutes?: number;
+    /**
+     * How often the collector claims a batch of import tasks, in ms. Each tick
+     * is one claim query, so a longer tick means fewer queries. Default: 30000.
+     */
+    importTaskTickMs?: number;
+    /**
+     * Most import tasks one tick claims and starts, however many earlier ones
+     * are still running. Throughput is about batchSize x (3600000 / tickMs)
+     * tasks an hour. Default: 4.
+     */
+    importTaskBatchSize?: number;
   };
 
   // OpenAI pricing and retry configuration

@@ -1,9 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ScrapeQueueName } from '@fittkereso-backend/database';
-import { ScrapeTaskCreatorService } from './scrape-task-creator.service';
+import { ProductImportTaskKind } from '@fittkereso-backend/database';
+import { ProductImportTaskCreatorService } from './product-import-task-creator.service';
 
-describe('ScrapeTaskCreatorService source resolution', () => {
-  let service: ScrapeTaskCreatorService;
+describe('ProductImportTaskCreatorService source resolution', () => {
+  let service: ProductImportTaskCreatorService;
   let sourceRepo: { findOne: jest.Mock; findAllByDomain: jest.Mock };
   let taskRepo: { findOneOrFail: jest.Mock };
   let publisher: { addTask: jest.Mock };
@@ -22,7 +22,7 @@ describe('ScrapeTaskCreatorService source resolution', () => {
 
   const create = (args: Record<string, unknown> = {}) =>
     service.create({
-      queue: ScrapeQueueName.ScrapeProductDetails,
+      kind: ProductImportTaskKind.DetailPage,
       url: 'https://speedbike.hu/some-bike',
       ...args,
     } as never);
@@ -42,12 +42,29 @@ describe('ScrapeTaskCreatorService source resolution', () => {
       }),
     };
 
-    service = new ScrapeTaskCreatorService(
+    service = new ProductImportTaskCreatorService(
       taskRepo as never,
       sourceRepo as never,
       { findById: jest.fn() } as never,
       publisher as never,
     );
+  });
+
+  it('refuses a feed_entry task: only a feed run has the row it needs', async () => {
+    await expect(
+      create({ kind: ProductImportTaskKind.FeedEntry, productSourceId: 'source-feed' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(publisher.addTask).not.toHaveBeenCalled();
+  });
+
+  it("queues a person's task at the manual priority unless it names one", async () => {
+    sourceRepo.findOne.mockResolvedValue(source());
+
+    await create({ productSourceId: 'source-scraping' });
+    await create({ productSourceId: 'source-scraping', priority: 100 });
+
+    expect(publisher.addTask.mock.calls[0][0].priority).toBe(90);
+    expect(publisher.addTask.mock.calls[1][0].priority).toBe(100);
   });
 
   it('uses the source it was given, without consulting the domain at all', async () => {
@@ -83,7 +100,7 @@ describe('ScrapeTaskCreatorService source resolution', () => {
   });
 
   // A feed source is not ambiguous with a scraping one — it simply cannot carry
-  // a scrape task, so it is not a candidate and the scraping source wins.
+  // an import task, so it is not a candidate and the scraping source wins.
   it('ignores a feed source on the same domain', async () => {
     sourceRepo.findAllByDomain.mockResolvedValue([feedSource(), source()]);
 
@@ -92,10 +109,10 @@ describe('ScrapeTaskCreatorService source resolution', () => {
     expect(publisher.addTask.mock.calls[0][0].source.id).toBe('source-scraping');
   });
 
-  it('refuses a scrape task aimed explicitly at a feed source', async () => {
+  it('refuses an import task aimed explicitly at a feed source', async () => {
     sourceRepo.findOne.mockResolvedValue(feedSource());
 
-    // A ScrapeTask fetches and parses a page; a feed source has no page
+    // A ProductImportTask fetches and parses a page; a feed source has no page
     // pipelines, so this would otherwise fail much later, inside a worker.
     await expect(create({ productSourceId: 'source-feed' })).rejects.toThrow(
       /imports a feed rather than scraping pages/,

@@ -5,7 +5,7 @@ import type {
 } from '../postgres/types/product-duplicate-pair.types';
 
 /**
- * What scrape-time listing matching decided, stored on `ScrapeTask` so the
+ * What scrape-time listing matching decided, stored on `ProductImportTask` so the
  * decision can be read back without replaying the scrape. `libs/product-identity`
  * produces it; the shape lives here because entities can only depend on this lib.
  */

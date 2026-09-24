@@ -6,7 +6,7 @@ import {
   ProductSource,
   ScrapedProduct,
   ScrapingSourceConfig,
-  ScrapeTask,
+  ProductImportTask,
   SourceSpecConfig,
 } from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
@@ -330,17 +330,17 @@ export class ProductSourceSimulationService {
     return (await this.runtime.getCategoryBySlug(slug)) ?? undefined;
   }
 
-  private buildFakeTask(url: string, config: ScrapingSourceConfig): ScrapeTask {
+  private buildFakeTask(url: string, config: ScrapingSourceConfig): ProductImportTask {
     // Only `task.url` is read by the interpreter ops (see link-ops buildBaseUrl);
     // task.force/task.source/task.product are irrelevant here since we never
     // call ProductScrapeUpdaterService. Cast rather than constructing a real
-    // ScrapeTask entity — this object is never persisted or passed to a
+    // ProductImportTask entity — this object is never persisted or passed to a
     // repository.
     return {
       url,
       force: true,
       source: { name: 'simulation', config },
-    } as unknown as ScrapeTask;
+    } as unknown as ProductImportTask;
   }
 
   private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {

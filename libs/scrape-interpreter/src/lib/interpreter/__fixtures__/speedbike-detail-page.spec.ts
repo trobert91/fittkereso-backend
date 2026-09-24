@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import {
   ScrapingSourceConfig,
-  ScrapeTask,
+  ProductImportTask,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import {
@@ -155,11 +155,11 @@ function buildHtml(): string {
   `;
 }
 
-function makeTask(): ScrapeTask {
+function makeTask(): ProductImportTask {
   return {
     id: 'task-1',
     url: 'https://speedbike.hu/ktm-macina-scarp-sx-prestige-di2-m43-osszteleszkopos-elektromos-mtb-kerekpar-olive-pearl-szinben',
-  } as ScrapeTask;
+  } as ProductImportTask;
 }
 
 describe('speedbike.hu detail page — declarative config golden fixture', () => {

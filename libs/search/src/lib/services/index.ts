@@ -3,7 +3,7 @@ export * from './product-category-search.service';
 export * from './brand-search.service';
 export * from './task-search.service';
 export * from './product-source-search.service';
-export * from './scrape-task-search.service';
+export * from './product-import-task-search.service';
 export * from './seller-search.service';
 export * from './offer-search.service';
 export * from './product-duplicate-pair-search.service';

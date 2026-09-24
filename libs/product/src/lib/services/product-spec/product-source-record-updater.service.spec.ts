@@ -88,6 +88,24 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
+  it("stores a feed row's hash, and keeps it when a scrape passes none", async () => {
+    const model = makeModel();
+    const upsert = (feedRowHash?: string) =>
+      service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        sourceUrl: 'https://speedbike.hu/product-1',
+        feedRowHash,
+      });
+
+    await upsert('row-hash-1');
+    const record = await upsert(undefined);
+
+    expect(record?.feedRowHash).toBe('row-hash-1');
+    expect(model.sources).toHaveLength(1);
+  });
+
   it('re-writes the row when the caller supplies a new productSpecsHash, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,

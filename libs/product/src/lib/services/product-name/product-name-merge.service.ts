@@ -195,6 +195,11 @@ export class ProductNameMergeService {
     sources: ProductSourceRecord[],
     manager?: EntityManager,
   ): Promise<void> {
+    // A product not inserted yet has no row for an alias to point at. The
+    // scraper that is creating it inserts the listing's aliases itself, right
+    // after the first save.
+    if (!model.id) return;
+
     const candidateAliases = new Set<string>();
     for (const record of sources) {
       for (const alias of record.scrapedProduct?.aliases ?? []) {

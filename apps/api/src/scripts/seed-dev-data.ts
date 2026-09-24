@@ -31,7 +31,7 @@
  * also makes the refresh above safe to repeat: an unchanged fixture is a no-op
  * rather than a new version, and a changed one appends the next version instead
  * of overwriting what was there. A config the schema rejects stops the seed
- * rather than being written for a scrape task to fail on later.
+ * rather than being written for an import task to fail on later.
  *
  * Usage without npm:
  *   API_CONFIG_PATH=apps/api/src/config/config.yaml npx ts-node \
@@ -76,17 +76,27 @@ const FIXTURES_DIR = path.resolve(
 /**
  * Every brand the dev database knows. They were all created by the scraper as
  * it met them, so the list is exactly the ebike brands the two sources sell.
+ *
+ * Giant through Moustache were added by hand for speedbike's feed, whose rows
+ * of an unknown brand are skipped after their LLM calls. Its `Mavic` and
+ * `Norco` rows are Moustache bikes; the feed's `EGYÉB` ("other") row is a
+ * Corratec. Neither label is a brand here.
  */
 const BRAND_NAMES = [
+  'Bergamont',
   'Brennabor',
   'Corratec',
   'Cube',
   'Ghost',
+  'Giant',
   'Haibike',
   'Hercules',
   'KTM',
+  'Liv',
+  'Moustache',
   'Rideonic',
   'Riese und Müller',
+  'Scott',
   'Victoria',
   'Winora',
 ];
@@ -172,7 +182,7 @@ const SOURCES: SeedSourceSpec[] = [
     name: 'speedbike-arukereso',
     type: 'arukereso',
     configFile: 'speedbike-arukereso.config.json',
-    // A feed run makes exactly one HTTP request and enqueues no scrape tasks,
+    // A feed run makes exactly one HTTP request and enqueues no import tasks,
     // so these caps govern nothing here.
     maxConcurrent: 1,
     requestsPerHour: 10,

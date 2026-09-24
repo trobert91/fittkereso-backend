@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AdvisoryLockService,
   Offer,
   OfferRepository,
   PriceHistory,
@@ -14,7 +15,8 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
-  ScrapeTask,
+  ProductImportTask,
+  productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -64,6 +66,7 @@ export class ProductMergeService {
     private readonly offerRepo: OfferRepository,
     private readonly duplicatePairRepo: ProductDuplicatePairRepository,
     private readonly offerFreshness: OfferFreshnessService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   /**
@@ -176,6 +179,26 @@ export class ProductMergeService {
 
     let movedSourceRecordIds: string[] = [];
 
+    // Both products' locks for the whole merge, the recompute included. An
+    // import attaching to either one meanwhile would otherwise save a copy
+    // loaded before the move over it, and re-bind the moved listings back.
+    await this.locks.withLocks(
+      [productLock(sourceId), productLock(targetId)],
+      async () => {
+        movedSourceRecordIds = await this.mergeLocked(sourceId, targetId);
+        await this.postMergeUpdates(targetId);
+      },
+    );
+
+    return {
+      product: await this.detailService.getProductById(targetId),
+      movedSourceRecordIds,
+    };
+  }
+
+  private async mergeLocked(sourceId: string, targetId: string): Promise<string[]> {
+    let movedSourceRecordIds: string[] = [];
+
     await this.productRepo.repo.manager.connection.transaction(
       async (manager) => {
         const source = await this.loadProductForMerge(manager, sourceId);
@@ -204,7 +227,7 @@ export class ProductMergeService {
         await this.moveOffers(manager, sourceId, targetId);
         await this.createAliasesFromSource(manager, source, target);
         await this.moveProductAliases(manager, sourceId, targetId);
-        await this.moveScrapeTasks(manager, sourceId, targetId);
+        await this.moveImportTasks(manager, sourceId, targetId);
         await this.movePriceHistory(manager, sourceId, targetId);
         // Before the delete, which cascades the source's own pairs away.
         await this.duplicatePairRepo.carryDismissalsForMerge(
@@ -222,12 +245,7 @@ export class ProductMergeService {
       },
     );
 
-    await this.postMergeUpdates(targetId);
-
-    return {
-      product: await this.detailService.getProductById(targetId),
-      movedSourceRecordIds,
-    };
+    return movedSourceRecordIds;
   }
 
   private async loadProductForMerge(
@@ -524,19 +542,19 @@ export class ProductMergeService {
     });
   }
 
-  private async moveScrapeTasks(
+  private async moveImportTasks(
     manager: EntityManager,
     sourceId: string,
     targetId: string,
   ): Promise<void> {
     const result = await manager
       .createQueryBuilder()
-      .update(ScrapeTask)
+      .update(ProductImportTask)
       .set({ product: { id: targetId } })
       .where('"productId" = :sourceId', { sourceId })
       .execute();
 
-    this.logger.debug('Moved scrape tasks', { count: result.affected });
+    this.logger.debug('Moved import tasks', { count: result.affected });
   }
 
   private async deleteSourceProduct(

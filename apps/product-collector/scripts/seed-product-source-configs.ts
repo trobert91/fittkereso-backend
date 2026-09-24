@@ -108,7 +108,7 @@ const SOURCES: SeedSourceSpec[] = [
     name: 'speedbike-arukereso',
     type: 'arukereso',
     configFile: 'speedbike-arukereso.config.json',
-    // A feed run makes exactly one HTTP request and enqueues no scrape tasks,
+    // A feed run makes exactly one HTTP request and enqueues no import tasks,
     // so these caps govern nothing here. Set low rather than copied from the
     // scraping source, so the row does not imply a fetch budget it never uses.
     maxConcurrent: 1,

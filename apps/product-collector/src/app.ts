@@ -14,6 +14,9 @@ export const createApp = async (): Promise<INestApplication> => {
   });
   const logger = app.get(LoggerService);
   app.useLogger(logger);
+  // On SIGTERM/SIGINT the import task scheduler finishes or hands back its
+  // running tasks (beforeApplicationShutdown) before the connections close.
+  app.enableShutdownHooks();
   configureApp(app);
   await app.init();
 

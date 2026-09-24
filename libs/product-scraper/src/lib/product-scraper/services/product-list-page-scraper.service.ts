@@ -1,13 +1,13 @@
 import { ScraperService } from '@fittkereso-backend/scraper';
-import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { ProductImportTaskPublisherService } from '@fittkereso-backend/task';
 import { ScrapeUrlDeduplicationService } from './scrape-url-deduplication.service';
 import { ListProductRefreshService } from './list-product-refresh.service';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   asScrapingConfig,
   ScrapedListProduct,
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
 } from '@fittkereso-backend/database';
 import * as cheerio from 'cheerio';
 import { compact, isEmpty } from 'lodash';
@@ -24,7 +24,7 @@ export class ProductListPageScraperService {
 
   constructor(
     private readonly scraperService: ScraperService,
-    private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
+    private readonly importTaskPublisher: ProductImportTaskPublisherService,
     private readonly scrapeUrlDedup: ScrapeUrlDeduplicationService,
     private readonly listProductRefresh: ListProductRefreshService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
@@ -38,7 +38,7 @@ export class ProductListPageScraperService {
    * and pagination are resolved once per run by ScrapingImportService, which is
    * what makes a self-paginating listing unable to re-emit its own page range.
    */
-  public async scrapeListPage(task: ScrapeTask): Promise<void> {
+  public async scrapeListPage(task: ProductImportTask): Promise<void> {
     const sourceName = task.source.name;
 
     this.logger.debug('Scraping list page', {
@@ -116,7 +116,7 @@ export class ProductListPageScraperService {
     );
 
     if (!isEmpty(detailTasks)) {
-      await this.scrapeTaskPublisher.addTasks(detailTasks);
+      await this.importTaskPublisher.addTasks(detailTasks);
     }
 
     this.logger.debug('List page scrape complete', {
@@ -145,9 +145,9 @@ export class ProductListPageScraperService {
   }
 
   private async createDetailTasks(
-    parentTask: ScrapeTask,
+    parentTask: ProductImportTask,
     items: ScrapedListProduct[],
-  ): Promise<ScrapeTask[]> {
+  ): Promise<ProductImportTask[]> {
     return compact(
       await Promise.all(
         items.map((item) => this.createDetailTaskForItem(parentTask, item)),
@@ -156,9 +156,9 @@ export class ProductListPageScraperService {
   }
 
   private async createDetailTaskForItem(
-    parentTask: ScrapeTask,
+    parentTask: ProductImportTask,
     item: ScrapedListProduct,
-  ): Promise<ScrapeTask | undefined> {
+  ): Promise<ProductImportTask | undefined> {
     try {
       // Only the in-flight layer applies here. The "already has a record" layer
       // is now the refresh decision above — permanently skipping known URLs is
@@ -177,10 +177,12 @@ export class ProductListPageScraperService {
         return;
       }
 
-      const task = new ScrapeTask();
+      const task = new ProductImportTask();
       task.source = parentTask.source;
-      task.queue = ScrapeQueueName.ScrapeProductDetails;
+      task.kind = ProductImportTaskKind.DetailPage;
       task.url = item.url;
+      // The list page's own: its detail pages are the same piece of work.
+      task.priority = parentTask.priority;
 
       return task;
     } catch (error) {

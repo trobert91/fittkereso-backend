@@ -1,14 +1,14 @@
-import { ScrapeQueueName, TaskStatus } from '@fittkereso-backend/database';
+import { ProductImportTaskKind, TaskStatus } from '@fittkereso-backend/database';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-export class ScrapeTaskSearchParams {
+export class ProductImportTaskSearchParams {
   @IsOptional()
   @IsEnum(TaskStatus, { each: true })
   statuses?: TaskStatus[];
 
   @IsOptional()
-  @IsEnum(ScrapeQueueName, { each: true })
-  queues?: ScrapeQueueName[];
+  @IsEnum(ProductImportTaskKind, { each: true })
+  kinds?: ProductImportTaskKind[];
 
   @IsOptional()
   @IsString({ each: true })
@@ -26,7 +26,8 @@ export class ScrapeTaskSearchParams {
 
   @IsOptional()
   @IsEnum([
-    'queue',
+    'kind',
+    'priority',
     'status',
     'attempts',
     'scheduledAt',
@@ -37,7 +38,8 @@ export class ScrapeTaskSearchParams {
     'updatedAt',
   ])
   sort?:
-    | 'queue'
+    | 'kind'
+    | 'priority'
     | 'status'
     | 'attempts'
     | 'scheduledAt'

@@ -6,6 +6,8 @@ export * from './scraping-import.service';
 export * from './product-source-importer-registry.service';
 export * from './product-source-simulation.service';
 export * from './spec-post-process.service';
+export * from './product-scrape-updater.service';
+export * from './offer-external-id';
 export * from './deterministic-specs';
 export * from './product-source-import-simulation.service';
 export * from './source-item-filter';

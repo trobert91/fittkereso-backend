@@ -157,7 +157,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(scrape_task_queue_depth{status=\"processing\"})",
+          "expr": "sum(product_import_task_queue_depth{status=\"processing\"})",
           "legendFormat": "Processing",
           "range": true,
           "refId": "A"
@@ -222,7 +222,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(scrape_task_queue_depth{status=\"pending\"})",
+          "expr": "sum(product_import_task_queue_depth{status=\"pending\"})",
           "legendFormat": "Pending",
           "range": true,
           "refId": "A"
@@ -347,7 +347,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(increase(scrape_task_failed_total[$__range]))",
+          "expr": "sum(increase(product_import_task_failed_total[$__range]))",
           "legendFormat": "Task Failures",
           "range": true,
           "refId": "B"
@@ -736,7 +736,7 @@
         "y": 16
       },
       "id": 300,
-      "title": "Scrape Task Throughput & Queue",
+      "title": "Import Task Throughput & Queue",
       "type": "row"
     },
     {
@@ -827,20 +827,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(scrape_task_started_total[5m])",
-          "legendFormat": "started ({{queue_name}} / {{source_type}})",
+          "expr": "rate(product_import_task_started_total[5m])",
+          "legendFormat": "started ({{kind}} / {{source_type}})",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "rate(scrape_task_finished_total[5m])",
-          "legendFormat": "finished ({{queue_name}} / {{source_type}})",
+          "expr": "rate(product_import_task_finished_total[5m])",
+          "legendFormat": "finished ({{kind}} / {{source_type}})",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Scrape Task Throughput",
+      "title": "Import Task Throughput",
       "type": "timeseries"
     },
     {
@@ -927,13 +927,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(scrape_task_failed_total[5m])",
-          "legendFormat": "{{queue_name}} / {{source_type}}",
+          "expr": "rate(product_import_task_failed_total[5m])",
+          "legendFormat": "{{kind}} / {{source_type}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Scrape Task Failures",
+      "title": "Import Task Failures",
       "type": "timeseries"
     },
     {
@@ -1025,13 +1025,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(scrape_task_failed_total[5m]) / rate(scrape_task_started_total[5m])",
-          "legendFormat": "{{queue_name}} / {{source_type}}",
+          "expr": "rate(product_import_task_failed_total[5m]) / rate(product_import_task_started_total[5m])",
+          "legendFormat": "{{kind}} / {{source_type}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Scrape Task Failure Rate",
+      "title": "Import Task Failure Rate",
       "type": "timeseries"
     },
     {
@@ -1117,8 +1117,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "scrape_task_queue_depth",
-          "legendFormat": "{{queue_name}} / {{source_type}} ({{status}})",
+          "expr": "product_import_task_queue_depth",
+          "legendFormat": "{{kind}} / {{source_type}} ({{status}})",
           "range": true,
           "refId": "A"
         }
@@ -1135,7 +1135,7 @@
         "y": 25
       },
       "id": 400,
-      "title": "Scrape Task Performance",
+      "title": "Import Task Performance",
       "type": "row"
     },
     {
@@ -1222,8 +1222,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "scrape_task_duration_seconds{quantile=\"0.5\"}",
-          "legendFormat": "p50 {{queue_name}} / {{source_type}}",
+          "expr": "product_import_task_duration_seconds{quantile=\"0.5\"}",
+          "legendFormat": "p50 {{kind}} / {{source_type}}",
           "range": true,
           "refId": "A"
         }
@@ -1315,8 +1315,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "scrape_task_duration_seconds{quantile=\"0.9\"}",
-          "legendFormat": "p90 {{queue_name}} / {{source_type}}",
+          "expr": "product_import_task_duration_seconds{quantile=\"0.9\"}",
+          "legendFormat": "p90 {{kind}} / {{source_type}}",
           "range": true,
           "refId": "A"
         }

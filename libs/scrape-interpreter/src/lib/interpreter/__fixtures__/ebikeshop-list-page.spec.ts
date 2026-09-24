@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ProductImportTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from '../scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
@@ -62,11 +62,11 @@ function buildHtml(): string {
   return `<div id="app" data-page="${json}"></div>`;
 }
 
-function makeTask(): ScrapeTask {
+function makeTask(): ProductImportTask {
   return {
     id: 'task-1',
     url: 'https://ebikeshop.hu/termekek/elektromos-kerekparok',
-  } as ScrapeTask;
+  } as ProductImportTask;
 }
 
 describe('ebikeshop list page — declarative config golden fixture', () => {

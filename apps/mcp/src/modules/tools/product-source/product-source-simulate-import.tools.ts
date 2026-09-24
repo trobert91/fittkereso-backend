@@ -18,7 +18,7 @@ export class ProductSourceSimulateImportTools {
   @Tool({
     name: 'simulate_product_source_import',
     description:
-      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ScrapeTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For an "arukereso" source: fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), and fully maps the first few items into ScrapedProducts. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
+      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ProductImportTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For an "arukereso" source: fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), maps every eligible item and reports what a run would do with it right now — queue a feed_entry task (new, changed, or missing its offer) or only refresh the offer in place — and runs the identity extraction on the first few. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to simulate a run for'),
       listUrl: z
@@ -109,6 +109,12 @@ export class ProductSourceSimulateImportTools {
 
     L.push('## What would be imported');
     L.push(`- **would import**: ${feed.wouldImport}`);
+    L.push(
+      `  - right now: would queue ${feed.wouldQueue} feed_entry tasks (new, changed, or missing their offer) · would refresh ${feed.wouldRefresh} offers in place`,
+    );
+    if (feed.duplicateUrls > 0) {
+      L.push(`  - ${feed.duplicateUrls} rows share a URL with an earlier row; only the last of each is imported`);
+    }
     L.push(`- **would skip**: ${feed.wouldSkip}`);
     for (const [reason, count] of Object.entries(feed.skipReasons).sort(
       (a, b) => (b[1] as number) - (a[1] as number),

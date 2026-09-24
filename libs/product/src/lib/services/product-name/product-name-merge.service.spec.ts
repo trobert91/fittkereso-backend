@@ -216,6 +216,15 @@ describe('ProductNameMergeService.mergeNames', () => {
     expect(aliasRepo.save).not.toHaveBeenCalled();
   });
 
+  it('creates no alias for a product that is not inserted yet', async () => {
+    const model = makeModel({ id: undefined, displayName: 'Trek Marlin 7' });
+    const sources = [makeSource('a', { aliases: ['Marlin 7'] })];
+
+    await service.mergeNames(model, sources, categorySlug);
+
+    expect(aliasRepo.save).not.toHaveBeenCalled();
+  });
+
   it('swallows unique-constraint errors when creating an alias', async () => {
     aliasRepo.save.mockRejectedValueOnce(new Error('duplicate key value'));
     const model = makeModel();

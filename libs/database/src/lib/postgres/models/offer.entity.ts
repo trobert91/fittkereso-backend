@@ -21,9 +21,13 @@ import { ProductSpecs } from '../../models/product-spec';
 @Unique([nameOf<Offer>('seller'), nameOf<Offer>('externalId')])
 export class Offer extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
+  // `disable`: saving a ProductModel with a loaded, stale offers array must
+  // never detach a row another writer attached meanwhile. TypeORM's default
+  // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.offers, {
     nullable: false,
     onDelete: 'CASCADE',
+    orphanedRowAction: 'disable',
   })
   @Index()
   model: ProductModel;

@@ -173,6 +173,18 @@ describe('ListingMatchService', () => {
         reason: 'different year',
       });
     });
+
+    it('never asks when the caller turns the LLM off', async () => {
+      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 75)]);
+
+      const result = await (
+        await withLlm()
+      ).match(SCRAPED, {}, { llm: false });
+
+      expect(result.productId).toBeUndefined();
+      expect(result.decision.outcome).toBe('created');
+      expect(llmService.pick).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps only the best few candidates on the decision', async () => {

@@ -13,8 +13,8 @@ export * from './task-search-result';
 export * from './product-source-search-params';
 export * from './product-source-search-result';
 
-export * from './scrape-task-search-params';
-export * from './scrape-task-search-result';
+export * from './product-import-task-search-params';
+export * from './product-import-task-search-result';
 
 
 

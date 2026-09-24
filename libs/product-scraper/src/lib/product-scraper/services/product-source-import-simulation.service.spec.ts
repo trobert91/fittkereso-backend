@@ -13,6 +13,7 @@ describe('ProductSourceImportSimulationService', () => {
   let listRefresh: { requiredFields: string[] };
   let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
   let specPostProcess: { extractIdentity: jest.Mock };
+  let feedTriage: { triage: jest.Mock };
 
   const feedSource = {
     id: 'source-1',
@@ -74,6 +75,13 @@ describe('ProductSourceImportSimulationService', () => {
     };
     listRefresh = { requiredFields: ['url', 'price', 'availability'] };
     sourceRecordRepo = { findBySourceAndUrl: jest.fn().mockResolvedValue(null) };
+    // Every row new unless a test says otherwise.
+    feedTriage = {
+      triage: jest.fn().mockImplementation(async (_source, rows) => ({
+        unchanged: [],
+        toImport: rows,
+      })),
+    };
     specPostProcess = {
       extractIdentity: jest
         .fn()
@@ -91,6 +99,7 @@ describe('ProductSourceImportSimulationService', () => {
       mapper as never,
       sourceRecordRepo as never,
       specPostProcess as never,
+      feedTriage as never,
     );
   });
 
@@ -102,10 +111,10 @@ describe('ProductSourceImportSimulationService', () => {
 
       expect(result.arukereso?.itemsParsed).toBe(7);
       expect(result.arukereso?.wouldImport).toBe(7);
-      // classify runs for every item; only the previews are mapped in full
-      // and extracted, and the extraction is what spends LLM calls.
+      // Every eligible item is mapped (free, and what the triage needs); only
+      // the previews are extracted, and the extraction is what spends LLM calls.
       expect(mapper.classify).toHaveBeenCalledTimes(7);
-      expect(mapper.map).toHaveBeenCalledTimes(2);
+      expect(mapper.map).toHaveBeenCalledTimes(7);
       expect(result.arukereso?.products).toHaveLength(2);
       // Each preview shows what a first import would extract — the one part
       // of the simulation that calls the LLM — never a stored result.
@@ -114,6 +123,41 @@ describe('ProductSourceImportSimulationService', () => {
         expect.objectContaining({ context: expect.objectContaining({ force: true }) }),
       );
       expect(result.arukereso?.products[0]).toMatchObject({ nameCleaned: true });
+    });
+
+    it('reports what a run would queue and what it would only refresh', async () => {
+      givenFeed(feed(['a', 'b', 'c']));
+      let row = 0;
+      mapper.map.mockImplementation(async () => {
+        row += 1;
+        return {
+          status: 'mapped',
+          url: `https://speedbike.hu/p/${row}`,
+          scrapedProduct: { offers: [{ externalId: `sku-${row}` }] },
+        };
+      });
+      feedTriage.triage.mockImplementation(async (_source, rows) => ({
+        unchanged: rows.slice(0, 1).map((r: unknown) => ({ row: r })),
+        toImport: rows.slice(1),
+      }));
+
+      const result = await service.simulate(feedSource);
+
+      expect(result.arukereso).toMatchObject({ wouldQueue: 2, wouldRefresh: 1, duplicateUrls: 0 });
+      expect(feedTriage.triage.mock.calls[0][1][0]).toMatchObject({
+        url: 'https://speedbike.hu/p/1',
+        externalId: 'sku-1',
+        rowHash: expect.any(String),
+      });
+    });
+
+    it('warns about rows that share a URL, since a run keeps only the last', async () => {
+      givenFeed(feed(['a', 'b']));
+
+      const result = await service.simulate(feedSource);
+
+      expect(result.arukereso?.duplicateUrls).toBe(1);
+      expect(result.warnings.join(' ')).toMatch(/share a URL/);
     });
 
     it('tallies why items were skipped rather than only how many', async () => {

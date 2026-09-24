@@ -13,6 +13,8 @@ import { SpecPostProcessService } from './services/spec-post-process.service';
 import { ArukeresoFeedParserService } from '../arukereso/arukereso-feed-parser.service';
 import { ArukeresoProductMapperService } from '../arukereso/arukereso-product-mapper.service';
 import { ArukeresoImportService } from '../arukereso/arukereso-import.service';
+import { ArukeresoFeedTriageService } from '../arukereso/arukereso-feed-triage.service';
+import { ArukeresoFeedEntryService } from '../arukereso/arukereso-feed-entry.service';
 import { TaskModule } from '@fittkereso-backend/task';
 import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { AiModule } from '@fittkereso-backend/ai';
@@ -51,6 +53,8 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ArukeresoFeedParserService,
     ArukeresoProductMapperService,
     ArukeresoImportService,
+    ArukeresoFeedTriageService,
+    ArukeresoFeedEntryService,
     ProductSourceImporterRegistry,
     ProductSourceSimulationService,
     ProductSourceImportSimulationService,
@@ -63,6 +67,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ScrapingImportService,
     ArukeresoFeedParserService,
     ArukeresoImportService,
+    ArukeresoFeedEntryService,
     ProductSourceImporterRegistry,
     ProductSourceSimulationService,
     ProductSourceImportSimulationService,

@@ -2,36 +2,37 @@ import { Injectable } from '@nestjs/common';
 import {
   ProductSourceConfigInvalidError,
   ProductSourceConfigValidatorService,
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
   systemActor,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
+  ArukeresoFeedEntryService,
   ProductDetailsPageScraperService,
   ProductListPageScraperService,
 } from '@fittkereso-backend/product-scraper';
 import { ProductSourceVersionService } from '@fittkereso-backend/product';
 
-// Replaces the per-source ArukeresoQueueProcessorService/
-// DisplayspecsQueueProcessorService — no source-type branching needed
-// anymore, since both scraper services derive everything from
-// task.source.config.
+// Routes a task by kind: the two page scrapers and the feed row importer all
+// derive everything from task.source.config (and a feed row from its payload),
+// so there is no per-source branching.
 @Injectable()
-export class ScrapeTaskProcessorService {
-  private readonly logger = new CustomLogger(ScrapeTaskProcessorService.name);
+export class ProductImportTaskProcessorService {
+  private readonly logger = new CustomLogger(ProductImportTaskProcessorService.name);
 
   constructor(
     private readonly listScraper: ProductListPageScraperService,
     private readonly detailsScraper: ProductDetailsPageScraperService,
+    private readonly feedEntries: ArukeresoFeedEntryService,
     private readonly configValidator: ProductSourceConfigValidatorService,
     private readonly versionService: ProductSourceVersionService,
   ) {}
 
-  public async process(task: ScrapeTask): Promise<void> {
-    this.logger.debug(`Dispatching scrape task to ${task.queue} handler`, {
+  public async process(task: ProductImportTask): Promise<void> {
+    this.logger.debug(`Dispatching ${task.kind} import task`, {
       taskId: task.id,
-      queue: task.queue,
+      kind: task.kind,
       url: task.url,
       sourceId: task.source.id,
       sourceName: task.source.name,
@@ -43,15 +44,18 @@ export class ScrapeTaskProcessorService {
     // whatever the pipeline happens to throw once it reaches the bad op.
     await this.assertConfigValid(task);
 
-    switch (task.queue) {
-      case ScrapeQueueName.ScrapeProductList:
+    switch (task.kind) {
+      case ProductImportTaskKind.ListPage:
         await this.listScraper.scrapeListPage(task);
         break;
-      case ScrapeQueueName.ScrapeProductDetails:
+      case ProductImportTaskKind.DetailPage:
         await this.detailsScraper.scrapeProductDetailsPage(task);
         break;
+      case ProductImportTaskKind.FeedEntry:
+        await this.feedEntries.importEntry(task);
+        break;
       default:
-        this.logger.error(`Unknown queue name: ${task.queue}`, undefined, {
+        this.logger.error(`Unknown import task kind: ${task.kind}`, undefined, {
           taskId: task.id,
           url: task.url,
         });
@@ -69,7 +73,7 @@ export class ScrapeTaskProcessorService {
    * fails each queued task once with a readable reason rather than three times
    * behind a backoff.
    */
-  private async assertConfigValid(task: ScrapeTask): Promise<void> {
+  private async assertConfigValid(task: ProductImportTask): Promise<void> {
     const problems = this.configValidator.problems(
       task.source.type,
       task.source.config,
@@ -82,7 +86,7 @@ export class ScrapeTaskProcessorService {
       await this.versionService.recordAction(
         task.source,
         'config_validation_failed',
-        { problems, taskId: task.id, queue: task.queue, url: task.url },
+        { problems, taskId: task.id, kind: task.kind, url: task.url },
         systemActor('scheduler'),
       );
     } catch (recordError: unknown) {

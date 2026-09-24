@@ -2,27 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
+  MANUAL_IMPORT_TASK_PRIORITY,
+  MAX_IMPORT_TASK_PRIORITY,
+  MIN_IMPORT_TASK_PRIORITY,
   OfferRepository,
   ProductSourceRecordRepository,
-  ScrapeQueueName,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTaskKind,
+  ProductImportTask,
+  ProductImportTaskRepository,
   TaskStatus,
 } from '@fittkereso-backend/database';
-import { ScrapeTaskCreatorService } from '@fittkereso-backend/task';
+import { ProductImportTaskCreatorService } from '@fittkereso-backend/task';
 import { nameOf } from '@fittkereso-backend/utils';
 
-// Manual scrape-run tooling: enqueue a single ScrapeTask outside the normal
-// cron/scheduler flow and inspect its result. The queue worker (a separate
-// process — ScrapeTaskManagerService, polling every 5s) picks up and
-// processes the task asynchronously; these tools don't run it inline, so
-// get_scrape_task/get_product_source_scrape_status must be called again
+// Manual scrape-run tooling: enqueue a single ProductImportTask outside the normal
+// cron/scheduler flow and inspect its result. The collector (a separate
+// process — ProductImportTaskManagerService, claiming a batch every tick, 30s
+// by default) picks up and processes the task asynchronously; these tools don't run it inline, so
+// get_product_import_task/get_product_source_import_status must be called again
 // after enough time has passed for the worker to have picked it up.
 @Injectable()
 export class ScrapeRunTools {
   constructor(
-    private readonly scrapeTaskCreator: ScrapeTaskCreatorService,
-    private readonly scrapeTaskRepo: ScrapeTaskRepository,
+    private readonly importTaskCreator: ProductImportTaskCreatorService,
+    private readonly importTaskRepo: ProductImportTaskRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerRepo: OfferRepository,
   ) {}
@@ -30,71 +33,82 @@ export class ScrapeRunTools {
   // ─── Write Tools ───────────────────────────────────────────────────────────
 
   @Tool({
-    name: 'enqueue_scrape_task',
+    name: 'enqueue_product_import_task',
     description:
-      'Manually enqueue a single ScrapeTask for a ProductSource, bypassing the normal cron scheduler — the fastest way to test a new or edited ProductSourceConfig against one real URL without waiting for/enabling scheduling. Queue "scrape-product-list" for a list/category page (produces more list + detail tasks once processed) or "scrape-product-details" for a single product detail page. The task runs asynchronously on the next queue-worker poll (~5s) — call get_scrape_task afterward to see the result.',
+      'Manually enqueue a single ProductImportTask for a ProductSource, bypassing the normal cron scheduler — the fastest way to test a new or edited ProductSourceConfig against one real URL without waiting for/enabling scheduling. Kind "list_page" for a list/category page (produces more list + detail tasks once processed) or "detail_page" for a single product detail page. The task runs asynchronously, started by the collector within one scheduler tick (30s by default) — call get_product_import_task afterward to see the result. It runs at priority 90 unless you pass one: higher runs first, so it goes ahead of the tasks an import run queued (50).',
     parameters: z.object({
       productSourceId: z
         .string()
         .describe(
           "ProductSource UUID the task belongs to. A webshop may have several sources (a page scraper and a feed, say), so this decides which one — it is no longer inferred from the URL. Must be a \"scraping\" source: a feed source has no page pipelines.",
         ),
-      queue: z
-        .nativeEnum(ScrapeQueueName)
-        .describe('"scrape-product-list" or "scrape-product-details"'),
+      kind: z
+        // Page kinds only: a feed row's task is queued by its feed run.
+        .enum([ProductImportTaskKind.ListPage, ProductImportTaskKind.DetailPage])
+        .describe('"list_page" or "detail_page"'),
       url: z.string().url().describe('The exact URL to scrape'),
+      priority: z
+        .number()
+        .int()
+        .min(MIN_IMPORT_TASK_PRIORITY)
+        .max(MAX_IMPORT_TASK_PRIORITY)
+        .optional()
+        .describe('0–100, higher runs first. Default 90; an import run queues its own tasks at 50.'),
     }),
     annotations: { destructiveHint: false, idempotentHint: false },
   })
-  async enqueueScrapeTask(args: {
+  async enqueueImportTask(args: {
     productSourceId: string;
-    queue: ScrapeQueueName;
+    kind: ProductImportTaskKind;
     url: string;
+    priority?: number;
   }): Promise<string> {
     try {
-      const task = await this.scrapeTaskCreator.create({
-        queue: args.queue,
+      const task = await this.importTaskCreator.create({
+        kind: args.kind,
         url: args.url,
+        priority: args.priority ?? MANUAL_IMPORT_TASK_PRIORITY,
         // Honoured rather than ignored: the source used to be inferred from the
         // URL's domain, which silently picked one arbitrary row once a webshop
         // had more than one source.
         productSourceId: args.productSourceId,
       });
 
-      return `Enqueued ${task.queue} task ${task.id} for "${task.url}" (status: ${task.status}). Call get_scrape_task with taskId "${task.id}" in a few seconds to see the result.`;
+      return `Enqueued ${task.kind} task ${task.id} at priority ${task.priority} for "${task.url}" (status: ${task.status}). Call get_product_import_task with taskId "${task.id}" in a few seconds to see the result.`;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      return `Failed to enqueue scrape task: ${message}`;
+      return `Failed to enqueue import task: ${message}`;
     }
   }
 
   // ─── Read Tools ────────────────────────────────────────────────────────────
 
   @Tool({
-    name: 'get_scrape_task',
+    name: 'get_product_import_task',
     description:
-      'Get the current status and result of a ScrapeTask by id — status (pending/processing/done/failed), attempts, timing, any error, and (for a done detail-page task) the ProductSourceRecord/Offer rows it produced. Use after enqueue_scrape_task to check whether the run succeeded.',
+      'Get the current status and result of a ProductImportTask by id — status (pending/processing/done/failed), attempts, timing, any error, and (for a done detail-page task) the ProductSourceRecord/Offer rows it produced. Use after enqueue_product_import_task to check whether the run succeeded.',
     parameters: z.object({
-      taskId: z.string().describe('ScrapeTask UUID'),
+      taskId: z.string().describe('ProductImportTask UUID'),
     }),
     annotations: { readOnlyHint: true },
   })
-  async getScrapeTask(args: { taskId: string }): Promise<string> {
-    const task = await this.scrapeTaskRepo.findOneOrFail({
+  async getImportTask(args: { taskId: string }): Promise<string> {
+    const task = await this.importTaskRepo.findOneOrFail({
       where: { id: args.taskId },
-      relations: [nameOf<ScrapeTask>('source'), nameOf<ScrapeTask>('product')],
+      relations: [nameOf<ProductImportTask>('source'), nameOf<ProductImportTask>('product')],
     });
 
     const L: string[] = [];
-    L.push(`# Scrape Task ${task.id}`);
-    L.push(`- **Queue**: ${task.queue}`);
+    L.push(`# Import Task ${task.id}`);
+    L.push(`- **Kind**: ${task.kind}`);
+    L.push(`- **Priority**: ${task.priority}`);
     L.push(`- **Source**: ${task.source?.name ?? '_unknown_'} (${task.source?.id ?? ''})`);
     L.push(`- **URL**: ${task.url}`);
     L.push(`- **Status**: ${task.status}`);
     L.push(`- **Attempts**: ${task.attempts}`);
     L.push(`- **Last run**: ${task.lastRunAt?.toISOString() ?? '_not run yet_'}`);
     L.push(
-      `- **Execution time**: ${task.executionTimeInSec !== undefined ? `${task.executionTimeInSec}s` : '_n/a_'}`,
+      `- **Execution time**: ${task.executionTimeInSec != null ? `${task.executionTimeInSec}s` : '_n/a_'}`,
     );
 
     if (task.error) {
@@ -134,7 +148,7 @@ export class ScrapeRunTools {
             `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability ?? '_not reported_'} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · gtin: ${offer.gtin ?? '_none_'} · mpn: ${offer.mpn ?? '_none_'} · lastSynced: ${offer.lastSynced?.toISOString?.() ?? ''}`,
           );
         }
-      } else if (task.queue === ScrapeQueueName.ScrapeProductDetails) {
+      } else if (task.kind === ProductImportTaskKind.DetailPage) {
         L.push('');
         L.push('_No Offer rows found for this product from this source — either the config has no `detailPage.offers` set up, or the offer pipeline did not resolve a price._');
       }
@@ -149,57 +163,57 @@ export class ScrapeRunTools {
   }
 
   @Tool({
-    name: 'get_product_source_scrape_status',
+    name: 'get_product_source_import_status',
     description:
-      'Get an aggregate status breakdown (pending/processing/done/failed counts per queue) of all ScrapeTasks belonging to a ProductSource. Use this to see overall progress of a source\'s scraping — e.g. after enabling scheduling, or after enqueuing a list-page task that fans out into many more tasks.',
+      'Get an aggregate status breakdown (pending/processing/done/failed counts per kind) of all ProductImportTasks belonging to a ProductSource. Use this to see overall progress of a source\'s scraping — e.g. after enabling scheduling, or after enqueuing a list-page task that fans out into many more tasks.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID'),
     }),
     annotations: { readOnlyHint: true },
   })
-  async getProductSourceScrapeStatus(args: {
+  async getProductSourceImportStatus(args: {
     productSourceId: string;
   }): Promise<string> {
-    const queueColumn = `t.${nameOf<ScrapeTask>('queue')}`;
-    const statusColumn = `t.${nameOf<ScrapeTask>('status')}`;
-    const rows: { queue: string; status: string; count: string }[] =
-      await this.scrapeTaskRepo.repo
+    const kindColumn = `t.${nameOf<ProductImportTask>('kind')}`;
+    const statusColumn = `t.${nameOf<ProductImportTask>('status')}`;
+    const rows: { kind: string; status: string; count: string }[] =
+      await this.importTaskRepo.repo
         .createQueryBuilder('t')
-        .select(queueColumn, 'queue')
+        .select(kindColumn, 'kind')
         .addSelect(statusColumn, 'status')
         .addSelect('COUNT(*)::int', 'count')
-        .where(`t.${nameOf<ScrapeTask>('source')} = :sourceId`, {
+        .where(`t.${nameOf<ProductImportTask>('source')} = :sourceId`, {
           sourceId: args.productSourceId,
         })
-        .groupBy(queueColumn)
+        .groupBy(kindColumn)
         .addGroupBy(statusColumn)
         .getRawMany();
 
     const L: string[] = [];
-    L.push(`# Scrape Status for Product Source ${args.productSourceId}`);
+    L.push(`# Import Status for Product Source ${args.productSourceId}`);
     L.push('');
 
     if (rows.length === 0) {
-      L.push('_No scrape tasks found for this source yet._');
+      L.push('_No import tasks found for this source yet._');
       return L.join('\n');
     }
 
-    const queues = new Map<string, Map<string, number>>();
+    const kinds = new Map<string, Map<string, number>>();
     for (const row of rows) {
-      const statuses = queues.get(row.queue) ?? new Map<string, number>();
+      const statuses = kinds.get(row.kind) ?? new Map<string, number>();
       statuses.set(row.status, Number(row.count));
-      queues.set(row.queue, statuses);
+      kinds.set(row.kind, statuses);
     }
 
-    L.push('| Queue | Pending | Processing | Done | Failed |');
+    L.push('| Kind | Pending | Processing | Done | Failed |');
     L.push('|-------|---------|------------|------|--------|');
-    for (const [queue, statuses] of queues) {
+    for (const [kind, statuses] of kinds) {
       L.push(
-        `| ${queue} | ${statuses.get('pending') ?? 0} | ${statuses.get('processing') ?? 0} | ${statuses.get('done') ?? 0} | ${statuses.get('failed') ?? 0} |`,
+        `| ${kind} | ${statuses.get('pending') ?? 0} | ${statuses.get('processing') ?? 0} | ${statuses.get('done') ?? 0} | ${statuses.get('failed') ?? 0} |`,
       );
     }
 
-    const failedRows = await this.scrapeTaskRepo.find({
+    const failedRows = await this.importTaskRepo.find({
       where: { source: { id: args.productSourceId }, status: TaskStatus.FAILED },
       take: 5,
       order: { lastRunAt: 'DESC' },

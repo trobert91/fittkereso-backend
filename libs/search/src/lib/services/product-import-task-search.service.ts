@@ -1,24 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import {
   ProductModel,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTask,
+  ProductImportTaskRepository,
 } from '@fittkereso-backend/database';
 import { SelectQueryBuilder } from 'typeorm';
 import { nameOf } from '@fittkereso-backend/utils';
-import { ScrapeTaskSearchParams } from '../models/scrape-task-search-params';
-import { ScrapeTaskSearchResult } from '../models/scrape-task-search-result';
+import { ProductImportTaskSearchParams } from '../models/product-import-task-search-params';
+import { ProductImportTaskSearchResult } from '../models/product-import-task-search-result';
 import { isEmpty } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 50;
 
 @Injectable()
-export class ScrapeTaskSearchService {
-  constructor(private readonly scrapeTaskRepo: ScrapeTaskRepository) {}
+export class ProductImportTaskSearchService {
+  constructor(private readonly importTaskRepo: ProductImportTaskRepository) {}
 
   public async search(
-    params: ScrapeTaskSearchParams,
-  ): Promise<ScrapeTaskSearchResult> {
+    params: ProductImportTaskSearchParams,
+  ): Promise<ProductImportTaskSearchResult> {
     const finalParams = {
       ...params,
       sort: params.sort ?? 'createdAt',
@@ -32,28 +32,28 @@ export class ScrapeTaskSearchService {
   }
 
   private buildQuery(
-    params: ScrapeTaskSearchParams,
-  ): SelectQueryBuilder<ScrapeTask> {
-    let query = this.scrapeTaskRepo.repo
-      .createQueryBuilder('scrapeTask')
-      .leftJoinAndSelect(`scrapeTask.${nameOf<ScrapeTask>('source')}`, 'source')
+    params: ProductImportTaskSearchParams,
+  ): SelectQueryBuilder<ProductImportTask> {
+    let query = this.importTaskRepo.repo
+      .createQueryBuilder('importTask')
+      .leftJoinAndSelect(`importTask.${nameOf<ProductImportTask>('source')}`, 'source')
       .leftJoinAndSelect(
-        `scrapeTask.${nameOf<ScrapeTask>('product')}`,
+        `importTask.${nameOf<ProductImportTask>('product')}`,
         'product',
       )
       .leftJoinAndSelect(`product.${nameOf<ProductModel>('brand')}`, 'brand');
 
     if (!isEmpty(params.statuses)) {
       query = query.andWhere(
-        `scrapeTask.${nameOf<ScrapeTask>('status')} IN (:...statuses)`,
+        `importTask.${nameOf<ProductImportTask>('status')} IN (:...statuses)`,
         { statuses: params.statuses },
       );
     }
 
-    if (!isEmpty(params.queues)) {
+    if (!isEmpty(params.kinds)) {
       query = query.andWhere(
-        `scrapeTask.${nameOf<ScrapeTask>('queue')} IN (:...queues)`,
-        { queues: params.queues },
+        `importTask.${nameOf<ProductImportTask>('kind')} IN (:...kinds)`,
+        { kinds: params.kinds },
       );
     }
 
@@ -64,7 +64,7 @@ export class ScrapeTaskSearchService {
     }
 
     query = query.orderBy(
-      `scrapeTask.${params.sort}`,
+      `importTask.${params.sort}`,
       params.order,
       'NULLS LAST',
     );
@@ -77,15 +77,15 @@ export class ScrapeTaskSearchService {
   }
 
   private mapToSearchResult(
-    result: [ScrapeTask[], number],
-    params: ScrapeTaskSearchParams,
-  ): ScrapeTaskSearchResult {
+    result: [ProductImportTask[], number],
+    params: ProductImportTaskSearchParams,
+  ): ProductImportTaskSearchResult {
     const [items, totalItems] = result;
     const page = params.page ?? 1;
     const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
     const totalPages = Math.ceil(totalItems / pageSize);
 
-    const searchResult = new ScrapeTaskSearchResult();
+    const searchResult = new ProductImportTaskSearchResult();
     searchResult.page = page;
     searchResult.pageSize = pageSize;
     searchResult.totalItems = totalItems;
@@ -94,7 +94,7 @@ export class ScrapeTaskSearchService {
     searchResult.sort = params.sort;
     searchResult.order = params.order;
     searchResult.statuses = params.statuses;
-    searchResult.queues = params.queues;
+    searchResult.kinds = params.kinds;
     searchResult.sourceIds = params.sourceIds;
 
     return searchResult;

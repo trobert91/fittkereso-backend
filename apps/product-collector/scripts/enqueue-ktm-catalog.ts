@@ -25,12 +25,13 @@
  * every earlier page (the product links it finds are deduped, but the list
  * fetch itself is not).
  *
- * The tasks only run while the product-collector app is up (its poller claims
- * them every 5s) and while the source's `processingEnabled` is true.
+ * The tasks only run while the product-collector app is up (its scheduler
+ * claims a batch every tick, 30s by default) and while the source's
+ * `processingEnabled` is true.
  */
 import { NestFactory } from '@nestjs/core';
-import { ScrapeQueueName } from '@fittkereso-backend/database';
-import { ScrapeTaskCreatorService } from '@fittkereso-backend/task';
+import { ProductImportTaskKind } from '@fittkereso-backend/database';
+import { ProductImportTaskCreatorService } from '@fittkereso-backend/task';
 import { AppModule } from '../src/app.module';
 
 interface CatalogSource {
@@ -85,7 +86,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const app = await NestFactory.createApplicationContext(AppModule);
-  const taskCreator = app.get(ScrapeTaskCreatorService);
+  const taskCreator = app.get(ProductImportTaskCreatorService);
 
   for (const source of sources) {
     // The source is resolved from the URL's domain, so a typo'd host fails
@@ -105,7 +106,7 @@ async function bootstrap(): Promise<void> {
       const url = source.urlOf(page);
       try {
         const task = await taskCreator.create({
-          queue: ScrapeQueueName.ScrapeProductList,
+          kind: ProductImportTaskKind.ListPage,
           url,
         });
         console.log(`  page ${page}: task ${task.id}`);

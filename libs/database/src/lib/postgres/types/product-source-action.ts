@@ -23,7 +23,9 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
   'config_restored',
   /**
    * A task refused to run this source because its stored config no longer
-   * matches the schema. Payload: { version, taskId, queue, problems }.
+   * matches the schema. Payload: { version, taskId, kind, url, problems }.
+   * Rows written before the ProductImportTask rename carry `queue` instead
+   * of `kind`, with the old values (scrape-product-list/-details).
    *
    * Written by the run-time guard, so a broken config is visible on the
    * source's own timeline rather than only inside one failed task's error
@@ -39,12 +41,14 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
   /** The owning seller changed. Payload: { from, to, fromLabel, toLabel }. */
   'seller_changed',
   /**
-   * An import run finished. Payload: { type, itemsSeen, productsCreated,
-   * offersUpdated, detailTasksEnqueued, skipped, failed, durationMs }.
+   * An import run finished. Payload: ImportRunSummary plus type and
+   * durationMs — { type, itemsSeen, listTasksEnqueued, detailTasksEnqueued,
+   * feedTasksEnqueued, tasksReplaced, offersUpdated, duplicateUrls, skipped,
+   * failed, durationMs }.
    *
-   * A feed run batches thousands of items in-process with no ScrapeTask row per
-   * item, so without this the run leaves no trace anywhere. Per-item failures
-   * are counted and sampled into the payload rather than written one row each.
+   * A run only queues tasks, so this is its own trace: what it read, what it
+   * confirmed in place, and what it queued. Per-item failures are counted
+   * rather than written one row each.
    */
   'import_run_completed',
   /** An import run threw. Payload: { type, error, durationMs }. */

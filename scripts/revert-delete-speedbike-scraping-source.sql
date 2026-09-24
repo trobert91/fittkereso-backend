@@ -4,7 +4,7 @@
 -- Restores the SOURCE DEFINITION and its config history only.
 -- The rows below were attached at dump time and are NOT restored
 -- by this file — re-run the source to rebuild them:
---   scrape_task.sourceId: 65 row(s)
+--   product_import_task.sourceId: 65 row(s)
 --   product_image.sourceId: 27 row(s)
 --   product_alias.sourceRefId: 0 row(s)
 --   product_source_record.sourceId: 63 row(s)

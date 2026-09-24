@@ -7,8 +7,8 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductSourceRecordRepository,
-  ScrapeTask,
-  ScrapeTaskRepository,
+  ProductImportTask,
+  ProductImportTaskRepository,
 } from '@fittkereso-backend/database';
 import type { ProductMetricsService } from '@fittkereso-backend/metrics';
 import type {
@@ -29,6 +29,13 @@ import type {
 } from '@fittkereso-backend/product';
 
 jest.mock('@fittkereso-backend/product-identity', () => ({}));
+
+// A new product's id is chosen before its insert. Tests name it through this.
+const mockRandomUUID = jest.fn();
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: () => mockRandomUUID(),
+}));
 
 jest.mock('@fittkereso-backend/product', () => ({}));
 
@@ -51,8 +58,15 @@ function makeCategory(overrides?: Partial<ProductCategory>): ProductCategory {
   return category;
 }
 
+/**
+ * Every product a test builds, so the reload under the product's lock finds
+ * the same object the test set up — by id at call time, since tests change ids.
+ */
+let knownModels: ProductModel[] = [];
+
 function makeExistingModel(): ProductModel {
   const model = new ProductModel();
+  knownModels.push(model);
   model.id = 'model-1';
   model.brand = makeBrand();
   model.productCategory = makeCategory();
@@ -65,7 +79,7 @@ function makeExistingModel(): ProductModel {
   return model;
 }
 
-function makeTask(): ScrapeTask {
+function makeTask(): ProductImportTask {
   return {
     id: 'task-1',
     url: 'https://example.com/product',
@@ -74,7 +88,7 @@ function makeTask(): ScrapeTask {
       name: 'arukereso',
       seller: { id: 'seller-arukereso', name: 'arukereso' },
     },
-  } as ScrapeTask;
+  } as ProductImportTask;
 }
 
 function makeScrapedProduct(
@@ -119,7 +133,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockDuplicateService: jest.Mocked<ProductDuplicateService>;
   let mockModelFactory: jest.Mocked<ProductModelFactoryService>;
   let mockProductRepo: jest.Mocked<ProductModelRepository>;
-  let mockTaskRepo: jest.Mocked<ScrapeTaskRepository>;
+  let mockTaskRepo: jest.Mocked<ProductImportTaskRepository>;
   let mockAliasRepo: jest.Mocked<ProductAliasRepository>;
   let mockSourceRecordRepo: jest.Mocked<ProductSourceRecordRepository>;
   let mockSourceRecordUpdater: jest.Mocked<ProductSourceRecordUpdaterService>;
@@ -133,8 +147,11 @@ describe('ProductScrapeUpdaterService', () => {
   let mockKeyLookup: jest.Mocked<ProductKeyLookupService>;
   let mockBrandResolution: jest.Mocked<BrandResolutionService>;
   let mockSpecPostProcess: jest.Mocked<SpecPostProcessService>;
+  let mockLocks: { withLocks: jest.Mock };
 
   beforeEach(() => {
+    knownModels = [];
+    mockRandomUUID.mockReturnValue('model-created');
     const aliasInsertBuilder = makeAliasInsertBuilder();
 
     // The common case for every test that isn't about matching: nothing close
@@ -149,13 +166,19 @@ describe('ProductScrapeUpdaterService', () => {
 
     mockProductRepo = {
       findOne: jest.fn(),
-      findOneOrFail: jest.fn(),
+      // A test's mockResolvedValueOnce answers identity resolution; the reload
+      // under the product's lock falls through to the products it built.
+      findOneOrFail: jest.fn().mockImplementation(async ({ where }) => {
+        const model = knownModels.find((known) => known.id === where.id);
+        if (!model) throw new Error(`No product ${where.id}`);
+        return model;
+      }),
       save: jest.fn(),
     } as unknown as jest.Mocked<ProductModelRepository>;
 
     mockTaskRepo = {
       save: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<ScrapeTaskRepository>;
+    } as unknown as jest.Mocked<ProductImportTaskRepository>;
 
     mockAliasRepo = {
       repo: {
@@ -197,6 +220,7 @@ describe('ProductScrapeUpdaterService', () => {
       offerGtin: jest.fn(),
       identityKeyConflict: jest.fn(),
       identityKeyDisagreement: jest.fn(),
+      identityRecheckAttached: jest.fn(),
     } as unknown as jest.Mocked<ProductMetricsService>;
 
     mockProductNormalizer = {
@@ -225,6 +249,7 @@ describe('ProductScrapeUpdaterService', () => {
       // marks the model as newly created downstream.
       createShell: jest.fn().mockImplementation(async () => {
         const model = new ProductModel();
+        knownModels.push(model);
         model.brand = makeBrand();
         model.enabled = true;
         return model;
@@ -254,6 +279,10 @@ describe('ProductScrapeUpdaterService', () => {
       unify: jest.fn().mockImplementation(async ({ scrapedProduct }) => scrapedProduct),
     } as unknown as jest.Mocked<SpecPostProcessService>;
 
+    mockLocks = {
+      withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()),
+    };
+
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
       mockDuplicateService,
@@ -273,6 +302,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockKeyLookup,
       mockBrandResolution,
       mockSpecPostProcess,
+      mockLocks as never,
     );
   });
 
@@ -398,10 +428,7 @@ describe('ProductScrapeUpdaterService', () => {
       },
     } as never);
     mockProductRepo.findOne.mockResolvedValue(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-llm-declined';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-llm-declined');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -421,10 +448,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
 
     mockProductRepo.findOne.mockResolvedValue(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-not-found';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-not-found');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -449,10 +473,7 @@ describe('ProductScrapeUpdaterService', () => {
       decision: { outcome: 'created', candidates: [] },
     } as never);
     mockProductRepo.findOne.mockResolvedValue(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-no-brand';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-no-brand');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -474,10 +495,7 @@ describe('ProductScrapeUpdaterService', () => {
     };
 
     const savedAs = (id: string) =>
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = id;
-        return model;
-      });
+      mockRandomUUID.mockReturnValue(id);
 
     it('looks up the normalized identifiers, the resolved brand and the declared siblings', async () => {
       savedAs('model-new');
@@ -552,7 +570,8 @@ describe('ProductScrapeUpdaterService', () => {
     // once as 2027. The shop contradicts itself; a person decides.
     it('sends a conflicting listing on to name matching, and pairs wherever it lands with the key\'s product', async () => {
       savedAs('model-2027');
-      mockKeyLookup.lookup.mockResolvedValueOnce([gtinMatch]);
+      // Every lookup, the re-check under the brand lock included, sees the GTIN.
+      mockKeyLookup.lookup.mockResolvedValue([gtinMatch]);
       const failedGates = {
         'model-speedbike': [
           {
@@ -564,7 +583,7 @@ describe('ProductScrapeUpdaterService', () => {
           },
         ],
       };
-      mockKeyLookup.decide.mockResolvedValueOnce({
+      mockKeyLookup.decide.mockResolvedValue({
         verdict: {
           kind: 'conflict',
           via: 'gtin',
@@ -682,10 +701,7 @@ describe('ProductScrapeUpdaterService', () => {
     });
 
     const savedAs = (id: string) =>
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = id;
-        return model;
-      });
+      mockRandomUUID.mockReturnValue(id);
 
     // The listing's own history decides whether the stored extraction can be
     // reused, so it has to be known before the extraction runs.
@@ -842,7 +858,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockProductRepo.save.mockResolvedValue(product);
 
       await service.createOrUpdateProduct(
-        contextFromTask({ ...makeTask(), force: true } as ScrapeTask),
+        contextFromTask({ ...makeTask(), force: true } as ProductImportTask),
         makeScrapedProduct(),
       );
 
@@ -911,10 +927,7 @@ describe('ProductScrapeUpdaterService', () => {
       const scrapedProduct = makeScrapedProduct();
 
       mockProductRepo.findOne.mockResolvedValue(null);
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = 'model-detect';
-        return model;
-      });
+      mockRandomUUID.mockReturnValue('model-detect');
 
       await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -950,10 +963,7 @@ describe('ProductScrapeUpdaterService', () => {
         new Error('recall exploded'),
       );
       mockProductRepo.findOne.mockResolvedValue(null);
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = 'model-detect-fails';
-        return model;
-      });
+      mockRandomUUID.mockReturnValue('model-detect-fails');
 
       const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -971,10 +981,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct();
 
     mockProductRepo.findOne.mockResolvedValue(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-new';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-new');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -998,12 +1005,7 @@ describe('ProductScrapeUpdaterService', () => {
     });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) {
-        model.id = 'model-2';
-      }
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-2');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -1017,10 +1019,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct(); // no `offers` field
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-no-offers';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-no-offers');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -1033,10 +1032,7 @@ describe('ProductScrapeUpdaterService', () => {
     const scrapedProduct = makeScrapedProduct({ offers: [] });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-empty-offers';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-empty-offers');
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
@@ -1059,10 +1055,7 @@ describe('ProductScrapeUpdaterService', () => {
     });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-with-offers';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-with-offers');
     mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
@@ -1093,10 +1086,7 @@ describe('ProductScrapeUpdaterService', () => {
     });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-      if (!model.id) model.id = 'model-partial-offer-failure';
-      return model;
-    });
+    mockRandomUUID.mockReturnValue('model-partial-offer-failure');
     mockOfferRepo.upsertFromScrape
       .mockRejectedValueOnce(new Error('offer upsert failed'))
       .mockResolvedValueOnce({} as never);
@@ -1117,10 +1107,7 @@ describe('ProductScrapeUpdaterService', () => {
     const runWithOffers = async (offers: unknown[]) => {
       const task = makeTask();
       mockProductRepo.findOne.mockResolvedValueOnce(null);
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = 'model-offer-identity';
-        return model;
-      });
+      mockRandomUUID.mockReturnValue('model-offer-identity');
       mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
@@ -1218,10 +1205,7 @@ describe('ProductScrapeUpdaterService', () => {
 
     const runWithOffers = async (offers: unknown[]) => {
       mockProductRepo.findOne.mockResolvedValueOnce(null);
-      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
-        if (!model.id) model.id = 'model-offer-identifiers';
-        return model;
-      });
+      mockRandomUUID.mockReturnValue('model-offer-identifiers');
       mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
@@ -1275,7 +1259,7 @@ describe('ProductScrapeUpdaterService', () => {
     const task = {
       ...makeTask(),
       source: { ...makeTask().source, seller },
-    } as ScrapeTask;
+    } as ProductImportTask;
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
@@ -1333,7 +1317,7 @@ describe('ProductScrapeUpdaterService', () => {
     const task = {
       ...makeTask(),
       source: { ...makeTask().source, seller },
-    } as ScrapeTask;
+    } as ProductImportTask;
     const scrapedProduct = makeScrapedProduct({
       offers: [
         {
@@ -1375,5 +1359,235 @@ describe('ProductScrapeUpdaterService', () => {
     expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith([
       'offer-53cm-stale',
     ]);
+  });
+
+  describe('locks and the re-check', () => {
+    const concurrentGtin = {
+      via: 'gtin' as const,
+      key: '09008594503199',
+      productId: 'model-concurrent',
+    };
+
+    /** The locks held right now, innermost last, as `kind:id`. */
+    let held: string[];
+    /** What each tracked call saw held when it ran. */
+    let seen: Record<string, string[][]>;
+
+    const see = (name: string) => {
+      (seen[name] ??= []).push([...held]);
+    };
+
+    beforeEach(() => {
+      held = [];
+      seen = {};
+      mockLocks.withLocks.mockImplementation(
+        async (
+          keys: { namespace: number; id: string }[],
+          work: () => Promise<unknown>,
+        ) => {
+          const labels = keys.map(
+            (key) => `${key.namespace === 1 ? 'product' : 'brand'}:${key.id}`,
+          );
+          held.push(...labels);
+          try {
+            return await work();
+          } finally {
+            held.splice(held.length - labels.length, labels.length);
+          }
+        },
+      );
+      mockModelFactory.createShell.mockImplementation(async () => {
+        see('createShell');
+        const model = new ProductModel();
+        knownModels.push(model);
+        model.brand = makeBrand();
+        model.enabled = true;
+        return model;
+      });
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        see(`save ${model.id}`);
+        return model;
+      });
+      mockSourceRecordUpdater.upsertSourceRecord.mockImplementation(async () => {
+        see('upsertSourceRecord');
+        return { id: 'source-record-1' } as never;
+      });
+      mockMergeService.recomputePrice.mockImplementation(async (model) => {
+        see('recomputePrice');
+        return model;
+      });
+      mockImageCopyService.copyImagesFromSource.mockImplementation(async () => {
+        see('copyImages');
+        return [];
+      });
+      mockKeyLookup.recordPairs.mockImplementation(async () => {
+        see('recordPairs');
+        return 0;
+      });
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({ id: 'offer-1' } as never);
+    });
+
+    const withOfferAndImage = () =>
+      makeScrapedProduct({
+        offers: [{ price: 100, currency: 'HUF', externalId: 'sku-1' }],
+        images: [{ url: 'https://example.com/a.jpg', order: 0 }],
+      } as Partial<ScrapedProduct>);
+
+    it('writes an existing product only under its lock, on a copy loaded under it', async () => {
+      const task = makeTask();
+      task.product = { id: 'model-1' } as never;
+      const stale = makeExistingModel();
+      const fresh = makeExistingModel();
+      mockProductRepo.findOneOrFail
+        .mockResolvedValueOnce(stale)
+        .mockResolvedValueOnce(fresh);
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(task),
+        withOfferAndImage(),
+      );
+
+      expect(result).toBe(fresh);
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ model: fresh }),
+      );
+      // By identity: the two copies are deep-equal.
+      expect(mockProductRepo.save.mock.calls.every(([model]) => model === fresh)).toBe(true);
+      expect(stale).not.toBe(fresh);
+      for (const call of [
+        'upsertSourceRecord',
+        'save model-1',
+        'copyImages',
+        'recomputePrice',
+      ]) {
+        expect(seen[call]?.length).toBeGreaterThan(0);
+        for (const locks of seen[call]) {
+          expect(locks).toEqual(['product:model-1']);
+        }
+      }
+      // Pairs only add rows, with ON CONFLICT: no lock needed.
+      expect(seen['recordPairs']).toEqual([[]]);
+    });
+
+    it('creates under the brand lock and its own, and copies the image after the brand lock', async () => {
+      mockRandomUUID.mockReturnValue('model-new');
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        withOfferAndImage(),
+      );
+
+      expect(result?.id).toBe('model-new');
+      // The embedding call happens before anything is locked.
+      expect(seen['createShell']).toEqual([[]]);
+      for (const call of ['upsertSourceRecord', 'save model-new', 'recomputePrice']) {
+        for (const locks of seen[call]) {
+          expect(locks).toEqual(['brand:brand-1', 'product:model-new']);
+        }
+      }
+      expect(seen['copyImages']).toEqual([['product:model-new']]);
+      expect(mockMetricsService.newProductCreated).toHaveBeenCalledWith('arukereso');
+      expect(mockMetricsService.identityRecheckAttached).not.toHaveBeenCalled();
+    });
+
+    it('re-checks without the LLM under the brand lock before creating', async () => {
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(mockListingMatch.match).toHaveBeenCalledTimes(2);
+      expect(mockListingMatch.match).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { taskId: 'task-1' },
+        { llm: false },
+      );
+    });
+
+    // Two sizes of one new bike imported at once: the second waited for the
+    // brand lock while the first created the product and wrote its offers.
+    it('attaches to the product a concurrent import created, found by its GTIN', async () => {
+      const concurrent = makeExistingModel();
+      concurrent.id = 'model-concurrent';
+      // The first decision ran before the other import's offers existed.
+      mockKeyLookup.lookup.mockResolvedValueOnce([]).mockResolvedValue([concurrentGtin]);
+      mockKeyLookup.decide
+        .mockResolvedValueOnce({ verdict: { kind: 'none' }, failedGates: {} } as never)
+        .mockResolvedValue({
+          verdict: { kind: 'attach', via: 'gtin', productId: 'model-concurrent' },
+          failedGates: { 'model-concurrent': [] },
+        } as never);
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        withOfferAndImage(),
+      );
+
+      expect(result).toBe(concurrent);
+      expect(mockMetricsService.identityRecheckAttached).toHaveBeenCalledWith(
+        'arukereso',
+        'gtin',
+      );
+      expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
+      expect(mockProductRepo.save).toHaveBeenCalledWith(concurrent);
+      for (const locks of seen['save model-concurrent']) {
+        expect(locks).toEqual(['brand:brand-1', 'product:model-concurrent']);
+      }
+      // Its own product: no pair with itself.
+      expect(mockKeyLookup.recordPairs).toHaveBeenCalledWith(
+        'model-concurrent',
+        [concurrentGtin],
+        { 'model-concurrent': [] },
+        'scrape',
+      );
+    });
+
+    it('attaches to a concurrent import\'s product found by name, and stores that decision', async () => {
+      const concurrent = makeExistingModel();
+      concurrent.id = 'model-concurrent';
+      const identified = {
+        outcome: 'identified',
+        nameKey: 'mx keys',
+        candidates: [],
+      };
+      mockListingMatch.match
+        .mockResolvedValueOnce(createdDecision() as never)
+        .mockResolvedValueOnce({
+          productId: 'model-concurrent',
+          decision: identified,
+        } as never);
+      const task = makeTask();
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(task),
+        makeScrapedProduct(),
+      );
+
+      expect(result).toBe(concurrent);
+      expect(mockMetricsService.identityRecheckAttached).toHaveBeenCalledWith(
+        'arukereso',
+        'name',
+      );
+      expect(task.identityDecision).toBe(identified);
+      expect(mockDuplicateService.detect).toHaveBeenCalledWith(
+        'model-concurrent',
+        'scrape',
+      );
+    });
+
+    it('creates nothing when the brand does not resolve', async () => {
+      mockModelFactory.createShell.mockRejectedValueOnce(
+        new Error('Brand could not be identified'),
+      );
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockLocks.withLocks).not.toHaveBeenCalled();
+      expect(mockProductRepo.save).not.toHaveBeenCalled();
+    });
   });
 });

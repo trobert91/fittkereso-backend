@@ -7,6 +7,7 @@ export * from './scrape-operation';
 export * from './scrape-operation.schema';
 export * from './product-source-config.schema';
 export * from './queues';
+export * from './product-import-task-kind';
 export * from './seller-type';
 export * from './offer-condition';
 export * from './offer-availability';

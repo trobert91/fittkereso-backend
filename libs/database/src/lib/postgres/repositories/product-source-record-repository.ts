@@ -49,6 +49,32 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
+   * Each of these URLs' feed row hash, for one source: a feed run's whole
+   * question about a row is whether its listing already holds that hash.
+   */
+  async findFeedRowHashes(
+    sourceId: string,
+    urls: string[],
+  ): Promise<Map<string, string | null>> {
+    if (urls.length === 0) return new Map();
+    const records = await this.repo
+      .createQueryBuilder('record')
+      .select([
+        `record.${nameOf<ProductSourceRecord>('id')}`,
+        `record.${nameOf<ProductSourceRecord>('url')}`,
+        `record.${nameOf<ProductSourceRecord>('feedRowHash')}`,
+      ])
+      .where(`record."${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, {
+        sourceId,
+      })
+      .andWhere(`record.${nameOf<ProductSourceRecord>('url')} IN (:...urls)`, { urls })
+      .getMany();
+    return new Map(
+      records.map((record) => [record.url as string, record.feedRowHash ?? null]),
+    );
+  }
+
+  /**
    * Identity lookup by (source, externalId) — the source-native SKU/model
    * code/slug, stable across URL changes — with `model` loaded via the given
    * relations so the result can be used directly as a resolved ProductModel

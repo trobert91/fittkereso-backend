@@ -33,8 +33,10 @@ export class ProductSourceSyncListener {
         `Processing ProductSourceSync job for source ${message.productSourceId}.`,
       );
 
+      // With its seller: importers key offers by (seller, externalId).
       const entity = await this.sourceRepo.findOneOrFail({
         where: { id: message.productSourceId },
+        relations: { seller: true },
       });
 
       // Before any work is done: a config that cannot be interpreted produces
@@ -76,10 +78,10 @@ export class ProductSourceSyncListener {
   /**
    * Dispatch to the importer for this source's type, and record what it did.
    *
-   * The run summary lands on the source's own timeline because a feed importer
-   * batches thousands of items in-process with no ScrapeTask per item — without
-   * this the run would leave no trace anywhere. A failure is recorded too, then
-   * rethrown so the task still fails and retries.
+   * The run summary lands on the source's own timeline: it is the run's own
+   * trace — what it read, confirmed in place and queued — beside the tasks it
+   * queued. A failure is recorded too, then rethrown so the task still fails
+   * and retries.
    */
   private async runImport(
     source: ProductSource,

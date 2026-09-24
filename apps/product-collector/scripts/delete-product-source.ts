@@ -123,7 +123,7 @@ async function main(): Promise<void> {
 
     // A plain DELETE on the source does NOT work, in two separate ways:
     //
-    //  - `scrape_task.sourceId` and `product_image.sourceId` are ON DELETE NO
+    //  - `product_import_task.sourceId` and `product_image.sourceId` are ON DELETE NO
     //    ACTION, so Postgres refuses the delete outright while any exist.
     //  - `product_source_record.sourceId` is ON DELETE SET NULL, not CASCADE.
     //    So even once that cleared, the records would SURVIVE with a null
@@ -145,10 +145,10 @@ async function main(): Promise<void> {
 
       // A task whose source is gone can never run.
       const tasks = await tx.query(
-        `DELETE FROM "scrape_task" WHERE "sourceId" = $1`,
+        `DELETE FROM "product_import_task" WHERE "sourceId" = $1`,
         [source.id],
       );
-      console.log(`  scrape_task: deleted (${tasks[1] ?? 0})`);
+      console.log(`  product_import_task: deleted (${tasks[1] ?? 0})`);
 
       // Remember whose prices need recomputing before the offers vanish.
       const models = await tx.query(

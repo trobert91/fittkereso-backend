@@ -146,13 +146,13 @@ These are the closest thing to living documentation for "what does this config a
 - `libs/product-scraper/src/lib/product-scraper/services/product-list-page-scraper.service.ts`
 - `libs/product-scraper/src/lib/product-scraper/services/product-details-page-scraper.service.ts`
 
-These are the two services that actually get invoked per `ScrapeTask`. Both:
+These are the two services that actually get invoked per `ProductImportTask`. Both:
 1. Fetch HTML via `ScraperService.getHtml(task.url)` (unchanged — still backed by the Zyte API, see `libs/zyte`).
 2. `cheerio.load()` it.
 3. Call the interpreter (`runListPage` or `runDetailPage`) with `task.source.config`.
 4. Do something with the result.
 
-`ProductListPageScraperService` turns the interpreter's `{categoryName, categoryLinks, productLinks}` into new `ScrapeTask` rows (pagination → more list tasks, product links → detail tasks), deduping via `ScrapeUrlDeduplicationService`.
+`ProductListPageScraperService` turns the interpreter's `{categoryName, categoryLinks, productLinks}` into new `ProductImportTask` rows (pagination → more list tasks, product links → detail tasks), deduping via `ScrapeUrlDeduplicationService`.
 
 `ProductDetailsPageScraperService` is the more involved one — it's also where the interpreter's raw output gets turned into a finished `ScrapedProduct`:
 1. Calls `interpreter.runDetailPage(...)`.
@@ -168,7 +168,7 @@ These are the two services that actually get invoked per `ScrapeTask`. Both:
 ## 7. What replaced the per-source dispatch switches
 
 **Files:**
-- `apps/product-collector/src/modules/queue-processor/scrape-task/scrape-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
+- `apps/product-collector/src/modules/queue-processor/product-import-task/product-import-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
 - `libs/product-scraper/src/lib/product-scraper/services/scraping-import.service.ts` — the `scraping` importer. Replaced `GenericProductSourceSyncService`, whose whole job was running a `config.discovery` block to *find* start URLs; neither live config ever had one, so a "full sync" silently did nothing. `startUrls` names them outright.
 - `libs/product-scraper/src/lib/arukereso/arukereso-import.service.ts` — the `arukereso` importer, resolved through `ProductSourceImporterRegistry` by `source.type`.
 
@@ -244,26 +244,35 @@ cron (ProductSourceSyncScheduler, every 10 min between 02:00–05:59 Europe/Buda
   ScrapingImportService
     → resolves startUrls → category URLs (categoryLinks, once) → EVERY page
       (pagination.pageCount against page 1, once) and enqueues one
-      ScrapeProductList task per page. Then returns; the poller does the rest.
+      list_page task per page. Then returns; the poller does the rest.
 
   ── type 'arukereso' ─────────────────────────────────────────────
   ArukeresoImportService
-    → one native GET, streamed through ArukeresoFeedParserService, mapped per
-      item and persisted inline. Enqueues nothing; there is no page to walk.
+    → one native GET, streamed through ArukeresoFeedParserService, every row
+      mapped (deterministic, no LLM) and triaged against its listing's stored
+      feedRowHash (ArukeresoFeedTriageService): an unchanged row only has its
+      offer's lastSynced confirmed; a new or changed row becomes a feed_entry
+      task carrying the row. Then returns; the run takes seconds.
 
-ScrapeTaskManagerService (5s poll, separate loop) — scraping only
-  → claims a ScrapeTask, routes by task.queue:
-      ScrapeProductList    → ProductListPageScraperService.scrapeListPage(task)
+ProductImportTaskManagerService (every tick, 30s by default)
+  → claims up to importTaskBatchSize tasks (priority first, then random within
+    a priority; one page task per source per tick, within its maxConcurrent
+    and requestsPerHour) and runs each, routed by task.kind:
+      list_page            → ProductListPageScraperService.scrapeListPage(task)
                                 → interpreter.runListPage → ScrapedListProduct[]
                                 → per card, ListProductRefreshService decides:
                                     refresh the offer in place (no detail fetch
-                                    spent), or enqueue ScrapeProductDetails.
+                                    spent), or enqueue a detail_page task.
                                 → enqueues NO further list pages, by design
-      ScrapeProductDetails → ProductDetailsPageScraperService
+      detail_page          → ProductDetailsPageScraperService
                                 → interpreter.runDetailPage, spec extraction,
                                   SpecPostProcessService (hash-skipped when
                                   nothing changed)
                                 → ScrapedProduct
+      feed_entry           → ArukeresoFeedEntryService (not rate-gated)
+                                → the stored row mapped again with the
+                                  source's current config → ScrapedProduct,
+                                  plus its feedRowHash for the listing
 
   ── both types converge here ─────────────────────────────────────
   ProductScrapeUpdaterService.createOrUpdateProduct(context, scrapedProduct)
@@ -273,7 +282,7 @@ ScrapeTaskManagerService (5s poll, separate loop) — scraping only
       with lastSynced)
 ```
 
-Everything below the converge line is import-agnostic: identity resolution, merge, spec validation and offer upsert cannot tell whether a product arrived as HTML or as a feed row. That is what `ProductImportContext` is for — the persistence path used to take a `ScrapeTask`, and a feed run has none.
+Everything below the converge line is import-agnostic: identity resolution, merge, spec validation and offer upsert cannot tell whether a product arrived as HTML or as a feed row. That is what `ProductImportContext` is for — the persistence path used to take a `ProductImportTask`, and a feed run has none.
 
 ---
 

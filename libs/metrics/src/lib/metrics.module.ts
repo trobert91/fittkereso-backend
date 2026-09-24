@@ -4,7 +4,7 @@ import { PrometheusService } from './prometheus.service';
 import {
   ProductMetricsService,
   SchedulerMetricsService,
-  ScrapeTaskMetricsService,
+  ProductImportTaskMetricsService,
   TaskMetricsService,
   OpenAiMetricsService,
   AiMetricsService,
@@ -24,7 +24,7 @@ import {
     PrometheusService,
     SchedulerMetricsService,
     TaskMetricsService,
-    ScrapeTaskMetricsService,
+    ProductImportTaskMetricsService,
     ProductMetricsService,
     AiMetricsService,
     OpenAiMetricsService,
@@ -39,7 +39,7 @@ import {
   exports: [
     SchedulerMetricsService,
     TaskMetricsService,
-    ScrapeTaskMetricsService,
+    ProductImportTaskMetricsService,
     ProductMetricsService,
     AiMetricsService,
     OpenAiMetricsService,

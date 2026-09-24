@@ -1,5 +1,5 @@
 import type { CheerioAPI, Cheerio } from 'cheerio';
-import type { ScrapeTask } from '@fittkereso-backend/database';
+import type { ProductImportTask } from '@fittkereso-backend/database';
 import type { RuntimeDataProvider } from './runtime-data-provider.interface';
 
 // A pipeline value is either a plain scalar/array result, or a live Cheerio
@@ -10,7 +10,7 @@ export type PipelineValue = unknown;
 export interface ScrapeExecutionContext {
   $: CheerioAPI;
   html: string;
-  task: ScrapeTask;
+  task: ProductImportTask;
   vars: Record<string, PipelineValue>;
   runtime: RuntimeDataProvider;
   // Extra named inputs supplied by the calling service for this run only

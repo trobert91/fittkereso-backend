@@ -1,6 +1,6 @@
 export * from './task-metrics.service';
 export * from './scheduler-metrics.service';
-export * from './scrape-task-metrics.service';
+export * from './product-import-task-metrics.service';
 export * from './product-metrics.service';
 export * from './openai-metrics.service';
 export * from './ai-metrics.service';

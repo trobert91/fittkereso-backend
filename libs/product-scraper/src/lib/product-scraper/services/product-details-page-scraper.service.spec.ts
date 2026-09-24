@@ -1,7 +1,7 @@
 import { ProductDetailsPageScraperService } from './product-details-page-scraper.service';
 import type {
   ProductCategory,
-  ScrapeTask,
+  ProductImportTask,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { asScrapingConfig } from '@fittkereso-backend/database';
@@ -20,7 +20,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     properties: {},
   };
 
-  function buildTask(): ScrapeTask {
+  function buildTask(): ProductImportTask {
     return {
       id: 'task-1',
       url: 'https://speedbike.hu/product/1',
@@ -38,7 +38,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
           detailPage: { specMapping: { ebikes: { mappings: [] } } },
         },
       },
-    } as unknown as ScrapeTask;
+    } as unknown as ProductImportTask;
   }
 
   // "raw title" is speedbike.hu's uncleaned marketing title — the exact
@@ -77,11 +77,11 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       specExtraction as any,
       {} as any, // translationSelector
       {} as any, // translationService
-      {} as any, // scrapeTaskPublisher
+      {} as any, // importTaskPublisher
     );
   });
 
-  function callExtractProduct(task: ScrapeTask) {
+  function callExtractProduct(task: ProductImportTask) {
     return (service as any).extractProduct(task, {} as any);
   }
 
@@ -198,9 +198,9 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
 describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
   let service: ProductDetailsPageScraperService;
-  let scrapeTaskPublisher: { dispatchIfNeeded: jest.Mock };
+  let importTaskPublisher: { dispatchIfNeeded: jest.Mock };
 
-  function buildTask(frequency?: string): ScrapeTask {
+  function buildTask(frequency?: string): ProductImportTask {
     return {
       id: 'task-1',
       url: 'https://speedbike.hu/product/1',
@@ -210,10 +210,10 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
         frequency,
         config: {},
       },
-    } as unknown as ScrapeTask;
+    } as unknown as ProductImportTask;
   }
 
-  function callDispatchVariantTasks(task: ScrapeTask, offerLinks: Array<{ url: string; title?: string }>) {
+  function callDispatchVariantTasks(task: ProductImportTask, offerLinks: Array<{ url: string; title?: string }>) {
     return (service as any).dispatchVariantTasks(task, {
       scrapedProduct: {} as any,
       offerLinks,
@@ -221,7 +221,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
   }
 
   beforeEach(() => {
-    scrapeTaskPublisher = {
+    importTaskPublisher = {
       dispatchIfNeeded: jest.fn().mockResolvedValue({ dispatched: true, task: {} }),
     };
 
@@ -235,7 +235,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
       {} as any, // specExtraction
       {} as any, // translationSelector
       {} as any, // translationService
-      scrapeTaskPublisher as any,
+      importTaskPublisher as any,
     );
   });
 
@@ -244,7 +244,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
 
     await callDispatchVariantTasks(task, []);
 
-    expect(scrapeTaskPublisher.dispatchIfNeeded).not.toHaveBeenCalled();
+    expect(importTaskPublisher.dispatchIfNeeded).not.toHaveBeenCalled();
   });
 
   it('dedupes offerLinks pointing at the same normalized URL into a single dispatch', async () => {
@@ -256,8 +256,8 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
       { url: 'https://speedbike.hu/product/1-blue', title: 'Blue' },
     ]);
 
-    expect(scrapeTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
-    const dispatchedUrls = scrapeTaskPublisher.dispatchIfNeeded.mock.calls.map(
+    expect(importTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
+    const dispatchedUrls = importTaskPublisher.dispatchIfNeeded.mock.calls.map(
       ([params]) => params.url,
     );
     expect(dispatchedUrls).toEqual([
@@ -272,12 +272,21 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
 
     await callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]);
 
-    const [params] = scrapeTaskPublisher.dispatchIfNeeded.mock.calls[0];
+    const [params] = importTaskPublisher.dispatchIfNeeded.mock.calls[0];
     expect(params.source).toBe(task.source);
-    expect(params.queue).toBeDefined();
+    expect(params.kind).toBeDefined();
     const expectedCutoff = before - 24 * 60 * 60 * 1000;
     expect(params.processedSince.getTime()).toBeGreaterThanOrEqual(expectedCutoff - 1000);
     expect(params.processedSince.getTime()).toBeLessThanOrEqual(Date.now() - 24 * 60 * 60 * 1000 + 1000);
+  });
+
+  it('dispatches variants at the priority of the task that found them', async () => {
+    const task = buildTask('1 day');
+    task.priority = 90;
+
+    await callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]);
+
+    expect(importTaskPublisher.dispatchIfNeeded.mock.calls[0][0].priority).toBe(90);
   });
 
   it('defaults to a 7 day cutoff when frequency is unset', async () => {
@@ -285,7 +294,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
 
     await callDispatchVariantTasks(task, [{ url: 'https://speedbike.hu/product/1-red' }]);
 
-    const [params] = scrapeTaskPublisher.dispatchIfNeeded.mock.calls[0];
+    const [params] = importTaskPublisher.dispatchIfNeeded.mock.calls[0];
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     expect(params.processedSince.getTime()).toBeGreaterThanOrEqual(sevenDaysAgo - 1000);
     expect(params.processedSince.getTime()).toBeLessThanOrEqual(sevenDaysAgo + 1000);
@@ -293,7 +302,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
 
   it('does not throw when dispatchIfNeeded reports the URL is pending or recently processed', async () => {
     const task = buildTask();
-    scrapeTaskPublisher.dispatchIfNeeded.mockResolvedValueOnce({
+    importTaskPublisher.dispatchIfNeeded.mockResolvedValueOnce({
       dispatched: false,
       reason: 'pending_task',
     });
@@ -305,7 +314,7 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
 
   it('isolates a failing dispatch for one link, continuing to dispatch the rest', async () => {
     const task = buildTask();
-    scrapeTaskPublisher.dispatchIfNeeded
+    importTaskPublisher.dispatchIfNeeded
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce({ dispatched: true, task: {} });
 
@@ -314,6 +323,6 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
       { url: 'https://speedbike.hu/product/1-blue' },
     ]);
 
-    expect(scrapeTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
+    expect(importTaskPublisher.dispatchIfNeeded).toHaveBeenCalledTimes(2);
   });
 });

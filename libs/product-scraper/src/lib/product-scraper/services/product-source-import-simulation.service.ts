@@ -12,7 +12,7 @@ import {
   ScrapedListProduct,
   ScrapedProduct,
   ScrapedProductSpec,
-  ScrapeTask,
+  ProductImportTask,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { NativeScraperService, ScraperService } from '@fittkereso-backend/scraper';
@@ -40,6 +40,12 @@ import {
   ArukeresoProductMapperService,
   FeedSkipReason,
 } from '../../arukereso/arukereso-product-mapper.service';
+import {
+  ArukeresoFeedTriageService,
+  FeedRow,
+} from '../../arukereso/arukereso-feed-triage.service';
+import { feedRowHash } from '../../arukereso/feed-row-hash';
+import { offerExternalIdOf } from './offer-external-id';
 
 /** What a run would do with one list card, and why. */
 export interface SimulatedListItemDecision {
@@ -77,6 +83,14 @@ export interface SimulatedArukeresoImport {
   /** Attribute pairs dropped for missing a name or a value. */
   attributesSkipped: number;
   wouldImport: number;
+  /**
+   * Of wouldImport, what a run would do right now: queue a feed_entry task
+   * (new, changed, or missing its offer), or only confirm the offer in place.
+   */
+  wouldQueue: number;
+  wouldRefresh: number;
+  /** Eligible rows sharing a URL with an earlier row: only the last is imported. */
+  duplicateUrls: number;
   wouldSkip: number;
   skipReasons: Partial<Record<FeedSkipReason, number>>;
   /** Distinct externalIds among eligible items, and any that repeat. */
@@ -136,6 +150,9 @@ export interface ProductSourceImportSimulationResult {
 /** Full previews are expensive; the counts around them are not. */
 export const DEFAULT_PREVIEW_LIMIT = 5;
 
+/** Rows triaged per lookup, the feed run's own batch size. */
+const TRIAGE_BATCH = 200;
+
 /**
  * Dry-run of a whole IMPORT RUN, as opposed to one detail page.
  *
@@ -166,6 +183,7 @@ export class ProductSourceImportSimulationService {
     private readonly mapper: ArukeresoProductMapperService,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly specPostProcess: SpecPostProcessService,
+    private readonly feedTriage: ArukeresoFeedTriageService,
   ) {}
 
   public async simulate(
@@ -237,7 +255,7 @@ export class ProductSourceImportSimulationService {
 
     const $ = cheerio.load(await this.scraperService.getHtml(listPageParsed));
     const page = await this.interpreter.runListPage(
-      { id: 'simulate', url: listPageParsed, source } as ScrapeTask,
+      { id: 'simulate', url: listPageParsed, source } as ProductImportTask,
       $,
       config,
     );
@@ -346,6 +364,22 @@ export class ProductSourceImportSimulationService {
       config.mapping,
       config.identityExtraction?.specRows,
     );
+    // What a run would do with each eligible row, triaged in batches as the
+    // run does (last row wins for a repeated URL).
+    const seenUrls = new Set<string>();
+    let batch: FeedRow[] = [];
+    let wouldQueue = 0;
+    let wouldRefresh = 0;
+    let duplicateUrls = 0;
+    let mappingFailures = 0;
+    const triageBatch = async () => {
+      const unique = [...new Map(batch.map((row) => [row.url, row])).values()];
+      batch = [];
+      if (unique.length === 0) return;
+      const triage = await this.feedTriage.triage(source, unique);
+      wouldQueue += triage.toImport.length;
+      wouldRefresh += triage.unchanged.length;
+    };
 
     const summary = await this.feedParser.parseStream(
       stream,
@@ -380,12 +414,39 @@ export class ProductSourceImportSimulationService {
           rawSpecs: toRawSpecs(item),
         });
 
-        if (products.length < limit) {
-          const mapped = await this.mapper.map({
+        // Every eligible row is mapped — deterministic and free — so the
+        // triage below covers the whole feed, exactly as a run would.
+        let mapped: Awaited<ReturnType<ArukeresoProductMapperService['map']>>;
+        try {
+          mapped = await this.mapper.map({
             config,
             item,
             requestedSlugs: options.categorySlugs,
           });
+        } catch (error: unknown) {
+          mappingFailures += 1;
+          if (mappingFailures === 1) {
+            result.warnings.push(
+              `An eligible item failed to map: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+          return;
+        }
+        if (mapped.status === 'mapped') {
+          if (seenUrls.has(mapped.url)) duplicateUrls += 1;
+          seenUrls.add(mapped.url);
+          const offer = mapped.scrapedProduct.offers?.[0];
+          batch.push({
+            url: mapped.url,
+            item,
+            scrapedProduct: mapped.scrapedProduct,
+            rowHash: feedRowHash(mapped.url, mapped.scrapedProduct),
+            externalId: offer ? offerExternalIdOf(offer, mapped.url).value : undefined,
+          });
+          if (batch.length >= TRIAGE_BATCH) await triageBatch();
+        }
+
+        if (products.length < limit) {
           if (mapped.status === 'mapped') {
             // The mapping itself is free; the preview then runs the identity
             // extraction a first import would, which is the part that costs.
@@ -414,6 +475,18 @@ export class ProductSourceImportSimulationService {
         contentType,
       },
     );
+
+    await triageBatch();
+    if (mappingFailures > 0) {
+      result.warnings.push(
+        `${mappingFailures} eligible items failed to map; a run would count them as failed and skip them.`,
+      );
+    }
+    if (duplicateUrls > 0) {
+      result.warnings.push(
+        `${duplicateUrls} eligible items share a URL with an earlier one, so a run imports only the last row of each. Is mapping.url unique per variant?`,
+      );
+    }
 
     const duplicateExternalIds = [...externalIds.entries()]
       .filter(([, count]) => count > 1)
@@ -469,6 +542,9 @@ export class ProductSourceImportSimulationService {
       itemsParsed: summary.itemsParsed,
       attributesSkipped: summary.attributesSkipped,
       wouldImport,
+      wouldQueue,
+      wouldRefresh,
+      duplicateUrls,
       wouldSkip: Object.values(skipReasons).reduce((a, b) => a + b, 0),
       skipReasons,
       distinctExternalIds: externalIds.size,

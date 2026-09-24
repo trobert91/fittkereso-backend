@@ -12,7 +12,7 @@ import { AdminTaskController } from './controllers/admin-task.controller';
 import { AdminTestController } from './controllers/admin-test.controller';
 import { AdminProductSourceController } from './controllers/admin-product-source.controller';
 import { AdminProductDuplicateController } from './controllers/admin-product-duplicate.controller';
-import { AdminScrapeTaskController } from './controllers/admin-scrape-task.controller';
+import { AdminProductImportTaskController } from './controllers/admin-product-import-task.controller';
 import { AdminSellerController } from './controllers/admin-seller.controller';
 import { AdminUserController } from './controllers/admin-user.controller';
 import { UserModule } from '@fittkereso-backend/user';
@@ -33,7 +33,7 @@ import { UserModule } from '@fittkereso-backend/user';
     AdminProductController,
     AdminProductDuplicateController,
     AdminProductSourceController,
-    AdminScrapeTaskController,
+    AdminProductImportTaskController,
     AdminSellerController,
     AdminTaskController,
     AdminTestController,

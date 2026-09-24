@@ -36,6 +36,8 @@ export class ProductSourceRecordUpdaterService {
     externalId?: string;
     sourceUrl?: string;
     normalizedSourceName?: string;
+    /** A feed row's hash, stored so the next feed run can tell it unchanged. */
+    feedRowHash?: string;
   }): Promise<ProductSourceRecord | undefined> {
     const {
       model,
@@ -188,6 +190,7 @@ export class ProductSourceRecordUpdaterService {
     source.lastUpdated = new Date();
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
+    if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;
 
     this.logger.debug(
       `Upserted source record for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,

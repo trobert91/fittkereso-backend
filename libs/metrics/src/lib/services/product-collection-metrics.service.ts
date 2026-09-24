@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
+  FEED_ENTRY_SKIPPED_TOTAL,
   FULL_SYNC_CATEGORIES_DISCOVERED_TOTAL,
   FULL_SYNC_DURATION_SECONDS,
   FULL_SYNC_LIST_TASKS_CREATED_TOTAL,
@@ -9,7 +10,7 @@ import {
   LIST_PAGE_DETAIL_TASKS_CREATED_TOTAL,
   LIST_PAGE_PRODUCTS_FOUND_TOTAL,
   LIST_PAGE_PRODUCTS_SKIPPED_TOTAL,
-  SCRAPE_TASK_QUEUE_DEPTH,
+  PRODUCT_IMPORT_TASK_QUEUE_DEPTH,
 } from '../metric-names';
 
 @Injectable()
@@ -22,8 +23,15 @@ export class ProductCollectionMetricsService {
   private readonly listPageProductsSkipped: client.Counter<string>;
   private readonly listPageDetailTasksCreated: client.Counter<string>;
   private readonly queueDepthGauge: client.Gauge<string>;
+  private readonly feedEntrySkipped: client.Counter<string>;
 
   constructor(private readonly prometheusService: PrometheusService) {
+    this.feedEntrySkipped = new client.Counter({
+      name: FEED_ENTRY_SKIPPED_TOTAL,
+      help: 'Queued feed rows their task skipped under the current config, by reason',
+      labelNames: ['source_type', 'reason'],
+      registers: [this.prometheusService.register],
+    });
     this.fullSyncTotal = new client.Counter({
       name: FULL_SYNC_TOTAL,
       help: 'Total full sync executions',
@@ -75,9 +83,9 @@ export class ProductCollectionMetricsService {
     });
 
     this.queueDepthGauge = new client.Gauge({
-      name: SCRAPE_TASK_QUEUE_DEPTH,
-      help: 'Current scrape tasks by queue, source, and status',
-      labelNames: ['queue_name', 'source_type', 'status'],
+      name: PRODUCT_IMPORT_TASK_QUEUE_DEPTH,
+      help: 'Current import tasks by kind, source, status and priority',
+      labelNames: ['kind', 'source_type', 'status', 'priority'],
       registers: [this.prometheusService.register],
     });
   }
@@ -106,6 +114,10 @@ export class ProductCollectionMetricsService {
     this.listPageProductsFound.inc({ source_type: sourceType }, count);
   }
 
+  feedEntrySkippedAt(sourceType: string, reason: string): void {
+    this.feedEntrySkipped.inc({ source_type: sourceType, reason });
+  }
+
   productSkipped(sourceType: string, reason: string): void {
     this.listPageProductsSkipped.inc({ source_type: sourceType, reason });
   }
@@ -118,9 +130,15 @@ export class ProductCollectionMetricsService {
     this.queueDepthGauge.reset();
   }
 
-  setQueueDepth(queueName: string, sourceType: string, status: string, count: number): void {
+  setQueueDepth(
+    kind: string,
+    sourceType: string,
+    status: string,
+    priority: number,
+    count: number,
+  ): void {
     this.queueDepthGauge.set(
-      { queue_name: queueName, source_type: sourceType, status },
+      { kind, source_type: sourceType, status, priority: String(priority) },
       count,
     );
   }

@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { ScrapingSourceConfig, ScrapeTask } from '@fittkereso-backend/database';
+import { ScrapingSourceConfig, ProductImportTask } from '@fittkereso-backend/database';
 import { ScrapeInterpreterService } from './scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from './services/scrape-pipeline-runner.service';
 import { ScrapeOpRegistryService } from './services/scrape-op-registry.service';
@@ -7,8 +7,8 @@ import { RuntimeDataProviderService } from './services/runtime-data-provider.ser
 import { ProductValueMapperService } from './services/product-value-mapper.service';
 import { registerOps } from './ops/register-ops';
 
-function makeTask(url = 'https://www.arukereso.hu/monitorok/asus-pg34-p12345/'): ScrapeTask {
-  return { id: 'task-1', url } as ScrapeTask;
+function makeTask(url = 'https://www.arukereso.hu/monitorok/asus-pg34-p12345/'): ProductImportTask {
+  return { id: 'task-1', url } as ProductImportTask;
 }
 
 describe('ScrapeInterpreterService', () => {
@@ -326,7 +326,7 @@ describe('ScrapeInterpreterService', () => {
         const task = {
           ...makeTask(),
           __fixtures: (config as any).__fixtures,
-        } as unknown as ScrapeTask;
+        } as unknown as ProductImportTask;
         return stubInterpreter.runDetailPage(task, $, config);
       };
 

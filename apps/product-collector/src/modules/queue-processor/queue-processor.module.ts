@@ -3,10 +3,10 @@ import { TaskModule } from '@fittkereso-backend/task';
 import { ProductSourceSyncListener } from './task/product-source-sync-listener.service';
 import { TaskManagerService } from './task/task-manager.service';
 import { DatabaseModule } from '@fittkereso-backend/database';
-import { ScrapeTaskManagerService } from './scrape-task/scrape-task-manager.service';
-import { ScrapeTaskProcessorService } from './scrape-task/scrape-task-processor.service';
+import { ProductImportTaskManagerService } from './product-import-task/product-import-task-manager.service';
+import { ProductImportTaskProcessorService } from './product-import-task/product-import-task-processor.service';
 import { ProductScraperModule } from '@fittkereso-backend/product-scraper';
-import { ScrapeTaskQueueDepthService } from './scrape-task/scrape-task-queue-depth.service';
+import { ProductImportTaskQueueDepthService } from './product-import-task/product-import-task-queue-depth.service';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 import { ProductModule } from '@fittkereso-backend/product';
@@ -25,9 +25,9 @@ import { ProductModule } from '@fittkereso-backend/product';
   providers: [
     ProductSourceSyncListener,
     TaskManagerService,
-    ScrapeTaskProcessorService,
-    ScrapeTaskManagerService,
-    ScrapeTaskQueueDepthService,
+    ProductImportTaskProcessorService,
+    ProductImportTaskManagerService,
+    ProductImportTaskQueueDepthService,
   ],
 })
 export class QueueProcessorModule {}

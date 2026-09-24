@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
+  AdvisoryLockService,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
   ProductSpecs,
+  productLock,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
@@ -27,9 +29,21 @@ export class ProductSpecUpdaterService {
     private readonly mergeService: ProductMergeService,
     private readonly validatorService: ProductSpecValidatorService,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly locks: AdvisoryLockService,
   ) {}
 
   public async updateManualSpecs(
+    id: string,
+    specs: ProductSpecs,
+  ): Promise<ProductModel> {
+    // The product's lock, so an import writing to it meanwhile neither
+    // overwrites the edit nor has its own listing overwritten by it.
+    return this.locks.withLocks([productLock(id)], () =>
+      this.updateManualSpecsLocked(id, specs),
+    );
+  }
+
+  private async updateManualSpecsLocked(
     id: string,
     specs: ProductSpecs,
   ): Promise<ProductModel> {

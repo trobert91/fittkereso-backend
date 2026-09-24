@@ -1,11 +1,26 @@
 import { Injectable } from '@nestjs/common';
+import { uniq } from 'lodash';
 import {
-  asArukeresoConfig,
+  AdvisoryLockService,
   ArukeresoSourceConfig,
+  asArukeresoConfig,
+  DEFAULT_IMPORT_TASK_PRIORITY,
+  OfferRepository,
+  ProductImportTask,
+  ProductImportTaskKind,
+  ProductImportTaskRepository,
+  ProductModelRepository,
   ProductSource,
+  productLock,
+  TaskStatus,
 } from '@fittkereso-backend/database';
+import { TaskConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
+import {
+  OfferFreshnessService,
+  ProductMergeService,
+} from '@fittkereso-backend/product';
 import { NativeScraperService } from '@fittkereso-backend/scraper';
 import {
   emptyImportRunSummary,
@@ -13,40 +28,54 @@ import {
   ImportRunSummary,
   ProductSourceImporter,
 } from '../interfaces/product-source-importer.interface';
-import { ProductImportContext } from '../interfaces/product-import-context.interface';
-import { ProductScrapeUpdaterService } from '../product-scraper/services/product-scrape-updater.service';
+import { offerExternalIdOf } from '../product-scraper/services/offer-external-id';
 import { ArukeresoFeedParserService } from './arukereso-feed-parser.service';
 import { ArukeresoFeedItem } from './arukereso-feed-item';
 import {
   ArukeresoProductMapperService,
   FeedSkipReason,
+  MappedFeedItem,
 } from './arukereso-product-mapper.service';
+import {
+  ArukeresoFeedTriageService,
+  FeedRow,
+  UnchangedFeedRow,
+} from './arukereso-feed-triage.service';
+import { FeedEntryPayload, feedRowHash } from './feed-row-hash';
 
 /**
  * How many consecutive per-item failures end the run.
  *
  * A handful of bad rows in a 3488-product feed is normal and must not abandon
- * the other 3487. A long unbroken streak is not a data problem — it is the
- * database being down, or a config that no longer matches the feed — and
- * continuing then just writes the same failure 3000 more times.
+ * the other 3487. A long unbroken streak is not a data problem — it is a
+ * config that no longer matches the feed — and continuing then just records
+ * the same failure 3000 more times.
  */
 export const MAX_CONSECUTIVE_ITEM_FAILURES = 50;
 
+/** Rows mapped per flush: each flush is a few lookups for the whole batch. */
+export const FEED_FLUSH_SIZE = 200;
+
+/** Used only when the collector's config sets no task.max_attempts. */
+const FALLBACK_MAX_ATTEMPTS = 3;
+
 /**
- * The `arukereso` importer: fetch one feed, convert it, persist every item.
+ * The `arukereso` importer: fetch one feed, and queue a task for every row
+ * that is new or changed.
  *
- * The opposite shape to ScrapingImportService, which enqueues tasks and
- * returns. A feed is one HTTP GET containing the whole catalogue, so there is
- * nothing to fan out to — the run completes inline, and its cost is the LLM
- * post-process pass rather than page fetches. That is also why the hash-based
- * skips in SpecPostProcessService matter so much here: without them a nightly
- * pass over speedbike's 3488 products would be thousands of LLM calls for a
- * catalogue that barely moved.
+ * A run takes seconds. It maps every row — deterministic, no LLM — and
+ * compares it with what the row's listing last imported (see
+ * ArukeresoFeedTriageService):
+ * - an unchanged row only has its offer confirmed in place (lastSynced), in
+ *   one statement per batch;
+ * - a new or changed row becomes a feed_entry task, which the collector's
+ *   scheduler imports in parallel with everything else. A row whose task is
+ *   still pending replaces that task's row instead.
  *
- * Items are processed one at a time, as the parser yields them. Sequential
- * rather than batched on purpose: identity resolution reads and writes shared
- * ProductModel rows, so two items for the same product resolving concurrently
- * would race to create it.
+ * So a nightly run over a catalogue that barely moved queues almost nothing,
+ * and the expensive part — identity extraction, unification, the writes — runs
+ * in tasks: retried one by one, spread over the scheduler's batches, and
+ * resumed after a restart.
  */
 @Injectable()
 export class ArukeresoImportService implements ProductSourceImporter {
@@ -58,7 +87,14 @@ export class ArukeresoImportService implements ProductSourceImporter {
     private readonly nativeScraper: NativeScraperService,
     private readonly feedParser: ArukeresoFeedParserService,
     private readonly mapper: ArukeresoProductMapperService,
-    private readonly productUpdater: ProductScrapeUpdaterService,
+    private readonly triage: ArukeresoFeedTriageService,
+    private readonly taskRepo: ProductImportTaskRepository,
+    private readonly offerRepo: OfferRepository,
+    private readonly productRepo: ProductModelRepository,
+    private readonly mergeService: ProductMergeService,
+    private readonly offerFreshness: OfferFreshnessService,
+    private readonly locks: AdvisoryLockService,
+    private readonly taskConfig: TaskConfigService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
   ) {}
 
@@ -66,13 +102,23 @@ export class ArukeresoImportService implements ProductSourceImporter {
     source: ProductSource,
     options?: ImportRunOptions,
   ): Promise<ImportRunSummary> {
+    // Before the feed is fetched: triage keys offers by (seller, externalId),
+    // and without the seller every flush would fail.
+    if (!source.seller) {
+      throw new Error(`Source ${source.name} was loaded without its seller`);
+    }
+
     const startTime = Date.now();
     const summary = emptyImportRunSummary();
     const config = asArukeresoConfig(source.config, source.name);
+    const requestedSlugs = options?.categorySlugs;
     const skips: Partial<Record<FeedSkipReason, number>> = {};
+    const seenUrls = new Set<string>();
 
     let consecutiveFailures = 0;
+    let eligible = 0;
     let capped = false;
+    let batch: FeedRow[] = [];
 
     try {
       const { stream, contentType } = await this.nativeScraper.stream(
@@ -82,31 +128,46 @@ export class ArukeresoImportService implements ProductSourceImporter {
       const parsed = await this.feedParser.parseStream(
         stream,
         async (item) => {
-          // The cap counts items IMPORTED, not items seen — with a filter
-          // alongside it, `maxItems: 10` means ten matching products, not ten
-          // attempts. Once reached, the remaining feed rows cost one no-op call
-          // each: the stream is already open and parsing the rest is cheap,
-          // whereas aborting mid-parse is not, so the run reads the feed out
-          // and simply stops importing.
-          if (config.maxItems !== undefined && summary.offersUpdated >= config.maxItems) {
+          // The cap counts ELIGIBLE rows — queued, confirmed in place, or
+          // already waiting in a task — not rows queued. Counting only queued
+          // rows would make every run of a capped source reach for the next
+          // `maxItems` rows. Once reached, the rest of the feed is read out
+          // (cheaper than aborting mid-parse) and ignored.
+          if (config.maxItems !== undefined && eligible >= config.maxItems) {
             capped = true;
             return;
           }
 
-          const outcome = await this.handleItem({
-            source,
-            config,
-            item,
-            requestedSlugs: options?.categorySlugs,
-            summary,
-            skips,
-          });
+          const mapped = await this.mapItem(source, config, item, requestedSlugs, summary);
+          if (!mapped) {
+            consecutiveFailures += 1;
+            if (consecutiveFailures >= MAX_CONSECUTIVE_ITEM_FAILURES) {
+              throw new Error(
+                `Abandoning feed import for "${source.name}": ${consecutiveFailures} consecutive items failed, which is a systemic problem rather than bad rows`,
+              );
+            }
+            return;
+          }
+          consecutiveFailures = 0;
 
-          consecutiveFailures = outcome === 'failed' ? consecutiveFailures + 1 : 0;
-          if (consecutiveFailures >= MAX_CONSECUTIVE_ITEM_FAILURES) {
-            throw new Error(
-              `Abandoning feed import for "${source.name}": ${consecutiveFailures} consecutive items failed, which is a systemic problem rather than bad rows`,
-            );
+          if (mapped.status === 'skipped') {
+            summary.skipped += 1;
+            skips[mapped.reason] = (skips[mapped.reason] ?? 0) + 1;
+            return;
+          }
+
+          eligible += 1;
+          if (seenUrls.has(mapped.url)) {
+            summary.duplicateUrls += 1;
+          } else {
+            seenUrls.add(mapped.url);
+          }
+          batch.push(this.toRow(mapped, item));
+
+          if (batch.length >= FEED_FLUSH_SIZE) {
+            const rows = batch;
+            batch = [];
+            await this.flush(source, rows, requestedSlugs, summary);
           }
         },
         {
@@ -115,13 +176,14 @@ export class ArukeresoImportService implements ProductSourceImporter {
           contentType,
         },
       );
+      await this.flush(source, batch, requestedSlugs, summary);
 
       summary.itemsSeen = parsed.itemsParsed;
 
       this.productCollectionMetrics.fullSyncCompleted(source.name);
       this.recordDuration(source, startTime);
 
-      this.logger.log('Árukereső feed import completed', {
+      this.logger.log('Árukereső feed run completed', {
         source: source.name,
         feedUrl: config.feedUrl,
         format: parsed.format,
@@ -129,87 +191,193 @@ export class ArukeresoImportService implements ProductSourceImporter {
         attributesSkipped: parsed.attributesSkipped,
         maxItems: config.maxItems ?? null,
         capped,
+        eligible,
+        feedTasksEnqueued: summary.feedTasksEnqueued,
+        tasksReplaced: summary.tasksReplaced,
         offersUpdated: summary.offersUpdated,
+        duplicateUrls: summary.duplicateUrls,
         skipped: summary.skipped,
         failed: summary.failed,
         skipReasons: skips,
+        durationMs: Date.now() - startTime,
       });
+      if (summary.duplicateUrls > 0) {
+        this.logger.warn(
+          'Feed rows share a URL — only the last row of each is imported. Is the URL mapping per variant?',
+          { source: source.name, duplicateUrls: summary.duplicateUrls },
+        );
+      }
 
       return summary;
     } catch (error) {
       this.productCollectionMetrics.fullSyncFailed(source.name);
       this.recordDuration(source, startTime);
-      this.logger.error('Árukereső feed import failed', error, {
+      this.logger.error('Árukereső feed run failed', error, {
         source: source.name,
         feedUrl: config.feedUrl,
-        itemsSeen: summary.itemsSeen,
-        offersUpdated: summary.offersUpdated,
+        eligible,
+        feedTasksEnqueued: summary.feedTasksEnqueued,
       });
       throw error;
     }
   }
 
   /**
-   * Map one item and persist it, tallying the outcome.
-   *
-   * Never throws for a single bad item — one malformed row must not abandon a
-   * catalogue. The consecutive-failure ceiling in the caller is what
-   * distinguishes that from a systemic failure.
+   * Map one item. Undefined when mapping threw: one malformed row must not
+   * abandon a catalogue, so it is counted and the run goes on.
    */
-  private async handleItem(params: {
-    source: ProductSource;
-    config: ArukeresoSourceConfig;
-    item: ArukeresoFeedItem;
-    requestedSlugs: string[] | undefined;
-    summary: ImportRunSummary;
-    skips: Partial<Record<FeedSkipReason, number>>;
-  }): Promise<'updated' | 'skipped' | 'failed'> {
-    const { source, config, item, requestedSlugs, summary, skips } = params;
-
+  private async mapItem(
+    source: ProductSource,
+    config: ArukeresoSourceConfig,
+    item: ArukeresoFeedItem,
+    requestedSlugs: string[] | undefined,
+    summary: ImportRunSummary,
+  ): Promise<MappedFeedItem | undefined> {
     try {
-      const mapped = await this.mapper.map({
+      return await this.mapper.map({
         config,
         item,
         requestedSlugs,
       });
-
-      if (mapped.status === 'skipped') {
-        summary.skipped += 1;
-        skips[mapped.reason] = (skips[mapped.reason] ?? 0) + 1;
-        return 'skipped';
-      }
-
-      // No `task`: a feed run has no ScrapeTask per item, and inventing one
-      // would put fake work in a table the workers poll. Everything downstream
-      // of here is the same code the scrape path runs.
-      const context: ProductImportContext = {
-        source,
-        url: mapped.url,
-      };
-
-      const model = await this.productUpdater.createOrUpdateProduct(
-        context,
-        mapped.scrapedProduct,
-      );
-
-      if (!model) {
-        // The updater already logged and metered why (no category, or brand
-        // resolution failed). Counted as skipped rather than failed: nothing
-        // went wrong, the product simply was not persistable.
-        summary.skipped += 1;
-        return 'skipped';
-      }
-
-      summary.offersUpdated += 1;
-      return 'updated';
     } catch (error) {
       summary.failed += 1;
-      this.logger.warn('Feed item failed, continuing', {
+      this.logger.warn('Feed item failed to map, continuing', {
         source: source.name,
         error: error instanceof Error ? error.message : String(error),
       });
-      return 'failed';
+      return undefined;
     }
+  }
+
+  private toRow(
+    mapped: Extract<MappedFeedItem, { status: 'mapped' }>,
+    item: ArukeresoFeedItem,
+  ): FeedRow {
+    const offer = mapped.scrapedProduct.offers?.[0];
+    return {
+      url: mapped.url,
+      item,
+      scrapedProduct: mapped.scrapedProduct,
+      rowHash: feedRowHash(mapped.url, mapped.scrapedProduct),
+      externalId: offer ? offerExternalIdOf(offer, mapped.url).value : undefined,
+    };
+  }
+
+  /** One batch: confirm the unchanged rows' offers, queue the rest. */
+  private async flush(
+    source: ProductSource,
+    rows: FeedRow[],
+    requestedSlugs: string[] | undefined,
+    summary: ImportRunSummary,
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    // A URL repeated in the feed: the last row wins (the repeat was counted
+    // where it was read). A repeat in a later batch replaces the earlier
+    // row's still-pending task the same way.
+    const unique = [...new Map(rows.map((row) => [row.url, row])).values()];
+
+    const { unchanged, toImport } = await this.triage.triage(source, unique);
+    summary.offersUpdated += await this.confirmInPlace(unchanged);
+
+    const queued = await this.queue(source, toImport, requestedSlugs);
+    summary.feedTasksEnqueued += queued.enqueued;
+    summary.tasksReplaced += queued.replaced;
+  }
+
+  /**
+   * An unchanged row's whole import: its offer is seen again. A product whose
+   * offer had aged out of visibility gets its price recomputed, since that
+   * offer was left out of it.
+   */
+  private async confirmInPlace(unchanged: UnchangedFeedRow[]): Promise<number> {
+    if (unchanged.length === 0) return 0;
+
+    const cutoff = this.offerFreshness.visibleCutoff();
+    await this.offerRepo.stampSynced(unchanged.map((entry) => entry.offerId));
+
+    const revived = uniq(
+      unchanged
+        .filter((entry) => !entry.lastSynced || entry.lastSynced < cutoff)
+        .map((entry) => entry.modelId),
+    );
+    for (const modelId of revived) {
+      await this.locks.withLocks([productLock(modelId)], async () => {
+        const model = await this.productRepo.findOne({ where: { id: modelId } });
+        if (!model) return;
+        await this.mergeService.recomputePrice(model);
+        await this.productRepo.save(model);
+      });
+    }
+    return unchanged.length;
+  }
+
+  /**
+   * A task per row to import, unless one is already waiting for it:
+   * - pending, or failed with retries left: it gets this row instead, and
+   *   runs at once;
+   * - already running this very row: nothing to add;
+   * - otherwise (none, finished, or running an older row): a new task.
+   */
+  private async queue(
+    source: ProductSource,
+    rows: FeedRow[],
+    requestedSlugs: string[] | undefined,
+  ): Promise<{ enqueued: number; replaced: number }> {
+    if (rows.length === 0) return { enqueued: 0, replaced: 0 };
+
+    const open = await this.taskRepo.findOpenFeedEntries(
+      source.id,
+      rows.map((row) => row.url),
+    );
+    const maxAttempts = this.taskConfig.maxAttempts ?? FALLBACK_MAX_ATTEMPTS;
+    const inserts: ProductImportTask[] = [];
+    let replaced = 0;
+
+    for (const row of rows) {
+      const tasks = open.filter((task) => task.url === row.url);
+      const payload: FeedEntryPayload = { item: row.item, requestedSlugs };
+
+      const waiting = tasks.find(
+        (task) =>
+          task.status === TaskStatus.PENDING ||
+          (task.status === TaskStatus.FAILED && task.attempts < maxAttempts),
+      );
+      if (waiting) {
+        if (waiting.payloadHash !== row.rowHash) {
+          await this.taskRepo.repo.update(waiting.id, {
+            // Cast: TypeORM's update typing rejects a nested interface in jsonb.
+            payload: payload as unknown as Record<string, never>,
+            payloadHash: row.rowHash,
+            scheduledAt: null,
+          });
+          replaced += 1;
+        }
+        continue;
+      }
+      if (
+        tasks.some(
+          (task) =>
+            task.status === TaskStatus.PROCESSING && task.payloadHash === row.rowHash,
+        )
+      ) {
+        continue;
+      }
+
+      const task = new ProductImportTask();
+      task.kind = ProductImportTaskKind.FeedEntry;
+      task.source = source;
+      task.url = row.url;
+      task.status = TaskStatus.PENDING;
+      task.priority = DEFAULT_IMPORT_TASK_PRIORITY;
+      task.payload = payload;
+      task.payloadHash = row.rowHash;
+      inserts.push(task);
+    }
+
+    if (inserts.length > 0) {
+      await this.taskRepo.saveAll(inserts);
+    }
+    return { enqueued: inserts.length, replaced };
   }
 
   private recordDuration(source: ProductSource, startTime: number): void {

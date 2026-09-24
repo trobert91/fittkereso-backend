@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common';
 import { MinRole } from '@fittkereso-backend/auth';
 import {
+  AdvisoryLockService,
+  MANUAL_IMPORT_TASK_PRIORITY,
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
@@ -22,8 +24,10 @@ import {
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
-  ScrapeQueueName,
-  ScrapeTask,
+  ProductImportTaskKind,
+  ProductImportTask,
+  ProductImportTaskRepository,
+  productLock,
   UserRole,
 } from '@fittkereso-backend/database';
 import {
@@ -50,7 +54,7 @@ import {
   ProductSearchService,
 } from '@fittkereso-backend/search';
 import { ProductDuplicateService } from '@fittkereso-backend/product-identity';
-import { ScrapeTaskPublisherService } from '@fittkereso-backend/task';
+import { ProductImportTaskPublisherService } from '@fittkereso-backend/task';
 import { QueueStatusDto } from '../dtos/product-source-sync.dto';
 import { ProductMergeDto } from '../dtos/product-merge.dto';
 import { ResyncProductSourceDto } from '../dtos/resync-product-source.dto';
@@ -70,11 +74,13 @@ export class AdminProductController {
     private readonly specUpdaterService: ProductSpecUpdaterService,
     private readonly productRepo: ProductModelRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
-    private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
+    private readonly importTaskPublisher: ProductImportTaskPublisherService,
     private readonly mergeService: ProductMergeService,
     private readonly aliasRepo: ProductAliasRepository,
     private readonly offerSearchService: OfferSearchService,
     private readonly duplicateService: ProductDuplicateService,
+    private readonly locks: AdvisoryLockService,
+    private readonly importTaskRepo: ProductImportTaskRepository,
   ) {}
 
   @Post('search')
@@ -261,18 +267,22 @@ export class AdminProductController {
     ],
   })
   async mergeProductSources(@Param('id') id: string): Promise<ProductModel> {
-    const model = await this.productRepo.findOneOrFail({
-      where: { id },
-      relations: [
-        nameOf<ProductModel>('brand'),
-        nameOf<ProductModel>('productCategory'),
-        nameOf<ProductModel>('sources'),
-        `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
-      ],
-    });
+    // Under the product's lock, so an import writing to it meanwhile is not
+    // overwritten with a copy loaded before.
+    await this.locks.withLocks([productLock(id)], async () => {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id },
+        relations: [
+          nameOf<ProductModel>('brand'),
+          nameOf<ProductModel>('productCategory'),
+          nameOf<ProductModel>('sources'),
+          `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
+        ],
+      });
 
-    await this.mergeService.mergeSources(model);
-    await this.productRepo.save(model);
+      await this.mergeService.mergeSources(model);
+      await this.productRepo.save(model);
+    });
 
     return this.detailService.getProductById(id);
   }
@@ -413,14 +423,32 @@ export class AdminProductController {
       throw new BadRequestException('Product source url is missing');
     }
 
-    const task = new ScrapeTask();
-    task.queue = ScrapeQueueName.ScrapeProductDetails;
+    const task = new ProductImportTask();
+    task.kind = ProductImportTaskKind.DetailPage;
     task.source = modelSource.source;
     task.url = modelSource.url;
     task.product = { id: productId } as ProductModel;
     task.force = body.force ?? false;
+    task.priority = body.priority ?? MANUAL_IMPORT_TASK_PRIORITY;
 
-    await this.scrapeTaskPublisher.addTask(task);
+    // A feed has no page to fetch: its listing is imported again from the row
+    // its last feed run stored.
+    if (modelSource.source.type === 'arukereso') {
+      const stored = await this.importTaskRepo.latestFeedPayload(
+        modelSource.source.id,
+        modelSource.url,
+      );
+      if (!stored) {
+        throw new BadRequestException(
+          'No feed row is stored for this listing yet — run the source sync to import it.',
+        );
+      }
+      task.kind = ProductImportTaskKind.FeedEntry;
+      task.payload = stored.payload;
+      task.payloadHash = stored.payloadHash;
+    }
+
+    await this.importTaskPublisher.addTask(task);
 
     return { status: 'queued' };
   }
