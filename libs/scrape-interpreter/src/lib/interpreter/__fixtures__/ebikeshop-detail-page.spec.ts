@@ -25,6 +25,27 @@ const EBIKESHOP_DETAIL_PAGE_DATA = {
       },
       legalManufacturerName: 'KTM Fahrrad GmbH',
       productCode: '1260040108',
+      gtin: '9008594503199',
+      // The shop's own size grouping: every frame size of this bike, this page
+      // included. Sizes without a barcode carry an empty gtin, as live.
+      variations: [
+        {
+          label: 'Vázméret',
+          type: 'frame_size',
+          items: [
+            { label: '43 cm', value: '43', selected: false, gtin: '', productCode: '1260040103' },
+            { label: '48 cm', value: '48', selected: true, gtin: '9008594503199', productCode: '1260040108' },
+            { label: '53 cm', value: '53', selected: false, gtin: '', productCode: '1260040113' },
+          ],
+        },
+        {
+          label: 'Váz típus',
+          type: 'frame_shape',
+          items: [
+            { label: 'Összteleszkópos', value: 'Összteleszkópos', selected: true, gtin: '9008594503199', productCode: '1260040108' },
+          ],
+        },
+      ],
       prices: {
         price: 3879000.0017,
         priceSale: 0,
@@ -201,6 +222,7 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     expect(result.releaseYear).toBe(2026);
 
     expect(result.externalId).toBe('1260040108');
+    expect(result.siblingIds).toEqual(['1260040103', '1260040108', '1260040113']);
 
     expect(result.imageUrls).toEqual(['https://ebikeshop.hu/img/a.webp']);
 
@@ -212,10 +234,45 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
         availability: 'preorder',
         url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
         externalId: '1260040108',
+        gtin: '9008594503199',
+        mpn: '1260040108',
         locations: undefined,
         specs: undefined,
       },
     ]);
+  });
+
+  // Only the frame-size list groups sizes. Other variation axes (frame shape,
+  // colour) link to the same or to different bikes, not to this bike's sizes.
+  it('takes sibling ids from the frame-size variations only', async () => {
+    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
+    data.props.product.variations[1].items.push({
+      label: 'Trapéz',
+      value: 'Trapéz',
+      selected: false,
+      gtin: '',
+      productCode: '1260099999',
+    });
+    const $ = cheerio.load(buildHtml({ data }));
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.siblingIds).not.toContain('1260099999');
+  });
+
+  it('reports no siblings and no barcode for a single-size bike without one', async () => {
+    const data = JSON.parse(JSON.stringify(EBIKESHOP_DETAIL_PAGE_DATA));
+    data.props.product.variations = [];
+    data.props.product.gtin = '';
+    const $ = cheerio.load(buildHtml({ data }));
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
+
+    const result = await interpreter.runDetailPage(makeTask(), $, config);
+
+    expect(result.siblingIds).toBeUndefined();
+    expect(result.rawOffers[0].gtin).toBeUndefined();
+    expect(result.rawOffers[0].mpn).toBe('1260040108');
   });
 
   it('falls back to a cleaned legalManufacturerName when manufacturer is null', async () => {

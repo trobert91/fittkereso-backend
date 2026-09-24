@@ -92,10 +92,9 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * disjoint from offerSpecsHash's input so an offer-level-only difference
    * between sibling variant pages never invalidates this half of the cache.
    * Computed once alongside offerSpecsHash and persisted as given — see its
-   * doc comment. Also the key used to find a SIBLING ProductSourceRecord
-   * (same source, different URL/listing) whose already-unified
-   * product-identity specs can be reused outright — see
-   * ProductSourceRecordRepository.findBySourceAndProductSpecsHash.
+   * doc comment. Together with offerSpecsHash and scrapedProduct's
+   * identityInputHash, it decides whether a re-import may reuse this record's
+   * identity extraction (SpecPostProcessService.extractIdentity).
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })

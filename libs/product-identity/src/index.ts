@@ -14,3 +14,4 @@ export * from './lib/token-idf.service';
 export * from './lib/product-candidate-finder.service';
 export * from './lib/product-duplicate.service';
 export * from './lib/product-duplicate-scan.service';
+export * from './lib/product-key-lookup.service';

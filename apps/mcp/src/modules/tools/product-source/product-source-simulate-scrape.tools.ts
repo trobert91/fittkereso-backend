@@ -10,6 +10,7 @@ import {
   ProductSourceSimulationResult,
   ProductSourceSimulationService,
 } from '@fittkereso-backend/product-scraper';
+import { formatListingIdentifiers } from './identifier-format';
 
 @Injectable()
 export class ProductSourceSimulateScrapeTools {
@@ -98,8 +99,21 @@ export class ProductSourceSimulateScrapeTools {
     L.push(`- **aliases**: ${result.extraction.aliases?.join(', ') || '_none_'}`);
     L.push(`- **releaseYear**: ${result.extraction.releaseYear ?? '_not extracted_'}`);
     L.push(`- **externalId**: ${result.extraction.externalId ?? '_not extracted_'}`);
+    L.push(
+      `- **siblingIds**: ${result.extraction.siblingIds?.join(', ') ?? '_not extracted_'}`,
+    );
     L.push(`- **imageUrls**: ${result.extraction.imageUrls.length} found`);
     L.push(`- **rawOffers**: ${result.extraction.rawOffers.length} found`);
+    L.push('');
+    L.push('### Identifiers (per offer)');
+    L.push(
+      '_What identity resolution looks up before any LLM call: GTIN across every shop, MPN within the brand, declared siblings within this source._',
+    );
+    if (result.identifiers.length === 0) L.push('_No offers extracted._');
+    result.identifiers.forEach((identifiers, index) => {
+      L.push(`- offer ${index + 1}`);
+      L.push(...formatListingIdentifiers(identifiers, '  '));
+    });
     L.push('');
     L.push('### rawSpecs');
     L.push('```json');
@@ -122,12 +136,14 @@ export class ProductSourceSimulateScrapeTools {
       L.push('```json');
       L.push(JSON.stringify(result.specs.deterministic, null, 2));
       L.push('```');
-      if (result.specs.llmContribution) {
-        L.push('### LLM Post-Process Contribution');
-        L.push('```json');
-        L.push(JSON.stringify(result.specs.llmContribution, null, 2));
-        L.push('```');
-      }
+      L.push('### Identity extraction (the fields that decide which product this is)');
+      L.push('```json');
+      L.push(JSON.stringify(result.specs.identity, null, 2));
+      L.push('```');
+      L.push('### Spec unification (what it adds when this page creates a product)');
+      L.push('```json');
+      L.push(JSON.stringify(result.specs.unification, null, 2));
+      L.push('```');
       L.push('### Merged (final)');
       L.push('```json');
       L.push(JSON.stringify(result.specs.merged, null, 2));

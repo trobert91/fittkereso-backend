@@ -12,8 +12,13 @@ export type IdentityGate =
 /** A spec value, or a name key's digit-bearing words for `modelNumberMismatch`. */
 export type IdentityGateValue = string | number | boolean | string[];
 
-/** Which recall arm found a candidate: its product name key or one of its aliases. */
-export type CandidateMatchedOn = 'name' | 'alias';
+/**
+ * What connects a pair. `name` and `alias` are the recall arms that found a
+ * candidate by its name key or one of its aliases. The rest are identifiers
+ * the two products share, found when a listing was imported: a size its shop
+ * declared as a sibling, a GTIN, or an MPN within one brand.
+ */
+export type CandidateMatchedOn = 'name' | 'alias' | 'sibling' | 'gtin' | 'mpn';
 
 /** How a pair was first found; set on insert and never changed. */
 export type DuplicateDetectedBy = 'scrape' | 'scan' | 'merge';

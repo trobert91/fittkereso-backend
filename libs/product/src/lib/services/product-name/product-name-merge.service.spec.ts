@@ -18,6 +18,7 @@ describe('ProductNameMergeService.mergeNames', () => {
       model?: string;
       displayName?: string;
       aliases?: string[];
+      nameCleaned?: boolean;
     },
     opts: { lastUpdated?: string; priority?: number } = {},
   ): ProductSourceRecord {
@@ -126,6 +127,45 @@ describe('ProductNameMergeService.mergeNames', () => {
     await service.mergeNames(model, sources, categorySlug);
 
     expect(model.displayName).toBe('Trek Marlin Seven');
+  });
+
+  // A listing whose identity extraction failed keeps its raw title, sizes and
+  // colours included — it must not outvote or out-date a cleaned name.
+  it('ignores a raw, uncleaned name whenever a cleaned one exists', async () => {
+    const model = makeModel();
+    const sources = [
+      makeSource(
+        'cleaned',
+        { model: 'Macina Scarp SX Exonic XX', displayName: 'KTM Macina Scarp SX Exonic XX' },
+        { lastUpdated: '2026-01-01T00:00:00Z' },
+      ),
+      makeSource(
+        'raw-1',
+        { model: 'MACINA SCARP SX EXONICX 48cm narancs', displayName: 'KTM MACINA SCARP SX EXONICX 48cm narancs', nameCleaned: false },
+        { lastUpdated: '2026-02-01T00:00:00Z' },
+      ),
+      makeSource(
+        'raw-2',
+        { model: 'MACINA SCARP SX EXONICX 48cm narancs', displayName: 'KTM MACINA SCARP SX EXONICX 48cm narancs', nameCleaned: false },
+        { lastUpdated: '2026-02-01T00:00:00Z' },
+      ),
+    ];
+
+    await service.mergeNames(model, sources, categorySlug);
+
+    expect(model.model).toBe('Macina Scarp SX Exonic XX');
+    expect(model.displayName).toBe('KTM Macina Scarp SX Exonic XX');
+  });
+
+  it('still names the product from a raw title when no source has a cleaned one', async () => {
+    const model = makeModel();
+    const sources = [
+      makeSource('raw', { displayName: 'KTM MACINA SCARP 48cm', nameCleaned: false }),
+    ];
+
+    await service.mergeNames(model, sources, categorySlug);
+
+    expect(model.displayName).toBe('KTM MACINA SCARP 48cm');
   });
 
   it('resolves the winning brand string through BrandResolutionService and assigns the resolved entity', async () => {

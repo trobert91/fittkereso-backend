@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import {
   OfferAvailability,
   ProductCategory,
+  ProductSource,
+  ScrapedProduct,
   ScrapingSourceConfig,
   ScrapeTask,
   SourceSpecConfig,
@@ -11,9 +13,6 @@ import { ScraperService } from '@fittkereso-backend/scraper';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BrandResolutionService,
-  DeterministicProductData,
-  ProductSourcePostProcessMergeService,
-  ProductSourcePostProcessService,
   ScrapedOffer,
   ScrapedProductSpec,
   SpecExtractionService,
@@ -25,7 +24,14 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
-import { pick, omit } from 'lodash';
+import { isEqual, omitBy, pick } from 'lodash';
+import { ProductImportContext } from '../../interfaces/product-import-context.interface';
+import { splitDeterministicSpecs } from './deterministic-specs';
+import { SpecPostProcessService } from './spec-post-process.service';
+import {
+  previewListingIdentifiers,
+  SimulatedListingIdentifiers,
+} from './identifier-preview';
 
 export interface SimulatedBrandResolution {
   queriedName: string | undefined;
@@ -60,9 +66,16 @@ export interface ProductSourceSimulationResult {
     aliases?: string[];
     releaseYear?: number;
     externalId?: string;
+    siblingIds?: string[];
     imageUrls: string[];
     rawOffers: RawOfferRecord[];
   };
+  /**
+   * Per offer: the GTIN/MPN as published and as they would be stored, the
+   * declared siblings, and how many spec rows identityExtraction.specRows
+   * lets through — everything identity resolution looks up before any LLM.
+   */
+  identifiers: SimulatedListingIdentifiers[];
   category?: {
     slug: string;
     found: boolean;
@@ -71,11 +84,11 @@ export interface ProductSourceSimulationResult {
   };
   specs?: {
     deterministic: Record<string, unknown>;
-    // Combined view of both LLM calls' contributions, kept for backwards
-    // compatibility with anything reading the old single-call shape.
-    llmContribution?: Record<string, unknown>;
-    offerIdentityContribution?: Record<string, unknown>;
-    modelSpecsContribution?: Record<string, unknown>;
+    /** The identity fields after the identity extraction (deterministic values merged in). */
+    identity: Record<string, unknown>;
+    /** What full spec unification added or corrected on top of that. */
+    unification: Record<string, unknown>;
+    /** Everything a product created from this page would carry. */
     merged: Record<string, unknown>;
   };
   brandResolution?: SimulatedBrandResolution;
@@ -102,8 +115,7 @@ export class ProductSourceSimulationService {
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
-    private readonly postProcess: ProductSourcePostProcessService,
-    private readonly postProcessMerge: ProductSourcePostProcessMergeService,
+    private readonly specPostProcess: SpecPostProcessService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
     private readonly brandResolution: BrandResolutionService,
@@ -132,9 +144,20 @@ export class ProductSourceSimulationService {
         aliases: detail.aliases,
         releaseYear: detail.releaseYear,
         externalId: detail.externalId,
+        siblingIds: detail.siblingIds,
         imageUrls: detail.imageUrls,
         rawOffers: detail.rawOffers,
       },
+      identifiers: detail.rawOffers.map((offer) =>
+        previewListingIdentifiers({
+          externalId: offer.externalId,
+          gtin: offer.gtin,
+          mpn: offer.mpn,
+          siblingIds: detail.siblingIds,
+          rawSpecs: detail.rawSpecs,
+          specRows: config.identityExtraction?.specRows,
+        }),
+      ),
       warnings,
       errors,
     };
@@ -212,111 +235,92 @@ export class ProductSourceSimulationService {
       deterministicSpecs['modelYear'] = detail.releaseYear;
     }
 
-    const deterministicData: DeterministicProductData = {
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
+    const split = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
+    // The same deterministic listing ProductDetailsPageScraperService hands
+    // the updater.
+    const listing: ScrapedProduct = {
       brand: detail.brand,
       model: detail.model,
-      specs: deterministicSpecs,
+      displayName: `${detail.brand} ${detail.model}`.trim(),
+      originalName: detail.model,
+      category: { id: category.id, slug: category.slug, name: category.name },
+      specs: split.productLevelDeterministicSpecs,
+      extractedSpecs: deterministicSpecs,
+      ...split,
+      rawSpecs: detail.rawSpecs,
+      description: detail.description,
+      externalId: detail.externalId,
+      siblingExternalIds: detail.siblingIds,
+      aliases: detail.aliases,
+      offers: this.toScrapedOffers(detail.rawOffers),
     };
 
-    const postProcessConfig = config.detailPage.postProcess;
-    let offerIdentityContribution: Record<string, unknown> | undefined;
-    let modelSpecsContribution: Record<string, unknown> | undefined;
-    let merged = deterministicData;
-
-    if (postProcessConfig?.enabled !== false) {
-      const goldenSample = this.categoryConfigService.getGoldenSample(category.slug);
-      if (!goldenSample) {
-        warnings.push(
-          `Post-processing is enabled but category "${category.slug}" has no golden sample — the real pipeline would silently skip post-processing and use deterministic specs only.`,
-        );
-        merged = this.postProcessMerge.merge(deterministicData, undefined, undefined);
-      } else {
-        const offerLevelSpecs =
-          this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
-        const offerLevelDeterministicSpecs = pick(deterministicSpecs, offerLevelSpecs);
-        const productLevelDeterministicSpecs = omit(deterministicSpecs, offerLevelSpecs);
-        // Simulation always runs BOTH calls, unconditionally — the point of
-        // a simulation run is to preview the full, non-cached extraction
-        // result for the sampled page, not the cost-optimized real pipeline
-        // (which can skip the model-spec call on a sibling/same-record hash
-        // match — see ProductDetailsPageScraperService).
-        const offerIdentityResult = await this.postProcess.processOfferIdentity({
-          data: {
-            brand: deterministicData.brand,
-            model: deterministicData.model,
-            specs: offerLevelDeterministicSpecs,
-          },
-          schema: jsonSchema,
-          goldenSample,
-          offerLevelSpecs,
-          model: postProcessConfig?.model,
-          thinking: postProcessConfig?.thinking,
-          effort: postProcessConfig?.effort,
-          maxTokens: postProcessConfig?.maxTokens,
-        });
-        if (!offerIdentityResult) {
-          warnings.push(
-            'Offer-identity post-processing ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned no confident fields) — degraded to deterministic specs only for that half.',
-          );
-        }
-        offerIdentityContribution = offerIdentityResult as Record<string, unknown> | undefined;
-
-        const modelSpecsResult = await this.postProcess.processModelSpecs({
-          data: { ...deterministicData, specs: productLevelDeterministicSpecs },
-          offerLevelDeterministicSpecs,
-          rawSpecs: detail.rawSpecs,
-          schema: jsonSchema,
-          goldenSample,
-          offerLevelSpecs,
-          model: postProcessConfig?.model,
-          thinking: postProcessConfig?.thinking,
-          effort: postProcessConfig?.effort,
-          maxTokens: postProcessConfig?.maxTokens,
-        });
-        if (!modelSpecsResult) {
-          warnings.push(
-            'Model-spec post-processing ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned no confident fields) — degraded to deterministic specs only for that half.',
-          );
-        }
-        modelSpecsContribution = modelSpecsResult as Record<string, unknown> | undefined;
-
-        merged = this.postProcessMerge.merge(deterministicData, offerIdentityResult, modelSpecsResult);
-      }
+    // Both calls a real import makes for a page that creates a product, run
+    // unconditionally: a simulation previews what extraction produces for this
+    // page, not what a re-import would reuse. `force` rules out any reuse.
+    const context: ProductImportContext = {
+      source: { name: 'simulation', config } as ProductSource,
+      url,
+      force: true,
+    };
+    const identified = await this.specPostProcess.extractIdentity({
+      context,
+      scrapedProduct: listing,
+    });
+    if (config.detailPage.postProcess?.enabled !== false && !identified.nameCleaned) {
+      warnings.push(
+        'The identity extraction ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned nothing confident) — the real pipeline would continue on the deterministic specs and the raw title.',
+      );
     }
+    const unified = await this.specPostProcess.unify({
+      context,
+      scrapedProduct: identified,
+      trigger: 'created',
+    });
 
+    const scopes = this.specPostProcess.scopesOf(category.slug, jsonSchema);
+    const pageOfferLevelSpecs = identified.offers?.[0]?.specs ?? {};
+    const identitySpecs = { ...identified.specs, ...pageOfferLevelSpecs };
+    const mergedSpecs = { ...unified.specs, ...pageOfferLevelSpecs };
     result.specs = {
       deterministic: deterministicSpecs,
-      llmContribution: { ...modelSpecsContribution, ...offerIdentityContribution },
-      offerIdentityContribution,
-      modelSpecsContribution,
-      merged: merged.specs,
+      identity: pick(identitySpecs, scopes.identityKeys),
+      unification: omitBy(unified.specs ?? {}, (value, key) =>
+        isEqual(value, identified.specs?.[key]),
+      ),
+      merged: mergedSpecs,
     };
 
-    const brandMatch = await this.brandResolution.resolve(merged.brand, `${merged.brand} ${merged.model}`.trim());
+    const brandMatch = await this.brandResolution.resolve(
+      identified.brand,
+      identified.displayName,
+    );
     result.brandResolution = {
-      queriedName: merged.brand,
+      queriedName: identified.brand,
       matched: !!brandMatch?.entity,
       resolvedName: brandMatch?.entity?.name,
       similarity: brandMatch?.similarity,
     };
     if (!brandMatch?.entity) {
       errors.push(
-        `Brand "${merged.brand}" could not be resolved against existing brands (no alias/trigram match >= 0.8) — the real pipeline would skip product creation for this page (unless a new Brand is created for it out of band).`,
+        `Brand "${identified.brand}" could not be resolved against existing brands (no alias/trigram match >= 0.8) — the real pipeline would skip product creation for this page (unless a new Brand is created for it out of band).`,
       );
     }
 
     result.productPreview = {
-      brand: merged.brand,
-      model: merged.model,
-      displayName: `${merged.brand} ${merged.model}`.trim(),
+      brand: identified.brand,
+      model: identified.model,
+      displayName: identified.displayName,
       originalName: detail.model,
       categorySlug: category.slug,
       categoryName: category.name,
       aliases: detail.aliases,
-      specs: merged.specs,
+      specs: mergedSpecs,
       externalId: detail.externalId,
       imageUrls: detail.imageUrls,
-      offers: this.toScrapedOffers(detail.rawOffers),
+      offers: identified.offers ?? [],
     };
 
     return result;
@@ -352,6 +356,9 @@ export class ProductSourceSimulationService {
         availability: this.parseAvailability(offer.availability),
         url: offer.url,
         externalId: offer.externalId,
+        gtin: offer.gtin,
+        mpn: offer.mpn,
+        locations: offer.locations,
       }));
   }
 

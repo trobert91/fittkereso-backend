@@ -12,6 +12,7 @@ describe('ProductSourceImportSimulationService', () => {
   let scrapingImport: { planRun: jest.Mock };
   let listRefresh: { requiredFields: string[] };
   let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
+  let specPostProcess: { extractIdentity: jest.Mock };
 
   const feedSource = {
     id: 'source-1',
@@ -73,6 +74,11 @@ describe('ProductSourceImportSimulationService', () => {
     };
     listRefresh = { requiredFields: ['url', 'price', 'availability'] };
     sourceRecordRepo = { findBySourceAndUrl: jest.fn().mockResolvedValue(null) };
+    specPostProcess = {
+      extractIdentity: jest
+        .fn()
+        .mockImplementation(async ({ scrapedProduct }) => ({ ...scrapedProduct, nameCleaned: true })),
+    };
 
     service = new ProductSourceImportSimulationService(
       scraperService as never,
@@ -84,6 +90,7 @@ describe('ProductSourceImportSimulationService', () => {
       new ArukeresoFeedParserService(),
       mapper as never,
       sourceRecordRepo as never,
+      specPostProcess as never,
     );
   });
 
@@ -95,11 +102,18 @@ describe('ProductSourceImportSimulationService', () => {
 
       expect(result.arukereso?.itemsParsed).toBe(7);
       expect(result.arukereso?.wouldImport).toBe(7);
-      // classify runs for every item; only the previews cost a full mapping,
-      // which is what spends LLM calls.
+      // classify runs for every item; only the previews are mapped in full
+      // and extracted, and the extraction is what spends LLM calls.
       expect(mapper.classify).toHaveBeenCalledTimes(7);
       expect(mapper.map).toHaveBeenCalledTimes(2);
       expect(result.arukereso?.products).toHaveLength(2);
+      // Each preview shows what a first import would extract — the one part
+      // of the simulation that calls the LLM — never a stored result.
+      expect(specPostProcess.extractIdentity).toHaveBeenCalledTimes(2);
+      expect(specPostProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ context: expect.objectContaining({ force: true }) }),
+      );
+      expect(result.arukereso?.products[0]).toMatchObject({ nameCleaned: true });
     });
 
     it('tallies why items were skipped rather than only how many', async () => {
@@ -130,6 +144,103 @@ describe('ProductSourceImportSimulationService', () => {
         { externalId: 'dup', count: 2 },
       ]);
       expect(result.errors.join(' ')).toMatch(/WOULD COLLAPSE onto one row/);
+    });
+
+    describe('identifiers, counted over the whole feed', () => {
+      const identifierSource = {
+        ...feedSource,
+        config: {
+          ...feedSource.config,
+          mapping: {
+            externalId: { field: 'identifier' },
+            brand: { field: 'manufacturer' },
+            gtin: { field: 'ean_code' },
+            mpn: { field: 'sku' },
+          },
+          identityExtraction: { specRows: ['Motor', 'Váz', 'Kerék'] },
+        },
+      } as unknown as ProductSource;
+
+      const product = (
+        id: string,
+        brand: string,
+        ean: string,
+        sku: string,
+        attributes: string[],
+      ) =>
+        `<Product><Identifier>${id}</Identifier><Manufacturer>${brand}</Manufacturer>` +
+        `<ean_code>${ean}</ean_code><sku>${sku}</sku><attributes>${attributes
+          .map(
+            (name) =>
+              `<attribute><attribute_name>${name}</attribute_name><attribute_value>x</attribute_value></attribute>`,
+          )
+          .join('')}</attributes></Product>`;
+
+      // Real shapes from speedbike's feed: a KTM barcode, a GIANT article
+      // stub in the barcode field, and a row with neither.
+      const identifierFeed = `<?xml version="1.0"?><Products>${[
+        product('a', 'KTM', '9008594503199', '1260040108', ['Motor', 'Váz', 'Fékbetét']),
+        product('b', 'GIANT', '5461000', '2300160206', ['Motor']),
+        product('c', 'CUBE', '', '', ['Fékbetét']),
+      ].join('')}</Products>`;
+
+      it('sorts GTINs into valid, invalid and absent, naming the brands behind the invalid ones', async () => {
+        givenFeed(identifierFeed);
+
+        const result = await service.simulate(identifierSource, { limit: 1 });
+
+        expect(result.arukereso?.identifiers).toMatchObject({
+          gtinMapped: true,
+          gtin: { valid: 1, invalid: 1, absent: 1 },
+          invalidGtinByBrand: { GIANT: 1 },
+          invalidGtinSamples: ['5461000'],
+          mpn: { valid: 2, invalid: 0, absent: 1 },
+        });
+      });
+
+      it('measures what the spec-row list lets through, and flags listings it leaves empty', async () => {
+        givenFeed(identifierFeed);
+
+        const result = await service.simulate(identifierSource, { limit: 1 });
+
+        expect(result.arukereso?.identifiers.specRows).toEqual({
+          configured: true,
+          listings: 3,
+          listingsWithNoRowSent: 1,
+          meanRowsSent: 1,
+          meanRowsTotal: 1.7,
+          byLabel: [
+            { label: 'Motor', listings: 2 },
+            { label: 'Váz', listings: 1 },
+            { label: 'Kerék', listings: 0 },
+          ],
+        });
+        expect(result.warnings.join(' ')).toMatch(/1 eligible items match none/);
+      });
+
+      it('previews each fully mapped item\'s identifiers as they would be stored', async () => {
+        givenFeed(identifierFeed);
+        mapper.map.mockResolvedValueOnce({
+          status: 'mapped',
+          url: 'u',
+          scrapedProduct: {
+            offers: [{ price: 1, externalId: 'a', gtin: '9008594503199', mpn: '1260040108' }],
+          },
+        });
+
+        const result = await service.simulate(identifierSource, { limit: 1 });
+
+        expect(result.arukereso?.productIdentifiers).toEqual([
+          {
+            externalId: 'a',
+            gtin: { raw: '9008594503199', stored: '09008594503199', outcome: 'valid' },
+            mpn: { raw: '1260040108', stored: '1260040108', outcome: 'valid' },
+            siblingIds: undefined,
+            specRowsSent: 2,
+            specRowsTotal: 3,
+          },
+        ]);
+      });
     });
 
     it('passes cleanly when every externalId is distinct', async () => {

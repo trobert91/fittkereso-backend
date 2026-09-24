@@ -6,6 +6,7 @@ import {
   ProductSourceImportSimulationResult,
   ProductSourceImportSimulationService,
 } from '@fittkereso-backend/product-scraper';
+import { formatListingIdentifiers } from './identifier-format';
 
 @Injectable()
 export class ProductSourceSimulateImportTools {
@@ -127,10 +128,77 @@ export class ProductSourceSimulateImportTools {
     }
     L.push('');
 
+    this.formatFeedIdentifiers(feed, L);
+
+    if (feed.productIdentifiers.length) {
+      L.push('## Previewed items: what identity resolution would look up');
+      feed.productIdentifiers.forEach((identifiers, index) => {
+        L.push(`- ${feed.products[index]?.originalName ?? `item ${index + 1}`}`);
+        L.push(...formatListingIdentifiers(identifiers, '  '));
+      });
+      L.push('');
+    }
+
     L.push(`## Mapped previews (${feed.products.length})`);
     L.push('```json');
     L.push(JSON.stringify(feed.products, null, 2));
     L.push('```');
+  }
+
+  private formatFeedIdentifiers(
+    feed: NonNullable<ProductSourceImportSimulationResult['arukereso']>,
+    L: string[],
+  ): void {
+    const { gtin, mpn, specRows } = feed.identifiers;
+    const share = (count: number) =>
+      specRows.listings
+        ? ` (${Math.round((count / specRows.listings) * 100)}%)`
+        : '';
+
+    L.push('## Identifiers, across every eligible item');
+    if (feed.identifiers.gtinMapped) {
+      L.push(
+        `- **GTIN**: valid ${gtin.valid}${share(gtin.valid)} · invalid ${gtin.invalid}${share(gtin.invalid)} · none ${gtin.absent}${share(gtin.absent)}`,
+      );
+      const byBrand = Object.entries(feed.identifiers.invalidGtinByBrand).sort(
+        (a, b) => b[1] - a[1],
+      );
+      if (byBrand.length) {
+        const brands = byBrand.map(([brand, count]) => `${brand} ${count}`);
+        const samples = feed.identifiers.invalidGtinSamples.map((v) => '`' + v + '`');
+        L.push(`  - invalid by brand: ${brands.join(', ')}`);
+        L.push(`  - samples: ${samples.join(', ')}`);
+      }
+    } else {
+      L.push('- **GTIN**: _not mapped_');
+    }
+    L.push(
+      feed.identifiers.mpnMapped
+        ? `- **MPN**: stored ${mpn.valid}${share(mpn.valid)} · too short ${mpn.invalid} · none ${mpn.absent}`
+        : '- **MPN**: _not mapped_',
+    );
+    L.push('');
+
+    L.push('## Spec rows sent to the identity extraction');
+    if (!specRows.configured) {
+      L.push(
+        `_identityExtraction.specRows is not set — every listing sends its whole table (${specRows.meanRowsTotal} rows on average)._`,
+      );
+    } else {
+      L.push(
+        `- **rows sent per listing**: ${specRows.meanRowsSent} of ${specRows.meanRowsTotal} on average`,
+      );
+      L.push(
+        `- **listings sending no row at all**: ${specRows.listingsWithNoRowSent}${share(specRows.listingsWithNoRowSent)}`,
+      );
+      L.push(
+        '- **listings each label matched** (0 = a typo, or a row the shop no longer publishes):',
+      );
+      for (const { label, listings } of specRows.byLabel) {
+        L.push(`  - ${label}: ${listings}${share(listings)}`);
+      }
+    }
+    L.push('');
   }
 
   private formatScraping(

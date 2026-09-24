@@ -99,54 +99,79 @@ describe('ListingMatchService', () => {
     expect(llmService.pick).not.toHaveBeenCalled();
   });
 
-  it('attaches to the LLM pick and records what it answered', async () => {
-    finder.findCandidates.mockResolvedValue([
-      candidateOf(MATCH_ID, 78),
-      candidateOf(OTHER_ID, 71),
-    ]);
-    llmService.pick.mockResolvedValue({
-      productId: OTHER_ID,
-      confidence: 88,
-      reason: 'same battery',
+  // Off since 2026-09-23 (near misses go to a person); the path is kept, so
+  // these run against the service with the check switched back on.
+  describe('with the LLM check on', () => {
+    const withLlm = async () => {
+      jest.resetModules();
+      jest.doMock('./product-identity.constants', () => ({
+        ...jest.requireActual('./product-identity.constants'),
+        LLM_ENABLED: true,
+      }));
+      const { ListingMatchService: WithLlm } =
+        await import('./listing-match.service');
+      return new WithLlm(
+        brandResolution as never,
+        queryService as never,
+        finder as never,
+        llmService as never,
+      );
+    };
+
+    it('attaches to the LLM pick and records what it answered', async () => {
+      finder.findCandidates.mockResolvedValue([
+        candidateOf(MATCH_ID, 78),
+        candidateOf(OTHER_ID, 71),
+      ]);
+      llmService.pick.mockResolvedValue({
+        productId: OTHER_ID,
+        confidence: 88,
+        reason: 'same battery',
+      });
+
+      const result = await (
+        await withLlm()
+      ).match(SCRAPED, { taskId: 'task-1' });
+
+      expect(result.productId).toBe(OTHER_ID);
+      expect(result.decision.outcome).toBe('llm_identified');
+      expect(result.decision.llm).toEqual({
+        productId: OTHER_ID,
+        confidence: 88,
+        reason: 'same battery',
+      });
+      // Only the near-misses are adjudicated, best first, with the listing's own
+      // names — which the query key alone doesn't carry.
+      expect(llmService.pick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brandName: BRAND.name,
+          model: SCRAPED.model,
+          displayName: SCRAPED.displayName,
+          nameKey: QUERY.nameKey,
+        }),
+        [
+          expect.objectContaining({ productId: MATCH_ID }),
+          expect.objectContaining({ productId: OTHER_ID }),
+        ],
+        { taskId: 'task-1' },
+      );
     });
 
-    const result = await service.match(SCRAPED, { taskId: 'task-1' });
+    it('creates when the LLM declines, keeping its answer on the decision', async () => {
+      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 70)]);
+      llmService.pick.mockResolvedValue({
+        confidence: 40,
+        reason: 'different year',
+      });
 
-    expect(result.productId).toBe(OTHER_ID);
-    expect(result.decision.outcome).toBe('llm_identified');
-    expect(result.decision.llm).toEqual({
-      productId: OTHER_ID,
-      confidence: 88,
-      reason: 'same battery',
-    });
-    // Only the near-misses are adjudicated, best first, with the listing's own
-    // names — which the query key alone doesn't carry.
-    expect(llmService.pick).toHaveBeenCalledWith(
-      expect.objectContaining({
-        brandName: BRAND.name,
-        model: SCRAPED.model,
-        displayName: SCRAPED.displayName,
-        nameKey: QUERY.nameKey,
-      }),
-      [
-        expect.objectContaining({ productId: MATCH_ID }),
-        expect.objectContaining({ productId: OTHER_ID }),
-      ],
-      { taskId: 'task-1' },
-    );
-  });
+      const result = await (await withLlm()).match(SCRAPED);
 
-  it('creates when the LLM declines, keeping its answer on the decision', async () => {
-    finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 70)]);
-    llmService.pick.mockResolvedValue({ confidence: 40, reason: 'different year' });
-
-    const result = await service.match(SCRAPED);
-
-    expect(result.productId).toBeUndefined();
-    expect(result.decision.outcome).toBe('created');
-    expect(result.decision.llm).toEqual({
-      confidence: 40,
-      reason: 'different year',
+      expect(result.productId).toBeUndefined();
+      expect(result.decision.outcome).toBe('created');
+      expect(result.decision.llm).toEqual({
+        confidence: 40,
+        reason: 'different year',
+      });
     });
   });
 
@@ -159,27 +184,18 @@ describe('ListingMatchService', () => {
 
     const result = await service.match(SCRAPED);
 
-    expect(result.decision.candidates).toHaveLength(LISTING_DECISION_CANDIDATES);
+    expect(result.decision.candidates).toHaveLength(
+      LISTING_DECISION_CANDIDATES,
+    );
     expect(result.decision.candidates[0].productId).toBe('product-0');
   });
 
-  it('creates near-misses without a call when the LLM check is off', async () => {
-    jest.resetModules();
-    jest.doMock('./product-identity.constants', () => ({
-      ...jest.requireActual('./product-identity.constants'),
-      LLM_ENABLED: false,
-    }));
-    const { ListingMatchService: WithoutLlm } = await import(
-      './listing-match.service'
-    );
+  // The default: a near miss becomes a new product, and duplicate detection
+  // pairs it with the candidate for a person to decide.
+  it('creates near-misses without a call, as the LLM check is off', async () => {
     finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 75)]);
 
-    const result = await new WithoutLlm(
-      brandResolution as never,
-      queryService as never,
-      finder as never,
-      llmService as never,
-    ).match(SCRAPED);
+    const result = await service.match(SCRAPED);
 
     expect(result.productId).toBeUndefined();
     expect(result.decision.outcome).toBe('created');

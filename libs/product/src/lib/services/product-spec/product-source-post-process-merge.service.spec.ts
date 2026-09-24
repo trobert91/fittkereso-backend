@@ -2,7 +2,7 @@ import { ProductSourcePostProcessMergeService } from './product-source-post-proc
 import type {
   DeterministicProductData,
   ModelSpecContribution,
-  OfferIdentityContribution,
+  IdentityContribution,
 } from './product-source-post-process.service';
 
 describe('ProductSourcePostProcessMergeService', () => {
@@ -33,14 +33,14 @@ describe('ProductSourcePostProcessMergeService', () => {
   });
 
   it('combines offer-identity and model-spec contributions into one merged specs object', () => {
-    const offerIdentity: OfferIdentityContribution = {
+    const identity: IdentityContribution = {
       specs: { frameSize: 43 },
     };
     const modelSpecs: ModelSpecContribution = {
       specs: { motorPosition: 'Középmotor' },
     };
 
-    const result = service.merge(deterministic, offerIdentity, modelSpecs);
+    const result = service.merge(deterministic, identity, modelSpecs);
 
     expect(result.specs).toEqual({
       weight: 17,
@@ -83,21 +83,23 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result).toEqual({
       brand: 'KTM',
       model: deterministic.model,
+      nameCleaned: false,
       specs: { weight: 17, batteryCapacity: 400 },
     });
     expect(result.specs).not.toBe(deterministic.specs);
   });
 
-  it('falls specs through to deterministic entirely when offerIdentity.specs is undefined but offerIdentity.model is set', () => {
-    const offerIdentity: OfferIdentityContribution = { model: 'MACINA SCARP SX PRESTIGE Di2' };
+  it('falls specs through to deterministic entirely when identity.specs is undefined but identity.model is set', () => {
+    const identity: IdentityContribution = { model: 'MACINA SCARP SX PRESTIGE Di2' };
 
-    const result = service.merge(deterministic, offerIdentity, undefined);
+    const result = service.merge(deterministic, identity, undefined);
 
     expect(result.specs).toEqual(deterministic.specs);
     expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
+    expect(result.nameCleaned).toBe(true);
   });
 
-  it('falls model through to deterministic when offerIdentity.model is absent but modelSpecs.specs is set', () => {
+  it('falls model through to deterministic when identity.model is absent but modelSpecs.specs is set', () => {
     const modelSpecs: ModelSpecContribution = { specs: { weight: 17.9 } };
 
     const result = service.merge(deterministic, undefined, modelSpecs);
@@ -106,13 +108,15 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.specs['weight']).toBe(17.9);
   });
 
-  it('overrides brand alone (only offerIdentity carries it), leaving specs/model to fall through', () => {
-    const offerIdentity: OfferIdentityContribution = { brand: 'KTM AG' };
+  it('overrides brand alone (only identity carries it), leaving specs/model to fall through', () => {
+    const identity: IdentityContribution = { brand: 'KTM AG' };
 
-    const result = service.merge(deterministic, offerIdentity, undefined);
+    const result = service.merge(deterministic, identity, undefined);
 
     expect(result.brand).toBe('KTM AG');
     expect(result.model).toBe(deterministic.model);
+    // The name is still the raw title: nothing cleaned it.
+    expect(result.nameCleaned).toBe(false);
     expect(result.specs).toEqual(deterministic.specs);
   });
 

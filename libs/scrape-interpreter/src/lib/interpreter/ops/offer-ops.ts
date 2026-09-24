@@ -3,6 +3,14 @@ import { OpHandler } from '../services/scrape-op-registry.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
 import { RawOfferRecord } from '../scrape-interpreter.service';
 
+// A barcode or article number read from JSON can arrive as a number; either
+// way it is kept as text, because leading zeros are part of the identifier.
+function toIdentifierText(value: unknown): string | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  const text = String(value).trim();
+  return text === '' ? undefined : text;
+}
+
 function toFiniteNumber(value: unknown): number | undefined {
   const num =
     typeof value === 'number'
@@ -48,6 +56,14 @@ export function makeAssembleOffer(
       ? ((await runner.run(op.externalId, ctx, input)) as string | undefined)
       : undefined;
 
+    const gtin = op.gtin
+      ? toIdentifierText(await runner.run(op.gtin, ctx, input))
+      : undefined;
+
+    const mpn = op.mpn
+      ? toIdentifierText(await runner.run(op.mpn, ctx, input))
+      : undefined;
+
     let locations: string[] | undefined;
     if (op.locations) {
       const rawLocations = (await runner.run(op.locations, ctx, input)) as
@@ -74,6 +90,8 @@ export function makeAssembleOffer(
       availability,
       url,
       externalId,
+      gtin,
+      mpn,
       locations,
       specs,
     };

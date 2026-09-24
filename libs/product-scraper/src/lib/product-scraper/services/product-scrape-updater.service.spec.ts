@@ -14,9 +14,11 @@ import type { ProductMetricsService } from '@fittkereso-backend/metrics';
 import type {
   ListingMatchService,
   ProductDuplicateService,
+  ProductKeyLookupService,
 } from '@fittkereso-backend/product-identity';
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
+  BrandResolutionService,
   OfferMatchingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -31,6 +33,7 @@ jest.mock('@fittkereso-backend/product-identity', () => ({}));
 jest.mock('@fittkereso-backend/product', () => ({}));
 
 import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
+import type { SpecPostProcessService } from './spec-post-process.service';
 
 function makeBrand(name = 'Logitech'): Brand {
   const brand = new Brand();
@@ -127,6 +130,9 @@ describe('ProductScrapeUpdaterService', () => {
   let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
+  let mockKeyLookup: jest.Mocked<ProductKeyLookupService>;
+  let mockBrandResolution: jest.Mocked<BrandResolutionService>;
+  let mockSpecPostProcess: jest.Mocked<SpecPostProcessService>;
 
   beforeEach(() => {
     const aliasInsertBuilder = makeAliasInsertBuilder();
@@ -161,7 +167,6 @@ describe('ProductScrapeUpdaterService', () => {
       findBySourceAndExternalIdWithModelRelations: jest
         .fn()
         .mockResolvedValue(null),
-      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
       findBySourceAndUrl: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
@@ -189,6 +194,9 @@ describe('ProductScrapeUpdaterService', () => {
       productBrandResolutionFailed: jest.fn(),
       scrapeResolutionOutcome: jest.fn(),
       offerIdentityConflict: jest.fn(),
+      offerGtin: jest.fn(),
+      identityKeyConflict: jest.fn(),
+      identityKeyDisagreement: jest.fn(),
     } as unknown as jest.Mocked<ProductMetricsService>;
 
     mockProductNormalizer = {
@@ -223,6 +231,29 @@ describe('ProductScrapeUpdaterService', () => {
       }),
     } as unknown as jest.Mocked<ProductModelFactoryService>;
 
+    // Nothing shares an identifier with the listing unless a test says so.
+    mockKeyLookup = {
+      lookup: jest.fn().mockResolvedValue([]),
+      decide: jest
+        .fn()
+        .mockResolvedValue({ verdict: { kind: 'none' }, failedGates: {} }),
+      disagreeingTiers: jest.fn().mockReturnValue([]),
+      recordPairs: jest.fn().mockResolvedValue(0),
+    } as unknown as jest.Mocked<ProductKeyLookupService>;
+
+    mockBrandResolution = {
+      resolve: jest.fn().mockResolvedValue({ entity: makeBrand(), similarity: 1 }),
+    } as unknown as jest.Mocked<BrandResolutionService>;
+
+    // Both LLM steps pass the listing through unchanged unless a test says
+    // otherwise, so the identity tests above read as before.
+    mockSpecPostProcess = {
+      extractIdentity: jest
+        .fn()
+        .mockImplementation(async ({ scrapedProduct }) => scrapedProduct),
+      unify: jest.fn().mockImplementation(async ({ scrapedProduct }) => scrapedProduct),
+    } as unknown as jest.Mocked<SpecPostProcessService>;
+
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
       mockDuplicateService,
@@ -239,6 +270,9 @@ describe('ProductScrapeUpdaterService', () => {
       mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
+      mockKeyLookup,
+      mockBrandResolution,
+      mockSpecPostProcess,
     );
   });
 
@@ -430,6 +464,445 @@ describe('ProductScrapeUpdaterService', () => {
       'arukereso',
       'created',
     );
+  });
+
+  describe('identifier tiers', () => {
+    const gtinMatch = {
+      via: 'gtin' as const,
+      key: '09008594503199',
+      productId: 'model-speedbike',
+    };
+
+    const savedAs = (id: string) =>
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = id;
+        return model;
+      });
+
+    it('looks up the normalized identifiers, the resolved brand and the declared siblings', async () => {
+      savedAs('model-new');
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({
+          externalId: '1260040108',
+          siblingExternalIds: ['1260040103', '1260040108', '1260040113'],
+          offers: [{ price: 1, gtin: '9008594503199', mpn: '1260-040108' }],
+        }),
+      );
+
+      expect(mockKeyLookup.lookup).toHaveBeenCalledWith({
+        sourceId: 'source-arukereso',
+        // The listing's own id is its history, never a sibling of itself.
+        siblingIds: ['1260040103', '1260040113'],
+        gtins: ['09008594503199'],
+        mpns: ['1260040108'],
+        brandId: 'brand-1',
+      });
+    });
+
+    // ebikeshop's KTM listing landing on the product speedbike's feed created,
+    // by barcode alone — the case names could not settle (EXONICX vs EXONIC XX).
+    it('attaches to the product an identifier found, without name matching', async () => {
+      const speedbikeProduct = makeExistingModel();
+      speedbikeProduct.id = 'model-speedbike';
+      mockKeyLookup.lookup.mockResolvedValueOnce([gtinMatch]);
+      mockKeyLookup.decide.mockResolvedValueOnce({
+        verdict: { kind: 'attach', via: 'gtin', productId: 'model-speedbike' },
+        failedGates: { 'model-speedbike': [] },
+      });
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(speedbikeProduct);
+      mockProductRepo.save.mockResolvedValue(speedbikeProduct);
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(result?.id).toBe('model-speedbike');
+      expect(mockListingMatch.match).not.toHaveBeenCalled();
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'gtin_hit',
+      );
+      // Resolved by an identifier, not scored: nothing for name-based
+      // duplicate detection to compare.
+      expect(mockDuplicateService.detect).not.toHaveBeenCalled();
+    });
+
+    it('checks the candidate against the listing\'s brand and specs', async () => {
+      savedAs('model-new');
+      const specs = { modelYear: 2027, batteryCapacity: 625 };
+      mockKeyLookup.lookup.mockResolvedValueOnce([gtinMatch]);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ specs }),
+      );
+
+      expect(mockKeyLookup.decide).toHaveBeenCalledWith([gtinMatch], {
+        brandId: 'brand-1',
+        specs,
+        categorySlug: 'keyboards',
+      });
+    });
+
+    // speedbike lists one CUBE trike twice under one GTIN, once as 2025 and
+    // once as 2027. The shop contradicts itself; a person decides.
+    it('sends a conflicting listing on to name matching, and pairs wherever it lands with the key\'s product', async () => {
+      savedAs('model-2027');
+      mockKeyLookup.lookup.mockResolvedValueOnce([gtinMatch]);
+      const failedGates = {
+        'model-speedbike': [
+          {
+            gate: 'primarySpecMismatch' as const,
+            spec: 'modelYear',
+            severity: 30,
+            queryValue: 2027,
+            candidateValue: 2025,
+          },
+        ],
+      };
+      mockKeyLookup.decide.mockResolvedValueOnce({
+        verdict: {
+          kind: 'conflict',
+          via: 'gtin',
+          reason: 'spec_mismatch',
+          productIds: ['model-speedbike'],
+        },
+        failedGates,
+      });
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(mockListingMatch.match).toHaveBeenCalled();
+      expect(result?.id).toBe('model-2027');
+      expect(mockMetricsService.identityKeyConflict).toHaveBeenCalledWith(
+        'arukereso',
+        'gtin',
+        'spec_mismatch',
+      );
+      expect(mockKeyLookup.recordPairs).toHaveBeenCalledWith(
+        'model-2027',
+        [gtinMatch],
+        failedGates,
+        'scrape',
+      );
+    });
+
+    // A duplicate created before the identifier was known: the listing's own
+    // history keeps it where it is, and the GTIN pointing elsewhere is what
+    // brings the other product to a person's attention.
+    it('never moves a listing its own history resolved, but pairs it with the product an identifier points at', async () => {
+      const ownProduct = makeExistingModel();
+      ownProduct.id = 'model-own';
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValueOnce({
+        model: ownProduct,
+      } as never);
+      mockKeyLookup.lookup.mockResolvedValueOnce([gtinMatch]);
+      mockKeyLookup.decide.mockResolvedValueOnce({
+        verdict: { kind: 'attach', via: 'gtin', productId: 'model-speedbike' },
+        failedGates: {},
+      });
+      mockKeyLookup.disagreeingTiers.mockReturnValueOnce(['gtin']);
+      mockProductRepo.save.mockResolvedValue(ownProduct);
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ offers: [{ price: 1, externalId: 'sku-1' }] }),
+      );
+
+      expect(result?.id).toBe('model-own');
+      expect(mockKeyLookup.disagreeingTiers).toHaveBeenCalledWith(
+        [gtinMatch],
+        'model-own',
+        undefined,
+      );
+      expect(mockMetricsService.identityKeyDisagreement).toHaveBeenCalledWith(
+        'arukereso',
+        'offer_external_id',
+        'gtin',
+      );
+      expect(mockKeyLookup.recordPairs).toHaveBeenCalledWith(
+        'model-own',
+        [gtinMatch],
+        {},
+        'scrape',
+      );
+    });
+
+    it('only counts tiers after the one that resolved as disagreeing', async () => {
+      const sibling = makeExistingModel();
+      sibling.id = 'model-sibling';
+      mockKeyLookup.decide.mockResolvedValueOnce({
+        verdict: { kind: 'attach', via: 'sibling', productId: 'model-sibling' },
+        failedGates: {},
+      });
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(sibling);
+      mockProductRepo.save.mockResolvedValue(sibling);
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'sibling_hit',
+      );
+      expect(mockKeyLookup.disagreeingTiers).toHaveBeenCalledWith(
+        [],
+        'model-sibling',
+        'sibling',
+      );
+    });
+
+    it('does not fail the scrape when writing the pairs throws', async () => {
+      savedAs('model-new');
+      mockKeyLookup.recordPairs.mockRejectedValueOnce(new Error('db down'));
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(result?.id).toBe('model-new');
+    });
+  });
+
+  describe('the LLM steps', () => {
+    const cleaned = (scrapedProduct: ScrapedProduct): ScrapedProduct => ({
+      ...scrapedProduct,
+      model: 'Macina Scarp SX',
+      displayName: 'KTM Macina Scarp SX',
+      specs: { modelYear: 2026 },
+      nameCleaned: true,
+    });
+
+    const savedAs = (id: string) =>
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = id;
+        return model;
+      });
+
+    // The listing's own history decides whether the stored extraction can be
+    // reused, so it has to be known before the extraction runs.
+    it('hands the extraction this listing\'s own record once its history found it', async () => {
+      const ownRecord = {
+        url: 'https://example.com/product',
+        source: { id: 'source-arukereso' },
+      };
+      const known = makeExistingModel();
+      known.sources = [
+        { url: 'https://example.com/other', source: { id: 'source-arukereso' } } as never,
+        ownRecord as never,
+      ];
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValueOnce({
+        model: known,
+      } as never);
+      mockProductRepo.save.mockResolvedValue(known);
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ offers: [{ price: 1, externalId: 'sku-1' }] }),
+      );
+
+      expect(mockSpecPostProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ ownRecord }),
+      );
+    });
+
+    it('runs history, extraction, identifier lookups, decision and unification in that order', async () => {
+      savedAs('model-new');
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ offers: [{ price: 1, externalId: 'sku-1' }] }),
+      );
+
+      const order = (mock: jest.Mock) => mock.mock.invocationCallOrder[0];
+      expect(
+        order(mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations as jest.Mock),
+      ).toBeLessThan(order(mockSpecPostProcess.extractIdentity as jest.Mock));
+      expect(order(mockSpecPostProcess.extractIdentity as jest.Mock)).toBeLessThan(
+        order(mockKeyLookup.lookup as jest.Mock),
+      );
+      expect(order(mockKeyLookup.decide as jest.Mock)).toBeLessThan(
+        order(mockSpecPostProcess.unify as jest.Mock),
+      );
+      expect(order(mockSpecPostProcess.unify as jest.Mock)).toBeLessThan(
+        order(mockSourceRecordUpdater.upsertSourceRecord as jest.Mock),
+      );
+    });
+
+    it('extracts a first-seen listing without a record to reuse', async () => {
+      savedAs('model-new');
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockSpecPostProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ ownRecord: undefined }),
+      );
+    });
+
+    // The sanity check compares the extracted specs, and name matching the
+    // cleaned name — not the raw title the importer handed over.
+    it('decides identity on what the extraction produced', async () => {
+      savedAs('model-new');
+      mockSpecPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) =>
+        cleaned(scrapedProduct),
+      );
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockKeyLookup.decide).toHaveBeenCalledWith([], expect.objectContaining({
+        specs: { modelYear: 2026 },
+      }));
+      expect(mockListingMatch.match).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'Macina Scarp SX', nameCleaned: true }),
+        expect.anything(),
+      );
+      expect(mockBrandResolution.resolve).toHaveBeenCalledWith(
+        'Logitech',
+        'KTM Macina Scarp SX',
+      );
+    });
+
+    it('unifies once when the listing creates its product, and saves the result', async () => {
+      savedAs('model-new');
+      mockSpecPostProcess.unify.mockImplementationOnce(async ({ scrapedProduct }) => ({
+        ...scrapedProduct,
+        specs: { ...scrapedProduct.specs, tubeless: true },
+      }));
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockSpecPostProcess.unify).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'created' }),
+      );
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scrapedProduct: expect.objectContaining({
+            specs: { layout: 'UK', tubeless: true },
+          }),
+        }),
+      );
+    });
+
+    // A shop's first listing of a product another shop created: its spec
+    // table gets read once, and extends the product's specs.
+    it('unifies when the listing is its source\'s first on an existing product', async () => {
+      const otherShops = makeExistingModel();
+      otherShops.sources = [{ source: { id: 'source-other-shop' } } as never];
+      mockListingMatch.match.mockResolvedValueOnce({
+        productId: otherShops.id,
+        decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+      } as never);
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(otherShops);
+      mockProductRepo.save.mockResolvedValue(otherShops);
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockSpecPostProcess.unify).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'new_source' }),
+      );
+    });
+
+    it('does not unify another size from a source that already contributed', async () => {
+      const product = makeExistingModel();
+      product.sources = [
+        { url: 'https://example.com/48cm', source: { id: 'source-arukereso' } } as never,
+      ];
+      mockKeyLookup.decide.mockResolvedValueOnce({
+        verdict: { kind: 'attach', via: 'sibling', productId: product.id },
+        failedGates: {},
+      });
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(product);
+      mockProductRepo.save.mockResolvedValue(product);
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockSpecPostProcess.unify).not.toHaveBeenCalled();
+    });
+
+    // The admin's "force resync" on one listing is a request to read it again in full.
+    it('unifies a listing its source already contributed when the resync is forced', async () => {
+      const product = makeExistingModel();
+      product.sources = [
+        { url: 'https://example.com/product', source: { id: 'source-arukereso' } } as never,
+      ];
+      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({
+        model: { id: product.id },
+      } as never);
+      mockProductRepo.findOneOrFail.mockResolvedValueOnce(product);
+      mockProductRepo.save.mockResolvedValue(product);
+
+      await service.createOrUpdateProduct(
+        contextFromTask({ ...makeTask(), force: true } as ScrapeTask),
+        makeScrapedProduct(),
+      );
+
+      expect(mockSpecPostProcess.unify).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'forced' }),
+      );
+    });
+
+    // The product cannot be created, so the listing is about to be dropped.
+    it('does not unify a product whose brand is unknown', async () => {
+      mockBrandResolution.resolve.mockResolvedValueOnce(undefined);
+      mockModelFactory.createShell.mockRejectedValueOnce(
+        new Error('Brand could not be identified'),
+      );
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ brand: 'Unknown Co' }),
+      );
+
+      expect(result).toBeUndefined();
+      expect(mockSpecPostProcess.unify).not.toHaveBeenCalled();
+    });
+
+    it('names a new product from the cleaned name', async () => {
+      savedAs('model-new');
+      mockSpecPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) =>
+        cleaned(scrapedProduct),
+      );
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockModelFactory.createShell).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'Macina Scarp SX', displayName: 'KTM Macina Scarp SX' }),
+      );
+    });
+  });
+
+  // A source without source-native ids still has a history: its own page.
+  it('recognises a listing by its page URL when no id resolves it', async () => {
+    const known = makeExistingModel();
+    mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({ model: { id: known.id } } as never);
+    mockProductRepo.findOneOrFail.mockResolvedValueOnce(known);
+    mockProductRepo.save.mockResolvedValue(known);
+
+    const result = await service.createOrUpdateProduct(
+      contextFromTask(makeTask()),
+      makeScrapedProduct(),
+    );
+
+    expect(result?.id).toBe(known.id);
+    expect(mockSourceRecordRepo.findBySourceAndUrl).toHaveBeenCalledWith(
+      'source-arukereso',
+      'https://example.com/product',
+    );
+    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+      'arukereso',
+      'source_url_hit',
+    );
+    expect(mockListingMatch.match).not.toHaveBeenCalled();
   });
 
   describe('duplicate detection after the scrape', () => {
@@ -733,6 +1206,62 @@ describe('ProductScrapeUpdaterService', () => {
         expect.any(String),
         'duplicate_slug_fallback',
       );
+    });
+  });
+
+  describe('offer identifiers', () => {
+    const upserted = () =>
+      mockOfferRepo.upsertFromScrape.mock.calls.map((call) => ({
+        gtin: (call[0] as { gtin?: string }).gtin,
+        mpn: (call[0] as { mpn?: string }).mpn,
+      }));
+
+    const runWithOffers = async (offers: unknown[]) => {
+      mockProductRepo.findOne.mockResolvedValueOnce(null);
+      mockProductRepo.save.mockImplementation(async (model: ProductModel) => {
+        if (!model.id) model.id = 'model-offer-identifiers';
+        return model;
+      });
+      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ offers: offers as never }),
+      );
+    };
+
+    it('stores the normalized GTIN and MPN, not the raw values', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://ebikeshop.hu/a', gtin: ' 9008594503199', mpn: '1260-040108' },
+      ]);
+
+      expect(upserted()).toEqual([{ gtin: '09008594503199', mpn: '1260040108' }]);
+    });
+
+    // speedbike's GIANT rows carry 7-digit article stubs in ean_code: storing
+    // one would let it match another shop's unrelated offer.
+    it('drops an invalid GTIN but keeps the MPN beside it', async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://speedbike.hu/a', gtin: '5461000', mpn: '2300160206' },
+      ]);
+
+      expect(upserted()).toEqual([{ gtin: undefined, mpn: '2300160206' }]);
+    });
+
+    it("counts every offer's GTIN by outcome, so a source whose barcodes stop validating is visible", async () => {
+      await runWithOffers([
+        { price: 1000, url: 'https://shop.hu/a', gtin: '9008594503199' },
+        { price: 2000, url: 'https://shop.hu/b', gtin: '5461000' },
+        { price: 3000, url: 'https://shop.hu/c' },
+        { price: 4000, url: 'https://shop.hu/d', gtin: '  ' },
+      ]);
+
+      expect(mockMetricsService.offerGtin.mock.calls.map((c) => c[1])).toEqual([
+        'valid',
+        'invalid',
+        'absent',
+        'absent',
+      ]);
     });
   });
 

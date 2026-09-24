@@ -16,6 +16,7 @@ import { nameOf } from '@fittkereso-backend/utils';
 import { pairRowOf } from './duplicate-pairs';
 import { NEAR_MISS_SCORE } from './product-identity.constants';
 import { ProductCandidateFinderService } from './product-candidate-finder.service';
+import { ProductKeyLookupService } from './product-key-lookup.service';
 import { ProductMatchQueryService } from './product-match-query.service';
 
 /**
@@ -33,13 +34,15 @@ export class ProductDuplicateService {
     private readonly queryService: ProductMatchQueryService,
     private readonly finder: ProductCandidateFinderService,
     private readonly mergeService: ProductMergeService,
+    private readonly keyLookup: ProductKeyLookupService,
   ) {}
 
   /**
    * Writes a pair for every candidate of this product scoring NEAR_MISS_SCORE
-   * or above — the same bar a listing has to clear to reach the LLM, so a
-   * near-miss the LLM declined still reaches a person. Returns the pairs
-   * written; already-dismissed pairs aren't reopened and don't count.
+   * or above — the bar below which a listing simply becomes a new product — and
+   * for every product sharing one of its identifiers (a GTIN, an MPN, a
+   * declared size). Returns the pairs written; already-dismissed pairs aren't
+   * reopened and don't count.
    */
   public async detect(
     productId: string,
@@ -59,12 +62,19 @@ export class ProductDuplicateService {
       return 0;
     }
 
-    const candidates = await this.finder.findCandidates(
-      this.queryService.ofProduct(product),
-    );
-    const rows = candidates
-      .filter((candidate) => candidate.score >= NEAR_MISS_SCORE)
-      .map((candidate) => pairRowOf(product.id, candidate, detectedBy));
+    const [candidates, identifierRows] = await Promise.all([
+      this.finder.findCandidates(this.queryService.ofProduct(product)),
+      this.keyLookup.storedPairRows(product, detectedBy),
+    ]);
+    // Identifier rows first: where a name found the same pair, the shared
+    // identifier is the evidence it keeps (upsertPairs keeps the first of
+    // equal scores, and an identifier row scores 100).
+    const rows = [
+      ...identifierRows,
+      ...candidates
+        .filter((candidate) => candidate.score >= NEAR_MISS_SCORE)
+        .map((candidate) => pairRowOf(product.id, candidate, detectedBy)),
+    ];
     if (isEmpty(rows)) return 0;
 
     const written = await this.pairRepo.upsertPairs(rows);
@@ -72,6 +82,7 @@ export class ProductDuplicateService {
       productId,
       detectedBy,
       candidates: candidates.length,
+      identifierPairs: identifierRows.length,
       written,
     });
     return written;

@@ -54,6 +54,61 @@ describe('hand-authored source configs', () => {
     ]);
   });
 
+  // ebikeshop's listing paginates on `oldal` (Hungarian for "page") — the
+  // param its own pagination links use. It silently ignores `?page=N` and
+  // serves page 1 again, so a wrong template doesn't fail: it re-imports the
+  // first 32 bikes once per page and never reaches the other 576.
+  it('ebikeshop config paginates on the query param the site actually reads', () => {
+    const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
+    expect(config.listPage.pagination?.urlTemplate).toBe(
+      '{{startUrl}}?oldal={{page}}',
+    );
+  });
+
+  // productCode is KTM's own article number (1260040108), which is what makes
+  // it an MPN that other shops' KTM listings can match. The offer's externalId
+  // is the same value, so offers keep converging on it as before.
+  it('ebikeshop config reads GTIN and MPN off the product payload', () => {
+    const offer = (ebikeshopConfig as unknown as ScrapingSourceConfig).detailPage
+      .offers?.itemPipeline[0] as { gtin?: unknown; mpn?: unknown; externalId?: unknown };
+    const readsPath = (path: string) => [
+      { op: 'parseJsonAttr', selector: '#app', attr: 'data-page', path },
+    ];
+
+    expect(offer.gtin).toEqual(readsPath('props.product.gtin'));
+    expect(offer.mpn).toEqual(readsPath('props.product.productCode'));
+    expect(offer.externalId).toEqual(readsPath('props.product.productCode'));
+  });
+
+  // The shop's own size grouping, and the only sibling signal trusted: all 752
+  // sibling pairs in the 2026-09-23 crawl listed the identical set.
+  it('ebikeshop config takes sibling ids from the frame-size variations', () => {
+    expect(
+      (ebikeshopConfig as unknown as ScrapingSourceConfig).detailPage.siblingIds,
+    ).toEqual([
+      {
+        op: 'parseJsonAttr',
+        selector: '#app',
+        attr: 'data-page',
+        path: 'props.product.variations',
+      },
+      { op: 'filterJsonArray', path: 'type', equals: 'frame_size' },
+      { op: 'flattenJsonArray', path: 'items' },
+      {
+        op: 'mapJsonArray',
+        fields: { productCode: { path: 'productCode' } },
+        flattenField: 'productCode',
+      },
+    ]);
+  });
+
+  // Its 23-row property table is short enough to send whole.
+  it('ebikeshop config sends its whole spec table to the identity extraction', () => {
+    expect(
+      (ebikeshopConfig as unknown as ScrapingSourceConfig).identityExtraction,
+    ).toBeUndefined();
+  });
+
   it('speedbike config resolves E-BIKE breadcrumb text to the ebikes category', () => {
     const config = speedbikeConfig as unknown as ScrapingSourceConfig;
     expect(config.detailPage.category.slugLookup).toEqual([
@@ -103,6 +158,39 @@ describe('hand-authored source configs', () => {
     // 3488 products and unique per variant.
     it('keys identity on identifier rather than the variant-shared sku', () => {
       expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // 75% of the feed's e-bike rows carry a checksum-valid ean_code. GIANT and
+    // LIV put 7-digit article stubs there instead, which normalizeGtin drops.
+    it('reads the GTIN from ean_code', () => {
+      expect(config.mapping['gtin']).toEqual({ field: 'ean_code' });
+    });
+
+    // The sku is the manufacturer's article number, sometimes with an "MX"
+    // prefix on KTM rows (60 of 737) that no other shop uses.
+    it('reads the MPN from sku, without the shop\'s MX prefix', () => {
+      expect(config.mapping['mpn']).toEqual({
+        field: 'sku',
+        pipeline: [{ op: 'stripPattern', pattern: '^MX' }],
+      });
+    });
+
+    // Measured on the 2026-09-23 feed: with this list every e-bike row still
+    // sends at least one row per identity group — frame 100%, battery 99%,
+    // motor 96%, wheels 100%, drivetrain 100%, weight 88% — while sending
+    // about 11 of its ~32 rows. Dropping one of these groups would silently
+    // cost the extraction the specs it carries.
+    it.each([
+      ['frame', ['Váz', 'Frame']],
+      ['motor', ['Motor', 'E-System']],
+      ['battery', ['Akkumulátor', 'Battery']],
+      ['wheels', ['Kerék', 'Első kerék', 'Gumi', 'Első gumi']],
+      ['drivetrain', ['Hátsó váltó', 'Fogaskoszorú', 'Gear Shift']],
+      ['weight', ['Súly', 'Weight']],
+    ])('sends the %s rows to the identity extraction', (_group, labels) => {
+      expect(config.identityExtraction?.specRows).toEqual(
+        expect.arrayContaining(labels),
+      );
     });
 
     // The feed's attribute_name values are the same labels the shop's own spec

@@ -25,7 +25,7 @@ export class SearchTools {
   @Tool({
     name: 'search_products',
     description:
-      'Search products by name, brand, or category. Returns product IDs, display names, brands, models. Use to find the correct product when resolution matched wrong one, or to verify product existence.',
+      'Search products by name, brand, category, or an identifier one of their offers carries (GTIN, MPN prefix). Returns product IDs, display names, brands, models. Use to find the correct product when resolution matched wrong one, to verify product existence, or to see which products a barcode or article number landed on — two products sharing a GTIN are usually a duplicate.',
     parameters: z.object({
       searchTerm: z
         .string()
@@ -33,6 +33,18 @@ export class SearchTools {
         .describe('Search by product name (trigram similarity match)'),
       brandId: z.string().optional().describe('Filter by brand UUID'),
       categoryId: z.string().optional().describe('Filter by category UUID'),
+      gtin: z
+        .string()
+        .optional()
+        .describe(
+          'Products with an offer (any shop, active or not) carrying this GTIN. EAN-13 and GTIN-14 forms both work; a value with a bad check digit matches nothing.',
+        ),
+      mpn: z
+        .string()
+        .optional()
+        .describe(
+          'Products with an offer whose manufacturer article number starts with this (case, spaces and hyphens ignored; at least 5 characters).',
+        ),
       pageSize: z
         .number()
         .optional()
@@ -44,12 +56,16 @@ export class SearchTools {
     searchTerm?: string;
     brandId?: string;
     categoryId?: string;
+    gtin?: string;
+    mpn?: string;
     pageSize?: number;
   }): Promise<string> {
     const params = new ProductSearchParams();
     params.searchTerm = args.searchTerm;
     params.brandIds = args.brandId ? [args.brandId] : undefined;
     params.categoryIds = args.categoryId ? [args.categoryId] : undefined;
+    params.gtin = args.gtin;
+    params.mpn = args.mpn;
     params.pageSize = Math.min(args.pageSize ?? 20, 50);
     params.page = 1;
 

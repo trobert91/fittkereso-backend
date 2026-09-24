@@ -102,6 +102,39 @@ export class Offer extends BasePostgresEntity {
   externalId?: string;
 
   /**
+   * This offer's barcode, as a checksum-validated GTIN-14 (see normalizeGtin
+   * in @fittkereso-backend/utils) — null when the source publishes none or an
+   * invalid one. The raw value survives on the source record's scrapedProduct.
+   *
+   * Lives on the offer, not the product, because a GTIN identifies one
+   * sellable SIZE, and an offer is per size. It is the one identifier that is
+   * the same at every shop, so a new listing whose GTIN matches another
+   * shop's offer is looked up onto that offer's product.
+   *
+   * Indexed for that lookup, and deliberately not unique: one shop can list
+   * the same item twice, and a disagreement is something to review, not a
+   * write to refuse.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Index()
+  @Column({ type: 'varchar', length: 14, nullable: true })
+  gtin?: string | null;
+
+  /**
+   * The manufacturer's article number for this size (normalizeMpn: upper
+   * case, no whitespace or hyphens) — null when the source publishes none.
+   *
+   * Only comparable within one brand, and only between shops that publish
+   * the manufacturer's code rather than their own: KTM's codes agree across
+   * shops, CUBE's do not. Indexed and not unique, for the same reasons as
+   * `gtin`.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  mpn?: string | null;
+
+  /**
    * Store/warehouse names where this offer is physically available (e.g.
    * ["Törökbálinti raktár", "Törökbálint"]) — always optional, most sources
    * have no per-location breakdown.

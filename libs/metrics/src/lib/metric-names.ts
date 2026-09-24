@@ -97,6 +97,46 @@ export const SCRAPE_RESOLUTION_OUTCOME_TOTAL = 'scrape_resolution_outcome_total'
  * one offer where it used to have four.
  */
 export const OFFER_IDENTITY_CONFLICT_TOTAL = 'offer_identity_conflict_total';
+/**
+ * Every scraped offer's GTIN, by whether it survived normalizeGtin.
+ *
+ * An invalid value is dropped rather than stored, which is correct and
+ * invisible — a source whose barcodes suddenly all fail (a mapping pointing at
+ * the wrong field, a shop switching to internal codes) would otherwise just
+ * quietly stop matching across shops.
+ */
+export const OFFER_GTIN_TOTAL = 'offer_gtin_total';
+/**
+ * A listing's identifier (declared sibling, GTIN, MPN) found a product the
+ * listing could not attach to: several products, another brand, or a primary
+ * spec contradiction. The listing went on to name matching and a pair was
+ * opened — a rising rate means a shop's identifiers stopped being trustworthy.
+ */
+export const IDENTITY_KEY_CONFLICT_TOTAL = 'identity_key_conflict_total';
+/**
+ * A listing resolved one way (its own history, or an earlier identifier tier)
+ * while a later identifier pointed at a different product. The listing stays
+ * where it was resolved; the pair it opens is the duplicate to merge.
+ */
+export const IDENTITY_KEY_DISAGREEMENT_TOTAL = 'identity_key_disagreement_total';
+/**
+ * The LLM identity extraction, per listing: extracted fresh, reused because
+ * the listing's input did not change, failed (the listing continues on its
+ * deterministic data), or disabled for the source. On a nightly re-import of
+ * an unchanged catalogue, everything should land in `reused`.
+ */
+export const IDENTITY_EXTRACTION_TOTAL = 'identity_extraction_total';
+/**
+ * Spec-table rows the source's identityExtraction.specRows let through, per
+ * listing. A source whose listings suddenly match none has renamed its labels;
+ * the extraction would then see the title alone and fill far fewer specs.
+ */
+export const IDENTITY_SPEC_ROWS_MATCHED = 'identity_spec_rows_matched';
+/**
+ * Full spec unification, which runs once per product per source: when a
+ * listing creates a product, or when a source first contributes to one.
+ */
+export const SPEC_UNIFICATION_TOTAL = 'spec_unification_total';
 
 // Detail page extraction metrics
 export const DETAIL_EXTRACTION_OUTCOME_TOTAL =

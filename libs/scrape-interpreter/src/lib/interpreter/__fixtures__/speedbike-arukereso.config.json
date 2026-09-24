@@ -27,6 +27,53 @@
       }
     ]
   },
+  "identityExtraction": {
+    "specRows": [
+      "Váz",
+      "Frame",
+      "Villa",
+      "Fork",
+      "Lengéscsillapító",
+      "Dampener",
+      "Motor",
+      "E-System",
+      "Operating System",
+      "Akkumulátor",
+      "Battery",
+      "Kerék",
+      "Kerékméret",
+      "Max kerék méret",
+      "Első kerék",
+      "Hátsó kerék",
+      "Felnik",
+      "Gumi",
+      "Külsők",
+      "Tire",
+      "Első gumi",
+      "Hátsó gumi",
+      "Gumiabroncs",
+      "Gumiabroncsok",
+      "Első gumiabroncs",
+      "Hátsó gumiabroncs",
+      "Gumiköpeny",
+      "Első gumiköpeny",
+      "Hátsó gumiköpeny",
+      "Hátsó váltó",
+      "Fogaskoszorú",
+      "Cassette",
+      "Váltó",
+      "Váltókar",
+      "Váltókarok",
+      "Shifters",
+      "Gear Shift",
+      "Váltórendszer",
+      "Súly",
+      "Weight",
+      "Modellév",
+      "Model Year",
+      "Évjárat"
+    ]
+  },
   "mapping": {
     "externalId": {
       "field": "identifier"
@@ -71,11 +118,32 @@
           "value": "HUF"
         }
       ]
+    },
+    "gtin": {
+      "field": "ean_code"
+    },
+    "mpn": {
+      "field": "sku",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "^MX"
+        }
+      ]
     }
   },
   "specMapping": {
     "ebikes": {
       "mappings": [
+        {
+          "key": "modelYear",
+          "labels": [
+            "Modellév",
+            "Model Year",
+            "Évjárat"
+          ],
+          "extract": "number"
+        },
         {
           "key": "frameType",
           "labels": [

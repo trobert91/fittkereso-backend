@@ -45,7 +45,7 @@ describe('ProductSourcePostProcessService', () => {
         },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(result?.specs).toEqual({ weight: 21.5, frameType: 'Full-suspension' });
@@ -62,7 +62,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
         model: 'custom-model',
       });
 
@@ -100,7 +100,7 @@ describe('ProductSourcePostProcessService', () => {
         ],
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(aiChat.createChat).toHaveBeenCalledWith(
@@ -143,7 +143,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema: enumSchema,
         goldenSample: { drivetrain: 'Lánc' },
-        offerLevelSpecs: [],
+        outputKeys: ['drivetrain'],
       });
 
       expect(aiChat.createChat).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -185,7 +185,9 @@ describe('ProductSourcePostProcessService', () => {
       expect(callArgs.schema.properties.specs.required).toBeUndefined();
     });
 
-    it('excludes offer-level keys from the response schema and canonical field listing', async () => {
+    // The identity extraction settled these already; unification may neither
+    // re-derive nor overwrite them.
+    it('fills only its own fields, never an identity field', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
       const schemaWithFrameSize: SpecDefinitionJsonSchema = {
         type: 'object',
@@ -200,7 +202,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema: schemaWithFrameSize,
         goldenSample,
-        offerLevelSpecs: ['frameSize'],
+        outputKeys: ['weight'],
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -216,7 +218,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -233,7 +235,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -241,33 +243,64 @@ describe('ProductSourcePostProcessService', () => {
       expect(systemPrompt).toContain('Never return "brand"/"model"');
     });
 
-    it('includes current offer-level values as read-only context in the user message', async () => {
+    it('includes the identity extraction\'s values as read-only context in the user message', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
-        offerLevelDeterministicSpecs: { frameSize: 43 },
+        knownSpecs: { frameSize: 43, modelYear: 2026 },
         schema,
         goldenSample,
-        offerLevelSpecs: ['frameSize'],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const userMessage = JSON.parse(aiChat.createChat.mock.calls[0][0].messages[1].content);
-      expect(userMessage.offerLevelSpecs).toEqual({ frameSize: 43 });
+      expect(userMessage.knownSpecs).toEqual({ frameSize: 43, modelYear: 2026 });
     });
 
-    it('omits offerLevelSpecs from the user message when offerLevelDeterministicSpecs is empty/absent', async () => {
+    it('omits knownSpecs from the user message when there are none', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
       await service.processModelSpecs({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: ['frameSize'],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const userMessage = JSON.parse(aiChat.createChat.mock.calls[0][0].messages[1].content);
-      expect(userMessage.offerLevelSpecs).toBeUndefined();
+      expect(userMessage.knownSpecs).toBeUndefined();
+    });
+
+    // The one golden sample holds every field; unification is shown only the
+    // fields it fills, so an identity value never appears as an example.
+    it('shows only its own fields of the golden sample', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processModelSpecs({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        outputKeys: ['weight'],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain('{"weight":22}');
+      expect(systemPrompt).not.toContain('Full-suspension');
+    });
+
+    it('leaves the worked example out entirely without a golden sample', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.processModelSpecs({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        outputKeys: ['weight', 'frameType'],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).not.toContain('Worked example');
+      expect(systemPrompt).not.toContain('golden example');
     });
 
     it('defaults to gpt-6-luna when no model override is given', async () => {
@@ -277,7 +310,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(aiChat.createChat).toHaveBeenCalledWith(
@@ -292,7 +325,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -311,7 +344,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -327,7 +360,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
         effort: 'high',
         maxTokens: 2000,
       });
@@ -346,7 +379,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
         thinking: false,
       });
 
@@ -367,7 +400,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(result).toBeUndefined();
@@ -384,7 +417,7 @@ describe('ProductSourcePostProcessService', () => {
         },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(result).toBeUndefined();
@@ -398,7 +431,7 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'brand', model: 'raw title', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(result).toBeUndefined();
@@ -411,20 +444,20 @@ describe('ProductSourcePostProcessService', () => {
         data: { brand: 'brand', model: 'raw title', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
 
       expect(result).toBeUndefined();
     });
 
-    it('independent failure does not affect a hypothetical concurrent offer-identity call', async () => {
+    it('independent failure does not affect a concurrent identity extraction', async () => {
       aiChat.createChat.mockRejectedValueOnce(new Error('model-spec call failed'));
 
       const modelSpecsResult = await service.processModelSpecs({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: { weight: 22 } },
         schema,
         goldenSample,
-        offerLevelSpecs: [],
+        outputKeys: ['weight', 'frameType'],
       });
       expect(modelSpecsResult).toBeUndefined();
 
@@ -432,24 +465,24 @@ describe('ProductSourcePostProcessService', () => {
         content: JSON.stringify({ brand: 'KTM' }),
         parsed: { brand: 'KTM' },
       });
-      const offerIdentityResult = await service.processOfferIdentity({
+      const identityResult = await service.extractIdentity({
         data: { brand: 'ktm', model: 'Macina Scarp', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
-      expect(offerIdentityResult?.brand).toBe('KTM');
+      expect(identityResult?.brand).toBe('KTM');
     });
   });
 
-  describe('processOfferIdentity', () => {
+  describe('extractIdentity', () => {
     it('defaults to high effort, without asserting thinking or maxTokens explicitly', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-      await service.processOfferIdentity({
+      await service.extractIdentity({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -465,10 +498,10 @@ describe('ProductSourcePostProcessService', () => {
         parsed: { brand: 'KTM' },
       });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'ktm', model: 'Macina Scarp', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -482,7 +515,7 @@ describe('ProductSourcePostProcessService', () => {
         parsed: { specs: {}, model: cleanedModel },
       });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: {
           brand: 'KTM',
           model:
@@ -490,7 +523,7 @@ describe('ProductSourcePostProcessService', () => {
           specs: {},
         },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -514,11 +547,11 @@ describe('ProductSourcePostProcessService', () => {
     it('forwards a given description into the user message and documents it as lower-confidence in the system prompt', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-      await service.processOfferIdentity({
+      await service.extractIdentity({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         description: 'Stabil karbonvázával és kiváló minőségű komponenseivel.',
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -533,10 +566,10 @@ describe('ProductSourcePostProcessService', () => {
     it('omits description from the user message when none is given', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-      await service.processOfferIdentity({
+      await service.extractIdentity({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -551,10 +584,10 @@ describe('ProductSourcePostProcessService', () => {
         parsed: { model: '   ' },
       });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'KTM', model: 'raw title', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -568,10 +601,10 @@ describe('ProductSourcePostProcessService', () => {
         parsed: { brand: '  ', model: 'Macina Scarp' },
       });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'KTM', model: 'raw title', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -582,10 +615,10 @@ describe('ProductSourcePostProcessService', () => {
     it('returns undefined when parsed output contributes nothing on any field', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'brand', model: 'raw title', specs: { weight: 22 } },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -600,10 +633,10 @@ describe('ProductSourcePostProcessService', () => {
         usage: { completionTokens: 8000 },
       });
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
@@ -613,43 +646,35 @@ describe('ProductSourcePostProcessService', () => {
     it('returns undefined when the LLM call throws', async () => {
       aiChat.createChat.mockRejectedValueOnce(new Error('provider error'));
 
-      const result = await service.processOfferIdentity({
+      const result = await service.extractIdentity({
         data: { brand: 'KTM', model: 'raw title', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
       expect(result).toBeUndefined();
     });
 
-    // Offer-identity has at most a couple of fields to output, so the
-    // diff-only "only include NEW/CORRECTED fields" contract used by
-    // processModelSpecs isn't applied here — it added reasoning overhead
-    // with no payload-size benefit on a call this small (measured
-    // 2026-08-29: completion tokens roughly tripled on real traffic with no
-    // offsetting savings, since there was rarely more than one field to
-    // omit in the first place).
-    it('does not use the diff-only contract — keeps the original "start from deterministicSpecs" instruction', async () => {
+    // The old offer-identity call dropped this contract: with one or two
+    // fields to output it only added reasoning (2026-08-29). With the whole
+    // identity set it keeps responses short, and it is what the 2026-09-23
+    // cost measurement ran with.
+    it('keeps responses diff-only: deterministic values are merged in, not echoed', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-      await service.processOfferIdentity({
+      await service.extractIdentity({
         data: { brand: 'KTM', model: 'raw title', specs: {} },
         schema,
-        goldenSample,
+        outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
-      expect(systemPrompt).toContain(
-        'Start from deterministicSpecs — those values are already correct',
-      );
-      expect(systemPrompt).not.toContain(
-        'deterministicSpecs is already merged in automatically after your response',
-      );
+      expect(systemPrompt).toContain('deterministicSpecs is merged in automatically after your response');
     });
 
-    it('never includes non-offer-level keys in the response schema', async () => {
+    it('puts exactly its output keys in the response schema, beside brand and model', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
       const schemaWithFrameSize: SpecDefinitionJsonSchema = {
         type: 'object',
@@ -660,10 +685,10 @@ describe('ProductSourcePostProcessService', () => {
         },
       };
 
-      await service.processOfferIdentity({
+      await service.extractIdentity({
         data: { brand: 'KTM', model: 'raw title', specs: {} },
         schema: schemaWithFrameSize,
-        goldenSample,
+        outputKeys: ['frameSize'],
         offerLevelSpecs: ['frameSize'],
       });
 
@@ -672,6 +697,138 @@ describe('ProductSourcePostProcessService', () => {
       expect(callArgs.schema.properties.specs.properties.frameSize).toBeDefined();
       expect(callArgs.schema.properties.brand).toBeDefined();
       expect(callArgs.schema.properties.model).toBeDefined();
+    });
+
+    // Measured on 20 listings: a golden sample changed 1% of values and made
+    // frameSize worse. The schema's allowed values, units and examples guide
+    // this call alone.
+    it('is guided by the schema alone: no golden sample, no worked example', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.extractIdentity({
+        data: { brand: 'KTM', model: 'raw title', specs: {} },
+        schema,
+        outputKeys: ['weight', 'frameType'],
+        offerLevelSpecs: [],
+      });
+
+      const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).not.toContain('Worked example');
+      expect(systemPrompt).not.toContain('Full-suspension');
+      expect(systemPrompt).toContain('- weight (number, unit: kg): Weight');
+      expect(systemPrompt).toContain('Aim to fill every canonical field above');
+    });
+
+    it('sends the selected spec rows with the title and the deterministic values', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+      await service.extractIdentity({
+        data: { brand: 'KTM', model: 'raw title', specs: { weight: 22 } },
+        rawSpecs: [{ name: 'Motor', values: ['Bosch Performance CX'] }],
+        schema,
+        outputKeys: ['weight', 'frameType'],
+        offerLevelSpecs: [],
+      });
+
+      expect(JSON.parse(aiChat.createChat.mock.calls[0][0].messages[1].content)).toEqual({
+        deterministicSpecs: { weight: 22 },
+        rawModel: 'raw title',
+        brand: 'KTM',
+        rawSpecs: [{ name: 'Motor', values: ['Bosch Performance CX'] }],
+      });
+    });
+
+    describe('the model year', () => {
+      const schemaWithYear: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'E-bike',
+        properties: {
+          modelYear: { type: 'number', title: 'Model year' },
+          weight: { type: 'number', title: 'Weight', meta: { unit: 'kg' } },
+        },
+      };
+
+      it('is read from an explicit field first, then from the title\'s short forms', async () => {
+        aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'KTM', model: "MACINA TEAM 892 43cm '25", specs: {} },
+          schema: schemaWithYear,
+          outputKeys: ['modelYear', 'weight'],
+          offerLevelSpecs: [],
+        });
+
+        const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+        expect(systemPrompt).toContain(`"'26", "MY26", "2026" all mean 2026`);
+        expect(systemPrompt).toContain('the explicit field wins');
+        expect(systemPrompt).toContain('Never assume a year the input does not state');
+      });
+
+      it('gets no rule when the category has no year field', async () => {
+        aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'KTM', model: 'raw title', specs: {} },
+          schema: schemaWithYear,
+          outputKeys: ['weight'],
+          offerLevelSpecs: [],
+        });
+
+        const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+        expect(systemPrompt).not.toContain('modelYear');
+      });
+
+      it('returns the year it extracted with the cleaned model', async () => {
+        aiChat.createChat.mockResolvedValueOnce({
+          content: '{}',
+          parsed: { model: 'Macina Team 892', specs: { modelYear: 2025 } },
+        });
+
+        const result = await service.extractIdentity({
+          data: { brand: 'KTM', model: "MACINA TEAM 892 43cm '25", specs: {} },
+          schema: schemaWithYear,
+          outputKeys: ['modelYear', 'weight'],
+          offerLevelSpecs: [],
+        });
+
+        expect(result).toEqual({
+          brand: undefined,
+          model: 'Macina Team 892',
+          specs: { modelYear: 2025 },
+        });
+      });
+    });
+
+    // Every key list comes from the caller (the category config), so a
+    // category with entirely different fields works unchanged.
+    it('follows the given keys, with nothing e-bike-specific in a stub category', async () => {
+      aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+      const monitors: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'Monitor',
+        properties: {
+          screenSize: { type: 'number', title: 'Screen size', meta: { unit: 'inch' } },
+          resolution: { type: 'string', title: 'Resolution', enum: ['FHD', '4K'] },
+          stand: { type: 'string', title: 'Stand' },
+        },
+      };
+
+      await service.extractIdentity({
+        data: { brand: 'LG', model: '27UL500-W 27" 4K', specs: {} },
+        schema: monitors,
+        outputKeys: ['screenSize', 'resolution'],
+        offerLevelSpecs: [],
+      });
+
+      const callArgs = aiChat.createChat.mock.calls[0][0];
+      expect(Object.keys(callArgs.schema.properties.specs.properties)).toEqual([
+        'screenSize',
+        'resolution',
+      ]);
+      const systemPrompt = callArgs.messages[0].content;
+      expect(systemPrompt).toContain('- resolution (string, allowed values (pick exactly one of these, verbatim): FHD | 4K): Resolution');
+      expect(systemPrompt).not.toContain('stand');
+      expect(systemPrompt).not.toMatch(/modelYear|frameSize|Pay particular attention/);
     });
 
     describe('offerLevelSpecs extraction guidance', () => {
@@ -688,10 +845,10 @@ describe('ProductSourcePostProcessService', () => {
       it('tells the LLM to extract offer-level fields from the raw title before stripping them', async () => {
         aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-        await service.processOfferIdentity({
+        await service.extractIdentity({
           data: { brand: 'KTM', model: 'raw title', specs: {} },
           schema: schemaWithFrameSize,
-          goldenSample,
+          outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: ['frameSize', 'color'],
         });
 
@@ -709,17 +866,17 @@ describe('ProductSourcePostProcessService', () => {
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
         expect(systemPrompt).toContain('rawModel');
         expect(systemPrompt).toMatch(
-          /add them to "specs".*BEFORE removing them from "model"/,
+          /into "specs" when "specs" does not already have it, BEFORE removing it from "model"/,
         );
       });
 
       it('omits the offer-level hint entirely when no offerLevelSpecs are configured for the category', async () => {
         aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
-        await service.processOfferIdentity({
+        await service.extractIdentity({
           data: { brand: 'KTM', model: 'raw title', specs: {} },
           schema: schemaWithFrameSize,
-          goldenSample,
+          outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: [],
         });
 
@@ -737,7 +894,7 @@ describe('ProductSourcePostProcessService', () => {
           parsed: { model: cleanedModel, specs: { frameSize: 43 } },
         });
 
-        const result = await service.processOfferIdentity({
+        const result = await service.extractIdentity({
           data: {
             brand: 'KTM',
             model:
@@ -745,7 +902,7 @@ describe('ProductSourcePostProcessService', () => {
             specs: {},
           },
           schema: schemaWithFrameSize,
-          goldenSample,
+          outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: ['frameSize', 'color'],
         });
 

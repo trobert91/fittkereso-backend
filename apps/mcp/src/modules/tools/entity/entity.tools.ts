@@ -10,7 +10,7 @@ export class EntityTools {
   @Tool({
     name: 'get_product_detail',
     description:
-      'Get detailed product information — display name, brand, model, specs, aliases, category, plus every ProductSourceRecord (one per scraped URL, with its own externalId/offerSpecsHash/productSpecsHash/spec validity) and every Offer (price, availability, seller, externalId, and which source record it belongs to). Use to investigate product resolution accuracy, verify if the correct product was matched, or debug why a scrape did or did not produce a new/updated offer.',
+      'Get detailed product information — display name, brand, model, specs, aliases, category, plus every ProductSourceRecord (one per scraped URL, with its own externalId, the sizes its page declared as siblings, offerSpecsHash/productSpecsHash/spec validity) and every Offer (price, availability, seller, externalId, GTIN and MPN, and which source record it belongs to). Use to investigate product resolution accuracy, verify if the correct product was matched, or debug why a scrape did or did not produce a new/updated offer.',
     parameters: z.object({
       productId: z.string().optional().describe('Product model UUID'),
       slug: z
@@ -109,6 +109,8 @@ export class EntityTools {
         L.push(`### ${record.source?.name ?? '(no source)'} — ${record.url ?? '(no url)'}`);
         L.push(`- **ID**: ${record.id}`);
         if (record.externalId) L.push(`- **External ID**: ${record.externalId}`);
+        const siblingIds = record.scrapedProduct?.siblingExternalIds ?? [];
+        if (siblingIds.length > 0) L.push(`- **Declared sizes**: ${siblingIds.join(', ')}`);
         L.push(`- **Last Updated**: ${record.lastUpdated?.toISOString?.() ?? record.lastUpdated}`);
         L.push(`- **Offer Specs Hash**: ${record.offerSpecsHash ?? '(none)'}`);
         L.push(`- **Product Specs Hash**: ${record.productSpecsHash ?? '(none)'}`);
@@ -128,7 +130,7 @@ export class EntityTools {
                 ? ` · locations=${offer.locations.join(', ')}`
                 : '';
             L.push(
-              `  - ${offer.seller?.name ?? '?'} · ${offer.price} ${offer.currency} · ${offer.availability ?? '(not reported)'} · externalId=${offer.externalId ?? '(none)'} · active=${offer.active}${locationsSuffix}`,
+              `  - ${offer.seller?.name ?? '?'} · ${offer.price} ${offer.currency} · ${offer.availability ?? '(not reported)'} · externalId=${offer.externalId ?? '(none)'} · gtin=${offer.gtin ?? '(none)'} · mpn=${offer.mpn ?? '(none)'} · active=${offer.active}${locationsSuffix}`,
             );
           }
         } else {
@@ -149,6 +151,8 @@ export class EntityTools {
         L.push(`- **Condition**: ${offer.condition}`);
         L.push(`- **URL**: ${offer.url ?? '(none)'}`);
         L.push(`- **External ID**: ${offer.externalId ?? '(none)'}`);
+        L.push(`- **GTIN**: ${offer.gtin ?? '(none)'}`);
+        L.push(`- **MPN**: ${offer.mpn ?? '(none)'}`);
         L.push(
           `- **Source Record**: ${offer.sourceRecord?.url ?? offer.sourceRecord?.id ?? '(none)'}`,
         );

@@ -3,30 +3,20 @@ import {
   ArukeresoMappingTarget,
   ArukeresoSourceConfig,
   OfferAvailability,
-  ProductSource,
-  ProductSourceRecord,
-  ProductSourceRecordRepository,
-  ProductSpecs,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
-import {
-  DeterministicProductData,
-  SpecExtractionService,
-} from '@fittkereso-backend/product';
+import { SpecExtractionService } from '@fittkereso-backend/product';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 import { RuntimeDataProviderService } from '@fittkereso-backend/scrape-interpreter';
 import { canonicalizeProductUrl, normalizeUrl } from '@fittkereso-backend/utils';
-import { pick, omit } from 'lodash';
 import {
   ArukeresoFeedItem,
   feedField,
   normalizeFieldName,
 } from './arukereso-feed-item';
-import { ProductImportContext } from '../interfaces/product-import-context.interface';
-import { SpecPostProcessService } from '../product-scraper/services/spec-post-process.service';
 import { splitDeterministicSpecs } from '../product-scraper/services/deterministic-specs';
 import { matchesFilter } from '../product-scraper/services/source-item-filter';
 
@@ -61,10 +51,11 @@ export type MappedFeedItem =
  *
  * It deliberately mirrors ProductDetailsPageScraperService.extractProduct step
  * for step — deterministic spec extraction, the offer/product split, the two
- * hashes, the post-process pass — and shares the parts where a divergence would
- * actually cost something (splitDeterministicSpecs, SpecPostProcessService).
- * What differs is only where the values come from: feed fields addressed by
- * name rather than DOM queries.
+ * hashes — and shares the parts where a divergence would actually cost
+ * something (splitDeterministicSpecs). What differs is only where the values
+ * come from: feed fields addressed by name rather than DOM queries. Like that
+ * importer it makes no LLM call: ProductScrapeUpdaterService decides whether a
+ * listing needs one, since only identity resolution knows it was seen before.
  */
 @Injectable()
 export class ArukeresoProductMapperService {
@@ -73,19 +64,15 @@ export class ArukeresoProductMapperService {
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
-    private readonly specPostProcess: SpecPostProcessService,
-    private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
   public async map(params: {
-    source: ProductSource;
     config: ArukeresoSourceConfig;
     item: ArukeresoFeedItem;
     /** Narrows the run to these slugs; empty means every enabled category. */
     requestedSlugs?: string[];
-    force?: boolean;
   }): Promise<MappedFeedItem> {
-    const { source, config, item, requestedSlugs, force } = params;
+    const { config, item, requestedSlugs } = params;
 
     // Checked here as well as in classify(), because the import path calls this
     // method directly — a filter that only applied to the simulator would look
@@ -110,8 +97,8 @@ export class ArukeresoProductMapperService {
     if (!brand) return { status: 'skipped', reason: 'missing_brand' };
 
     // The raw marketing title, exactly as the detail path treats a page title:
-    // required to be present, not required to be clean. The post-process pass
-    // below is what turns it into a model name.
+    // required to be present, not required to be clean. The updater's identity
+    // extraction is what turns it into a model name.
     const rawName = this.asString(await this.resolve(config, item, 'name'));
     if (!rawName) return { status: 'skipped', reason: 'missing_name' };
 
@@ -124,7 +111,6 @@ export class ArukeresoProductMapperService {
     const description = this.asString(
       await this.resolve(config, item, 'description'),
     );
-    const context: ProductImportContext = { source, url, force };
 
     const offerLevelKeys =
       this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
@@ -153,89 +139,18 @@ export class ArukeresoProductMapperService {
       productSpecsHash,
     } = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
 
-    const existingSource = await this.findExistingSource(source, externalId, url);
-    const existingOfferForSpecs =
-      existingSource?.offers?.find((o) => o.externalId === externalId) ??
-      existingSource?.offers?.[0];
-
-    const offerIdentitySameRecordHit =
-      !force && existingSource?.offerSpecsHash === offerSpecsHash;
-    const productSpecsSameRecordHit =
-      !force && existingSource?.productSpecsHash === productSpecsHash;
-
     const offerFields = await this.resolveOfferFields(config, item, url, price);
-
-    // Both halves unchanged — no fresh LLM work at all. This is the path the
-    // overwhelming majority of a nightly feed run takes, and it is the whole
-    // reason the hashes exist: a 3488-item feed whose catalogue barely moved
-    // costs two LLM calls for the handful of products that did.
-    if (offerIdentitySameRecordHit && productSpecsSameRecordHit) {
-      const model = existingSource?.model?.model ?? rawName;
-      const existingOfferLevelSpecs = pick(
-        existingOfferForSpecs?.specs,
-        offerLevelKeys,
-      );
-      return {
-        status: 'mapped',
-        url,
-        scrapedProduct: {
-          brand,
-          model,
-          displayName: `${brand} ${model}`.trim(),
-          originalName: rawName,
-          category: {
-            id: category.id,
-            slug: category.slug,
-            name: category.name,
-          },
-          externalId,
-          aliases: await this.resolveAliases(config, item),
-          images: await this.resolveImages(config, item),
-          offers: [{ ...offerFields, specs: existingOfferLevelSpecs }],
-        },
-      };
-    }
-
-    const deterministicData: DeterministicProductData = {
-      brand,
-      model: rawName,
-      specs: deterministicSpecs,
-    };
-
-    const { brand: cleanBrand, model, specs } = await this.specPostProcess.resolve(
-      {
-        context,
-        config: config.postProcess,
-        data: deterministicData,
-        offerLevelDeterministicSpecs,
-        productLevelDeterministicSpecs,
-        rawSpecs,
-        description,
-        productSpecsHash,
-        jsonSchema,
-        categorySlug: category.slug,
-        offerIdentitySameRecordHit,
-        existingSource: existingSource ?? undefined,
-        existingOfferForSpecs,
-        offerLevelKeys,
-      },
-    );
-
-    // Offer-level keys never reach the shared ProductModel/ProductSourceRecord
-    // specs — they vary between the very offers a ProductModel groups, so they
-    // have no single correct value at the model level.
-    const pageOfferLevelSpecs = pick(specs, offerLevelKeys);
 
     return {
       status: 'mapped',
       url,
       scrapedProduct: {
-        brand: cleanBrand,
-        model,
-        displayName: `${cleanBrand} ${model}`.trim(),
+        brand,
+        model: rawName,
+        displayName: `${brand} ${rawName}`.trim(),
         originalName: rawName,
         category: { id: category.id, slug: category.slug, name: category.name },
-        specs: omit(specs, offerLevelKeys),
+        specs: productLevelDeterministicSpecs,
         extractedSpecs: deterministicSpecs,
         offerLevelDeterministicSpecs,
         productLevelDeterministicSpecs,
@@ -246,7 +161,9 @@ export class ArukeresoProductMapperService {
         externalId,
         aliases: await this.resolveAliases(config, item),
         images: await this.resolveImages(config, item),
-        offers: [{ ...offerFields, specs: pageOfferLevelSpecs }],
+        // A feed row is one offer; its listing-level specs (size, colour) are
+        // filled in once the identity extraction has read them off the title.
+        offers: [offerFields],
       },
     };
   }
@@ -412,6 +329,9 @@ export class ArukeresoProductMapperService {
     availability: OfferAvailability;
     url: string;
     externalId?: string;
+    /** As published — validated and normalized when stored on the Offer. */
+    gtin?: string;
+    mpn?: string;
   }> {
     return {
       price,
@@ -424,6 +344,8 @@ export class ArukeresoProductMapperService {
       ),
       url: normalizeUrl(url),
       externalId: this.asString(await this.resolve(config, item, 'externalId')),
+      gtin: this.asString(await this.resolve(config, item, 'gtin')),
+      mpn: this.asString(await this.resolve(config, item, 'mpn')),
     };
   }
 
@@ -455,21 +377,6 @@ export class ArukeresoProductMapperService {
       .filter((entry): entry is string => !!entry);
 
     return urls.length ? urls.map((url, order) => ({ url, order })) : undefined;
-  }
-
-  /** Prefers the source-native id; falls back to the URL, as the detail path does. */
-  private async findExistingSource(
-    source: ProductSource,
-    externalId: string | undefined,
-    url: string,
-  ): Promise<ProductSourceRecord | null> {
-    if (externalId) {
-      return this.sourceRecordRepo.findBySourceAndExternalId(
-        source.id,
-        externalId,
-      );
-    }
-    return this.sourceRecordRepo.findBySourceAndUrl(source.id, normalizeUrl(url));
   }
 
   /**
@@ -532,7 +439,7 @@ export class ArukeresoProductMapperService {
 
     // Whitespace of every kind, non-breaking space included — Hungarian
     // shops group thousands with one.
-    const text = String(value).trim().replace(/[\s ]/g, '');
+    const text = String(value).trim().replace(/[\s\u00a0]/g, '');
     // Which separator is the decimal point is decided by what FOLLOWS it: a
     // grouping separator is always followed by exactly three digits, so one or
     // two trailing digits identify the decimal. Everything else is grouping and

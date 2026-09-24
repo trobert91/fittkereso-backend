@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
+import type { ScrapedProduct } from '../../models/scraped-product';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
@@ -48,36 +49,10 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Cheap identity lookup by (source, externalId) — the source-native SKU/
-   * model code/slug, stable across URL changes. Used ahead of full identity
-   * resolution to recognize an already-known listing so extraction/LLM
-   * unification can be skipped when its offerSpecsHash/productSpecsHash is
-   * unchanged.
-   *
-   * Loads `offers` too — offer-level specs (e.g. frameSize/color) are
-   * deliberately stripped out of ProductSourceRecord.scrapedProduct.specs
-   * (they vary per offer, not per record), so the offerSpecsHash-unchanged
-   * fast path in ProductDetailsPageScraperService.extractProduct must read
-   * them back off the previously-persisted Offer row instead.
-   */
-  async findBySourceAndExternalId(
-    sourceId: string,
-    externalId: string,
-  ): Promise<ProductSourceRecord | null> {
-    return this.repo.findOne({
-      where: {
-        source: { id: sourceId },
-        externalId,
-      },
-      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
-    });
-  }
-
-  /**
-   * Same (source, externalId) identity lookup as findBySourceAndExternalId,
-   * but with `model` loaded via the given relations so the result can be used
-   * directly as a resolved ProductModel (see ProductScrapeUpdaterService
-   * Path 0.5) instead of only as a cheap existence check.
+   * Identity lookup by (source, externalId) — the source-native SKU/model
+   * code/slug, stable across URL changes — with `model` loaded via the given
+   * relations so the result can be used directly as a resolved ProductModel
+   * (see ProductScrapeUpdaterService Path 3).
    */
   async findBySourceAndExternalIdWithModelRelations(
     sourceId: string,
@@ -99,23 +74,53 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Finds any other ProductSourceRecord from the same source whose
-   * productSpecsHash matches — used to reuse an already-unified product-
-   * identity specs contribution for a brand-new listing (e.g. a not-yet-seen
-   * size/color variant) without a second model-spec LLM call. Picks the most
-   * recently updated match. No `relations` needed — only
-   * `scrapedProduct.specs` (a plain jsonb column) is read from the result.
+   * Which products hold one of this source's records under these externalIds —
+   * the declared-sibling lookup: the other sizes a shop lists for a product,
+   * wherever this source has already put them.
    */
-  async findBySourceAndProductSpecsHash(
+  async findModelIdsBySourceAndExternalIds(
     sourceId: string,
-    productSpecsHash: string,
-  ): Promise<ProductSourceRecord | null> {
-    return this.repo.findOne({
-      where: {
-        source: { id: sourceId },
-        productSpecsHash,
-      },
-      order: { lastUpdated: 'DESC' },
+    externalIds: string[],
+  ): Promise<{ modelId: string; externalId: string }[]> {
+    if (externalIds.length === 0) return [];
+    const records = await this.repo.find({
+      where: { source: { id: sourceId }, externalId: In(externalIds) },
+      relations: { model: true },
+      select: { id: true, externalId: true, model: { id: true } },
     });
+    return records.flatMap((record) =>
+      record.model && record.externalId
+        ? [{ modelId: record.model.id, externalId: record.externalId }]
+        : [],
+    );
+  }
+
+  /**
+   * The sizes each of a product's listings declared as siblings, by source.
+   * Reads that one key of `scrapedProduct` rather than the whole payload, since
+   * the nightly duplicate scan asks this of every product.
+   */
+  async findDeclaredSiblingIdsOfModel(
+    modelId: string,
+  ): Promise<{ sourceId: string; siblingIds: string[] }[]> {
+    const record = 'record';
+    const source = 'source';
+    const siblingExternalIds: keyof ScrapedProduct = 'siblingExternalIds';
+    const rows: { sourceId: string; siblingIds: unknown }[] = await this.repo
+      .createQueryBuilder(record)
+      .innerJoin(`${record}.${nameOf<ProductSourceRecord>('source')}`, source)
+      .select(`${source}.id`, 'sourceId')
+      .addSelect(
+        `${record}.${nameOf<ProductSourceRecord>('scrapedProduct')} -> '${siblingExternalIds}'`,
+        'siblingIds',
+      )
+      .where(`${record}.${nameOf<ProductSourceRecord>('model')} = :modelId`, { modelId })
+      .getRawMany();
+
+    return rows.flatMap((row) =>
+      Array.isArray(row.siblingIds) && row.siblingIds.length > 0
+        ? [{ sourceId: row.sourceId, siblingIds: row.siblingIds.map(String) }]
+        : [],
+    );
   }
 }

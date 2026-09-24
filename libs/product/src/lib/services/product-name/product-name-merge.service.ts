@@ -52,12 +52,20 @@ export class ProductNameMergeService {
       latestPerSource,
       (r) => r.scrapedProduct?.brand,
     );
+    // A name the identity extraction did not clean (it failed, or is off for
+    // that source) is the raw title — sizes, colours, marketing words. It only
+    // names the product when no source has a cleaned one. Records from before
+    // the flag existed carry none, and were cleaned by the old pass.
+    const cleaned = latestPerSource.filter(
+      (r) => r.scrapedProduct?.nameCleaned !== false,
+    );
+    const nameSources = cleaned.length > 0 ? cleaned : latestPerSource;
     const modelWinner = this.resolveField(
-      latestPerSource,
+      nameSources,
       (r) => r.scrapedProduct?.model,
     );
     const displayNameWinner = this.resolveField(
-      latestPerSource,
+      nameSources,
       (r) => r.scrapedProduct?.displayName,
     );
 

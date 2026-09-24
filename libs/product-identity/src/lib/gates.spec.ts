@@ -2,7 +2,7 @@ import type {
   ProductCategoryConfig,
   ProductSpecs,
 } from '@fittkereso-backend/database';
-import { applyGates, scoreOf } from './gates';
+import { applyGates, primarySpecMismatches, scoreOf } from './gates';
 import { baseScore, nameSimilarity } from './name-similarity';
 import { ACCEPT_SCORE, NEAR_MISS_SCORE } from './product-identity.constants';
 
@@ -118,6 +118,32 @@ describe('applyGates', () => {
     it('skips when either key has no number', () => {
       expect(applyGates({ queryKey: 'cross macina', candidateKey: '725 cross macina' })).toEqual([]);
     });
+  });
+});
+
+// For a candidate an identifier found: the names are not in question, and a
+// size in one shop's title ("l/48") must not read as another model number.
+describe('primarySpecMismatches', () => {
+  it('reports only primary-spec contradictions', () => {
+    expect(
+      primarySpecMismatches({
+        querySpecs: { modelYear: 2027, motorPower: 250 },
+        candidateSpecs: { modelYear: 2025, motorPower: 600 },
+        categoryConfig: ebikes,
+      }),
+    ).toEqual([
+      expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'modelYear' }),
+    ]);
+  });
+
+  it('finds nothing when the primary specs agree or are missing', () => {
+    expect(
+      primarySpecMismatches({
+        querySpecs: { modelYear: 2026 },
+        candidateSpecs: { modelYear: 2026, batteryCapacity: 800 },
+        categoryConfig: ebikes,
+      }),
+    ).toEqual([]);
   });
 });
 

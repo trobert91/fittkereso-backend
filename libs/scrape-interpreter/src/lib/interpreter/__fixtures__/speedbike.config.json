@@ -210,6 +210,15 @@
       "ebikes": {
         "mappings": [
           {
+            "key": "modelYear",
+            "labels": [
+              "Modellév",
+              "Model Year",
+              "Évjárat"
+            ],
+            "extract": "number"
+          },
+          {
             "key": "frameType",
             "labels": [
               "Váztípus"

@@ -17,13 +17,19 @@ import {
 } from '@fittkereso-backend/database';
 import type { ListingMatchDecision } from '@fittkereso-backend/database';
 import {
+  FailedGate,
+  IdentifierTier,
+  KeyMatch,
   ListingMatchService,
   ProductDuplicateService,
+  ProductKeyLookupService,
 } from '@fittkereso-backend/product-identity';
 import {
   generateSlug,
   nameOf,
   normalize,
+  inspectGtin,
+  normalizeMpn,
   normalizeUrl,
   slugFromUrl,
 } from '@fittkereso-backend/utils';
@@ -31,6 +37,7 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BRAND_NOT_IDENTIFIED,
+  BrandResolutionService,
   OfferMatchingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -41,7 +48,11 @@ import {
 import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { compact, isEmpty, minBy, pick } from 'lodash';
-import { ProductMetricsService } from '@fittkereso-backend/metrics';
+import { SpecPostProcessService } from './spec-post-process.service';
+import {
+  IdentityResolvedVia,
+  ProductMetricsService,
+} from '@fittkereso-backend/metrics';
 
 interface ResolvedIdentity {
   model?: ProductModel;
@@ -49,9 +60,34 @@ interface ResolvedIdentity {
   /**
    * What listing matching decided. Set by Path 4 and only by Path 4, so its
    * presence is also how the post-save step knows to look for duplicates —
-   * Paths 1–3 resolved by a stored id and have nothing new to compare.
+   * everything before it resolved by a stored id or a shared identifier, and
+   * has nothing new to compare by name.
    */
   decision?: ListingMatchDecision;
+  /**
+   * Every product one of this listing's identifiers (declared sibling, GTIN,
+   * MPN) points at, whether or not the listing attached to it. Once the
+   * listing's product is saved, each one that is a different product becomes
+   * a duplicate pair.
+   */
+  keyMatches: KeyMatch[];
+  /** Primary-spec contradictions between the listing and each key-matched product. */
+  keyGates: Record<string, FailedGate[]>;
+}
+
+/** An offer's identifiers in stored form, index-aligned with ScrapedProduct.offers. */
+interface OfferIdentifiers {
+  gtin?: string;
+  mpn?: string;
+}
+
+/** A listing found through its own history: a pin, its offer, or its record. */
+interface HistoryHit {
+  model: ProductModel;
+  via: Extract<
+    IdentityResolvedVia,
+    'pinned' | 'offer_external_id' | 'external_id' | 'source_url'
+  >;
 }
 
 interface PersistResult {
@@ -80,6 +116,9 @@ export class ProductScrapeUpdaterService {
     private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly keyLookup: ProductKeyLookupService,
+    private readonly brandResolution: BrandResolutionService,
+    private readonly specPostProcess: SpecPostProcessService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -100,29 +139,60 @@ export class ProductScrapeUpdaterService {
     }
 
     try {
-      const normalizedSourceName =
-        this.buildNormalizedSourceName(scrapedProduct);
       // Every offer belongs to its ProductSource's own seller — no per-offer
       // seller resolution needed. Path 2 keys its (seller, externalId)
       // lookup off this.
       const seller = context.source.seller;
-      const identity = await this.resolveProductIdentity(
+      // Normalized once, here: identity resolution looks them up and the offer
+      // upsert stores them, and each GTIN's outcome must be counted once.
+      const identifiers = this.normalizeOfferIdentifiers(
+        context,
+        scrapedProduct.offers ?? [],
+      );
+
+      // The listing's own history first, because it decides whether the
+      // extraction can reuse this listing's stored result instead of calling
+      // the LLM — the path every unchanged listing of a re-import takes.
+      const history = await this.resolveFromHistory(
         context,
         scrapedProduct,
         seller,
       );
-      const persisted = await this.persistProduct({
+      const extracted = await this.specPostProcess.extractIdentity({
         context,
         scrapedProduct,
+        ownRecord: this.ownRecordOf(context, scrapedProduct, history?.model),
+      });
+
+      // The decision reads what the extraction produced: the sanity check
+      // compares its specs, and name matching its cleaned name.
+      const { identity, brandResolved } = await this.resolveProductIdentity(
+        context,
+        extracted,
+        identifiers,
+        history,
+      );
+      const listing = await this.unifyForNewSource(
+        context,
+        extracted,
+        identity,
+        brandResolved,
+      );
+
+      const normalizedSourceName = this.buildNormalizedSourceName(listing);
+      const persisted = await this.persistProduct({
+        context,
+        scrapedProduct: listing,
         normalizedSourceName,
         identity,
       });
       await this.applyPostSaveSideEffects({
         context,
-        scrapedProduct,
+        scrapedProduct: listing,
         model: persisted.model,
         sourceRecord: persisted.sourceRecord,
         identity,
+        identifiers,
       });
       return persisted.model;
     } catch (error) {
@@ -152,18 +222,214 @@ export class ProductScrapeUpdaterService {
     });
   }
 
+  /**
+   * Which product this listing is, decided in tiers.
+   *
+   * 1. **Its own history** (resolved by the caller, before the extraction): a
+   *    pinned task, one of its offers, or its record — this exact listing was
+   *    seen before. Attaches without further checks.
+   * 2. **Its identifiers**: a size its shop declares as a sibling, its GTIN,
+   *    its MPN within the brand. The first tier that finds a product proposes
+   *    it; the listing attaches if it passes the sanity check (same brand, no
+   *    primary spec contradicting it). No LLM, no name scoring.
+   * 3. **Name matching** (Path 4) for everything else, including listings whose
+   *    identifiers conflicted.
+   *
+   * The identifier tiers are evaluated even when the listing's history
+   * resolves it, because an identifier pointing at a DIFFERENT product is how a
+   * duplicate created before the identifier was known comes to light. Those
+   * become pairs after the save (recordKeyPairs); the listing never moves.
+   */
   private async resolveProductIdentity(
     context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
+    identifiers: OfferIdentifiers[],
+    history: HistoryHit | undefined,
+  ): Promise<{ identity: ResolvedIdentity; brandResolved: boolean }> {
+    const brand = await this.brandResolution.resolve(
+      scrapedProduct.brand,
+      scrapedProduct.displayName,
+    );
+    const brandId = brand?.entity?.id;
+    const brandResolved = !!brandId;
+    const keyMatches = await this.keyLookup.lookup({
+      sourceId: context.source.id,
+      // The listing's own id is its history, not a sibling of itself.
+      siblingIds: (scrapedProduct.siblingExternalIds ?? []).filter(
+        (id) => id !== scrapedProduct.externalId,
+      ),
+      gtins: compact(identifiers.map((identifier) => identifier.gtin)),
+      mpns: compact(identifiers.map((identifier) => identifier.mpn)),
+      brandId,
+    });
+    const { verdict, failedGates: keyGates } = await this.keyLookup.decide(
+      keyMatches,
+      {
+        brandId,
+        specs: scrapedProduct.specs,
+        categorySlug: scrapedProduct.category.slug,
+      },
+    );
+
+    if (history) {
+      this.recordDisagreements(context, keyMatches, history.model.id, history.via);
+      return {
+        identity: { model: history.model, isExistingMatch: true, keyMatches, keyGates },
+        brandResolved,
+      };
+    }
+
+    if (verdict.kind === 'attach') {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: verdict.productId },
+        relations: this.getProductRelations(),
+      });
+      this.productMetricsService.scrapeResolutionOutcome(
+        context.source.name,
+        `${verdict.via}_hit`,
+      );
+      this.recordDisagreements(context, keyMatches, model.id, verdict.via);
+      return {
+        identity: { model, isExistingMatch: true, keyMatches, keyGates },
+        brandResolved,
+      };
+    }
+
+    if (verdict.kind === 'conflict') {
+      this.productMetricsService.identityKeyConflict(
+        context.source.name,
+        verdict.via,
+        verdict.reason,
+      );
+      this.logger.warn(
+        'An identifier matched a product the listing cannot attach to — falling back to name matching',
+        {
+          taskId: context.task?.id,
+          url: context.url,
+          source: context.source.name,
+          via: verdict.via,
+          reason: verdict.reason,
+          productIds: verdict.productIds,
+        },
+      );
+    }
+
+    // Path 4: match the listing against the stored catalog by name and specs.
+    // Also the fallback for same-source variant siblings a source does not
+    // declare — a source's own catalog legitimately accumulates several
+    // ProductSourceRecords on one ProductModel (one per variant URL; see
+    // §2.1a's offerLinks dispatch), so a same-source hit here is not
+    // inherently a false positive.
+    const { productId, decision } = await this.listingMatch.match(
+      scrapedProduct,
+      // Omitted rather than blank on the feed path: there is no task, and an
+      // empty taskId in the logs would read as a lost one.
+      context.task ? { taskId: context.task.id } : {},
+    );
+
+    if (productId) {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
+      this.productMetricsService.scrapeResolutionOutcome(
+        context.source.name,
+        decision.outcome === 'llm_identified' ? 'llm_identified' : 'identified',
+      );
+      this.productMetricsService.productMatched(context.source.name);
+      return {
+        identity: { model, isExistingMatch: true, decision, keyMatches, keyGates },
+        brandResolved,
+      };
+    }
+
+    // No match. `llm_declined` means the LLM actually looked at near-miss
+    // candidates and wasn't confident — distinct from nothing being close
+    // enough to be worth asking, which costs no call at all. A new product
+    // either way (the safe default); the distinction measures how often
+    // scoring leaves the LLM undecided.
+    if (decision.llm) {
+      this.productMetricsService.scrapeResolutionOutcome(
+        context.source.name,
+        'llm_declined',
+      );
+    }
+
+    return {
+      identity: { isExistingMatch: false, decision, keyMatches, keyGates },
+      brandResolved,
+    };
+  }
+
+  /**
+   * This listing's own record, when its history resolved it: the one this
+   * scrape will overwrite, found by URL as the record updater does, else by
+   * externalId. Read off the product's already-loaded sources — no query.
+   */
+  private ownRecordOf(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
+    model: ProductModel | undefined,
+  ): ProductSourceRecord | undefined {
+    const records = (model?.sources ?? []).filter(
+      (record) => record.source?.id === context.source.id,
+    );
+    const url = normalizeUrl(context.url);
+    return (
+      records.find((record) => record.url === url) ??
+      (scrapedProduct.externalId
+        ? records.find((record) => record.externalId === scrapedProduct.externalId)
+        : undefined)
+    );
+  }
+
+  /**
+   * Full spec unification, once per product per source: when this listing
+   * creates its product, or is the first listing its source contributes to an
+   * existing one. Every later size and every re-import of the source skips
+   * it — the source's first record already carries what it adds. An admin's
+   * forced resync is the exception: it re-reads that one listing in full.
+   */
+  private async unifyForNewSource(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
+    identity: ResolvedIdentity,
+    brandResolved: boolean,
+  ): Promise<ScrapedProduct> {
+    const { model } = identity;
+    const contributed = !!model?.sources?.some(
+      (record) => record.source?.id === context.source.id,
+    );
+    if (contributed && !context.force) return scrapedProduct;
+    // A product whose brand is unknown cannot be created, so the listing is
+    // about to be dropped — not worth the most expensive call of the import.
+    if (!model && !brandResolved) return scrapedProduct;
+
+    return this.specPostProcess.unify({
+      context,
+      scrapedProduct,
+      trigger: !model ? 'created' : contributed ? 'forced' : 'new_source',
+    });
+  }
+
+  /**
+   * This exact listing, seen before: its task was pinned to a product (Path 1),
+   * one of its offers is already stored for this seller (Path 2), or this source
+   * already has its record, by externalId (Path 3) or by page URL (Path 3b).
+   * All are the listing's own history, so none needs checking against anything.
+   */
+  private async resolveFromHistory(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
     seller: Seller,
-  ): Promise<ResolvedIdentity> {
+  ): Promise<HistoryHit | undefined> {
     // Path 1: task already pinned to a product
     if (context.product?.id) {
       const model = await this.productRepo.findOneOrFail({
         where: { id: context.product.id },
         relations: this.getProductRelations(),
       });
-      return { model, isExistingMatch: true };
+      return { model, via: 'pinned' };
     }
 
     // Path 2: variant-level Offer.externalId reuse, multi-candidate — try
@@ -191,18 +457,16 @@ export class ProductScrapeUpdaterService {
           context.source.name,
           'offer_external_id_hit',
         );
-        return { model: existingOffer.model, isExistingMatch: true };
+        return { model: existingOffer.model, via: 'offer_external_id' };
       }
     }
 
     // Path 3: this exact (source, externalId) listing was already scraped
-    // and linked to a product — reuse that link directly rather than
-    // re-deriving identity from the name or falling through to the
-    // matcher/embedding/LLM pipeline in Path 4. externalId is a group-level
-    // id (e.g. ShopRenter's parent.sku), stable across URL, variant, and
-    // display-name changes. Only reached when Path 2 found no offer-level
-    // match (either no offer externalId matched, or this scrape carries
-    // none at all).
+    // and linked to a product — reuse that link directly. externalId is a
+    // group-level id (e.g. ShopRenter's parent.sku), stable across URL,
+    // variant, and display-name changes. Only reached when Path 2 found no
+    // offer-level match (either no offer externalId matched, or this scrape
+    // carries none at all).
     if (scrapedProduct.externalId) {
       const existingSource =
         await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
@@ -215,49 +479,58 @@ export class ProductScrapeUpdaterService {
           context.source.name,
           'external_id_hit',
         );
-        return { model: existingSource.model, isExistingMatch: true };
+        return { model: existingSource.model, via: 'external_id' };
       }
     }
 
-    // Path 4: match the listing against the stored catalog by name and specs.
-    // Also the fallback for same-source variant siblings that carry no
-    // group-level externalId (Path 3) — a source's own catalog legitimately
-    // accumulates several ProductSourceRecords on one ProductModel (one per
-    // variant URL; see §2.1a's offerLinks dispatch), so a same-source hit here
-    // is not inherently a false positive.
-    const { productId, decision } = await this.listingMatch.match(
-      scrapedProduct,
-      // Omitted rather than blank on the feed path: there is no task, and an
-      // empty taskId in the logs would read as a lost one.
-      context.task ? { taskId: context.task.id } : {},
+    // Path 3b: this source already has a record for this very page. The only
+    // history a source without source-native ids has, and what lets its
+    // unchanged listings skip the extraction on a re-import.
+    const byUrl = await this.sourceRecordRepo.findBySourceAndUrl(
+      context.source.id,
+      normalizeUrl(context.url),
     );
-
-    if (productId) {
+    if (byUrl?.model) {
       const model = await this.productRepo.findOneOrFail({
-        where: { id: productId },
+        where: { id: byUrl.model.id },
         relations: this.getProductRelations(),
       });
       this.productMetricsService.scrapeResolutionOutcome(
         context.source.name,
-        decision.outcome === 'llm_identified' ? 'llm_identified' : 'identified',
+        'source_url_hit',
       );
-      this.productMetricsService.productMatched(context.source.name);
-      return { model, isExistingMatch: true, decision };
+      return { model, via: 'source_url' };
     }
 
-    // No match. `llm_declined` means the LLM actually looked at near-miss
-    // candidates and wasn't confident — distinct from nothing being close
-    // enough to be worth asking, which costs no call at all. A new product
-    // either way (the safe default); the distinction measures how often
-    // scoring leaves the LLM undecided.
-    if (decision.llm) {
-      this.productMetricsService.scrapeResolutionOutcome(
+    return undefined;
+  }
+
+  /**
+   * Counts every identifier tier that points at another product than the one
+   * this listing resolved to. The listing stays put — an earlier tier is the
+   * stronger evidence — and the pair written after the save is how a person
+   * finds the duplicate.
+   */
+  private recordDisagreements(
+    context: ProductImportContext,
+    keyMatches: KeyMatch[],
+    productId: string,
+    resolvedVia: IdentityResolvedVia,
+  ): void {
+    const identifierTier = ['sibling', 'gtin', 'mpn'].includes(resolvedVia)
+      ? (resolvedVia as IdentifierTier)
+      : undefined;
+    for (const via of this.keyLookup.disagreeingTiers(
+      keyMatches,
+      productId,
+      identifierTier,
+    )) {
+      this.productMetricsService.identityKeyDisagreement(
         context.source.name,
-        'llm_declined',
+        resolvedVia,
+        via,
       );
     }
-
-    return { isExistingMatch: false, decision };
   }
 
   private async persistProduct(params: {
@@ -325,8 +598,10 @@ export class ProductScrapeUpdaterService {
     model: ProductModel;
     sourceRecord?: ProductSourceRecord;
     identity: ResolvedIdentity;
+    identifiers: OfferIdentifiers[];
   }): Promise<void> {
-    const { context, scrapedProduct, model, sourceRecord, identity } = params;
+    const { context, scrapedProduct, model, sourceRecord, identity, identifiers } =
+      params;
 
     if (!model.slug) {
       await this.generateProductSlug(model);
@@ -376,10 +651,45 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    await this.createOrUpdateOffers(context, scrapedProduct, model, sourceRecord);
+    await this.createOrUpdateOffers(
+      context,
+      scrapedProduct,
+      model,
+      sourceRecord,
+      identifiers,
+    );
 
     if (identity.decision) {
       await this.detectDuplicates(context, model);
+    }
+    // After name-based detection, so where both found the same pair the
+    // identifier — the stronger evidence — is what the pair shows.
+    await this.recordKeyPairs(context, model, identity);
+  }
+
+  /**
+   * Pairs this listing's product with every other product one of its
+   * identifiers points at. Never fails the scrape, for the same reason
+   * detectDuplicates doesn't.
+   */
+  private async recordKeyPairs(
+    context: ProductImportContext,
+    model: ProductModel,
+    identity: ResolvedIdentity,
+  ): Promise<void> {
+    try {
+      await this.keyLookup.recordPairs(
+        model.id,
+        identity.keyMatches,
+        identity.keyGates,
+        'scrape',
+      );
+    } catch (error) {
+      this.logger.warn('Recording identifier duplicate pairs failed, continuing', {
+        taskId: context.task?.id,
+        productId: model.id,
+        error,
+      });
     }
   }
 
@@ -417,6 +727,7 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct,
     model: ProductModel,
     primarySourceRecord: ProductSourceRecord | undefined,
+    identifiers: OfferIdentifiers[],
   ): Promise<void> {
     const offers = scrapedProduct.offers;
     if (isEmpty(offers)) return;
@@ -503,6 +814,8 @@ export class ProductScrapeUpdaterService {
           availability: scraped.availability,
           url: normalizedScrapedUrl,
           externalId: externalIds[index],
+          gtin: identifiers[index].gtin,
+          mpn: identifiers[index].mpn,
           locations: scraped.locations,
           specs: scraped.specs ?? pageOfferLevelSpecs,
         });
@@ -635,6 +948,34 @@ export class ProductScrapeUpdaterService {
       }
 
       return undefined;
+    });
+  }
+
+  /**
+   * Every offer's GTIN and MPN in the form Offer stores and matches on.
+   *
+   * An invalid GTIN is dropped rather than stored, because a GTIN is matched
+   * against every shop's offers and a wrong one would attach this listing to a
+   * different bike. The raw value stays on the source record's scrapedProduct;
+   * the outcome of every offer's GTIN is counted, so a source whose barcodes
+   * stop validating shows up as a rate rather than as missing matches.
+   */
+  private normalizeOfferIdentifiers(
+    context: ProductImportContext,
+    offers: ScrapedOffer[],
+  ): OfferIdentifiers[] {
+    return offers.map((scraped) => {
+      const { gtin, outcome } = inspectGtin(scraped.gtin);
+      this.productMetricsService.offerGtin(context.source.name, outcome);
+      if (outcome === 'invalid') {
+        this.logger.debug('Dropping an invalid GTIN', {
+          taskId: context.task?.id,
+          url: context.url,
+          source: context.source.name,
+          gtin: scraped.gtin,
+        });
+      }
+      return { gtin, mpn: normalizeMpn(scraped.mpn) };
     });
   }
 

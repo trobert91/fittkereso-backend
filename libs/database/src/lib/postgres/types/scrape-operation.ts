@@ -473,6 +473,11 @@ export interface AssembleOfferOp extends OpBase {
   availability?: ScrapeOperation[];
   url?: ScrapeOperation[];
   externalId?: ScrapeOperation[];
+  // The offer's barcode and the manufacturer's article number, as published.
+  // Validated and normalized downstream (Offer.gtin/mpn), so a pipeline only
+  // has to locate them.
+  gtin?: ScrapeOperation[];
+  mpn?: ScrapeOperation[];
   // Store/warehouse names where this offer is physically available (e.g.
   // ["Törökbálinti raktár", "Törökbálint"]). Optional — most sources have no
   // per-location breakdown; resolve to undefined (not []) when none apply.

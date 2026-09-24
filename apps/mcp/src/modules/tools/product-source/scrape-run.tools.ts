@@ -131,7 +131,7 @@ export class ScrapeRunTools {
             ? ` (was ${offer.priceWithoutDiscount} ${offer.currency})`
             : '';
           L.push(
-            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability ?? '_not reported_'} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · lastSynced: ${offer.lastSynced?.toISOString?.() ?? ''}`,
+            `- ${offer.price} ${offer.currency}${discountSuffix} · availability: ${offer.availability ?? '_not reported_'} · condition: ${offer.condition} · externalId: ${offer.externalId ?? '_none_'} · gtin: ${offer.gtin ?? '_none_'} · mpn: ${offer.mpn ?? '_none_'} · lastSynced: ${offer.lastSynced?.toISOString?.() ?? ''}`,
           );
         }
       } else if (task.queue === ScrapeQueueName.ScrapeProductDetails) {

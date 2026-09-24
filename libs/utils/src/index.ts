@@ -9,5 +9,6 @@ export * from './lib/transform';
 export * from './lib/slug.util';
 export * from './lib/edit-distance';
 export * from './lib/spec-hash';
+export * from './lib/gtin-utils';
 export * from './lib/retry';
 export * from './lib/auth-decorators';

@@ -27,6 +27,8 @@ export interface RawOfferRecord {
   availability?: string;
   url?: string;
   externalId?: string;
+  gtin?: string;
+  mpn?: string;
   locations?: string[];
   specs?: ProductSpecs;
 }
@@ -40,6 +42,8 @@ export interface DetailPageResult {
   aliases?: string[];
   releaseYear?: number;
   externalId?: string;
+  /** detailPage.siblingIds, trimmed and deduped — absent when not configured or empty. */
+  siblingIds?: string[];
   imageUrls: string[];
   rawOffers: RawOfferRecord[];
   offerLinks: WebLink[];
@@ -249,6 +253,10 @@ export class ScrapeInterpreterService {
       : undefined;
     ctx.vars['externalId'] = externalId;
 
+    const siblingIds = config.detailPage.siblingIds
+      ? this.toIdList(await this.runner.run(config.detailPage.siblingIds, ctx))
+      : undefined;
+
     const imageUrls =
       ((await this.runner.run(
         config.detailPage.images,
@@ -273,6 +281,7 @@ export class ScrapeInterpreterService {
       aliases,
       releaseYear,
       externalId,
+      siblingIds,
       imageUrls,
       rawOffers,
       offerLinks,
@@ -312,6 +321,17 @@ export class ScrapeInterpreterService {
     return (results as (RawOfferRecord | undefined)[]).filter(
       (r): r is RawOfferRecord => !!r,
     );
+  }
+
+  // A pipeline may end on a single id or a list, with numbers where the JSON
+  // had them. Blank entries are dropped rather than kept as ids that match
+  // nothing, and a list that comes out empty is reported as absent.
+  private toIdList(value: unknown): string[] | undefined {
+    const ids = (Array.isArray(value) ? value : [value])
+      .filter((id) => typeof id === 'string' || typeof id === 'number')
+      .map((id) => String(id).trim())
+      .filter((id) => id !== '');
+    return ids.length ? [...new Set(ids)] : undefined;
   }
 
   private resolveCategorySlug(

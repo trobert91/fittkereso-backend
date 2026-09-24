@@ -55,9 +55,14 @@ export const TOKEN_IDF_TTL_MS = 5 * 60 * 1000;
 /**
  * Whether near-misses are put to the LLM at all. Off, a listing the score
  * can't attach on its own becomes a new product — the same safe default the
- * LLM declining gives.
+ * LLM declining gives — and duplicate detection pairs it with every candidate
+ * at NEAR_MISS_SCORE or above, for a person to decide.
+ *
+ * Off since the keys-first identity work (2026-09-23): shared identifiers now
+ * settle the cross-shop cases the LLM was mostly asked about, and a person
+ * reviewing the rest costs nothing per listing.
  */
-export const LLM_ENABLED = true;
+export const LLM_ENABLED = false;
 
 /** The model that adjudicates near-misses. */
 export const LLM_MODEL = 'deepseek-v4-flash';

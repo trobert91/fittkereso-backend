@@ -168,7 +168,6 @@ export class ArukeresoImportService implements ProductSourceImporter {
 
     try {
       const mapped = await this.mapper.map({
-        source,
         config,
         item,
         requestedSlugs,

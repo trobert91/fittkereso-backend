@@ -47,7 +47,7 @@ export interface ScrapedProduct {
    * `filterDefinedSpecs(pick(extractedSpecs, offerLevelSpecs))` — the
    * offer-level subset of the deterministic mapping, computed once in
    * ProductDetailsPageScraperService.extractProduct and reused for: (a) the
-   * offer-identity post-process call's input, (b) offerSpecsHash below (see
+   * identity extraction's input, (b) offerSpecsHash below (see
    * hashSpecs/filterDefinedSpecs in @fittkereso-backend/utils). Persisted
    * here rather than recomputed at each read site, so hashing/LLM-input/
    * persistence all agree on exactly the same, already-filtered object.
@@ -72,12 +72,10 @@ export interface ScrapedProduct {
    */
   offerSpecsHash?: string;
   /**
-   * `hashSpecs(productLevelDeterministicSpecs)` — see offerSpecsHash. Also
-   * the value ultimately compared against sibling records by
-   * ProductSourceRecordRepository.findBySourceAndProductSpecsHash, so a
-   * mismatch between the hash used to decide vs. the hash persisted would
-   * silently defeat that cache — see productSpecsHash's history for why this
-   * must be computed exactly once and threaded through unchanged.
+   * `hashSpecs(productLevelDeterministicSpecs)` — see offerSpecsHash. A
+   * mismatch between the hash used to decide and the hash persisted would
+   * silently defeat the re-import skip, which is why it is computed exactly
+   * once and threaded through unchanged.
    */
   productSpecsHash?: string;
   rawSpecs?: ScrapedProductSpec[];
@@ -89,6 +87,36 @@ export interface ScrapedProduct {
    */
   description?: string;
   externalId?: string;
+  /**
+   * The other sizes of this product, as the shop itself declares them (e.g.
+   * ebikeshop's frame-size variation list), in the same id space as
+   * `externalId`. May include this listing's own id.
+   *
+   * Only ever compared within this listing's own source: a shop's grouping
+   * is authoritative for its own ids and says nothing about another shop's.
+   * Absent for a source that declares none — deliberately not derived from
+   * article-number prefixes or shared images, which were measured to group
+   * different bikes together.
+   */
+  siblingExternalIds?: string[];
+  /**
+   * Whether `model` came back from the LLM identity extraction, rather than
+   * being the raw title because the call was skipped or failed. A raw title
+   * carries sizes, colours and marketing words, so ProductNameMergeService
+   * lets it vote on a product's name only when no cleaned name exists.
+   */
+  nameCleaned?: boolean;
+  /**
+   * Hash of exactly what the identity extraction was given — the raw title,
+   * the brand, the deterministic identity values and the selected spec rows.
+   * A re-import whose hash (and both spec hashes) match the stored record's
+   * reuses that record's extraction instead of calling the LLM again.
+   *
+   * Needed beside offerSpecsHash/productSpecsHash because those only cover the
+   * deterministic mapping: on a source whose mapping fills a single field, a
+   * changed title or spec table would otherwise never be re-read.
+   */
+  identityInputHash?: string;
   images?: ProductSourceImage[];
   offers?: ScrapedOffer[];
 }
@@ -114,6 +142,18 @@ export interface ScrapedOffer {
   availability?: OfferAvailability;
   url?: string;
   externalId?: string;
+  /**
+   * The barcode exactly as the source published it (EAN-13, UPC-12, or
+   * whatever the shop put in that field). Normalized and validated only when
+   * written to Offer.gtin, so an invalid value stays inspectable here.
+   */
+  gtin?: string;
+  /**
+   * The manufacturer's article number exactly as the source published it,
+   * after the source config's own clean-up. Normalized when written to
+   * Offer.mpn.
+   */
+  mpn?: string;
   /**
    * Store/warehouse names where this offer is physically available (e.g.
    * ["Törökbálinti raktár", "Törökbálint"]). Optional — most sources have no

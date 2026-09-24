@@ -1,10 +1,8 @@
 import { ArukeresoProductMapperService } from './arukereso-product-mapper.service';
 import { ArukeresoFeedItem } from './arukereso-feed-item';
-import type {
-  ArukeresoSourceConfig,
-  ProductSource,
-} from '@fittkereso-backend/database';
+import type { ArukeresoSourceConfig } from '@fittkereso-backend/database';
 import { OfferAvailability } from '@fittkereso-backend/database';
+import { hashSpecs } from '@fittkereso-backend/utils';
 
 describe('ArukeresoProductMapperService', () => {
   let mapper: ArukeresoProductMapperService;
@@ -15,13 +13,6 @@ describe('ArukeresoProductMapperService', () => {
   let runtime: { getCategoryBySlug: jest.Mock };
   let categoryConfigService: { getConfig: jest.Mock; getJsonSchema: jest.Mock };
   let specExtraction: { extractSpecs: jest.Mock };
-  let specPostProcess: { resolve: jest.Mock };
-  let sourceRecordRepo: {
-    findBySourceAndExternalId: jest.Mock;
-    findBySourceAndUrl: jest.Mock;
-  };
-
-  const source = { id: 'source-1', name: 'speedbike' } as ProductSource;
 
   const config = (overrides: Partial<ArukeresoSourceConfig> = {}) =>
     ({
@@ -59,7 +50,7 @@ describe('ArukeresoProductMapperService', () => {
   });
 
   const call = (cfg = config(), feedItem = item(), requestedSlugs?: string[]) =>
-    mapper.map({ source, config: cfg, item: feedItem, requestedSlugs });
+    mapper.map({ config: cfg, item: feedItem, requestedSlugs });
 
   beforeEach(() => {
     interpreter = {
@@ -78,23 +69,11 @@ describe('ArukeresoProductMapperService', () => {
         .mockReturnValue({ type: 'object', title: 'E-bike', properties: {} }),
     };
     specExtraction = { extractSpecs: jest.fn().mockReturnValue({}) };
-    specPostProcess = {
-      resolve: jest
-        .fn()
-        .mockImplementation(({ data }) => ({ ...data, specs: data.specs })),
-    };
-    sourceRecordRepo = {
-      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
-      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
-    };
-
     mapper = new ArukeresoProductMapperService(
       interpreter as any,
       runtime as any,
       categoryConfigService as any,
       specExtraction as any,
-      specPostProcess as any,
-      sourceRecordRepo as any,
     );
   });
 
@@ -145,6 +124,59 @@ describe('ArukeresoProductMapperService', () => {
     // Without this a feed row and the scraped page for one product would be
     // two different ProductSourceRecord identities forever.
     expect(result.url).toBe('https://speedbike.hu/ktm-macina-scarp');
+  });
+
+  describe('offer identifiers', () => {
+    const withIdentifiers = (mpnPipeline?: unknown[]) =>
+      config({
+        mapping: {
+          ...config().mapping,
+          gtin: { field: 'ean_code' },
+          mpn: mpnPipeline
+            ? { field: 'sku', pipeline: mpnPipeline as never }
+            : { field: 'sku' },
+        },
+      });
+
+    it('puts the GTIN and MPN on the offer as published', async () => {
+      const result = await call(
+        withIdentifiers(),
+        item({ eancode: '9008594503199', sku: '1260040108' }),
+      );
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0]).toMatchObject({
+        gtin: '9008594503199',
+        mpn: '1260040108',
+      });
+    });
+
+    // speedbike sometimes prefixes KTM's article number with "MX"; the config's
+    // pipeline removes it before the value reaches the offer.
+    it('runs the mapping pipeline, so a shop quirk is cleaned in config', async () => {
+      interpreter.runValuePipeline.mockImplementation(async (_pipeline, raw) =>
+        String(raw).replace(/^MX/, ''),
+      );
+
+      const result = await call(
+        withIdentifiers([{ op: 'stripPattern', pattern: '^MX' }]),
+        item({ sku: 'MX1260040108' }),
+      );
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].mpn).toBe('1260040108');
+    });
+
+    it('leaves them absent when the feed row has none', async () => {
+      const result = await call(withIdentifiers(), item({ eancode: '', sku: '' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].gtin).toBeUndefined();
+      expect(result.scrapedProduct.offers?.[0].mpn).toBeUndefined();
+    });
   });
 
   describe('prices, as Árukereső and Hungarian shops actually write them', () => {
@@ -382,68 +414,47 @@ describe('ArukeresoProductMapperService', () => {
     });
   });
 
-  // This is the cost control. A nightly pass over 3488 products whose
-  // catalogue barely moved must not pay for 3488 pairs of LLM calls.
-  describe('the unchanged-product fast path', () => {
-    const unchangedRecord = (hashes: {
-      offerSpecsHash?: string;
-      productSpecsHash?: string;
-    }) => ({
-      ...hashes,
-      model: { model: 'Macina Scarp SX Prestige' },
-      offers: [{ externalId: 'SKU-1', specs: { frameSize: 43 } }],
-      scrapedProduct: { productLevelDeterministicSpecs: {} },
-    });
-
-    it('skips post-processing entirely when both hashes match', async () => {
-      const { hashSpecs } = await import('@fittkereso-backend/utils');
-      sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(
-        unchangedRecord({
-          offerSpecsHash: hashSpecs({}),
-          productSpecsHash: hashSpecs({}),
-        }),
-      );
-
+  // Whether a listing needs an LLM call depends on whether it was seen
+  // before, which only identity resolution knows — so the mapper never makes
+  // one, and hands the updater everything the decision needs.
+  describe('deterministic data only', () => {
+    it('keeps the raw title as the model, for the identity extraction to clean', async () => {
       const result = await call();
 
-      expect(specPostProcess.resolve).not.toHaveBeenCalled();
       expect(result.status).toBe('mapped');
       if (result.status !== 'mapped') return;
-      // The persisted model name is reused rather than the raw feed title.
-      expect(result.scrapedProduct.model).toBe('Macina Scarp SX Prestige');
-      // And the offer keeps its own offer-level specs, which are stripped from
-      // scrapedProduct.specs and so exist nowhere else.
-      expect(result.scrapedProduct.offers?.[0].specs).toEqual({ frameSize: 43 });
+      expect(result.scrapedProduct).toMatchObject({
+        model: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
+        originalName: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
+        displayName: 'KTM KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
+      });
+      expect(result.scrapedProduct.nameCleaned).toBeUndefined();
     });
 
-    it('still post-processes when only one hash matches', async () => {
-      const { hashSpecs } = await import('@fittkereso-backend/utils');
-      sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(
-        unchangedRecord({
-          offerSpecsHash: hashSpecs({}),
-          productSpecsHash: 'something-else',
-        }),
-      );
+    it('carries the split deterministic specs and both hashes', async () => {
+      specExtraction.extractSpecs.mockReturnValueOnce({ weight: 24, frameSize: 43 });
 
-      await call();
+      const result = await call(config({ specMapping: { ebikes: { mappings: [] } } }));
 
-      expect(specPostProcess.resolve).toHaveBeenCalledWith(
-        expect.objectContaining({ offerIdentitySameRecordHit: true }),
-      );
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct).toMatchObject({
+        specs: { weight: 24 },
+        extractedSpecs: { weight: 24, frameSize: 43 },
+        offerLevelDeterministicSpecs: { frameSize: 43 },
+        productLevelDeterministicSpecs: { weight: 24 },
+        offerSpecsHash: hashSpecs({ frameSize: 43 }),
+        productSpecsHash: hashSpecs({ weight: 24 }),
+      });
+      // Listing-level values are filled in once the extraction has read them.
+      expect(result.scrapedProduct.offers?.[0].specs).toBeUndefined();
     });
 
-    it('looks the record up by URL when the item has no source-native id', async () => {
+    // The shared persistence path derives the slug fallback, so that a
+    // scraping source and a feed source for one shop land on one identity.
+    it('leaves an offer without a source-native id to the shared slug fallback', async () => {
       const result = await call(config(), item({ sku: '' }));
 
-      expect(sourceRecordRepo.findBySourceAndExternalId).not.toHaveBeenCalled();
-      expect(sourceRecordRepo.findBySourceAndUrl).toHaveBeenCalledWith(
-        'source-1',
-        'https://speedbike.hu/ktm-macina-scarp',
-      );
-
-      // The offer carries no externalId of its own; the shared persistence
-      // path derives the slug fallback, so that a scraping source and a feed
-      // source for one shop land on the same identity.
       expect(result.status).toBe('mapped');
       if (result.status !== 'mapped') return;
       expect(result.scrapedProduct.offers?.[0].externalId).toBeUndefined();

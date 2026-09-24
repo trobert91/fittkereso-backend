@@ -20,7 +20,7 @@
       }
     ],
     "pagination": {
-      "urlTemplate": "{{startUrl}}?page={{page}}",
+      "urlTemplate": "{{startUrl}}?oldal={{page}}",
       "pageCount": [
         {
           "op": "parseJsonAttr",
@@ -187,6 +187,32 @@
         "selector": "#app",
         "attr": "data-page",
         "path": "props.product.productCode"
+      }
+    ],
+    "siblingIds": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.variations"
+      },
+      {
+        "op": "filterJsonArray",
+        "path": "type",
+        "equals": "frame_size"
+      },
+      {
+        "op": "flattenJsonArray",
+        "path": "items"
+      },
+      {
+        "op": "mapJsonArray",
+        "fields": {
+          "productCode": {
+            "path": "productCode"
+          }
+        },
+        "flattenField": "productCode"
       }
     ],
     "model": [
@@ -555,6 +581,22 @@
             }
           ],
           "externalId": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.productCode"
+            }
+          ],
+          "gtin": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.gtin"
+            }
+          ],
+          "mpn": [
             {
               "op": "parseJsonAttr",
               "selector": "#app",

@@ -8,6 +8,7 @@ import { ListingMatchService } from './listing-match.service';
 import { ProductCandidateFinderService } from './product-candidate-finder.service';
 import { ProductDuplicateScanService } from './product-duplicate-scan.service';
 import { ProductDuplicateService } from './product-duplicate.service';
+import { ProductKeyLookupService } from './product-key-lookup.service';
 import { ProductMatchQueryService } from './product-match-query.service';
 import { TokenIdfService } from './token-idf.service';
 
@@ -26,6 +27,7 @@ import { TokenIdfService } from './token-idf.service';
     ListingMatchService,
     ProductDuplicateService,
     ProductDuplicateScanService,
+    ProductKeyLookupService,
   ],
   exports: [
     ProductMatchQueryService,
@@ -36,6 +38,7 @@ import { TokenIdfService } from './token-idf.service';
     ListingMatchService,
     ProductDuplicateService,
     ProductDuplicateScanService,
+    ProductKeyLookupService,
   ],
 })
 export class ProductIdentityModule {}

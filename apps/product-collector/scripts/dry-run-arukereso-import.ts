@@ -3,9 +3,10 @@
  * or spending a token.
  *
  * Runs the real mapper — field addressing, the category gate, deterministic
- * spec extraction, the two hashes — against the live feed, with only the LLM
- * post-process pass stubbed out (it is the one part that costs money, and it
- * cannot change which items are imported or what they are keyed on).
+ * spec extraction, the two hashes — against the live feed. The mapper makes no
+ * LLM call (the updater decides which listings need one), so nothing here costs
+ * money, and nothing it skips could change which items are imported or what
+ * they are keyed on.
  *
  * What it is for: a feed is the whole catalogue in one document, so the cost of
  * a mistake is the whole catalogue. The two questions it answers before a first
@@ -23,15 +24,8 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import {
   asArukeresoConfig,
-  ProductSourceRecordRepository,
   ProductSourceRepository,
 } from '@fittkereso-backend/database';
-import { SpecExtractionService } from '@fittkereso-backend/product';
-import { CategoryConfigService } from '@fittkereso-backend/config';
-import {
-  RuntimeDataProviderService,
-  ScrapeInterpreterService,
-} from '@fittkereso-backend/scrape-interpreter';
 import { NativeScraperService } from '@fittkereso-backend/scraper';
 import {
   ArukeresoFeedParserService,
@@ -59,18 +53,7 @@ async function main(): Promise<void> {
 
     const config = asArukeresoConfig(source.config, source.name);
 
-    // The real mapper, with only the LLM half replaced by a pass-through. Every
-    // decision that determines WHICH items are imported and HOW they are keyed
-    // is made before this point, so stubbing it changes nothing this script
-    // reports.
-    const mapper = new ArukeresoProductMapperService(
-      app.get(ScrapeInterpreterService),
-      app.get(RuntimeDataProviderService),
-      app.get(CategoryConfigService),
-      app.get(SpecExtractionService),
-      { resolve: async ({ data }: any) => data } as any,
-      app.get(ProductSourceRecordRepository),
-    );
+    const mapper = app.get(ArukeresoProductMapperService);
 
     const skips: Partial<Record<FeedSkipReason, number>> = {};
     const externalIds = new Map<string, number>();
@@ -92,7 +75,7 @@ async function main(): Promise<void> {
         seen += 1;
         if (seen > limit) return;
 
-        const result = await mapper.map({ source, config, item });
+        const result = await mapper.map({ config, item });
         if (result.status === 'skipped') {
           skips[result.reason] = (skips[result.reason] ?? 0) + 1;
           return;

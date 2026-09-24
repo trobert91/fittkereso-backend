@@ -17,7 +17,11 @@
  *     apps/product-collector/scripts/delete-product-source.ts <source-name> [--confirm]
  */
 import { NestFactory } from '@nestjs/core';
-import { ProductSourceRepository } from '@fittkereso-backend/database';
+import {
+  ProductModelRepository,
+  ProductSourceRepository,
+} from '@fittkereso-backend/database';
+import { ProductMergeService } from '@fittkereso-backend/product';
 import { AppModule } from '../src/app.module';
 
 interface Referencing {
@@ -184,10 +188,6 @@ async function main(): Promise<void> {
     // what the public listing sorts and filters on — leaving it pointing at a
     // deleted offer's price is exactly the kind of stale number nobody notices.
     if (affectedModelIds.length) {
-      const { ProductMergeService } = await import('@fittkereso-backend/product');
-      const { ProductModelRepository } = await import(
-        '@fittkereso-backend/database'
-      );
       const mergeService = app.get(ProductMergeService);
       const modelRepo = app.get(ProductModelRepository);
 

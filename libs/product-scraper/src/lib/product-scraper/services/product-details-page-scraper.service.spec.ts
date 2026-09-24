@@ -1,29 +1,17 @@
 import { ProductDetailsPageScraperService } from './product-details-page-scraper.service';
-import { SpecPostProcessService } from './spec-post-process.service';
 import type {
   ProductCategory,
   ScrapeTask,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { asScrapingConfig } from '@fittkereso-backend/database';
-import { hashSpecs } from '@fittkereso-backend/utils';
 
 describe('ProductDetailsPageScraperService.extractProduct', () => {
   let service: ProductDetailsPageScraperService;
   let interpreter: { runDetailPage: jest.Mock };
   let runtime: { getCategoryBySlug: jest.Mock };
-  let categoryConfigService: {
-    getJsonSchema: jest.Mock;
-    getConfig: jest.Mock;
-    getGoldenSample: jest.Mock;
-  };
-  let sourceRecordRepo: {
-    findBySourceAndExternalId: jest.Mock;
-    findBySourceAndUrl: jest.Mock;
-    findBySourceAndProductSpecsHash: jest.Mock;
-  };
-  let postProcessMerge: { merge: jest.Mock };
-  let postProcess: { processOfferIdentity: jest.Mock; processModelSpecs: jest.Mock };
+  let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
+  let specExtraction: { extractSpecs: jest.Mock };
 
   const category = { id: 'cat-1', slug: 'ebikes', name: 'Ebikes' } as ProductCategory;
   const jsonSchema: SpecDefinitionJsonSchema = {
@@ -32,11 +20,10 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     properties: {},
   };
 
-  function buildTask(force = false): ScrapeTask {
+  function buildTask(): ScrapeTask {
     return {
       id: 'task-1',
       url: 'https://speedbike.hu/product/1',
-      force,
       source: {
         id: 'source-1',
         name: 'speedbike',
@@ -48,7 +35,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
             itemMode: 'cheerio',
             itemPipeline: [],
           },
-          detailPage: { specMapping: {}, postProcess: undefined },
+          detailPage: { specMapping: { ebikes: { mappings: [] } } },
         },
       },
     } as unknown as ScrapeTask;
@@ -60,7 +47,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     categorySlug: 'ebikes',
     brand: 'KTM',
     model: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
-    rawSpecs: [],
+    rawSpecs: [{ name: 'Motor', values: ['Bosch Performance CX'] }],
     rawOffers: [],
     imageUrls: [],
     aliases: [],
@@ -73,22 +60,13 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     runtime = { getCategoryBySlug: jest.fn().mockResolvedValue(category) };
     categoryConfigService = {
       getJsonSchema: jest.fn().mockReturnValue(jsonSchema),
-      getConfig: jest.fn().mockReturnValue(undefined),
-      getGoldenSample: jest.fn().mockReturnValue(undefined),
+      getConfig: jest.fn().mockReturnValue({ offerLevelSpecs: ['frameSize'] }),
     };
-    sourceRecordRepo = {
-      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
-      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
-      findBySourceAndProductSpecsHash: jest.fn().mockResolvedValue(null),
-    };
-    postProcessMerge = {
-      merge: jest.fn().mockImplementation((data) => data),
-    };
-    postProcess = {
-      processOfferIdentity: jest.fn().mockResolvedValue(undefined),
-      processModelSpecs: jest.fn().mockResolvedValue(undefined),
-    };
+    specExtraction = { extractSpecs: jest.fn().mockReturnValue({}) };
 
+    // No LLM service and no record repository among the dependencies: this
+    // importer cannot spend a call or decide to skip one. The updater does
+    // both, once identity resolution knows whether the listing is new.
     service = new ProductDetailsPageScraperService(
       {} as any, // scraperService
       {} as any, // productUpdaterService
@@ -96,20 +74,9 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       interpreter as any,
       runtime as any,
       categoryConfigService as any,
-      { extractSpecs: jest.fn().mockReturnValue({}) } as any, // specExtraction
-      // The real service, not a stub: these tests are what keep the hash-skip
-      // and sibling-reuse decisions honest, and they must exercise the code
-      // the feed importer shares rather than a mock of it.
-      new SpecPostProcessService(
-        categoryConfigService as any,
-        postProcess as any,
-        postProcessMerge as any,
-        sourceRecordRepo as any,
-        { recordExtractionSkipReason: jest.fn() } as any,
-      ),
+      specExtraction as any,
       {} as any, // translationSelector
       {} as any, // translationService
-      sourceRecordRepo as any,
       {} as any, // scrapeTaskPublisher
     );
   });
@@ -118,61 +85,41 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     return (service as any).extractProduct(task, {} as any);
   }
 
-  it('carries the raw scraped title through as originalName alongside the cleaned model', async () => {
-    const task = buildTask();
+  it('hands over the raw title as the model, for the identity extraction to clean', async () => {
+    const result = await callExtractProduct(buildTask());
 
-    const result = await callExtractProduct(task);
-
-    expect(result.scrapedProduct.model).toBe(detail.model);
-    expect(result.scrapedProduct.originalName).toBe(detail.model);
-  });
-
-  it('sets originalName on the both-hashes-unchanged fast path too', async () => {
-    const task = buildTask();
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: hashSpecs({}),
-      productSpecsHash: hashSpecs({}),
-      model: { model: 'Reused Model Name' },
+    expect(result.scrapedProduct).toMatchObject({
+      brand: 'KTM',
+      model: detail.model,
+      originalName: detail.model,
+      displayName: `KTM ${detail.model}`,
+      rawSpecs: detail.rawSpecs,
+      externalId: 'sku-1',
     });
-
-    const result = await callExtractProduct(task);
-
-    expect(result.scrapedProduct.model).toBe('Reused Model Name');
-    expect(result.scrapedProduct.originalName).toBe(detail.model);
-    expect(postProcess.processOfferIdentity).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+    expect(result.scrapedProduct.nameCleaned).toBeUndefined();
   });
 
-  it('carries the pre-LLM deterministic specs through alongside the post-process-merged specs', async () => {
-    const task = buildTask();
-    asScrapingConfig(task.source.config).detailPage.specMapping = { ebikes: { mappings: [] } };
-    const deterministicSpecs = { weight: 17 };
-    const specExtraction = { extractSpecs: jest.fn().mockReturnValue(deterministicSpecs) };
-    (service as any).specExtraction = specExtraction;
-    postProcessMerge.merge.mockImplementation((data) => ({
-      ...data,
-      specs: { ...data.specs, motorPosition: 'Középmotor' },
-    }));
+  it('carries the deterministic specs, split by the category\'s offer-level keys, and both hashes', async () => {
+    specExtraction.extractSpecs.mockReturnValue({ weight: 17, frameSize: 43 });
 
-    const result = await callExtractProduct(task);
+    const result = await callExtractProduct(buildTask());
 
-    expect(result.scrapedProduct.extractedSpecs).toBe(deterministicSpecs);
-    expect(result.scrapedProduct.specs).toEqual({ weight: 17, motorPosition: 'Középmotor' });
+    expect(result.scrapedProduct).toMatchObject({
+      specs: { weight: 17 },
+      extractedSpecs: { weight: 17, frameSize: 43 },
+      offerLevelDeterministicSpecs: { frameSize: 43 },
+      productLevelDeterministicSpecs: { weight: 17 },
+      offerSpecsHash: expect.any(String),
+      productSpecsHash: expect.any(String),
+    });
   });
 
-  it('computes offerLevelDeterministicSpecs/productLevelDeterministicSpecs by splitting the deterministic mapping via offerLevelSpecs config', async () => {
-    const task = buildTask();
-    asScrapingConfig(task.source.config).detailPage.specMapping = { ebikes: { mappings: [] } };
-    const deterministicSpecs = { weight: 17, frameSize: 43 };
-    (service as any).specExtraction = {
-      extractSpecs: jest.fn().mockReturnValue(deterministicSpecs),
-    };
-    categoryConfigService.getConfig.mockReturnValue({ offerLevelSpecs: ['frameSize'] });
+  it('folds a dedicated release-year pipeline into modelYear', async () => {
+    interpreter.runDetailPage.mockResolvedValueOnce({ ...detail, releaseYear: 2026 });
 
-    const result = await callExtractProduct(task);
+    const result = await callExtractProduct(buildTask());
 
-    expect(result.scrapedProduct.offerLevelDeterministicSpecs).toEqual({ frameSize: 43 });
-    expect(result.scrapedProduct.productLevelDeterministicSpecs).toEqual({ weight: 17 });
+    expect(result.scrapedProduct.extractedSpecs).toEqual({ modelYear: 2026 });
   });
 
   // Regression: a normalization pass (e.g. ProductSpecNormalizationService)
@@ -184,192 +131,68 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
   // persistence — so two source records with byte-identical real specs could
   // get different offerSpecsHash/productSpecsHash values purely depending on
   // whether this noise key happened to be present, permanently defeating the
-  // same-record skip and the cross-sibling reuse lookup.
-  it('filters undefined-valued keys out of offerLevelDeterministicSpecs/productLevelDeterministicSpecs before hashing, so a phantom key does not change the hash', async () => {
-    const task = buildTask();
-    asScrapingConfig(task.source.config).detailPage.specMapping = { ebikes: { mappings: [] } };
-    const deterministicSpecsWithPhantomKey = {
-      weight: 17,
-      frameSize: 43,
-      display: undefined,
-    };
-    const deterministicSpecsWithoutPhantomKey = { weight: 17, frameSize: 43 };
-    categoryConfigService.getConfig.mockReturnValue({ offerLevelSpecs: ['frameSize'] });
+  // re-import skip.
+  it('filters undefined-valued keys out before hashing, so a phantom key does not change the hash', async () => {
+    specExtraction.extractSpecs.mockReturnValueOnce({ weight: 17, frameSize: 43, display: undefined });
+    const withPhantomKey = await callExtractProduct(buildTask());
 
-    (service as any).specExtraction = {
-      extractSpecs: jest.fn().mockReturnValue(deterministicSpecsWithPhantomKey),
-    };
-    const resultWithPhantomKey = await callExtractProduct(task);
+    specExtraction.extractSpecs.mockReturnValueOnce({ weight: 17, frameSize: 43 });
+    const withoutPhantomKey = await callExtractProduct(buildTask());
 
-    (service as any).specExtraction = {
-      extractSpecs: jest.fn().mockReturnValue(deterministicSpecsWithoutPhantomKey),
-    };
-    const resultWithoutPhantomKey = await callExtractProduct(task);
-
-    expect(resultWithPhantomKey.scrapedProduct.productLevelDeterministicSpecs).toEqual({
-      weight: 17,
-    });
-    expect(resultWithPhantomKey.scrapedProduct.offerSpecsHash).toBe(
-      resultWithoutPhantomKey.scrapedProduct.offerSpecsHash,
+    expect(withPhantomKey.scrapedProduct.productLevelDeterministicSpecs).toEqual({ weight: 17 });
+    expect(withPhantomKey.scrapedProduct.offerSpecsHash).toBe(
+      withoutPhantomKey.scrapedProduct.offerSpecsHash,
     );
-    expect(resultWithPhantomKey.scrapedProduct.productSpecsHash).toBe(
-      resultWithoutPhantomKey.scrapedProduct.productSpecsHash,
+    expect(withPhantomKey.scrapedProduct.productSpecsHash).toBe(
+      withoutPhantomKey.scrapedProduct.productSpecsHash,
     );
   });
 
-  it('leaves extractedSpecs undefined on the both-hashes-unchanged fast path', async () => {
+  it('skips extraction without a specMapping for the category', async () => {
     const task = buildTask();
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: hashSpecs({}),
-      productSpecsHash: hashSpecs({}),
-      model: { model: 'Reused Model Name' },
-    });
+    asScrapingConfig(task.source.config).detailPage.specMapping = {};
 
     const result = await callExtractProduct(task);
 
-    expect(result.scrapedProduct.extractedSpecs).toBeUndefined();
-    expect(result.scrapedProduct.specs).toBeUndefined();
+    expect(specExtraction.extractSpecs).not.toHaveBeenCalled();
+    expect(result.scrapedProduct.extractedSpecs).toEqual({});
   });
 
-  // Regression: on the both-hashes-unchanged fast path, offer-level keys
-  // (e.g. frameSize/color) used to be hardcoded to {}. A first attempted fix
-  // picked them from existingSource.scrapedProduct.specs, but that field
-  // structurally never carries offer-level keys — they're omit()'d before
-  // being persisted there (see the non-fast-path branch's
-  // pageOfferLevelSpecs/strippedSpecs split). The only place they survive
-  // across scrapes is the previously-persisted Offer row itself, so that's
-  // what the fast path must read from.
-  it('picks offer-level specs from the existing Offer row on the both-hashes-unchanged fast path', async () => {
-    const task = buildTask();
-    const detailWithOffer = {
+  // Listing-level values arrive once the identity extraction has read them;
+  // only an offer's own values (one variant of several on a page) come from here.
+  it('gives an offer only its own specs', async () => {
+    interpreter.runDetailPage.mockResolvedValueOnce({
       ...detail,
-      rawOffers: [{ price: 3359000 }],
-    };
-    interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
-    categoryConfigService.getConfig.mockReturnValue({
-      offerLevelSpecs: ['frameSize', 'color'],
-    });
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: hashSpecs({}),
-      productSpecsHash: hashSpecs({}),
-      model: { model: 'Reused Model Name' },
-      // scrapedProduct.specs deliberately has no frameSize/color — proving
-      // the fix doesn't (and structurally can't) read offer-level keys from
-      // here.
-      scrapedProduct: { specs: { motorPosition: 'Középmotor' } },
-      offers: [
-        {
-          externalId: 'sku-1',
-          specs: { frameSize: 48, color: 'Olíva' },
-        },
-      ],
+      rawOffers: [{ price: 1, specs: { frameSize: 48 } }, { price: 2 }],
     });
 
-    const result = await callExtractProduct(task);
+    const result = await callExtractProduct(buildTask());
 
-    expect(result.offerLevelSpecs).toEqual({ frameSize: 48, color: 'Olíva' });
-    expect(result.scrapedProduct.offers).toEqual([
-      expect.objectContaining({
-        price: 3359000,
-        specs: { frameSize: 48, color: 'Olíva' },
-      }),
+    expect(result.scrapedProduct.offers.map((offer: { specs?: unknown }) => offer.specs)).toEqual([
+      { frameSize: 48 },
+      undefined,
     ]);
   });
 
-  it('falls back to the record\'s single offer when externalId does not match any of them', async () => {
-    const task = buildTask();
-    const detailWithOffer = {
-      ...detail,
-      externalId: 'sku-different',
-      rawOffers: [{ price: 3359000 }],
-    };
-    interpreter.runDetailPage.mockResolvedValueOnce(detailWithOffer);
-    categoryConfigService.getConfig.mockReturnValue({
-      offerLevelSpecs: ['frameSize'],
+  describe('identifiers', () => {
+    it('carries the declared siblings and each offer\'s GTIN and MPN through', async () => {
+      interpreter.runDetailPage.mockResolvedValueOnce({
+        ...detail,
+        siblingIds: ['1260040103', '1260040108', '1260040113'],
+        rawOffers: [{ price: 3879000, gtin: '9008594503199', mpn: '1260040108' }],
+      });
+
+      const result = await callExtractProduct(buildTask());
+
+      expect(result.scrapedProduct.siblingExternalIds).toEqual([
+        '1260040103',
+        '1260040108',
+        '1260040113',
+      ]);
+      expect(result.scrapedProduct.offers).toEqual([
+        expect.objectContaining({ gtin: '9008594503199', mpn: '1260040108' }),
+      ]);
     });
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: hashSpecs({}),
-      productSpecsHash: hashSpecs({}),
-      model: { model: 'Reused Model Name' },
-      scrapedProduct: { specs: {} },
-      offers: [{ externalId: 'sku-1', specs: { frameSize: 53 } }],
-    });
-
-    const result = await callExtractProduct(task);
-
-    expect(result.offerLevelSpecs).toEqual({ frameSize: 53 });
-  });
-
-  it('only skips the offer-identity call when just offerSpecsHash matches, still running processModelSpecs', async () => {
-    const task = buildTask();
-    categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: hashSpecs({}),
-      productSpecsHash: 'stale-hash',
-      model: { model: 'Reused Model Name' },
-    });
-
-    await callExtractProduct(task);
-
-    expect(postProcess.processOfferIdentity).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).toHaveBeenCalled();
-  });
-
-  it('only skips the model-spec call when just productSpecsHash matches, still running processOfferIdentity', async () => {
-    const task = buildTask();
-    categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce({
-      offerSpecsHash: 'stale-hash',
-      productSpecsHash: hashSpecs({}),
-      scrapedProduct: { productLevelDeterministicSpecs: {} },
-      model: { model: 'Reused Model Name' },
-    });
-
-    await callExtractProduct(task);
-
-    expect(postProcess.processOfferIdentity).toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-  });
-
-  it('reuses a sibling record\'s product-level specs for a brand-new listing never scraped before', async () => {
-    const task = buildTask();
-    categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
-    asScrapingConfig(task.source.config).detailPage.specMapping = { ebikes: { mappings: [] } };
-    const deterministicSpecs = { weight: 22, motorPosition: 'Bosch', torque: 60 };
-    (service as any).specExtraction = {
-      extractSpecs: jest.fn().mockReturnValue(deterministicSpecs),
-    };
-    // No existing record at all for this exact listing.
-    sourceRecordRepo.findBySourceAndExternalId.mockResolvedValueOnce(null);
-    sourceRecordRepo.findBySourceAndProductSpecsHash.mockResolvedValueOnce({
-      id: 'sibling-id',
-      url: 'https://speedbike.hu/product/1-blue',
-      lastUpdated: new Date('2026-01-01'),
-      scrapedProduct: { productLevelDeterministicSpecs: deterministicSpecs },
-    });
-
-    await callExtractProduct(task);
-
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).toHaveBeenCalledWith(
-      'source-1',
-      hashSpecs(deterministicSpecs),
-    );
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-    expect(postProcess.processOfferIdentity).toHaveBeenCalled();
-  });
-
-  it('never queries for a sibling when task.force is set', async () => {
-    const task = buildTask(true);
-    categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
-    asScrapingConfig(task.source.config).detailPage.specMapping = { ebikes: { mappings: [] } };
-    (service as any).specExtraction = {
-      extractSpecs: jest.fn().mockReturnValue({ weight: 22, motorPosition: 'Bosch', torque: 60 }),
-    };
-
-    await callExtractProduct(task);
-
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).toHaveBeenCalled();
   });
 });
 
@@ -393,7 +216,6 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
   function callDispatchVariantTasks(task: ScrapeTask, offerLinks: Array<{ url: string; title?: string }>) {
     return (service as any).dispatchVariantTasks(task, {
       scrapedProduct: {} as any,
-      offerLevelSpecs: {},
       offerLinks,
     });
   }
@@ -411,10 +233,8 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
       {} as any, // runtime
       {} as any, // categoryConfigService
       {} as any, // specExtraction
-      {} as any, // specPostProcess
       {} as any, // translationSelector
       {} as any, // translationService
-      {} as any, // sourceRecordRepo
       scrapeTaskPublisher as any,
     );
   });

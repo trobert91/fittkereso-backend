@@ -10,10 +10,15 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductSearchParams } from '../models/product-search-params';
 import { ProductSearchResult } from '../models/product-search-result';
 import { SelectQueryBuilder } from 'typeorm';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, normalizeGtin, normalizeMpn } from '@fittkereso-backend/utils';
 import { isEmpty, isArray } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
+
+/** A value matched literally inside LIKE, with backslash as the escape character. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
 
 /** Any RFC 4122 variant, since ids come from elsewhere in the system rather than
  *  being generated here — the point is only to keep a non-uuid away from a uuid
@@ -98,6 +103,33 @@ export class ProductSearchService {
       });
     }
 
+    // Identifiers live on offers, and a product has one offer per size. Like
+    // an unparseable id, a value the normalizer rejects matches nothing.
+    if (params.gtin && !isEmpty(params.gtin.trim())) {
+      const gtin = normalizeGtin(params.gtin);
+      query = gtin
+        ? query.andWhere(
+            this.anyOffer(query, 'gtinOffer', 'gtin', '= :gtin'),
+            { gtin },
+          )
+        : query.andWhere('1 = 0');
+    }
+
+    if (params.mpn && !isEmpty(params.mpn.trim())) {
+      const mpn = normalizeMpn(params.mpn);
+      query = mpn
+        ? query.andWhere(
+            this.anyOffer(
+              query,
+              'mpnOffer',
+              'mpn',
+              `LIKE :mpnPrefix ESCAPE '\\'`,
+            ),
+            { mpnPrefix: `${escapeLike(mpn)}%` },
+          )
+        : query.andWhere('1 = 0');
+    }
+
     if (!isEmpty(params.specFilters)) {
       query = this.applySpecFilters(query, params.specFilters!);
     }
@@ -155,6 +187,28 @@ export class ProductSearchService {
     query = query.skip((page - 1) * pageSize).take(pageSize);
 
     return query;
+  }
+
+  /**
+   * `EXISTS` an offer of this product — any shop's, active or not — whose
+   * column meets the condition. A subquery rather than a join, so a product
+   * whose three sizes all match is still one row: getManyAndCount with
+   * skip/take counts and pages products, not offers.
+   */
+  private anyOffer(
+    query: SelectQueryBuilder<ProductModel>,
+    alias: string,
+    column: keyof Offer,
+    condition: string,
+  ): string {
+    const offers = query
+      .subQuery()
+      .select('1')
+      .from(Offer, alias)
+      .where(`${alias}.${nameOf<Offer>('model')} = product.${nameOf<ProductModel>('id')}`)
+      .andWhere(`${alias}.${nameOf<Offer>(column)} ${condition}`)
+      .getQuery();
+    return `EXISTS ${offers}`;
   }
 
   // A spec key is offer-level if ANY known category flags it as such —

@@ -1,415 +1,408 @@
 import { SpecPostProcessService } from './spec-post-process.service';
-import type { DeterministicProductData } from '@fittkereso-backend/product';
+import { ProductSourcePostProcessMergeService } from '@fittkereso-backend/product';
 import type {
   ProductSource,
-  ScrapeTask,
+  ProductSourceRecord,
+  ScrapedProduct,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
-import { hashSpecs } from '@fittkereso-backend/utils';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 
 describe('SpecPostProcessService', () => {
   let service: SpecPostProcessService;
-  let categoryConfigService: { getGoldenSample: jest.Mock; getConfig: jest.Mock };
-  let postProcess: { processOfferIdentity: jest.Mock; processModelSpecs: jest.Mock };
-  let postProcessMerge: { merge: jest.Mock };
-  let sourceRecordRepo: { findBySourceAndProductSpecsHash: jest.Mock };
+  let categoryConfigService: {
+    getJsonSchema: jest.Mock;
+    getConfig: jest.Mock;
+    getGoldenSample: jest.Mock;
+  };
+  let postProcess: { extractIdentity: jest.Mock; processModelSpecs: jest.Mock };
+  let metrics: {
+    identityExtraction: jest.Mock;
+    identitySpecRowsMatched: jest.Mock;
+    specUnification: jest.Mock;
+  };
 
-  const jsonSchema: SpecDefinitionJsonSchema = {
+  const schema: SpecDefinitionJsonSchema = {
     type: 'object',
     title: 'E-bike',
-    properties: {},
-  };
-
-  const data: DeterministicProductData = {
-    brand: 'KTM',
-    model: 'Macina Scarp',
-    specs: { weight: 17, modelYear: 2024 },
-  };
-
-  function buildCase(
-    config?: {
-      enabled: boolean;
-      model?: string;
-      includeDescriptionInOfferIdentity?: boolean;
-      includeDescriptionInModelSpecs?: boolean;
+    properties: {
+      modelYear: { type: 'number', title: 'Model year' },
+      batteryCapacity: { type: 'number', title: 'Battery' },
+      weight: { type: 'number', title: 'Weight' },
+      frameSize: { type: 'number', title: 'Frame size' },
+      color: { type: 'string', title: 'Color' },
+      forkTravel: { type: 'number', title: 'Fork travel' },
+      tubeless: { type: 'boolean', title: 'Tubeless' },
     },
+  };
+  const golden = { modelYear: 2024, forkTravel: 140, tubeless: true };
+
+  const rawSpecs = [
+    { name: 'Motor', values: ['Bosch Performance CX'] },
+    { name: 'Akkumulátor', values: ['Bosch PowerTube 750 Wh'] },
+    { name: 'Fékbetét', values: ['Shimano J05A'] },
+  ];
+
+  /** What an importer hands the updater: deterministic data only. */
+  const listing = (overrides: Partial<ScrapedProduct> = {}): ScrapedProduct => ({
+    brand: 'KTM',
+    model: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+    displayName: "KTM KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+    originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+    category: { id: 'cat-1', slug: 'ebikes', name: 'E-bikes' },
+    specs: { weight: 24 },
+    extractedSpecs: { weight: 24, forkTravel: 150 },
+    offerSpecsHash: 'offer-hash',
+    productSpecsHash: 'product-hash',
+    rawSpecs,
+    description: 'Könnyű, strapabíró.',
+    offers: [{ price: 1, externalId: 'sku-43' }],
+    ...overrides,
+  });
+
+  const context = (
+    config: Record<string, unknown> = {},
     force = false,
-  ): { context: ProductImportContext; config: typeof config } {
-    return {
-      context: {
-        url: 'https://speedbike.hu/product/1',
-        force,
-        source: { id: 'source-1', name: 'speedbike' } as ProductSource,
-        // The scrape path sets this; a feed run does not. Both reach the same
-        // code, which is the point of the extraction.
-        task: { id: 'task-1' } as ScrapeTask,
-      },
-      config,
-    };
-  }
+  ): ProductImportContext => ({
+    url: 'https://speedbike.hu/ktm-macina',
+    force,
+    source: {
+      id: 'source-1',
+      name: 'speedbike-arukereso',
+      config: { feedUrl: 'https://speedbike.hu/feed', mapping: {}, ...config },
+    } as unknown as ProductSource,
+  });
 
   beforeEach(() => {
     categoryConfigService = {
-      getGoldenSample: jest.fn(),
-      getConfig: jest.fn().mockReturnValue(undefined),
+      getJsonSchema: jest.fn().mockReturnValue(schema),
+      getConfig: jest.fn().mockReturnValue({
+        primarySpecs: ['modelYear', 'batteryCapacity'],
+        matcherSpecs: ['weight', 'notInSchema'],
+        offerLevelSpecs: ['frameSize', 'color'],
+      }),
+      getGoldenSample: jest.fn().mockReturnValue(golden),
     };
     postProcess = {
-      processOfferIdentity: jest.fn(),
-      processModelSpecs: jest.fn(),
+      extractIdentity: jest.fn().mockResolvedValue({
+        model: 'Macina Scarp SX Prestige Di2',
+        specs: { modelYear: 2026, batteryCapacity: 750, frameSize: 43, color: 'Olíva' },
+      }),
+      processModelSpecs: jest.fn().mockResolvedValue({ specs: { tubeless: true } }),
     };
-    postProcessMerge = { merge: jest.fn() };
-    sourceRecordRepo = { findBySourceAndProductSpecsHash: jest.fn().mockResolvedValue(null) };
+    metrics = {
+      identityExtraction: jest.fn(),
+      identitySpecRowsMatched: jest.fn(),
+      specUnification: jest.fn(),
+    };
 
     service = new SpecPostProcessService(
-      categoryConfigService as any,
-      postProcess as any,
-      postProcessMerge as any,
-      sourceRecordRepo as any,
-      { recordExtractionSkipReason: jest.fn() } as any,
+      categoryConfigService as never,
+      postProcess as never,
+      new ProductSourcePostProcessMergeService(),
+      metrics as never,
     );
   });
 
-  const productLevelDeterministicSpecs = {
-    weight: 17,
-    motorPosition: 'Középmotor',
-    torque: 60,
-  };
-  const productSpecsHash = hashSpecs(productLevelDeterministicSpecs);
-
-  function callResolve(
-    testCase: ReturnType<typeof buildCase>,
-    overrides: Partial<Record<string, unknown>> = {},
-  ) {
-    return service.resolve({
-      context: testCase.context,
-      config: testCase.config,
-      data,
-      offerLevelDeterministicSpecs: {},
-      productLevelDeterministicSpecs,
-      rawSpecs: [],
-      productSpecsHash,
-      jsonSchema,
-      categorySlug: 'ebikes',
-      offerIdentitySameRecordHit: false,
-      existingSource: undefined,
-      existingOfferForSpecs: undefined,
-      offerLevelKeys: [],
-      ...overrides,
+  describe('scopesOf', () => {
+    it('splits the schema by the category config: identity fields, and everything else', () => {
+      expect(service.scopesOf('ebikes', schema)).toEqual({
+        // A configured key the schema lacks is left out.
+        identityKeys: ['modelYear', 'batteryCapacity', 'weight', 'frameSize', 'color'],
+        offerLevelKeys: ['frameSize', 'color'],
+        unificationKeys: ['forkTravel', 'tubeless'],
+      });
     });
-  }
-
-  it('skips both LLM calls and merges with undefined when post-processing is disabled', async () => {
-    const testCase = buildCase(undefined);
-    const merged = { ...data };
-    postProcessMerge.merge.mockReturnValueOnce(merged);
-
-    const result = await callResolve(testCase);
-
-    expect(postProcess.processOfferIdentity).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(data, undefined, undefined);
-    expect(result).toBe(merged);
   });
 
-  it('skips both LLM calls and merges with undefined when the category has no golden sample', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce(undefined);
-    const merged = { ...data };
-    postProcessMerge.merge.mockReturnValueOnce(merged);
+  describe('extractIdentity', () => {
+    it('asks for the identity fields, from the raw title, their deterministic values and the selected rows', async () => {
+      await service.extractIdentity({
+        context: context({ identityExtraction: { specRows: ['motor', 'Akkumulátor'] } }),
+        scrapedProduct: listing(),
+      });
 
-    const result = await callResolve(testCase);
-
-    expect(postProcess.processOfferIdentity).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(data, undefined, undefined);
-    expect(result).toBe(merged);
-  });
-
-  it('calls both LLM methods and merges their results when enabled with a golden sample', async () => {
-    const testCase = buildCase({ enabled: true, model: 'custom-model' });
-    const goldenSample = { weight: 22 };
-    categoryConfigService.getGoldenSample.mockReturnValueOnce(goldenSample);
-    const offerIdentity = { specs: { frameSize: 43 } };
-    const modelSpecs = { specs: { motorPosition: 'Középmotor' } };
-    postProcess.processOfferIdentity.mockResolvedValueOnce(offerIdentity);
-    postProcess.processModelSpecs.mockResolvedValueOnce(modelSpecs);
-    const merged = { ...data, specs: { ...data.specs, motorPosition: 'Középmotor', frameSize: 43 } };
-    postProcessMerge.merge.mockReturnValueOnce(merged);
-
-    const result = await callResolve(testCase, { offerLevelDeterministicSpecs: { frameSize: 43 } });
-
-    expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ specs: { frameSize: 43 } }),
-        schema: jsonSchema,
-        goldenSample,
-        offerLevelSpecs: [],
-        model: 'custom-model',
-      }),
-    );
-    expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ specs: productLevelDeterministicSpecs }),
-        schema: jsonSchema,
-        goldenSample,
-        offerLevelSpecs: [],
-        model: 'custom-model',
-      }),
-    );
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(data, offerIdentity, modelSpecs);
-    expect(result).toBe(merged);
-  });
-
-  it('passes the category offerLevelSpecs config through to both LLM calls', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-
-    await callResolve(testCase, { offerLevelKeys: ['frameSize', 'color'] });
-
-    expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
-      expect.objectContaining({ offerLevelSpecs: ['frameSize', 'color'] }),
-    );
-    expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
-      expect.objectContaining({ offerLevelSpecs: ['frameSize', 'color'] }),
-    );
-  });
-
-  describe('description toggles', () => {
-    beforeEach(() => {
-      categoryConfigService.getGoldenSample.mockReturnValue({ weight: 22 });
-      postProcess.processOfferIdentity.mockResolvedValue(undefined);
-      postProcess.processModelSpecs.mockResolvedValue(undefined);
-      postProcessMerge.merge.mockReturnValue(data);
+      expect(postProcess.extractIdentity).toHaveBeenCalledWith({
+        data: {
+          brand: 'KTM',
+          model: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+          // forkTravel is deterministic too, but not an identity field.
+          specs: { weight: 24 },
+        },
+        rawSpecs: [rawSpecs[0], rawSpecs[1]],
+        description: undefined,
+        schema,
+        outputKeys: ['modelYear', 'batteryCapacity', 'weight', 'frameSize', 'color'],
+        offerLevelSpecs: ['frameSize', 'color'],
+        model: undefined,
+        thinking: undefined,
+        effort: undefined,
+        maxTokens: undefined,
+      });
+      expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'extracted');
+      // The drift guard: a source whose labels change stops matching rows.
+      expect(metrics.identitySpecRowsMatched).toHaveBeenCalledWith('speedbike-arukereso', 2);
     });
 
-    it('withholds description from offer-identity but forwards it to model-spec by default', async () => {
-      const testCase = buildCase({ enabled: true });
+    it('sends the whole table when the source names no rows', async () => {
+      await service.extractIdentity({ context: context(), scrapedProduct: listing() });
 
-      await callResolve(testCase, { description: 'Marketing blurb' });
+      expect(postProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ rawSpecs }),
+      );
+      expect(metrics.identitySpecRowsMatched).not.toHaveBeenCalled();
+    });
 
-      expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
+    it('puts product-level values on the listing and listing-level values on its offers', async () => {
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing(),
+      });
+
+      expect(result).toMatchObject({
+        model: 'Macina Scarp SX Prestige Di2',
+        displayName: 'KTM Macina Scarp SX Prestige Di2',
+        originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+        nameCleaned: true,
+        specs: { modelYear: 2026, batteryCapacity: 750, weight: 24, forkTravel: 150 },
+        offers: [{ price: 1, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
+      });
+      expect(result.specs).not.toHaveProperty('frameSize');
+      expect(result.identityInputHash).toEqual(expect.any(String));
+    });
+
+    // A page listing several variants gives each offer its own size.
+    it('keeps an offer\'s own listing-level specs', async () => {
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing({
+          offers: [
+            { price: 1, specs: { frameSize: 48 } },
+            { price: 2 },
+          ],
+        }),
+      });
+
+      expect(result.offers?.map((offer) => offer.specs)).toEqual([
+        { frameSize: 48 },
+        { frameSize: 43, color: 'Olíva' },
+      ]);
+    });
+
+    it('forwards the description only when the source opts in', async () => {
+      await service.extractIdentity({
+        context: context({ postProcess: { includeDescriptionInOfferIdentity: true } }),
+        scrapedProduct: listing(),
+      });
+
+      expect(postProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Könnyű, strapabíró.' }),
+      );
+    });
+
+    it('continues on the deterministic data when the LLM fails, with the name marked uncleaned', async () => {
+      postProcess.extractIdentity.mockResolvedValueOnce(undefined);
+
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing(),
+      });
+
+      expect(result.model).toBe("KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE");
+      expect(result.nameCleaned).toBe(false);
+      expect(result.specs).toEqual({ weight: 24, forkTravel: 150 });
+      expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'failed');
+    });
+
+    it('makes no call for a source that turned post-processing off', async () => {
+      const result = await service.extractIdentity({
+        context: context({ postProcess: { enabled: false } }),
+        scrapedProduct: listing(),
+      });
+
+      expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+      expect(result.nameCleaned).toBe(false);
+      expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'disabled');
+    });
+
+    describe('on a re-import', () => {
+      /** This listing's record, as the first import left it. */
+      const storedRecord = async (): Promise<ProductSourceRecord> => {
+        const first = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing(),
+        });
+        postProcess.extractIdentity.mockClear();
+        metrics.identityExtraction.mockClear();
+        return {
+          offerSpecsHash: 'offer-hash',
+          productSpecsHash: 'product-hash',
+          scrapedProduct: {
+            ...first,
+            // What unification added when the product was created.
+            specs: { ...first.specs, tubeless: true },
+          },
+        } as unknown as ProductSourceRecord;
+      };
+
+      it('reuses the stored extraction without a call when nothing it reads has changed', async () => {
+        const ownRecord = await storedRecord();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing({ offers: [{ price: 2, externalId: 'sku-43' }] }),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+        expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'reused');
+        expect(result).toMatchObject({
+          model: 'Macina Scarp SX Prestige Di2',
+          nameCleaned: true,
+          specs: expect.objectContaining({ modelYear: 2026, tubeless: true }),
+          // Today's price, the stored listing-level specs.
+          offers: [{ price: 2, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
+        });
+      });
+
+      // speedbike's deterministic mapping fills one field, so both spec
+      // hashes can stay equal while the title and spec table change.
+      it('extracts again when the title changed, though the deterministic hashes did not', async () => {
+        const ownRecord = await storedRecord();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing({ originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '27 OLIVE" }),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+        // Unification does not re-run for a source that already contributed,
+        // so its fields on this record are kept.
+        expect(result.specs).toMatchObject({ tubeless: true, modelYear: 2026 });
+      });
+
+      it('extracts again when a deterministic hash changed', async () => {
+        const ownRecord = await storedRecord();
+
+        await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing({ productSpecsHash: 'changed' }),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+      });
+
+      it('never reuses under force', async () => {
+        const ownRecord = await storedRecord();
+
+        await service.extractIdentity({
+          context: context({}, true),
+          scrapedProduct: listing(),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('unify', () => {
+    const extracted = async () =>
+      service.extractIdentity({ context: context(), scrapedProduct: listing() });
+
+    it('fills every other schema field, with the identity values as context and the golden sample as example', async () => {
+      await service.unify({
+        context: context(),
+        scrapedProduct: await extracted(),
+        trigger: 'created',
+      });
+
+      expect(postProcess.processModelSpecs).toHaveBeenCalledWith({
+        data: {
+          brand: 'KTM',
+          model: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
+          specs: { forkTravel: 150 },
+        },
+        knownSpecs: {
+          batteryCapacity: 750,
+          color: 'Olíva',
+          frameSize: 43,
+          modelYear: 2026,
+          weight: 24,
+        },
+        // The whole table: unification reads every row, not just the identity ones.
+        rawSpecs,
+        description: 'Könnyű, strapabíró.',
+        schema,
+        outputKeys: ['forkTravel', 'tubeless'],
+        goldenSample: golden,
+        model: undefined,
+        thinking: undefined,
+        effort: undefined,
+        maxTokens: undefined,
+      });
+      expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'created', 'ok');
+    });
+
+    it('extends the listing\'s specs, never overwriting an identity value', async () => {
+      postProcess.processModelSpecs.mockResolvedValueOnce({
+        specs: { tubeless: true, modelYear: 1999 },
+      });
+
+      const result = await service.unify({
+        context: context(),
+        scrapedProduct: await extracted(),
+        trigger: 'new_source',
+      });
+
+      expect(result.specs).toMatchObject({ tubeless: true, modelYear: 2026 });
+    });
+
+    it('leaves the listing as it was when the call fails', async () => {
+      postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
+      const before = await extracted();
+
+      const result = await service.unify({
+        context: context(),
+        scrapedProduct: before,
+        trigger: 'new_source',
+      });
+
+      expect(result).toBe(before);
+      expect(metrics.specUnification).toHaveBeenCalledWith(
+        'speedbike-arukereso',
+        'new_source',
+        'failed',
+      );
+    });
+
+    it('withholds the description from a source that opted out', async () => {
+      await service.unify({
+        context: context({ postProcess: { includeDescriptionInModelSpecs: false } }),
+        scrapedProduct: await extracted(),
+        trigger: 'created',
+      });
+
+      expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
         expect.objectContaining({ description: undefined }),
       );
-      expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'Marketing blurb' }),
-      );
     });
 
-    it('forwards description to offer-identity when includeDescriptionInOfferIdentity is true', async () => {
-      const testCase = buildCase({
-        enabled: true,
-        includeDescriptionInOfferIdentity: true,
+    it('makes no call for a source that turned post-processing off', async () => {
+      await service.unify({
+        context: context({ postProcess: { enabled: false } }),
+        scrapedProduct: listing(),
+        trigger: 'created',
       });
 
-      await callResolve(testCase, { description: 'Marketing blurb' });
-
-      expect(postProcess.processOfferIdentity).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'Marketing blurb' }),
-      );
-    });
-
-    it('withholds description from model-spec when includeDescriptionInModelSpecs is false', async () => {
-      const testCase = buildCase({
-        enabled: true,
-        includeDescriptionInModelSpecs: false,
-      });
-
-      await callResolve(testCase, { description: 'Marketing blurb' });
-
-      expect(postProcess.processModelSpecs).toHaveBeenCalledWith(
-        expect.objectContaining({ description: undefined }),
-      );
-    });
-  });
-
-  it('reuses offer-level specs from the existing offer instead of calling processOfferIdentity on a same-record hit', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-
-    await callResolve(testCase, {
-      offerIdentitySameRecordHit: true,
-      existingOfferForSpecs: { specs: { frameSize: 48, color: 'Olíva' } },
-      offerLevelKeys: ['frameSize', 'color'],
-    });
-
-    expect(postProcess.processOfferIdentity).not.toHaveBeenCalled();
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(
-      data,
-      { specs: { frameSize: 48, color: 'Olíva' } },
-      undefined,
-    );
-  });
-
-  it('reuses product-level specs from existingSource instead of calling processModelSpecs on a same-record productSpecsHash hit', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-
-    await callResolve(testCase, {
-      existingSource: {
-        productSpecsHash,
-        scrapedProduct: { productLevelDeterministicSpecs },
-      },
-    });
-
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).not.toHaveBeenCalled();
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(
-      data,
-      undefined,
-      { specs: productLevelDeterministicSpecs },
-    );
-  });
-
-  it('reuses product-level specs from a sibling source record when no same-record hit exists', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-    sourceRecordRepo.findBySourceAndProductSpecsHash.mockResolvedValueOnce({
-      id: 'sibling-source-id',
-      url: 'https://speedbike.hu/product/1-blue',
-      lastUpdated: new Date('2026-01-01'),
-      scrapedProduct: { productLevelDeterministicSpecs },
-    });
-
-    await callResolve(testCase);
-
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).toHaveBeenCalledWith(
-      'source-1',
-      productSpecsHash,
-    );
-    expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
-    expect(postProcessMerge.merge).toHaveBeenCalledWith(
-      data,
-      undefined,
-      { specs: productLevelDeterministicSpecs },
-    );
-  });
-
-  it('falls through to processModelSpecs when a sibling is found but its productLevelDeterministicSpecs is undefined', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcess.processModelSpecs.mockResolvedValueOnce({ specs: { weight: 22 } });
-    postProcessMerge.merge.mockReturnValueOnce(data);
-    sourceRecordRepo.findBySourceAndProductSpecsHash.mockResolvedValueOnce({
-      id: 'sibling-source-id',
-      scrapedProduct: undefined,
-    });
-
-    await callResolve(testCase);
-
-    expect(postProcess.processModelSpecs).toHaveBeenCalled();
-  });
-
-  it('skips the sibling lookup entirely and always calls both LLM methods when force is set', async () => {
-    const testCase = buildCase({ enabled: true }, true);
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-
-    await callResolve(testCase, {
-      existingSource: { productSpecsHash, scrapedProduct: { productLevelDeterministicSpecs } },
-    });
-
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).toHaveBeenCalled();
-  });
-
-  it('skips the sibling lookup when productLevelDeterministicSpecs is below the minimum-key threshold', async () => {
-    const testCase = buildCase({ enabled: true });
-    categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-    postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-    postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-    postProcessMerge.merge.mockReturnValueOnce(data);
-
-    await callResolve(testCase, {
-      productLevelDeterministicSpecs: { weight: 22 }, // only 1 key, below MIN_PRODUCT_SPEC_KEYS_FOR_SIBLING_REUSE
-    });
-
-    expect(sourceRecordRepo.findBySourceAndProductSpecsHash).not.toHaveBeenCalled();
-    expect(postProcess.processModelSpecs).toHaveBeenCalled();
-  });
-
-  describe('logging', () => {
-    let logger: { debug: jest.Mock };
-
-    beforeEach(() => {
-      logger = { debug: jest.fn() };
-      (service as any).logger = logger;
-    });
-
-    it('logs when the offer-identity call actually runs, with the offer-level key count', async () => {
-      const testCase = buildCase({ enabled: true });
-      categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-      postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-      postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-      postProcessMerge.merge.mockReturnValueOnce(data);
-
-      await callResolve(testCase, { offerLevelDeterministicSpecs: { frameSize: 43 } });
-
-      expect(logger.debug).toHaveBeenCalledWith(
-        'Running offer-identity LLM call',
-        expect.objectContaining({ taskId: 'task-1', url: testCase.context.url, offerLevelKeyCount: 1 }),
-      );
-    });
-
-    it('logs when the model-spec call actually runs, with the product-level key count', async () => {
-      const testCase = buildCase({ enabled: true });
-      categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-      postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-      postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
-      postProcessMerge.merge.mockReturnValueOnce(data);
-
-      await callResolve(testCase);
-
-      expect(logger.debug).toHaveBeenCalledWith(
-        'Running model-spec LLM call',
-        expect.objectContaining({
-          taskId: 'task-1',
-          url: testCase.context.url,
-          productSpecsHash,
-          productLevelKeyCount: Object.keys(productLevelDeterministicSpecs).length,
-        }),
-      );
-    });
-
-    it('logs a sibling hit with the sibling identifying fields', async () => {
-      const testCase = buildCase({ enabled: true });
-      categoryConfigService.getGoldenSample.mockReturnValueOnce({ weight: 22 });
-      postProcess.processOfferIdentity.mockResolvedValueOnce(undefined);
-      postProcessMerge.merge.mockReturnValueOnce(data);
-      const siblingLastUpdated = new Date('2026-01-01');
-      sourceRecordRepo.findBySourceAndProductSpecsHash.mockResolvedValueOnce({
-        id: 'sibling-source-id',
-        url: 'https://speedbike.hu/product/1-blue',
-        lastUpdated: siblingLastUpdated,
-        scrapedProduct: { productLevelDeterministicSpecs },
-      });
-
-      await callResolve(testCase);
-
-      expect(logger.debug).toHaveBeenCalledWith(
-        'Product specs match a sibling source record, reusing its unified model-level specs',
-        expect.objectContaining({
-          taskId: 'task-1',
-          url: testCase.context.url,
-          productSpecsHash,
-          siblingSourceId: 'sibling-source-id',
-          siblingUrl: 'https://speedbike.hu/product/1-blue',
-          siblingLastUpdated,
-        }),
+      expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+      expect(metrics.specUnification).toHaveBeenCalledWith(
+        'speedbike-arukereso',
+        'created',
+        'disabled',
       );
     });
   });
 });
-

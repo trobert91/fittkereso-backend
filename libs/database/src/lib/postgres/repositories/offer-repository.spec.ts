@@ -107,6 +107,33 @@ describe('OfferRepository.upsertFromScrape', () => {
     expect(result.availability).toBe(OfferAvailability.out_of_stock);
   });
 
+  it('persists the identifiers it is given', async () => {
+    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
+
+    const result = await repository.upsertFromScrape(
+      makeParams({ gtin: '09008594503199', mpn: '1260040108' }),
+    );
+
+    expect(result.gtin).toBe('09008594503199');
+    expect(result.mpn).toBe('1260040108');
+  });
+
+  // Identifiers are looked up across shops, so one a source has stopped
+  // publishing must not linger on the offer and keep matching.
+  it('clears identifiers an existing offer had when the source no longer publishes them', async () => {
+    const existing = new Offer();
+    existing.id = 'offer-1';
+    existing.condition = OfferCondition.new;
+    existing.gtin = '09008594503199';
+    existing.mpn = '1260040108';
+    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
+
+    const result = await repository.upsertFromScrape(makeParams({ existing }));
+
+    expect(result.gtin).toBeNull();
+    expect(result.mpn).toBeNull();
+  });
+
   // The cross-source adoption path, and the reason it stopped being rare:
   // offers are preloaded per SOURCE, so a second source importing a listing the
   // first already owns cannot see that row, conflicts on insert, and lands
@@ -126,7 +153,7 @@ describe('OfferRepository.upsertFromScrape', () => {
     mockRepo.save.mockImplementationOnce(async (offer: Offer) => offer);
 
     const result = await repository.upsertFromScrape(
-      makeParams({ locations: ['Törökbálint'] }),
+      makeParams({ locations: ['Törökbálint'], gtin: '09008594503199', mpn: '1260040108' }),
     );
 
     expect(mockRepo.findOne).toHaveBeenCalledWith({
@@ -137,6 +164,8 @@ describe('OfferRepository.upsertFromScrape', () => {
     expect(result).toBe(owner);
     expect(result.price).toBe(199990);
     expect(result.locations).toEqual(['Törökbálint']);
+    expect(result.gtin).toBe('09008594503199');
+    expect(result.mpn).toBe('1260040108');
   });
 
   // Both silent options are wrong: assigning `model` relocates a listing
@@ -265,5 +294,46 @@ describe('OfferRepository.findFirstBySellerAndExternalIdsWithModelRelations', ()
         'model.mainImage',
       ],
     });
+  });
+});
+
+describe('OfferRepository identifier lookups', () => {
+  let mockRepo: { find: jest.Mock };
+  let repository: OfferRepository;
+
+  beforeEach(() => {
+    mockRepo = { find: jest.fn().mockResolvedValue([]) };
+    repository = Object.create(OfferRepository.prototype);
+    (repository as unknown as { repo: unknown }).repo = mockRepo;
+  });
+
+  it('finds the products behind a GTIN at any seller', async () => {
+    mockRepo.find.mockResolvedValue([
+      { id: 'o1', gtin: '09008594503199', model: { id: 'model-1' } },
+    ]);
+
+    expect(await repository.findModelIdsByGtins(['09008594503199'])).toEqual([
+      { modelId: 'model-1', gtin: '09008594503199' },
+    ]);
+    // No seller in the filter: a GTIN is the same at every shop.
+    expect(mockRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gtin: expect.anything() } }),
+    );
+  });
+
+  it('only finds MPNs within one brand', async () => {
+    await repository.findModelIdsByMpns('brand-ktm', ['1260040108']);
+
+    expect(mockRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { mpn: expect.anything(), model: { brand: { id: 'brand-ktm' } } },
+      }),
+    );
+  });
+
+  it('does not query for an empty list', async () => {
+    expect(await repository.findModelIdsByGtins([])).toEqual([]);
+    expect(await repository.findModelIdsByMpns('brand-ktm', [])).toEqual([]);
+    expect(mockRepo.find).not.toHaveBeenCalled();
   });
 });

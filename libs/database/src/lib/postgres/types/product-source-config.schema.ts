@@ -176,6 +176,22 @@ const filterSchema: JsonSchemaFragment = {
   additionalProperties: false,
 };
 
+const identityExtractionSchema: JsonSchemaFragment = {
+  type: 'object',
+  description:
+    "What the LLM identity extraction reads from this source's listings. Per source because it is about the shop's labels; the fields the extraction outputs are category config.",
+  properties: {
+    specRows: {
+      type: 'array',
+      minItems: 1,
+      items: { type: 'string' },
+      description:
+        'Allowlist of spec-table row labels sent to the identity extraction: the rows carrying frame, motor, battery, wheel, drivetrain, weight or year. Matched ignoring case (as specMapping labels are) and stray whitespace, but not accents. Omit to send the whole table, which suits a shop whose table is already short. Full spec unification always gets the whole table.',
+    },
+  },
+  additionalProperties: false,
+};
+
 /**
  * The LLM post-processing block, shared by both config shapes.
  *
@@ -213,12 +229,12 @@ const postProcessConfigSchema: JsonSchemaFragment = {
     includeDescriptionInOfferIdentity: {
       type: 'boolean',
       description:
-        'Whether the extracted description reaches the offer-identity call. Defaults to false — that call reconciles brand/model/size/colour, which a marketing blurb rarely states better than the title.',
+        'Whether the extracted description reaches the identity extraction (the per-listing call reading the name, size, colour, year and other identity fields). Defaults to false — a marketing blurb rarely states those better than the title and spec table.',
     },
     includeDescriptionInModelSpecs: {
       type: 'boolean',
       description:
-        'Whether the extracted description reaches the model-spec call. Defaults to true. Set false for a source whose description is pure sales copy.',
+        'Whether the extracted description reaches full spec unification (the once-per-product call filling every non-identity field). Defaults to true. Set false for a source whose description is pure sales copy.',
     },
   },
   additionalProperties: false,
@@ -268,6 +284,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     ),
     maxItems: maxItemsSchema,
     filter: filterSchema,
+    identityExtraction: identityExtractionSchema,
 
     categories: {
       type: 'object',
@@ -387,6 +404,9 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
         releaseYear: pipelineRef('Pipeline producing the model year.'),
         externalId: pipelineRef(
           'Pipeline producing the source-native listing id (SKU, model code, slug) — stable across URL changes. May be a group-level id shared by variant siblings.',
+        ),
+        siblingIds: pipelineRef(
+          "Optional. Pipeline producing the ids of this product's other sizes, as the shop itself declares them (e.g. a frame-size variation list), in the same id space as externalId. May include this page's own id. Identity resolution looks them up within this source only, so every size the shop groups lands on one product. Configure it only from a list the shop declares — groupings inferred from shared images or article-number prefixes put different bikes together.",
         ),
         images: pipelineRef('Pipeline producing image URLs.'),
         specMapping: {
@@ -607,6 +627,7 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
 
     maxItems: maxItemsSchema,
     filter: filterSchema,
+    identityExtraction: identityExtractionSchema,
 
     categories: {
       type: 'object',

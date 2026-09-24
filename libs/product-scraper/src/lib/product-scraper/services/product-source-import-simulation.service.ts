@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import {
+  ArukeresoFieldMapping,
+  ArukeresoMappingTarget,
   asArukeresoConfig,
   asScrapingConfig,
   OfferAvailability,
@@ -9,15 +11,31 @@ import {
   ProductSourceType,
   ScrapedListProduct,
   ScrapedProduct,
+  ScrapedProductSpec,
   ScrapeTask,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { NativeScraperService, ScraperService } from '@fittkereso-backend/scraper';
 import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
-import { normalizeUrl } from '@fittkereso-backend/utils';
+import {
+  GtinOutcome,
+  inspectGtin,
+  normalizeMpn,
+  normalizeUrl,
+} from '@fittkereso-backend/utils';
+import { selectIdentitySpecRows } from '@fittkereso-backend/product';
 import { ScrapingImportService } from './scraping-import.service';
 import { ListProductRefreshService } from './list-product-refresh.service';
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
+import {
+  ArukeresoFeedItem,
+  feedField,
+} from '../../arukereso/arukereso-feed-item';
+import {
+  previewListingIdentifiers,
+  SimulatedListingIdentifiers,
+} from './identifier-preview';
+import { SpecPostProcessService } from './spec-post-process.service';
 import {
   ArukeresoProductMapperService,
   FeedSkipReason,
@@ -65,8 +83,45 @@ export interface SimulatedArukeresoImport {
   distinctExternalIds: number;
   duplicateExternalIds: { externalId: string; count: number }[];
   itemsWithoutExternalId: number;
-  /** Fully mapped previews — the only part that costs LLM calls. */
+  /** Fully mapped previews, identity extraction included — the only part that costs LLM calls. */
   products: ScrapedProduct[];
+  /** Per preview, aligned with `products`: what identity resolution would look up. */
+  productIdentifiers: SimulatedListingIdentifiers[];
+  /** Across every eligible item, not just the previews — free either way. */
+  identifiers: SimulatedFeedIdentifiers;
+}
+
+/** How a feed's identifiers would fare, counted over every eligible item. */
+export interface SimulatedFeedIdentifiers {
+  gtinMapped: boolean;
+  gtin: Record<GtinOutcome, number>;
+  /**
+   * Invalid GTINs per brand. A shop that fills its barcode field with its own
+   * article stubs usually does it for a few brands (speedbike: GIANT and LIV),
+   * which is what tells a data quirk apart from a mapping pointing at the
+   * wrong field.
+   */
+  invalidGtinByBrand: Record<string, number>;
+  invalidGtinSamples: string[];
+  mpnMapped: boolean;
+  mpn: Record<GtinOutcome, number>;
+  specRows: SimulatedSpecRowCoverage;
+}
+
+/** What identityExtraction.specRows lets through, over every eligible item. */
+export interface SimulatedSpecRowCoverage {
+  /** False when the source lists no rows, and every listing sends its whole table. */
+  configured: boolean;
+  listings: number;
+  /** Listings that would send the extraction no spec row at all. */
+  listingsWithNoRowSent: number;
+  meanRowsSent: number;
+  meanRowsTotal: number;
+  /**
+   * Per configured label, how many listings it matched on. A label matching
+   * nothing is either a typo or a row the shop has stopped publishing.
+   */
+  byLabel: { label: string; listings: number }[];
 }
 
 export interface ProductSourceImportSimulationResult {
@@ -110,6 +165,7 @@ export class ProductSourceImportSimulationService {
     private readonly feedParser: ArukeresoFeedParserService,
     private readonly mapper: ArukeresoProductMapperService,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly specPostProcess: SpecPostProcessService,
   ) {}
 
   public async simulate(
@@ -285,6 +341,11 @@ export class ProductSourceImportSimulationService {
     const products: ScrapedProduct[] = [];
     let wouldImport = 0;
     let itemsWithoutExternalId = 0;
+    const productIdentifiers: SimulatedListingIdentifiers[] = [];
+    const identifiers = new FeedIdentifierTally(
+      config.mapping,
+      config.identityExtraction?.specRows,
+    );
 
     const summary = await this.feedParser.parseStream(
       stream,
@@ -312,14 +373,39 @@ export class ProductSourceImportSimulationService {
         if (!externalId) itemsWithoutExternalId += 1;
         else externalIds.set(externalId, (externalIds.get(externalId) ?? 0) + 1);
 
+        identifiers.add({
+          brand: await this.previewTarget(config, item, 'brand'),
+          gtin: await this.previewTarget(config, item, 'gtin'),
+          mpn: await this.previewTarget(config, item, 'mpn'),
+          rawSpecs: toRawSpecs(item),
+        });
+
         if (products.length < limit) {
           const mapped = await this.mapper.map({
-            source,
             config,
             item,
             requestedSlugs: options.categorySlugs,
           });
-          if (mapped.status === 'mapped') products.push(mapped.scrapedProduct);
+          if (mapped.status === 'mapped') {
+            // The mapping itself is free; the preview then runs the identity
+            // extraction a first import would, which is the part that costs.
+            // `force` rules out reusing a stored result.
+            const extracted = await this.specPostProcess.extractIdentity({
+              context: { source, url: mapped.url, force: true },
+              scrapedProduct: mapped.scrapedProduct,
+            });
+            products.push(extracted);
+            const offer = extracted.offers?.[0];
+            productIdentifiers.push(
+              previewListingIdentifiers({
+                externalId: offer?.externalId,
+                gtin: offer?.gtin,
+                mpn: offer?.mpn,
+                rawSpecs: toRawSpecs(item),
+                specRows: config.identityExtraction?.specRows,
+              }),
+            );
+          }
         }
       },
       {
@@ -350,6 +436,20 @@ export class ProductSourceImportSimulationService {
         'No item survives the category gate — check category.labelFrom, category.slugLookup and categories.<slug>.enabled.',
       );
     }
+    const identifierSummary = identifiers.summary();
+    if (
+      identifierSummary.gtinMapped &&
+      identifierSummary.gtin.invalid > identifierSummary.gtin.valid
+    ) {
+      result.warnings.push(
+        `More GTINs are invalid (${identifierSummary.gtin.invalid}) than valid (${identifierSummary.gtin.valid}). Invalid ones are dropped rather than matched on, but this many usually means mapping.gtin points at a field that is not a barcode.`,
+      );
+    }
+    if (identifierSummary.specRows.listingsWithNoRowSent > 0) {
+      result.warnings.push(
+        `${identifierSummary.specRows.listingsWithNoRowSent} eligible items match none of identityExtraction.specRows, so their identity extraction would see the title alone. Check the labels against the feed's attribute names.`,
+      );
+    }
     if (itemsWithoutExternalId > 0) {
       result.warnings.push(
         `${itemsWithoutExternalId} eligible items carry no externalId and would fall back to the URL slug.`,
@@ -375,6 +475,8 @@ export class ProductSourceImportSimulationService {
       duplicateExternalIds: duplicateExternalIds.slice(0, 10),
       itemsWithoutExternalId,
       products,
+      productIdentifiers,
+      identifiers: identifierSummary,
     };
   }
 
@@ -388,12 +490,19 @@ export class ProductSourceImportSimulationService {
     config: Parameters<ArukeresoProductMapperService['classify']>[0],
     item: Parameters<ArukeresoProductMapperService['classify']>[1],
   ): Promise<string | undefined> {
-    const mapping = config.mapping['externalId'];
+    return this.previewTarget(config, item, 'externalId');
+  }
+
+  /** One mapping target's value, resolved the way the mapper resolves it. */
+  private async previewTarget(
+    config: Parameters<ArukeresoProductMapperService['classify']>[0],
+    item: Parameters<ArukeresoProductMapperService['classify']>[1],
+    target: ArukeresoMappingTarget,
+  ): Promise<string | undefined> {
+    const mapping = config.mapping[target];
     if (!mapping) return undefined;
 
-    const raw = mapping.field
-      ? item.fields[mapping.field.toLowerCase().replace(/[_\-\s]/g, '')]
-      : undefined;
+    const raw = mapping.field ? feedField(item, mapping.field) : undefined;
 
     const value = mapping.pipeline?.length
       ? await this.interpreter.runValuePipeline(mapping.pipeline, raw, {
@@ -403,5 +512,86 @@ export class ProductSourceImportSimulationService {
 
     const text = value === undefined || value === null ? '' : String(value).trim();
     return text === '' ? undefined : text;
+  }
+}
+
+/** A feed item's attribute pairs as spec rows — the table the mapper extracts from. */
+function toRawSpecs(item: ArukeresoFeedItem): ScrapedProductSpec[] {
+  return item.attributes.map((attribute) => ({
+    name: attribute.name,
+    values: [attribute.value],
+  }));
+}
+
+/** Running counts behind SimulatedFeedIdentifiers. */
+class FeedIdentifierTally {
+  private readonly gtin: Record<GtinOutcome, number> = { valid: 0, invalid: 0, absent: 0 };
+  private readonly mpn: Record<GtinOutcome, number> = { valid: 0, invalid: 0, absent: 0 };
+  private readonly invalidGtinByBrand: Record<string, number> = {};
+  private readonly invalidGtinSamples: string[] = [];
+  private readonly labelHits: Map<string, number>;
+  private listings = 0;
+  private listingsWithNoRowSent = 0;
+  private rowsSent = 0;
+  private rowsTotal = 0;
+
+  constructor(
+    private readonly mapping: Record<string, ArukeresoFieldMapping>,
+    private readonly specRows: string[] | undefined,
+  ) {
+    this.labelHits = new Map((specRows ?? []).map((label) => [label, 0]));
+  }
+
+  add(item: {
+    brand?: string;
+    gtin?: string;
+    mpn?: string;
+    rawSpecs: ScrapedProductSpec[];
+  }): void {
+    this.listings += 1;
+
+    const { outcome } = inspectGtin(item.gtin);
+    this.gtin[outcome] += 1;
+    if (outcome === 'invalid') {
+      const brand = item.brand ?? '(no brand)';
+      this.invalidGtinByBrand[brand] = (this.invalidGtinByBrand[brand] ?? 0) + 1;
+      if (this.invalidGtinSamples.length < 5) {
+        this.invalidGtinSamples.push(String(item.gtin));
+      }
+    }
+
+    this.mpn[normalizeMpn(item.mpn) ? 'valid' : item.mpn ? 'invalid' : 'absent'] += 1;
+
+    const sent = selectIdentitySpecRows(item.rawSpecs, this.specRows);
+    this.rowsSent += sent.length;
+    this.rowsTotal += item.rawSpecs.length;
+    if (sent.length === 0) this.listingsWithNoRowSent += 1;
+
+    for (const label of this.labelHits.keys()) {
+      if (selectIdentitySpecRows(item.rawSpecs, [label]).length > 0) {
+        this.labelHits.set(label, (this.labelHits.get(label) ?? 0) + 1);
+      }
+    }
+  }
+
+  summary(): SimulatedFeedIdentifiers {
+    const mean = (sum: number) =>
+      this.listings ? Math.round((sum / this.listings) * 10) / 10 : 0;
+    return {
+      gtinMapped: !!this.mapping['gtin'],
+      gtin: this.gtin,
+      invalidGtinByBrand: this.invalidGtinByBrand,
+      invalidGtinSamples: this.invalidGtinSamples,
+      mpnMapped: !!this.mapping['mpn'],
+      mpn: this.mpn,
+      specRows: {
+        configured: !!this.specRows?.length,
+        listings: this.listings,
+        listingsWithNoRowSent: this.listingsWithNoRowSent,
+        meanRowsSent: mean(this.rowsSent),
+        meanRowsTotal: mean(this.rowsTotal),
+        byLabel: [...this.labelHits].map(([label, listings]) => ({ label, listings })),
+      },
+    };
   }
 }

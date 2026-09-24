@@ -782,6 +782,12 @@ const OP_PARAMS: Record<
       availability: pipeline('Sub-pipeline producing the availability.'),
       url: pipeline('Sub-pipeline producing the offer URL.'),
       externalId: pipeline('Sub-pipeline producing the source-native offer id.'),
+      gtin: pipeline(
+        "Sub-pipeline producing the offer's barcode (EAN/UPC/GTIN) as published. Validated and normalized when stored — an invalid value is dropped, never matched on.",
+      ),
+      mpn: pipeline(
+        "Sub-pipeline producing the manufacturer's article number for this size. Only the manufacturer's own code matches across shops; a shop's private SKU scheme does not.",
+      ),
       locations: pipeline(
         'Sub-pipeline producing store/warehouse names where this offer is physically available. Most sources have no per-location breakdown — resolve to undefined, not [].',
       ),

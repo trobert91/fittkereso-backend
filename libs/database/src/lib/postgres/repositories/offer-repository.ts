@@ -26,6 +26,11 @@ export interface UpsertOfferFromScrapeParams {
   availability?: OfferAvailability;
   url?: string;
   externalId?: string;
+  /** Already normalized (normalizeGtin/normalizeMpn) — this layer stores what
+   *  it is given. Absent is written as null, so a source that stops
+   *  publishing one clears it rather than leaving a stale key to match on. */
+  gtin?: string;
+  mpn?: string;
   /** Store/warehouse names where this offer is physically available —
    *  always optional, absence is normal and must never block the upsert. */
   locations?: string[];
@@ -68,6 +73,8 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       availability,
       url,
       externalId,
+      gtin,
+      mpn,
       locations,
       specs,
     } = params;
@@ -86,6 +93,8 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     offer.availability = availability ?? null;
     offer.url = url;
     offer.externalId = externalId;
+    offer.gtin = gtin ?? null;
+    offer.mpn = mpn ?? null;
     offer.locations = locations;
     offer.lastSynced = new Date();
     offer.active = true;
@@ -139,6 +148,8 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
           // correct for price and freshness, meaningless as attribution. Do not
           // read `sourceRecord` on a shared offer as "the source that owns it".
           owner.sourceRecord = sourceRecord;
+          owner.gtin = gtin ?? null;
+          owner.mpn = mpn ?? null;
           owner.locations = locations;
           owner.lastSynced = new Date();
           owner.active = true;
@@ -230,6 +241,48 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
         ...modelRelations.map((r) => `${nameOf<Offer>('model')}.${r}`),
       ],
     });
+  }
+
+  /**
+   * Which products have an offer carrying one of these GTINs, at any seller.
+   *
+   * Across sellers on purpose: a GTIN names one sellable item everywhere, so
+   * this is how one shop's listing finds the product another shop's listing
+   * already created. Pass normalized values (normalizeGtin).
+   */
+  async findModelIdsByGtins(
+    gtins: string[],
+  ): Promise<{ modelId: string; gtin: string }[]> {
+    if (gtins.length === 0) return [];
+    const offers = await this.repo.find({
+      where: { gtin: In(gtins) },
+      relations: { model: true },
+      select: { id: true, gtin: true, model: { id: true } },
+    });
+    return offers.flatMap((offer) =>
+      offer.gtin ? [{ modelId: offer.model.id, gtin: offer.gtin }] : [],
+    );
+  }
+
+  /**
+   * Which of this brand's products have an offer carrying one of these MPNs.
+   *
+   * Brand-scoped because an article number is only unique within its
+   * manufacturer's own numbering. Pass normalized values (normalizeMpn).
+   */
+  async findModelIdsByMpns(
+    brandId: string,
+    mpns: string[],
+  ): Promise<{ modelId: string; mpn: string }[]> {
+    if (mpns.length === 0) return [];
+    const offers = await this.repo.find({
+      where: { mpn: In(mpns), model: { brand: { id: brandId } } },
+      relations: { model: true },
+      select: { id: true, mpn: true, model: { id: true } },
+    });
+    return offers.flatMap((offer) =>
+      offer.mpn ? [{ modelId: offer.model.id, mpn: offer.mpn }] : [],
+    );
   }
 
   // Drives ProductModel.price/priceWithoutDiscount denormalization — the

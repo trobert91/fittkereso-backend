@@ -50,6 +50,26 @@ export class ProductSearchParams {
   @IsString()
   id?: string;
 
+  /**
+   * A barcode: the products with an offer carrying it, from any shop, active
+   * or not. Normalized the way an imported one is (normalizeGtin), so an EAN-13
+   * and its zero-padded GTIN-14 find the same product. A value that is not a
+   * valid GTIN finds nothing.
+   */
+  @IsOptional()
+  @IsString()
+  gtin?: string;
+
+  /**
+   * The start of a manufacturer article number: the products with an offer
+   * whose MPN begins with it. Normalized the way an imported one is
+   * (normalizeMpn: case, spaces and hyphens dropped), so under 5 characters
+   * it finds nothing.
+   */
+  @IsOptional()
+  @IsString()
+  mpn?: string;
+
   @IsOptional()
   @IsNumber()
   @Min(1)

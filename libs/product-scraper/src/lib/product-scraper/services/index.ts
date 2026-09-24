@@ -9,3 +9,4 @@ export * from './spec-post-process.service';
 export * from './deterministic-specs';
 export * from './product-source-import-simulation.service';
 export * from './source-item-filter';
+export * from './identifier-preview';

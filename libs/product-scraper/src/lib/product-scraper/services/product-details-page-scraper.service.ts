@@ -1,8 +1,5 @@
 import {
   OfferAvailability,
-  ProductSourceRecord,
-  ProductSourceRecordRepository,
-  ProductSpecs,
   ScrapeQueueName,
   ScrapeTask,
   SourceSpecConfig,
@@ -19,7 +16,6 @@ import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { normalizeUrl } from '@fittkereso-backend/utils';
 import {
-  DeterministicProductData,
   ProductSourceImage,
   ScrapedOffer,
   ScrapedProduct,
@@ -27,7 +23,6 @@ import {
   SpecExtractionService,
   SpecTranslationSelectorService,
 } from '@fittkereso-backend/product';
-import { SpecPostProcessService } from './spec-post-process.service';
 import { splitDeterministicSpecs } from './deterministic-specs';
 import {
   DetailPageResult,
@@ -38,12 +33,11 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
-import { omit, pick, uniqBy } from 'lodash';
+import { uniqBy } from 'lodash';
 import ms from 'ms';
 
 interface ExtractedPage {
   scrapedProduct: ScrapedProduct;
-  offerLevelSpecs: ProductSpecs;
   offerLinks: DetailPageResult['offerLinks'];
 }
 
@@ -61,10 +55,8 @@ export class ProductDetailsPageScraperService {
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly specExtraction: SpecExtractionService,
-    private readonly specPostProcess: SpecPostProcessService,
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
-    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly scrapeTaskPublisher: ScrapeTaskPublisherService,
   ) {}
 
@@ -266,8 +258,8 @@ export class ProductDetailsPageScraperService {
 
     // `detail.model` is only required to be present, not already clean — some
     // sources (e.g. speedbike.hu) only expose the full marketing title as
-    // their "model" field; maybePostProcess below cleans it via the LLM when
-    // configured. Brand stays a hard requirement: every source's brand field
+    // their "model" field; the updater's identity extraction cleans it via
+    // the LLM when configured. Brand stays a hard requirement: every source's brand field
     // observed so far is a clean, reliable value, unlike model/title.
     if (!detail.brand || !detail.model) {
       this.logger.warn(
@@ -324,113 +316,18 @@ export class ProductDetailsPageScraperService {
       productSpecsHash,
     } = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
 
-    const existingSource = await this.findExistingSource(task, detail.externalId);
-
-    // No fresh specs extracted for whichever half is unchanged, so
-    // offer-level keys (e.g. frameSize) must come from somewhere other than
-    // existingSource.scrapedProduct.specs — that field structurally never
-    // carries them (they're omit()'d before being persisted there; see
-    // pageOfferLevelSpecs/strippedSpecs below). The only place they still
-    // live across scrapes is the previously-persisted Offer row(s) on this
-    // same record, so read them back from there instead — otherwise a
-    // re-scrape hitting the offer-identity skip would overwrite each offer's
-    // specs with {}, silently wiping out frameSize/color on every subsequent
-    // scrape after the first.
-    const existingOfferForSpecs =
-      existingSource?.offers?.find((o) => o.externalId === detail.externalId) ??
-      existingSource?.offers?.[0];
-
-    const offerIdentitySameRecordHit =
-      !task.force && existingSource?.offerSpecsHash === offerSpecsHash;
-    const productSpecsSameRecordHit =
-      !task.force && existingSource?.productSpecsHash === productSpecsHash;
-
-    if (offerIdentitySameRecordHit) {
-      this.logger.debug(
-        'Offer specs unchanged since last scrape, skipping offer-identity call',
-        { taskId: task.id, url: task.url, externalId: detail.externalId, offerSpecsHash },
-      );
-      this.scrapingMetrics.recordExtractionSkipReason(
-        task.source.name,
-        'offer_specs_unchanged',
-      );
-    }
-    if (productSpecsSameRecordHit) {
-      this.logger.debug(
-        'Product specs unchanged since last scrape, skipping model-spec call',
-        { taskId: task.id, url: task.url, externalId: detail.externalId, productSpecsHash },
-      );
-      this.scrapingMetrics.recordExtractionSkipReason(
-        task.source.name,
-        'product_specs_unchanged',
-      );
-    }
-
-    // Both halves unchanged — full skip, same shape as the old single-hash
-    // fast path: no fresh LLM work at all, reuse the persisted model name
-    // and this record's own offer-level specs.
-    if (offerIdentitySameRecordHit && productSpecsSameRecordHit) {
-      const model = existingSource!.model?.model ?? detail.model;
-      const existingPageOfferLevelSpecs = pick(
-        existingOfferForSpecs?.specs,
-        offerLevelKeys,
-      );
-      return {
-        scrapedProduct: {
-          brand: detail.brand,
-          model,
-          displayName: `${detail.brand} ${model}`.trim(),
-          originalName: detail.model,
-          category,
-          aliases: detail.aliases,
-          externalId: detail.externalId,
-          images: this.toScrapedImages(detail.imageUrls),
-          offers: this.toScrapedOffers(detail.rawOffers, existingPageOfferLevelSpecs),
-        },
-        offerLevelSpecs: existingPageOfferLevelSpecs,
-        offerLinks: detail.offerLinks,
-      };
-    }
-
-    const deterministicData: DeterministicProductData = {
-      brand: detail.brand,
-      model: detail.model,
-      specs: deterministicSpecs,
-    };
-
-    const { brand, model, specs } = await this.specPostProcess.resolve({
-      context: contextFromTask(task),
-      config: config.detailPage.postProcess,
-      data: deterministicData,
-      offerLevelDeterministicSpecs,
-      productLevelDeterministicSpecs,
-      rawSpecs: detail.rawSpecs,
-      description: detail.description,
-      productSpecsHash,
-      jsonSchema,
-      categorySlug: category.slug,
-      offerIdentitySameRecordHit,
-      existingSource: existingSource ?? undefined,
-      existingOfferForSpecs,
-      offerLevelKeys,
-    });
-
-    // Offer-level keys (e.g. frameSize) never reach the shared
-    // ProductModel/ProductSourceRecord.specs — they vary between the very
-    // offers a single ProductModel groups together, so they have no single
-    // correct value at the model level. The pre-strip value is what each
-    // offer's own specs is picked from instead — see toScrapedOffers below.
-    const pageOfferLevelSpecs = pick(specs, offerLevelKeys);
-    const strippedSpecs = omit(specs, offerLevelKeys);
-
+    // Deterministic data only. Whether this listing needs an LLM call at all
+    // depends on whether it was seen before, which only identity resolution
+    // knows — so the updater makes that call (SpecPostProcessService), and
+    // this importer never spends one.
     return {
       scrapedProduct: {
-        brand,
-        model,
-        displayName: `${brand} ${model}`.trim(),
+        brand: detail.brand,
+        model: detail.model,
+        displayName: `${detail.brand} ${detail.model}`.trim(),
         originalName: detail.model,
         category,
-        specs: strippedSpecs,
+        specs: productLevelDeterministicSpecs,
         extractedSpecs: deterministicSpecs,
         offerLevelDeterministicSpecs,
         productLevelDeterministicSpecs,
@@ -439,50 +336,23 @@ export class ProductDetailsPageScraperService {
         rawSpecs: detail.rawSpecs,
         description: detail.description,
         externalId: detail.externalId,
+        siblingExternalIds: detail.siblingIds,
         aliases: detail.aliases,
         images: this.toScrapedImages(detail.imageUrls),
-        offers: this.toScrapedOffers(detail.rawOffers, pageOfferLevelSpecs),
+        offers: this.toScrapedOffers(detail.rawOffers),
       },
-      offerLevelSpecs: pageOfferLevelSpecs,
       offerLinks: detail.offerLinks,
     };
-  }
-
-  /**
-   * Identity lookup ahead of full resolution — prefers the source-native
-   * externalId (stable across URL changes) via a dedicated repository query;
-   * falls back to a URL lookup when the source has no externalId pipeline
-   * configured. `ScrapeTask.product` is loaded without its `sources`
-   * relation at this point (see ScrapeTaskRepository), so this always does a
-   * fresh lookup rather than relying on task.product.sources being populated.
-   */
-  private async findExistingSource(
-    task: ScrapeTask,
-    externalId: string | undefined,
-  ): Promise<ProductSourceRecord | null> {
-    if (externalId) {
-      return this.sourceRecordRepo.findBySourceAndExternalId(
-        task.source.id,
-        externalId,
-      );
-    }
-    return this.sourceRecordRepo.findBySourceAndUrl(
-      task.source.id,
-      normalizeUrl(task.url),
-    );
   }
 
   // RawOfferRecord's fields are all optional (interpreter output before
   // validation); ScrapedOffer requires price, so entries missing it are
   // dropped here rather than persisted as broken Offer rows.
-  // Each offer's own specs (from an assembleOffer op's per-item `specs`
-  // sub-pipelines, e.g. frameSize varying per variant) take priority; the
-  // page-level offerLevelSpecs is the fallback for offers with none of
-  // their own — the ordinary single-offer-per-page case.
-  private toScrapedOffers(
-    rawOffers: RawOfferRecord[],
-    pageOfferLevelSpecs: ProductSpecs,
-  ): ScrapedOffer[] {
+  // Only an offer's OWN specs are set here (an assembleOffer op's per-item
+  // `specs` sub-pipelines, e.g. frameSize varying per variant). Every other
+  // offer gets the page's listing-level values once the identity extraction
+  // has produced them — see SpecPostProcessService.
+  private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
     return rawOffers
       .filter(
         (offer): offer is RawOfferRecord & { price: number } =>
@@ -495,8 +365,10 @@ export class ProductDetailsPageScraperService {
         availability: this.parseAvailability(offer.availability),
         url: offer.url ? normalizeUrl(offer.url) : offer.url,
         externalId: offer.externalId,
+        gtin: offer.gtin,
+        mpn: offer.mpn,
         locations: offer.locations,
-        specs: offer.specs ?? pageOfferLevelSpecs,
+        specs: offer.specs,
       }));
   }
 

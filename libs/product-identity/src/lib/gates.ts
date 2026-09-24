@@ -38,6 +38,23 @@ export function applyGates(input: GateInput): FailedGate[] {
   ]);
 }
 
+/**
+ * Only the primary-spec gates: the contradictions that make two things
+ * different products however their names compare. For a candidate an
+ * identifier already found — the names are not in question there, and the
+ * model-number gate would read a size written into one shop's title ("L/48")
+ * as a different model.
+ */
+export function primarySpecMismatches(
+  input: Omit<GateInput, 'queryKey' | 'candidateKey'>,
+): FailedGate[] {
+  return compact(
+    uniq(input.categoryConfig?.primarySpecs ?? []).map((key) =>
+      specGate('primarySpecMismatch', key, input),
+    ),
+  );
+}
+
 /** A base score minus every failed gate's severity, kept within 1–100. */
 export function scoreOf(baseScore: number, failedGates: FailedGate[]): number {
   return clamp(baseScore - sumBy(failedGates, (gate) => gate.severity), 1, 100);
@@ -60,7 +77,11 @@ function isPresent(value: ProductSpecs[string]): value is SpecValue {
 function specGate(
   gate: IdentityGate,
   key: string,
-  { querySpecs, candidateSpecs, categoryConfig }: GateInput,
+  {
+    querySpecs,
+    candidateSpecs,
+    categoryConfig,
+  }: Omit<GateInput, 'queryKey' | 'candidateKey'>,
 ): FailedGate | undefined {
   const queryValue = querySpecs?.[key];
   const candidateValue = candidateSpecs?.[key];

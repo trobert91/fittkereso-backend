@@ -93,23 +93,48 @@ export interface ProductSourcePostProcessConfig {
   maxTokens?: number;
   /**
    * Whether `detailPage.description` (when the source configures it) is
-   * forwarded to the offer-identity call. Defaults to false — that call
-   * reconciles brand/model/offer-level fields (size, color) from rawModel,
-   * and a marketing blurb is unlikely to state those more precisely than the
-   * title already does, so most sources gain nothing from paying to send it.
-   * Enable per-source if a listing's title omits a color/size that its
-   * description does state clearly.
+   * forwarded to the identity extraction. Defaults to false — that call reads
+   * the name and identity fields from the title and the selected spec rows,
+   * and a marketing blurb is unlikely to state those more precisely, so most
+   * sources gain nothing from paying to send it. Enable per-source if a
+   * listing's title omits a color/size/year that its description does state
+   * clearly. (The name predates the identity extraction, and is kept so
+   * stored configs keep validating.)
    */
   includeDescriptionInOfferIdentity?: boolean;
   /**
    * Whether `detailPage.description` (when the source configures it) is
-   * forwarded to the model-spec call. Defaults to true, matching this call's
+   * forwarded to full spec unification (formerly the model-spec call). Defaults to true, matching this call's
    * original behavior before the toggle existed — every source that
    * configures a description has historically had it reach this call
    * unconditionally. Set false for a source whose description is pure sales
    * copy with no reliable spec content, to skip the extra input tokens.
    */
   includeDescriptionInModelSpecs?: boolean;
+}
+
+/**
+ * What the LLM identity extraction reads from this source's listings.
+ *
+ * Per source rather than per category because it is about the SHOP's labels,
+ * not the product's fields: every shop names its spec rows differently, but
+ * one shop names them the same way on every listing. The fields the extraction
+ * OUTPUTS stay category config (primarySpecs, matcherSpecs, offerLevelSpecs).
+ */
+export interface ProductSourceIdentityExtractionConfig {
+  /**
+   * Allowlist of spec-table row labels sent to the identity extraction — the
+   * rows that carry a primary, matcher or offer-level spec (frame, motor,
+   * battery, wheels, drivetrain, weight, year). Matched ignoring case, as
+   * specMapping labels are, and ignoring stray whitespace — but not accents.
+   *
+   * Omit to send the whole table, which suits a shop whose table is already
+   * short. A long free-text component list (speedbike's ~32 rows) is worth
+   * narrowing: the other rows are brake pads and bar tape, which cost tokens
+   * and cannot change a bike's identity. Full spec unification always gets
+   * the whole table regardless.
+   */
+  specRows?: string[];
 }
 
 export interface ProductSourceDetailPageConfig {
@@ -140,6 +165,18 @@ export interface ProductSourceDetailPageConfig {
   // across variant siblings (e.g. ShopRenter's parent.sku) when the source
   // exposes one — see offerLinks below.
   externalId?: ScrapeOperation[];
+  /**
+   * The ids of this product's other sizes, as the shop itself declares them —
+   * e.g. ebikeshop's frame-size variation list. Must yield ids in the same
+   * space as `externalId`; may include this page's own. Becomes
+   * ScrapedProduct.siblingExternalIds, which identity resolution looks up
+   * within this source only, so every size a shop groups lands on one product.
+   *
+   * Configure it only from a list the SHOP declares. Groupings inferred from
+   * shared images or article-number prefixes were measured to put different
+   * bikes together.
+   */
+  siblingIds?: ScrapeOperation[];
   images: ScrapeOperation[];
   // Keyed by category slug — replaces the old per-category specMappings.json
   // file (which was keyed by source instead, now implicit in "which
@@ -197,6 +234,7 @@ export interface ScrapingSourceConfig {
   maxItems?: number;
   /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
   filter?: ProductSourceFilterConfig;
+  identityExtraction?: ProductSourceIdentityExtractionConfig;
   listPage: ProductSourceListPageConfig;
   detailPage: ProductSourceDetailPageConfig;
 }
@@ -288,6 +326,18 @@ export const ARUKERESO_MAPPING_TARGETS = [
   'categoryLabel',
   'aliases',
   'releaseYear',
+  /**
+   * The offer's barcode (EAN/UPC/GTIN), as published. Validated and
+   * normalized when stored on Offer.gtin — an invalid value is dropped there,
+   * so mapping a field that is only sometimes a real barcode is safe.
+   */
+  'gtin',
+  /**
+   * The manufacturer's article number for this size. Only map a field that
+   * carries the MANUFACTURER's code: a shop's own SKU scheme matches nothing
+   * at other shops. Strip shop-specific decoration in the pipeline.
+   */
+  'mpn',
 ] as const;
 
 export type ArukeresoMappingTarget = (typeof ARUKERESO_MAPPING_TARGETS)[number];
@@ -354,6 +404,8 @@ export interface ArukeresoSourceConfig {
   maxItems?: number;
   /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
   filter?: ProductSourceFilterConfig;
+  /** The feed's attribute pairs are its spec table — see ProductSourceIdentityExtractionConfig. */
+  identityExtraction?: ProductSourceIdentityExtractionConfig;
   mapping: Record<string, ArukeresoFieldMapping>;
   /** Keyed by category slug, exactly as detailPage.specMapping is. */
   specMapping?: Record<string, SourceSpecConfig>;

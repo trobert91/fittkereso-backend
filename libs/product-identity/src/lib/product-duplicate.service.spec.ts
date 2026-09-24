@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ProductDuplicateService } from './product-duplicate.service';
+import type { DuplicatePairRow } from '@fittkereso-backend/database';
 import type { ProductCandidate } from './types';
 
 const PRODUCT_ID = '11111111-1111-1111-1111-111111111111';
@@ -28,6 +29,7 @@ describe('ProductDuplicateService', () => {
   let queryService: { ofProduct: jest.Mock };
   let finder: { findCandidates: jest.Mock };
   let mergeService: { mergeProducts: jest.Mock };
+  let keyLookup: { storedPairRows: jest.Mock };
   let service: ProductDuplicateService;
 
   beforeEach(() => {
@@ -46,12 +48,14 @@ describe('ProductDuplicateService', () => {
         movedSourceRecordIds: ['record-1'],
       }),
     };
+    keyLookup = { storedPairRows: jest.fn().mockResolvedValue([]) };
     service = new ProductDuplicateService(
       productRepo as never,
       pairRepo as never,
       queryService as never,
       finder as never,
       mergeService as never,
+      keyLookup as never,
     );
   });
 
@@ -80,6 +84,44 @@ describe('ProductDuplicateService', () => {
 
       await expect(service.detect(PRODUCT_ID, 'scrape')).resolves.toBe(0);
       expect(pairRepo.upsertPairs).not.toHaveBeenCalled();
+    });
+
+    // A complete scan deletes the open pairs it didn't re-find, and names
+    // alone would not re-find a pair raised by a shared GTIN.
+    describe('identifier pairs', () => {
+      const identifierRow: DuplicatePairRow = {
+        productAId: PRODUCT_ID,
+        productBId: OTHER_ID,
+        similarityScore: 100,
+        matchedOn: 'gtin',
+        matchedValue: '09008594503199',
+        failedGates: [],
+        nameSimilarity: null,
+        detectedBy: 'scan',
+      };
+
+      it('writes a pair for every product sharing an identifier, with no name candidate', async () => {
+        keyLookup.storedPairRows.mockResolvedValue([identifierRow]);
+
+        await service.detect(PRODUCT_ID, 'scan');
+
+        expect(keyLookup.storedPairRows).toHaveBeenCalledWith(
+          expect.objectContaining({ id: PRODUCT_ID }),
+          'scan',
+        );
+        expect(pairRepo.upsertPairs).toHaveBeenCalledWith([identifierRow]);
+      });
+
+      // upsertPairs keeps the first of equal scores, so the order is the rule.
+      it('puts the identifier ahead of a name that found the same pair', async () => {
+        keyLookup.storedPairRows.mockResolvedValue([identifierRow]);
+        finder.findCandidates.mockResolvedValue([candidateOf(OTHER_ID, 100)]);
+
+        await service.detect(PRODUCT_ID, 'scan');
+
+        const [rows] = pairRepo.upsertPairs.mock.calls[0];
+        expect(rows.map((row: DuplicatePairRow) => row.matchedOn)).toEqual(['gtin', 'name']);
+      });
     });
 
     it('does nothing for a product that no longer exists', async () => {
