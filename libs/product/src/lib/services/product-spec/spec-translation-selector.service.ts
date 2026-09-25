@@ -34,10 +34,13 @@ export class SpecTranslationSelectorService {
    *     parsed from the raw string directly, translation adds nothing
    *   - Values covered by the mapping's `valueMap` — those are resolved
    *     deterministically at extract time and bypass translation entirely
+   *   - Specs mapped onto `untranslatedKeys` (getVerbatimSpecKeys), which
+   *     keep the source's own words
    */
   public collectTranslatableValues(
     extractedSpecs: ScrapedProductSpec[],
     sourceConfig: SourceSpecConfig | undefined,
+    untranslatedKeys: string[] = [],
   ): string[] {
     if (!sourceConfig) return [];
 
@@ -45,6 +48,7 @@ export class SpecTranslationSelectorService {
     for (const mapping of sourceConfig.mappings) {
       if (mapping.extract && NUMERIC_EXTRACT_MODES.has(mapping.extract))
         continue;
+      if (untranslatedKeys.includes(mapping.key)) continue;
       for (const label of mapping.labels) {
         mappingsByLabel.set(label.toLowerCase(), mapping);
       }

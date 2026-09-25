@@ -1,4 +1,7 @@
-import { ProductSpecs } from '@fittkereso-backend/database';
+import {
+  ProductSpecs,
+  SpecDefinitionJsonSchema,
+} from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { isEmpty, omit, pick } from 'lodash';
 
@@ -27,6 +30,24 @@ export function getOfferLevelSpecs(
 ): ProductSpecs {
   const offerLevelKeys = getOfferLevelKeys(categoryConfigService, categorySlug);
   return isEmpty(offerLevelKeys) ? {} : pick(specs, offerLevelKeys);
+}
+
+/**
+ * The offer-level keys whose values are the shop's own name for the variant it
+ * sells — free text, such as a colour ("BLACK/TITAN", "Olive Pearl"). Shops and
+ * manufacturers use these names as marketing terms, so they are kept exactly
+ * as the source writes them and never translated, by the mapping's translator
+ * or by the LLM. Numbers and fixed-list fields are left out: a number is
+ * parsed, and a fixed-list value has to be mapped onto the list.
+ */
+export function getVerbatimSpecKeys(
+  schema: SpecDefinitionJsonSchema,
+  offerLevelKeys: string[],
+): string[] {
+  return offerLevelKeys.filter((key) => {
+    const property = schema.properties[key];
+    return property?.type === 'string' && !property.enum?.length;
+  });
 }
 
 function getOfferLevelKeys(

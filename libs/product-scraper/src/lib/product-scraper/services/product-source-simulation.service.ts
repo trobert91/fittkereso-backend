@@ -16,6 +16,7 @@ import {
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
+  getVerbatimSpecKeys,
 } from '@fittkereso-backend/product';
 import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
@@ -213,11 +214,15 @@ export class ProductSourceSimulationService {
       );
     }
 
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
+    const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
     const translator = await this.buildTranslator(
       config,
       detail.rawSpecs,
       sourceConfig,
       category.name,
+      untranslatedKeys,
     );
 
     const deterministicSpecs = sourceConfig
@@ -226,6 +231,7 @@ export class ProductSourceSimulationService {
           schema: jsonSchema,
           sourceConfig,
           translator,
+          untranslatedKeys,
         })
       : {};
     // Mirrors ProductDetailsPageScraperService: detailPage.releaseYear is a
@@ -235,8 +241,6 @@ export class ProductSourceSimulationService {
       deterministicSpecs['modelYear'] = detail.releaseYear;
     }
 
-    const offerLevelKeys =
-      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
     const split = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
     // The same deterministic listing ProductDetailsPageScraperService hands
     // the updater.
@@ -348,13 +352,18 @@ export class ProductSourceSimulationService {
     rawSpecs: ScrapedProductSpec[],
     sourceConfig: SourceSpecConfig | undefined,
     categoryName: string,
+    untranslatedKeys: string[],
   ) {
     const translationConfig = config.detailPage.translation;
     if (!translationConfig?.enabled) {
       return undefined;
     }
 
-    const rawValues = this.translationSelector.collectTranslatableValues(rawSpecs, sourceConfig);
+    const rawValues = this.translationSelector.collectTranslatableValues(
+      rawSpecs,
+      sourceConfig,
+      untranslatedKeys,
+    );
     if (rawValues.length === 0) {
       return undefined;
     }

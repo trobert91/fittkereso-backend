@@ -8,6 +8,7 @@ import type {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { isEmpty, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
+import { getVerbatimSpecKeys } from './product-level-specs';
 
 /**
  * gpt-6-luna since 2026-09-23, replacing gpt-5.6-luna (itself swapped in from
@@ -376,12 +377,29 @@ export class ProductSourcePostProcessService {
       .join('\n');
   }
 
-  private buildTranslationPreamble(schema: SpecDefinitionJsonSchema): string {
-    return `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below. For string spec VALUES: translate genuine descriptive/category words into Hungarian (e.g. "black" -> "fekete", "front suspension" -> "első felfüggesztés"). Do NOT translate or otherwise alter proper nouns, brand/component/part names, or model-style designations embedded in a value (e.g. "KTM aluminium 34T Direct Mount", "Shimano Deore", "FOX Transfer") — copy these verbatim, character-for-character, including spelling, casing, and any words that happen to look like an untranslated Hungarian/English/German term. Never "correct" the spelling of a value copied from the source — if unsure whether a token is a translatable word or a proper noun/part name, leave it exactly as given rather than guessing.`;
+  /**
+   * `verbatimTitles`: the fields whose values are never translated (see
+   * getVerbatimSpecKeys). Only the identity extraction fills them, so only it
+   * passes any.
+   */
+  private buildTranslationPreamble(
+    schema: SpecDefinitionJsonSchema,
+    verbatimTitles: string[] = [],
+  ): string {
+    const verbatimException = verbatimTitles.length
+      ? ` Values of ${verbatimTitles.join(', ')} are the exception: they name the exact variant a shop sells, usually by a marketing name, so they are copied exactly as the source writes them and never translated.`
+      : '';
+    return `You are normalizing product data for the "${schema.title}" category into a fixed canonical shape. The target audience is Hungarian — canonical spec field NAMES stay in English exactly as given below. For string spec VALUES: translate genuine descriptive/category words into Hungarian (e.g. "front suspension" -> "első felfüggesztés", "hydraulic disc brake" -> "hidraulikus tárcsafék").${verbatimException} Do NOT translate or otherwise alter proper nouns, brand/component/part names, or model-style designations embedded in a value (e.g. "KTM aluminium 34T Direct Mount", "Shimano Deore", "FOX Transfer") — copy these verbatim, character-for-character, including spelling, casing, and any words that happen to look like an untranslated Hungarian/English/German term. Never "correct" the spelling of a value copied from the source — if unsure whether a token is a translatable word or a proper noun/part name, leave it exactly as given rather than guessing.`;
   }
 
   private buildAllowedValuesRule(): string {
     return `- For a spec field with "allowed values" listed above: if the source gives a value for that field, you MUST translate/normalize it to one of those exact Hungarian strings (never invent a new label, never leave it untranslated) — but only when the source value genuinely describes that field's own concept. A source value describing a *different* concept (e.g. a riding-discipline/category term like "All Mountain" when the field asks for frame geometry, or a gendered variant like "Cross férfi" when a category-only enum value like "Cross Trekking" fits better) must be routed to whichever field it actually matches, or dropped if no field fits — never force it into an enum value it doesn't really mean just because the field has no other value to offer. If nothing in the input specifically describes what the field is asking about, omit the key.\n`;
+  }
+
+  private titlesOf(schema: SpecDefinitionJsonSchema, keys: string[]): string[] {
+    return keys
+      .map((key) => schema.properties[key]?.title)
+      .filter((title): title is string => Boolean(title));
   }
 
   // ─── Identity extraction prompt/schema ──────────────────────────────────
@@ -393,16 +411,20 @@ export class ProductSourcePostProcessService {
   ): string {
     const fieldDescriptions = this.buildFieldDescriptions(schema, outputKeys);
 
-    const offerLevelTitles = offerLevelSpecs
-      .filter((key) => outputKeys.includes(key))
-      .map((key) => schema.properties[key]?.title)
-      .filter((title): title is string => Boolean(title));
+    const offerLevelKeys = offerLevelSpecs.filter((key) =>
+      outputKeys.includes(key),
+    );
+    const offerLevelTitles = this.titlesOf(schema, offerLevelKeys);
     const offerLevelList = offerLevelTitles.join(', ');
-    const colorNamingHint = outputKeys.includes('color')
-      ? ` Manufacturers often give a color a stylized marketing name instead of a plain color word (e.g. "Space Galaxy Matt", "Olive Pearl") — sometimes followed by a literal breakdown in parentheses right after it (e.g. "Space Galaxy Matt (Grey+Black)"). Treat the stylized name together with any such parenthetical as one "color" value — never leave the stylized name in "model" while dropping the parenthetical, and never leave either part unextracted just because it isn't a plain color word.`
+    const verbatimTitles = this.titlesOf(
+      schema,
+      getVerbatimSpecKeys(schema, offerLevelKeys),
+    );
+    const verbatimHint = verbatimTitles.length
+      ? ` Copy a value of ${verbatimTitles.join(', ')} exactly as the source writes it — its words, language, spelling and casing — and never translate it, not even a plain word: a title's "BLACK" stays "BLACK", never "fekete". Such a value is often a stylized marketing name rather than a plain word (e.g. "Space Galaxy Matt", "Olive Pearl"), sometimes followed by a literal breakdown in parentheses right after it (e.g. "Space Galaxy Matt (Grey+Black)"). Treat the name together with any such parenthetical as one value — never leave the name in "model" while dropping the parenthetical, and never leave either part unextracted just because it isn't a plain word.`
       : '';
     const offerLevelRule = offerLevelTitles.length
-      ? `- Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title rather than the spec table (e.g. a size code like "M/43" or a color name), and must be extracted from there if present.${colorNamingHint}\n`
+      ? `- Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title rather than the spec table (e.g. a size code like "M/43" or a color name), and must be extracted from there if present.${verbatimHint}\n`
       : '';
     const offerLevelModelHint = offerLevelTitles.length
       ? ` ${offerLevelList} describe this specific listing (this exact size, this exact color), not the product model, so they must never remain in "model" once extracted.`
@@ -414,7 +436,7 @@ export class ProductSourcePostProcessService {
       : '';
 
     return (
-      `${this.buildTranslationPreamble(schema)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
+      `${this.buildTranslationPreamble(schema, verbatimTitles)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
       `Canonical spec fields — the ones that tell this product apart from similar ones, plus the ones that describe this specific listing:\n${fieldDescriptions}\n\n` +
       `The user message has the already-known "brand", "rawModel" (the source's raw, uncleaned product title), "deterministicSpecs" (values a label-matching pass already mapped onto the canonical fields above) and, when available, "rawSpecs" — rows from the source's spec table, label/value exactly as scraped, sometimes grouped under a "section", sometimes carrying a per-row free-text "description". Return "brand", "model" and "specs", each only as far as you can confidently produce it — omit anything rather than guessing.\n\n` +
       `Field-specific guidance:\n` +

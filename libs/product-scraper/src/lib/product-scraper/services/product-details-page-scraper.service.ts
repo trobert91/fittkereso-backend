@@ -20,6 +20,7 @@ import {
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
+  getVerbatimSpecKeys,
 } from '@fittkereso-backend/product';
 import { splitDeterministicSpecs } from './deterministic-specs';
 import { toScrapedOffers } from './scraped-offers';
@@ -283,6 +284,7 @@ export class ProductDetailsPageScraperService {
       this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ??
       [];
     const sourceConfig = config.detailPage.specMapping[category.slug];
+    const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
 
     // Deterministic mapping runs unconditionally and unconditionally cheap
     // (no LLM) — its output is the canonical object both hashes and both
@@ -292,6 +294,7 @@ export class ProductDetailsPageScraperService {
       detail.rawSpecs,
       sourceConfig,
       category.name,
+      untranslatedKeys,
     );
     const deterministicSpecs = sourceConfig
       ? this.specExtraction.extractSpecs({
@@ -299,6 +302,7 @@ export class ProductDetailsPageScraperService {
           schema: jsonSchema,
           sourceConfig,
           translator,
+          untranslatedKeys,
         })
       : {};
     // detailPage.releaseYear is a dedicated deterministic scrape-op some
@@ -363,6 +367,7 @@ export class ProductDetailsPageScraperService {
     rawSpecs: ScrapedProductSpec[],
     sourceConfig: SourceSpecConfig | undefined,
     categoryName: string,
+    untranslatedKeys: string[],
   ) {
     const translationConfig = asScrapingConfig(
       task.source.config,
@@ -375,6 +380,7 @@ export class ProductDetailsPageScraperService {
     const rawValues = this.translationSelector.collectTranslatableValues(
       rawSpecs,
       sourceConfig,
+      untranslatedKeys,
     );
     if (rawValues.length === 0) {
       return undefined;

@@ -84,11 +84,9 @@
       "meta": {
         "examples": [
           "Olive Pearl",
-          "Fekete",
-          "Fehér",
-          "Piros",
-          "Kék",
-          "Zöld"
+          "Space Galaxy Matt (Grey+Black)",
+          "BLACK/TITAN",
+          "fekete"
         ]
       },
       "type": "string",

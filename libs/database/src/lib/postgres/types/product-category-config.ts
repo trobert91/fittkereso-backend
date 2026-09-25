@@ -154,7 +154,9 @@ export interface ProductCategoryConfig {
    *  listings of the same model in different sizes/colors match to one
    *  ProductModel with multiple Offer rows instead of each variant tripping
    *  the model-level spec gates in `libs/product-identity`. Always optional per-listing — absence of a value is normal, not
-   *  an error. */
+   *  an error. A free-text one (a string field with no enum, e.g. color) is the
+   *  shop's own name for the variant, so it is kept exactly as the source
+   *  writes it and never translated (getVerbatimSpecKeys in libs/product). */
   offerLevelSpecs?: string[];
   /** Ordered subset of spec keys (must exist in the category's
    *  jsonSchema.json) to surface on the storefront list/card view, where

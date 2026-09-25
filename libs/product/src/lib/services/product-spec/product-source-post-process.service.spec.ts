@@ -738,6 +738,51 @@ describe('ProductSourcePostProcessService', () => {
       });
     });
 
+    describe('variant names', () => {
+      const schemaWithVariants: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'Phone',
+        properties: {
+          storage: { type: 'number', title: 'Storage', meta: { unit: 'GB' } },
+          finish: { type: 'string', title: 'Finish' },
+          sizeLabel: { type: 'string', title: 'Size label', enum: ['S', 'M', 'L'] },
+          weight: { type: 'number', title: 'Weight', meta: { unit: 'kg' } },
+        },
+      };
+
+      it("keeps the category's free-text offer-level values as the source writes them", async () => {
+        aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'Acme', model: 'raw title', specs: {} },
+          schema: schemaWithVariants,
+          outputKeys: ['storage', 'finish', 'sizeLabel', 'weight'],
+          offerLevelSpecs: ['storage', 'finish', 'sizeLabel'],
+        });
+
+        const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+        expect(systemPrompt).toContain('Values of Finish are the exception');
+        expect(systemPrompt).toContain('Copy a value of Finish exactly as the source writes it');
+        // A number is parsed, and a fixed-list value is mapped onto the list.
+        expect(systemPrompt).not.toMatch(/(Values|value) of [^.]*(Storage|Size label)/);
+      });
+
+      it('names none when no offer-level field is free text', async () => {
+        aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'Acme', model: 'raw title', specs: {} },
+          schema: schemaWithVariants,
+          outputKeys: ['storage', 'finish', 'sizeLabel', 'weight'],
+          offerLevelSpecs: ['storage', 'sizeLabel'],
+        });
+
+        const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+        expect(systemPrompt).not.toContain('are the exception');
+        expect(systemPrompt).not.toContain('Copy a value of');
+      });
+    });
+
     describe('the model year', () => {
       const schemaWithYear: SpecDefinitionJsonSchema = {
         type: 'object',

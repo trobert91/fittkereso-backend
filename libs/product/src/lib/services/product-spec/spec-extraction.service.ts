@@ -23,6 +23,8 @@ export class SpecExtractionService {
     schema: SpecDefinitionJsonSchema;
     sourceConfig: SourceSpecConfig;
     translator?: SpecValueTranslator;
+    /** Keys whose values are kept as the source writes them (getVerbatimSpecKeys). */
+    untranslatedKeys?: string[];
   }): ProductSpecs {
     const { scrapedSpecs, schema, sourceConfig, translator } = params;
     if (!scrapedSpecs) return {};
@@ -31,6 +33,7 @@ export class SpecExtractionService {
       scrapedSpecs,
       sourceConfig.mappings,
       translator,
+      new Set(params.untranslatedKeys ?? []),
     );
 
     const calculated = this.evaluateCalculated(
@@ -50,7 +53,8 @@ export class SpecExtractionService {
   private mapFromConfig(
     specs: ScrapedProductSpec[],
     mappings: SourceSpecMapping[],
-    translator?: SpecValueTranslator,
+    translator: SpecValueTranslator | undefined,
+    untranslatedKeys: ReadonlySet<string>,
   ): ProductSpecs {
     const result: ProductSpecs = {};
 
@@ -75,7 +79,9 @@ export class SpecExtractionService {
       const translated =
         remapped !== undefined
           ? remapped
-          : this.translateValue(rawValue, translator);
+          : untranslatedKeys.has(mapping.key)
+            ? rawValue
+            : this.translateValue(rawValue, translator);
       const trimmed = this.applyTrimSuffixes(translated, mapping.trimSuffixes);
       const replaced = this.applyReplacePatterns(
         trimmed,

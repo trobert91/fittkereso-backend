@@ -194,6 +194,32 @@ describe('SpecExtractionService', () => {
       expect(translator).toHaveBeenCalledWith('Valami új típus');
     });
 
+    it('keeps the source words of an untranslated key while translating the rest', () => {
+      const scrapedSpecs: ScrapedProductSpec[] = [
+        { name: 'Típus', values: ['Valami új típus'] },
+        { name: 'Felbontás', values: ['Fekete Gyöngyház'] },
+      ];
+      const sourceConfig: SourceSpecConfig = {
+        mappings: [
+          { key: 'type', labels: ['Típus'] },
+          { key: 'resolution', labels: ['Felbontás'] },
+        ],
+      };
+      const translator = jest.fn(() => 'Translated');
+
+      const result = service.extractSpecs({
+        scrapedSpecs,
+        schema,
+        sourceConfig,
+        translator,
+        untranslatedKeys: ['resolution'],
+      });
+
+      expect(result['type']).toBe('Translated');
+      expect(result['resolution']).toBe('Fekete Gyöngyház');
+      expect(translator).not.toHaveBeenCalledWith('Fekete Gyöngyház');
+    });
+
     it('should not apply valueMap when mapping does not define one', () => {
       const scrapedSpecs: ScrapedProductSpec[] = [
         { name: 'Típus', values: ['Fülhallgató'] },
