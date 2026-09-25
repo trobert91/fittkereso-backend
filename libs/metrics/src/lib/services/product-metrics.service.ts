@@ -52,7 +52,13 @@ export type ScrapeResolutionOutcome =
    *  to attach, so a new product was created. Distinct from nothing being
    *  close enough to be worth asking, which costs no call at all — this
    *  measures how often scoring leaves the LLM undecided. */
-  | 'llm_declined';
+  | 'llm_declined'
+  /** A source that does not identify products joined its seller's existing
+   *  offer, by externalId, with no identity work. */
+  | 'contributed'
+  /** A source that does not identify products found no offer of its seller
+   *  to join: its listing waits unattached until one is written. */
+  | 'unattached';
 
 /**
  * How two things came to claim one offer identity.

@@ -4,10 +4,24 @@ import {
   ProductSourceType,
   ScrapingSourceConfig,
   ProductSourceConfigValidatorService,
+  SourceSpecMapping,
+  SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
+import {
+  ProductSpecNormalizationService,
+  SpecExtractionService,
+} from '@fittkereso-backend/product';
+import { pick } from 'lodash';
 import ebikeshopConfig from './ebikeshop.config.json';
 import speedbikeConfig from './speedbike.config.json';
 import speedbikeArukeresoConfig from './speedbike-arukereso.config.json';
+import speedbikeGoogleshopConfig from './speedbike-googleshop.config.json';
+// The size specs are read against the category's real, current schema, as
+// speedbike-detail-page.spec.ts does, for the same reason.
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import ebikesJsonSchema from '../../../../../config/src/lib/categories/ebikes/jsonSchema.json';
+
+const SIZE_KEYS = ['frameSize', 'frameSizeLabel'];
 
 // Schema validation of the hand-authored production configs — not a live-site
 // test, but it catches typos in op names, missing or misspelled op
@@ -134,6 +148,7 @@ describe('hand-authored source configs', () => {
     ['ebikeshop', ebikeshopConfig],
     ['speedbike', speedbikeConfig],
     ['speedbike-arukereso', speedbikeArukeresoConfig],
+    ['speedbike-googleshop', speedbikeGoogleshopConfig],
   ])('%s is capped at 10 items — REMOVE BEFORE A REAL RUN', (_name, config) => {
     expect((config as { maxItems?: number }).maxItems).toBe(10);
   });
@@ -195,12 +210,48 @@ describe('hand-authored source configs', () => {
 
     // The feed's attribute_name values are the same labels the shop's own spec
     // table uses, which is what makes a feed source cheap to add for a shop
-    // that was already scraped.
-    it('reuses the scraping source spec mappings unchanged', () => {
-      expect(config.specMapping?.['ebikes']).toEqual(
-        (speedbikeConfig as unknown as ScrapingSourceConfig).detailPage
-          .specMapping['ebikes'],
+    // that was already scraped. The size is the one addition: a page shows it
+    // in its size selector rather than its spec table, while the feed carries
+    // it as a `Méret` (or `size`) attribute on about half of its e-bike rows.
+    it('reuses the scraping source spec mappings, plus the frame size', () => {
+      const scraping = (speedbikeConfig as unknown as ScrapingSourceConfig)
+        .detailPage.specMapping['ebikes'];
+      const feed = config.specMapping?.['ebikes'];
+      const isSize = (mapping: SourceSpecMapping) => SIZE_KEYS.includes(mapping.key);
+
+      expect({ ...feed, mappings: feed?.mappings.filter((m) => !isSize(m)) }).toEqual(
+        scraping,
       );
+      expect(feed?.mappings.filter(isSize).map((m) => m.key)).toEqual(SIZE_KEYS);
+    });
+
+    // The distinct shapes of the 2026-09-24 feed's size values: centimetres
+    // are the frame size, a trailing letter the label, and a kids' bike's
+    // "ONE SIZE" wheel sizes are neither — read as a number, 24" would pass
+    // for a 24 cm frame.
+    it.each([
+      ['Méret', 'M', { frameSizeLabel: 'M' }],
+      ['Méret', 'XXL', { frameSizeLabel: 'XXL' }],
+      ['Méret', 'Easy Entry L', { frameSizeLabel: 'L' }],
+      ['Méret', 'Trapeze XL', { frameSizeLabel: 'XL' }],
+      ['Méret', '54 cm', { frameSize: 54 }],
+      ['Méret', 'Easy Entry 46 cm', { frameSize: 46 }],
+      ['Méret', 'Trapeze 50 cm', { frameSize: 50 }],
+      ['size', '62 cm', { frameSize: 62 }],
+      ['Méret', '24" / 20": ONE SIZE', {}],
+      ['Méret', '26": ONE SIZE', {}],
+    ])('reads the %s attribute %j', (name, value, expected) => {
+      const ebikes = config.specMapping?.['ebikes'];
+      if (!ebikes) throw new Error('The fixture has no ebikes specMapping');
+      const specs = new SpecExtractionService(
+        new ProductSpecNormalizationService(),
+      ).extractSpecs({
+        scrapedSpecs: [{ name, values: [value] }],
+        schema: ebikesJsonSchema as unknown as SpecDefinitionJsonSchema,
+        sourceConfig: ebikes,
+      });
+
+      expect(pick(specs, SIZE_KEYS)).toEqual(expected);
     });
 
     it('resolves the breadcrumb path to the same category rule the scraper uses', () => {
@@ -222,6 +273,44 @@ describe('hand-authored source configs', () => {
           { op: 'mapValue', cases: { NO: 'out_of_stock' }, default: 'in_stock' },
         ],
       });
+    });
+  });
+
+  // Speedbike's Google Shopping feed: only a contributor to the Árukereső
+  // source's offers, for the old price and the descriptions that feed lacks.
+  describe("speedbike's Google Shopping feed config", () => {
+    const config = speedbikeGoogleshopConfig as unknown as ArukeresoSourceConfig;
+    const arukereso = speedbikeArukeresoConfig as unknown as ArukeresoSourceConfig;
+    const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
+
+    it('validates against the feed config schema', () => {
+      assertConfigValid(config, 'speedbike-googleshop', 'googleshop');
+    });
+
+    // Its `id` equals the Árukereső `identifier` on every row, which is what
+    // joins its rows to that source's offers.
+    it('keys offers on id, the Árukereső identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'id' });
+    });
+
+    // Google's price is the list price; sale_price, when there is one, is
+    // what the shop charges. "2269000 HUF" is no number without the strip.
+    it('takes the sale price, else the price, and the price as the old price', () => {
+      expect(config.mapping['price']).toEqual([
+        { field: 'sale_price', pipeline: stripCurrency },
+        { field: 'price', pipeline: stripCurrency },
+      ]);
+      expect(config.mapping['priceWithoutDiscount']).toEqual({ field: 'price', pipeline: stripCurrency });
+    });
+
+    it('resolves categories as the Árukereső source does', () => {
+      expect(config.category).toEqual(arukereso.category);
+      expect(config.categories).toEqual(arukereso.categories);
+    });
+
+    // It identifies nothing and carries no specs: no LLM call has anything to do.
+    it('turns the LLM post-processing off', () => {
+      expect(config.postProcess).toEqual({ enabled: false });
     });
   });
 });

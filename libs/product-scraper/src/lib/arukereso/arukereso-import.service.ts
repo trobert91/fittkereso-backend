@@ -1,34 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { uniq } from 'lodash';
 import {
-  AdvisoryLockService,
   ArukeresoSourceConfig,
   asArukeresoConfig,
   DEFAULT_IMPORT_TASK_PRIORITY,
-  OfferRepository,
   ProductImportTask,
   ProductImportTaskKind,
   ProductImportTaskRepository,
-  ProductModelRepository,
   ProductSource,
-  productLock,
+  ProductSourceRecordRepository,
   TaskStatus,
 } from '@fittkereso-backend/database';
 import { TaskConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
-import {
-  OfferFreshnessService,
-  ProductMergeService,
-} from '@fittkereso-backend/product';
+import { offerExternalIdOf } from '@fittkereso-backend/utils';
+import { CompleteSourceRemovalService } from '@fittkereso-backend/product';
 import { NativeScraperService } from '@fittkereso-backend/scraper';
 import {
   emptyImportRunSummary,
   ImportRunOptions,
   ImportRunSummary,
   ProductSourceImporter,
+  RemovalSkipReason,
 } from '../interfaces/product-source-importer.interface';
-import { offerExternalIdOf } from '../product-scraper/services/offer-external-id';
 import { ArukeresoFeedParserService } from './arukereso-feed-parser.service';
 import { ArukeresoFeedItem } from './arukereso-feed-item';
 import {
@@ -36,11 +30,8 @@ import {
   FeedSkipReason,
   MappedFeedItem,
 } from './arukereso-product-mapper.service';
-import {
-  ArukeresoFeedTriageService,
-  FeedRow,
-  UnchangedFeedRow,
-} from './arukereso-feed-triage.service';
+import { ArukeresoFeedTriageService, FeedRow } from './arukereso-feed-triage.service';
+import { ArukeresoFeedConfirmService } from './arukereso-feed-confirm.service';
 import { FeedEntryPayload, feedRowHash } from './feed-row-hash';
 
 /**
@@ -67,10 +58,14 @@ const FALLBACK_MAX_ATTEMPTS = 3;
  * compares it with what the row's listing last imported (see
  * ArukeresoFeedTriageService):
  * - an unchanged row only has its offer confirmed in place (lastSynced), in
- *   one statement per batch;
+ *   one statement per batch — or, for a source that does not identify
+ *   products, only its listing when it waits unattached;
  * - a new or changed row becomes a feed_entry task, which the collector's
  *   scheduler imports in parallel with everything else. A row whose task is
  *   still pending replaces that task's row instead.
+ *
+ * A source that lists the shop's whole catalog (hasAllProducts) also removes,
+ * after a complete run, the seller's offers the run did not see.
  *
  * So a nightly run over a catalogue that barely moved queues almost nothing,
  * and the expensive part — identity extraction, unification, the writes — runs
@@ -79,7 +74,8 @@ const FALLBACK_MAX_ATTEMPTS = 3;
  */
 @Injectable()
 export class ArukeresoImportService implements ProductSourceImporter {
-  readonly type = 'arukereso' as const;
+  /** Both feed types: an Árukereső feed and a Google Shopping TSV share the config and the run. */
+  readonly types = ['arukereso', 'googleshop'] as const;
 
   private readonly logger = new CustomLogger(ArukeresoImportService.name);
 
@@ -88,14 +84,12 @@ export class ArukeresoImportService implements ProductSourceImporter {
     private readonly feedParser: ArukeresoFeedParserService,
     private readonly mapper: ArukeresoProductMapperService,
     private readonly triage: ArukeresoFeedTriageService,
+    private readonly feedConfirm: ArukeresoFeedConfirmService,
     private readonly taskRepo: ProductImportTaskRepository,
-    private readonly offerRepo: OfferRepository,
-    private readonly productRepo: ProductModelRepository,
-    private readonly mergeService: ProductMergeService,
-    private readonly offerFreshness: OfferFreshnessService,
-    private readonly locks: AdvisoryLockService,
     private readonly taskConfig: TaskConfigService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly completeSourceRemoval: CompleteSourceRemovalService,
   ) {}
 
   public async import(
@@ -114,6 +108,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
     const requestedSlugs = options?.categorySlugs;
     const skips: Partial<Record<FeedSkipReason, number>> = {};
     const seenUrls = new Set<string>();
+    // Every eligible row's offer key: what a complete run weighs the seller's
+    // offers against.
+    const seenExternalIds = new Set<string>();
 
     let consecutiveFailures = 0;
     let eligible = 0;
@@ -162,7 +159,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
           } else {
             seenUrls.add(mapped.url);
           }
-          batch.push(this.toRow(mapped, item));
+          const row = this.toRow(mapped, item);
+          if (row.externalId) seenExternalIds.add(row.externalId);
+          batch.push(row);
 
           if (batch.length >= FEED_FLUSH_SIZE) {
             const rows = batch;
@@ -179,6 +178,17 @@ export class ArukeresoImportService implements ProductSourceImporter {
       await this.flush(source, batch, requestedSlugs, summary);
 
       summary.itemsSeen = parsed.itemsParsed;
+      if (source.hasAllProducts) {
+        await this.removeUnseen({
+          source,
+          config,
+          requestedSlugs,
+          capped,
+          seenExternalIds,
+          summary,
+        });
+      }
+      summary.unattachedRecords = await this.sourceRecordRepo.countUnattached(source.id);
 
       this.productCollectionMetrics.fullSyncCompleted(source.name);
       this.recordDuration(source, startTime);
@@ -196,6 +206,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
         tasksReplaced: summary.tasksReplaced,
         offersUpdated: summary.offersUpdated,
         duplicateUrls: summary.duplicateUrls,
+        unattachedRecords: summary.unattachedRecords,
+        offersRemoved: summary.offersRemoved,
+        removalSkipped: summary.removalSkipped,
         skipped: summary.skipped,
         failed: summary.failed,
         skipReasons: skips,
@@ -220,6 +233,51 @@ export class ArukeresoImportService implements ProductSourceImporter {
       });
       throw error;
     }
+  }
+
+  /**
+   * The seller's offers a run of a source listing the whole catalog did not
+   * see are gone from the shop — but only a complete run knows that: not
+   * capped, not filtered, over every enabled category, and with every eligible
+   * row mapped (a row that failed to map was not seen either, and its offer
+   * would go). Anything less saw part of the catalog, and says nothing about
+   * the rest. The removal itself, and its share guard, are
+   * CompleteSourceRemovalService's.
+   */
+  private async removeUnseen(params: {
+    source: ProductSource;
+    config: ArukeresoSourceConfig;
+    requestedSlugs: string[] | undefined;
+    capped: boolean;
+    seenExternalIds: Set<string>;
+    summary: ImportRunSummary;
+  }): Promise<void> {
+    const { source, config, requestedSlugs, capped, seenExternalIds, summary } = params;
+    const enabledSlugs = Object.entries(config.categories ?? {})
+      .filter(([, category]) => category.enabled)
+      .map(([slug]) => slug);
+    const incomplete: RemovalSkipReason | undefined = capped
+      ? 'capped'
+      : config.filter?.conditions?.length
+        ? 'filtered'
+        : requestedSlugs?.length && !enabledSlugs.every((slug) => requestedSlugs.includes(slug))
+          ? 'narrowed'
+          : summary.failed > 0
+            ? 'mapping_failures'
+            : undefined;
+
+    summary.offersRemoved = 0;
+    if (incomplete) {
+      summary.removalSkipped = incomplete;
+      return;
+    }
+    const removal = await this.completeSourceRemoval.removeUnseen({
+      source,
+      seenExternalIds,
+      categorySlugs: enabledSlugs,
+    });
+    summary.offersRemoved = removal.removed;
+    if (removal.skipped) summary.removalSkipped = removal.skipped;
   }
 
   /**
@@ -277,38 +335,11 @@ export class ArukeresoImportService implements ProductSourceImporter {
     const unique = [...new Map(rows.map((row) => [row.url, row])).values()];
 
     const { unchanged, toImport } = await this.triage.triage(source, unique);
-    summary.offersUpdated += await this.confirmInPlace(unchanged);
+    summary.offersUpdated += await this.feedConfirm.confirm(source, unchanged);
 
     const queued = await this.queue(source, toImport, requestedSlugs);
     summary.feedTasksEnqueued += queued.enqueued;
     summary.tasksReplaced += queued.replaced;
-  }
-
-  /**
-   * An unchanged row's whole import: its offer is seen again. A product whose
-   * offer had aged out of visibility gets its price recomputed, since that
-   * offer was left out of it.
-   */
-  private async confirmInPlace(unchanged: UnchangedFeedRow[]): Promise<number> {
-    if (unchanged.length === 0) return 0;
-
-    const cutoff = this.offerFreshness.visibleCutoff();
-    await this.offerRepo.stampSynced(unchanged.map((entry) => entry.offerId));
-
-    const revived = uniq(
-      unchanged
-        .filter((entry) => !entry.lastSynced || entry.lastSynced < cutoff)
-        .map((entry) => entry.modelId),
-    );
-    for (const modelId of revived) {
-      await this.locks.withLocks([productLock(modelId)], async () => {
-        const model = await this.productRepo.findOne({ where: { id: modelId } });
-        if (!model) return;
-        await this.mergeService.recomputePrice(model);
-        await this.productRepo.save(model);
-      });
-    }
-    return unchanged.length;
   }
 
   /**

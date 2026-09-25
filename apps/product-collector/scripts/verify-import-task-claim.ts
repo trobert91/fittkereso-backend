@@ -55,6 +55,10 @@ const claim = (limit: number, overrides: Partial<ClaimImportTasksParams> = {}) =
     ...overrides,
   });
 
+// A seller's sources need distinct priorities (unique per seller), and these
+// share their two sellers.
+let nextPriority = 0;
+
 async function makeSource(
   name: string,
   limits: { maxConcurrent?: number; requestsPerHour?: number; seller?: Seller } = {},
@@ -64,6 +68,7 @@ async function makeSource(
   source.type = 'scraping' as ProductSource['type'];
   source.config = {} as ProductSource['config'];
   source.seller = limits.seller ?? freeSeller;
+  source.priority = nextPriority++;
   source.maxConcurrent = limits.maxConcurrent ?? 1000;
   source.requestsPerHour = limits.requestsPerHour ?? UNPACED;
   source.processingEnabled = true;

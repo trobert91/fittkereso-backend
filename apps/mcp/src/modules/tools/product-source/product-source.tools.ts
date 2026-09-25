@@ -40,7 +40,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'get_product_source_config_schema',
     description:
-      'Get the JSON Schema a ProductSource config is validated against. There is one schema PER SOURCE TYPE — "scraping" (startUrls, listPage, detailPage pipelines) and "arukereso" (feedUrl, field mapping) share no keys — so pass the type you are writing. Omit it to get every schema keyed by type. Documents the whole config shape and every scrape operation with its required and optional parameters. Read this BEFORE hand-writing or editing a config: update_product_source rejects anything that does not match, and copying the shape from an existing config only shows the ops that config happens to use.',
+      'Get the JSON Schema a ProductSource config is validated against. There is one schema PER SOURCE TYPE — "scraping" (startUrls, listPage, detailPage pipelines) and the feed types "arukereso" and "googleshop" (feedUrl, field mapping; the two share one schema) share no keys — so pass the type you are writing. Omit it to get every schema keyed by type. Documents the whole config shape and every scrape operation with its required and optional parameters. Read this BEFORE hand-writing or editing a config: update_product_source rejects anything that does not match, and copying the shape from an existing config only shows the ops that config happens to use.',
     parameters: z.object({
       type: z
         .enum(PRODUCT_SOURCE_TYPES)
@@ -111,7 +111,7 @@ export class ProductSourceTools {
       type: z
         .enum(PRODUCT_SOURCE_TYPES)
         .describe(
-          'Which schema to check against — the config shape is type-bound, so a scraping config checked as "arukereso" fails on every key.',
+          'Which schema to check against — the config shape is type-bound, so a scraping config checked as "arukereso" or "googleshop" fails on every key.',
         ),
       config: z
         .record(z.string(), z.any())
@@ -200,7 +200,9 @@ export class ProductSourceTools {
         `- Scheduling: ${source.schedulingEnabled ? 'on' : 'off'} · Processing: ${source.processingEnabled ? 'on' : 'off'}`,
       );
       L.push(`- Type: ${source.type}`);
-      L.push(`- Priority: ${source.priority}`);
+      L.push(
+        `- Priority: ${source.priority} · Identifies products: ${source.identifiesProducts ? 'yes' : 'no'} · Has all products: ${source.hasAllProducts ? 'yes' : 'no'}`,
+      );
       L.push(`- Base URL: ${source.config?.baseUrl ?? '_not set_'}`);
       L.push('');
     }
@@ -217,14 +219,34 @@ export class ProductSourceTools {
   @Tool({
     name: 'create_product_source_for_seller',
     description:
-      'Create a new ProductSource for a seller. Takes a name and a type — the created source starts with scheduling and processing both disabled, and an empty config. The type decides which config format the source uses and CANNOT be changed afterwards, so pick it deliberately: "scraping" drives page pipelines (startUrls, listPage, detailPage), "arukereso" drives a product-feed mapping (feedUrl, mapping). One seller may have several sources of different types. Use update_product_source afterward to fill in the config and enable scheduling/processing once it is ready.',
+      'Create a new ProductSource for a seller. Takes a name and a type — the created source starts with scheduling and processing both disabled, and an empty config. The type decides which config format the source uses and CANNOT be changed afterwards, so pick it deliberately: "scraping" drives page pipelines (startUrls, listPage, detailPage); "arukereso" (an Árukereső XML/CSV feed) and "googleshop" (a Google Shopping TSV feed) drive a product-feed mapping (feedUrl, mapping, where a target may list fallbacks: the first non-empty value wins). One seller may have several sources: the higher priority overwrites the lower one field by field, priorities are unique per seller, and at least one source per seller identifies products (creates products and offers) while the others only contribute to the offers it created. Use update_product_source afterward to fill in the config and enable scheduling/processing once it is ready.',
     parameters: z.object({
       sellerId: z.string().describe('Seller UUID to attach the new source to'),
       name: z.string().min(1).describe('Unique name for the product source'),
       type: z
         .enum(PRODUCT_SOURCE_TYPES)
         .describe(
-          'Import type — "scraping" or "arukereso". Create-only: it cannot be changed later, because each type has its own config format.',
+          'Import type — "scraping", "arukereso" or "googleshop". Create-only: it cannot be changed later, because each type has its own config format.',
+        ),
+      priority: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "Unique per seller; higher wins field by field. Omit for 10 on a seller's first source, else 10 below the seller's lowest.",
+        ),
+      identifiesProducts: z
+        .boolean()
+        .optional()
+        .describe(
+          "Default true. Off: the source only contributes prices, specs and descriptions to the offers an identifying source of the seller created, matched by externalId, and waits unattached otherwise. A seller's first source must identify.",
+        ),
+      hasAllProducts: z
+        .boolean()
+        .optional()
+        .describe(
+          "Default false. The source lists the shop's whole catalog for its enabled categories, so a complete run may remove the offers it did not see. Feed sources only.",
         ),
     }),
     annotations: { destructiveHint: false, idempotentHint: false },
@@ -233,19 +255,25 @@ export class ProductSourceTools {
     sellerId: string;
     name: string;
     type: ProductSourceType;
+    priority?: number;
+    identifiesProducts?: boolean;
+    hasAllProducts?: boolean;
   }): Promise<string> {
-    const source = await this.createService.createForSeller(args.sellerId, {
-      name: args.name,
-      type: args.type,
-    });
+    try {
+      const { sellerId, ...dto } = args;
+      const source = await this.createService.createForSeller(sellerId, dto);
 
-    return `Product source "${source.name}" created (${source.id}, type "${source.type}") for seller ${args.sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
+      return `Product source "${source.name}" created (${source.id}, type "${source.type}", priority ${source.priority}, identifies products: ${source.identifiesProducts}, has all products: ${source.hasAllProducts}) for seller ${sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Failed to create product source "${args.name}": ${message}`;
+    }
   }
 
   @Tool({
     name: 'update_product_source',
     description:
-      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority, throttling (maxConcurrent, requestsPerHour), and the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
+      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority (unique per seller), identifiesProducts / hasAllProducts, throttling (maxConcurrent, requestsPerHour), and the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to update'),
       name: z.string().min(1).optional(),
@@ -257,7 +285,24 @@ export class ProductSourceTools {
         ),
       schedulingEnabled: z.boolean().optional(),
       processingEnabled: z.boolean().optional(),
-      priority: z.number().int().min(0).optional(),
+      priority: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("Unique per seller; higher wins field by field over the seller's other sources."),
+      identifiesProducts: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether this source creates products and offers. Refused when it would leave the seller with no identifying source.',
+        ),
+      hasAllProducts: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the source lists the whole catalog, so a complete run may remove unseen offers. Feed sources only.',
+        ),
       maxConcurrent: z.number().int().min(1).optional(),
       requestsPerHour: z.number().int().min(1).optional(),
       frequency: z
@@ -275,6 +320,8 @@ export class ProductSourceTools {
     schedulingEnabled?: boolean;
     processingEnabled?: boolean;
     priority?: number;
+    identifiesProducts?: boolean;
+    hasAllProducts?: boolean;
     maxConcurrent?: number;
     requestsPerHour?: number;
     frequency?: string | null;
@@ -524,6 +571,8 @@ export class ProductSourceTools {
     L.push(`- **Scheduling enabled**: ${source.schedulingEnabled}`);
     L.push(`- **Processing enabled**: ${source.processingEnabled}`);
     L.push(`- **Priority**: ${source.priority}`);
+    L.push(`- **Identifies products**: ${source.identifiesProducts}`);
+    L.push(`- **Has all products**: ${source.hasAllProducts}`);
     L.push(`- **Max concurrent**: ${source.maxConcurrent}`);
     L.push(`- **Requests per hour**: ${source.requestsPerHour}`);
     L.push(`- **Frequency**: ${source.frequency ?? '_not set_'}`);

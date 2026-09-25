@@ -5,10 +5,13 @@ import {
   BrandRepository,
   ProductModel,
   ProductModelRepository,
+  ProductSourceRecord,
   productLock,
 } from '@fittkereso-backend/database';
 import { generateSlug, nameOf } from '@fittkereso-backend/utils';
+import { isUndefined } from 'lodash';
 import { ProductUpdateMapperService } from './product-update-mapper.service';
+import { ProductDescriptionService } from '../product-description/product-description.service';
 
 @Injectable()
 export class ProductUpdateService {
@@ -17,6 +20,7 @@ export class ProductUpdateService {
     private readonly brandRepo: BrandRepository,
     private readonly mapper: ProductUpdateMapperService,
     private readonly locks: AdvisoryLockService,
+    private readonly descriptionService: ProductDescriptionService,
   ) {}
 
   public async updateProduct(
@@ -28,6 +32,11 @@ export class ProductUpdateService {
     return this.locks.withLocks([productLock(id)], async () => {
       const product = await this.getProductById(id);
       await this.mapper.mapDtoToEntity(dto, product);
+      // Only the description: the full mergeSources would also recompute the
+      // name fields from the sources, undoing a name edit in this same save.
+      if (!isUndefined(dto.description)) {
+        product.description = this.descriptionService.pick(product.sources);
+      }
 
       await this.generateSlug(product);
 
@@ -62,6 +71,10 @@ export class ProductUpdateService {
         nameOf<ProductModel>('productCategory'),
         nameOf<ProductModel>('aliases'),
         nameOf<ProductModel>('embedding'),
+        // The admin's record takes the edits the admin makes to specs and the
+        // description; without its records loaded, each edit added another.
+        nameOf<ProductModel>('sources'),
+        `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
       ],
     });
   }

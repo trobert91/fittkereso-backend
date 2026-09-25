@@ -14,6 +14,7 @@ import { ArukeresoFeedParserService } from '../arukereso/arukereso-feed-parser.s
 import { ArukeresoProductMapperService } from '../arukereso/arukereso-product-mapper.service';
 import { ArukeresoImportService } from '../arukereso/arukereso-import.service';
 import { ArukeresoFeedTriageService } from '../arukereso/arukereso-feed-triage.service';
+import { ArukeresoFeedConfirmService } from '../arukereso/arukereso-feed-confirm.service';
 import { ArukeresoFeedEntryService } from '../arukereso/arukereso-feed-entry.service';
 import { TaskModule } from '@fittkereso-backend/task';
 import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
@@ -54,6 +55,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ArukeresoProductMapperService,
     ArukeresoImportService,
     ArukeresoFeedTriageService,
+    ArukeresoFeedConfirmService,
     ArukeresoFeedEntryService,
     ProductSourceImporterRegistry,
     ProductSourceSimulationService,

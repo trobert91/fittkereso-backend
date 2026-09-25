@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import {
-  OfferAvailability,
   ProductCategory,
   ProductSource,
   ScrapedProduct,
@@ -28,6 +27,7 @@ import { isEqual, omitBy, pick } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { splitDeterministicSpecs } from './deterministic-specs';
 import { SpecPostProcessService } from './spec-post-process.service';
+import { toScrapedOffers } from './scraped-offers';
 import {
   previewListingIdentifiers,
   SimulatedListingIdentifiers,
@@ -254,7 +254,7 @@ export class ProductSourceSimulationService {
       externalId: detail.externalId,
       siblingExternalIds: detail.siblingIds,
       aliases: detail.aliases,
-      offers: this.toScrapedOffers(detail.rawOffers),
+      offers: toScrapedOffers(detail.rawOffers),
     };
 
     // Both calls a real import makes for a page that creates a product, run
@@ -341,31 +341,6 @@ export class ProductSourceSimulationService {
       force: true,
       source: { name: 'simulation', config },
     } as unknown as ProductImportTask;
-  }
-
-  private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
-    return rawOffers
-      .filter(
-        (offer): offer is RawOfferRecord & { price: number } =>
-          typeof offer.price === 'number' && Number.isFinite(offer.price),
-      )
-      .map((offer) => ({
-        price: offer.price,
-        priceWithoutDiscount: offer.priceWithoutDiscount,
-        currency: offer.currency,
-        availability: this.parseAvailability(offer.availability),
-        url: offer.url,
-        externalId: offer.externalId,
-        gtin: offer.gtin,
-        mpn: offer.mpn,
-        locations: offer.locations,
-      }));
-  }
-
-  private parseAvailability(value: string | undefined): OfferAvailability | undefined {
-    return value && (Object.values(OfferAvailability) as string[]).includes(value)
-      ? (value as OfferAvailability)
-      : undefined;
   }
 
   private async buildTranslator(

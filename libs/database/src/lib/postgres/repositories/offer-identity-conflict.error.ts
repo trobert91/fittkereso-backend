@@ -11,7 +11,8 @@ export interface OfferIdentityConflictDetails {
 /**
  * Two sources claim one seller listing belongs to two different products.
  *
- * Raised from OfferRepository's cross-source adoption branch. It is a genuine
+ * Raised by OfferComposerService when a listing's product is not the one the
+ * seller's offer already sits on. It is a genuine
  * identity disagreement rather than a transient failure, so retrying achieves
  * nothing — one of the two sources has resolved the wrong product, and which
  * one is a question only the data answers.

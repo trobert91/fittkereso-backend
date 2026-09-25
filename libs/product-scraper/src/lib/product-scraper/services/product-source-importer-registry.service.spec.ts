@@ -8,8 +8,8 @@ import { ProductScraperModule } from '../product-scraper.module';
 import { ScrapingImportService } from './scraping-import.service';
 import { ArukeresoImportService } from '../../arukereso/arukereso-import.service';
 
-const stubImporter = (type: ProductSourceType): ProductSourceImporter => ({
-  type,
+const stubImporter = (...types: ProductSourceType[]): ProductSourceImporter => ({
+  types,
   import: jest.fn(),
 });
 
@@ -25,6 +25,23 @@ describe('ProductSourceImporterRegistry', () => {
     registry.register(importer);
 
     expect(registry.get('scraping')).toBe(importer);
+  });
+
+  it('resolves an importer under each of its types', () => {
+    const feeds = stubImporter('arukereso', 'googleshop');
+    registry.register(feeds);
+
+    expect(registry.get('arukereso')).toBe(feeds);
+    expect(registry.get('googleshop')).toBe(feeds);
+  });
+
+  it('refuses an importer claiming a type another has, and registers none of its types', () => {
+    registry.register(stubImporter('arukereso'));
+
+    expect(() => registry.register(stubImporter('googleshop', 'arukereso'))).toThrow(
+      /already registered for product source type "arukereso"/,
+    );
+    expect(registry.types()).toEqual(['arukereso']);
   });
 
   it('refuses a second importer for the same type', () => {
@@ -56,7 +73,7 @@ describe('ProductSourceImporterRegistry', () => {
   });
 
   it('declares exactly the types this codebase intends to support', () => {
-    expect([...PRODUCT_SOURCE_TYPES]).toEqual(['scraping', 'arukereso']);
+    expect([...PRODUCT_SOURCE_TYPES]).toEqual(['scraping', 'arukereso', 'googleshop']);
   });
 
   // The other direction, and the one that actually bites: a declared type with
@@ -64,10 +81,12 @@ describe('ProductSourceImporterRegistry', () => {
   // real onModuleInit rather than a restated list, so adding a type without
   // wiring its importer fails here instead of at 02:00.
   it('wires an importer for every declared type', () => {
+    // The real importers, for the types they declare; nothing else of theirs runs.
+    const none = {} as never;
     const module = new ProductScraperModule(
       registry,
-      { type: 'scraping' } as unknown as ScrapingImportService,
-      { type: 'arukereso' } as unknown as ArukeresoImportService,
+      new ScrapingImportService(none, none, none, none),
+      new ArukeresoImportService(none, none, none, none, none, none, none, none, none, none),
     );
 
     module.onModuleInit();

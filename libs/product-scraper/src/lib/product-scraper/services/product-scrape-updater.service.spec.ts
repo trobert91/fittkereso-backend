@@ -19,6 +19,8 @@ import type {
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
   BrandResolutionService,
+  ContributorDetachService,
+  OfferComposerService,
   OfferMatchingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -148,6 +150,8 @@ describe('ProductScrapeUpdaterService', () => {
   let mockBrandResolution: jest.Mocked<BrandResolutionService>;
   let mockSpecPostProcess: jest.Mocked<SpecPostProcessService>;
   let mockLocks: { withLocks: jest.Mock };
+  let mockOfferComposer: jest.Mocked<OfferComposerService>;
+  let mockContributorDetach: jest.Mocked<ContributorDetachService>;
 
   beforeEach(() => {
     knownModels = [];
@@ -191,12 +195,17 @@ describe('ProductScrapeUpdaterService', () => {
         .fn()
         .mockResolvedValue(null),
       findBySourceAndUrl: jest.fn().mockResolvedValue(null),
+      findUnattachedBySellerAndExternalIds: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockImplementation(async (record) => record),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
 
     mockSourceRecordUpdater = {
       upsertSourceRecord: jest
         .fn()
         .mockResolvedValue({ id: 'source-record-1' }),
+      upsertUnattached: jest
+        .fn()
+        .mockImplementation(({ existing }) => existing ?? { id: 'record-unattached' }),
     } as unknown as jest.Mocked<ProductSourceRecordUpdaterService>;
 
     mockMergeService = {
@@ -232,8 +241,8 @@ describe('ProductScrapeUpdaterService', () => {
     } as unknown as jest.Mocked<OfferMatchingService>;
 
     mockOfferRepo = {
-      upsertFromScrape: jest.fn(),
       findAllByModelAndSource: jest.fn().mockResolvedValue([]),
+      findBySellerAndExternalIds: jest.fn().mockResolvedValue([]),
       findFirstBySellerAndExternalIdsWithModelRelations: jest
         .fn()
         .mockResolvedValue(null),
@@ -283,6 +292,19 @@ describe('ProductScrapeUpdaterService', () => {
       withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()),
     };
 
+    // Composition itself is OfferComposerService's spec; here, what the
+    // updater asks of it.
+    mockOfferComposer = {
+      compose: jest.fn().mockResolvedValue({ offers: [{ id: 'offer-1' }], conflicts: [] }),
+      writeUnkeyed: jest.fn().mockResolvedValue({ id: 'offer-unkeyed' }),
+      currentCarriers: jest.fn().mockReturnValue([]),
+    } as unknown as jest.Mocked<OfferComposerService>;
+
+    mockContributorDetach = {
+      detach: jest.fn().mockResolvedValue([]),
+      detachRecords: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<ContributorDetachService>;
+
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
       mockDuplicateService,
@@ -303,6 +325,8 @@ describe('ProductScrapeUpdaterService', () => {
       mockBrandResolution,
       mockSpecPostProcess,
       mockLocks as never,
+      mockOfferComposer,
+      mockContributorDetach,
     );
   });
 
@@ -499,7 +523,6 @@ describe('ProductScrapeUpdaterService', () => {
 
     it('looks up the normalized identifiers, the resolved brand and the declared siblings', async () => {
       savedAs('model-new');
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
@@ -629,7 +652,6 @@ describe('ProductScrapeUpdaterService', () => {
       });
       mockKeyLookup.disagreeingTiers.mockReturnValueOnce(['gtin']);
       mockProductRepo.save.mockResolvedValue(ownProduct);
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       const result = await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
@@ -719,7 +741,6 @@ describe('ProductScrapeUpdaterService', () => {
         model: known,
       } as never);
       mockProductRepo.save.mockResolvedValue(known);
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
@@ -733,7 +754,6 @@ describe('ProductScrapeUpdaterService', () => {
 
     it('runs history, extraction, identifier lookups, decision and unification in that order', async () => {
       savedAs('model-new');
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
@@ -1023,7 +1043,8 @@ describe('ProductScrapeUpdaterService', () => {
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
-    expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+    expect(mockOfferComposer.compose).not.toHaveBeenCalled();
+    expect(mockOfferComposer.writeUnkeyed).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
@@ -1036,11 +1057,11 @@ describe('ProductScrapeUpdaterService', () => {
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
-    expect(mockOfferRepo.upsertFromScrape).not.toHaveBeenCalled();
+    expect(mockOfferComposer.compose).not.toHaveBeenCalled();
     expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
   });
 
-  it('upserts an offer per entry using the task source\'s seller when ScrapedProduct.offers is populated, then recomputes model price', async () => {
+  it('composes the listing\'s offers for the task source\'s seller, then recomputes model price', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       offers: [
@@ -1056,59 +1077,116 @@ describe('ProductScrapeUpdaterService', () => {
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
     mockRandomUUID.mockReturnValue('model-with-offers');
-    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({} as never);
 
     await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
-    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledWith(
-      expect.objectContaining({
-        seller: task.source.seller,
-        sourceRecord: { id: 'source-record-1' },
-        price: 199990,
-        priceWithoutDiscount: 249990,
-        currency: 'HUF',
-        url: 'https://alza.hu/product/1',
-        externalId: 'listing-1',
-      }),
-    );
+    expect(mockOfferComposer.compose).toHaveBeenCalledWith({
+      model: expect.objectContaining({ id: 'model-with-offers' }),
+      seller: task.source.seller,
+      externalIds: ['listing-1'],
+      sighted: true,
+      create: true,
+    });
     expect(mockMergeService.recomputePrice).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'model-with-offers' }),
     );
   });
 
-  it('continues processing remaining offers and does not fail the scrape if one offer upsert throws', async () => {
-    const task = makeTask();
-    const scrapedProduct = makeScrapedProduct({
-      offers: [
-        { price: 1000 },
-        { price: 2000 },
+  // The record alone is then enough to compose the offer from, whichever
+  // source's import composes it next.
+  it('stores each offer on the record with the externalId its offer is stored under', async () => {
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockCategoryConfigService.getConfig.mockReturnValue({
+      offerLevelSpecs: ['layout'],
+    } as never);
+
+    await service.createOrUpdateProduct(
+      contextFromTask(makeTask()),
+      makeScrapedProduct({
+        specs: { layout: 'UK', weight: 800 },
+        offers: [
+          { price: 199990, externalId: 'listing-1' },
+          { price: 209990, externalId: 'listing-2', specs: { layout: 'US' } },
+        ],
+      }),
+    );
+
+    const stored = mockSourceRecordUpdater.upsertSourceRecord.mock.calls[0][0]
+      .scrapedProduct?.offers;
+    expect(stored).toEqual([
+      // The page's offer-level specs where the offer has none of its own.
+      { price: 199990, externalId: 'listing-1', resolvedExternalId: 'listing-1', specs: { layout: 'UK' } },
+      { price: 209990, externalId: 'listing-2', resolvedExternalId: 'listing-2', specs: { layout: 'US' } },
+    ]);
+  });
+
+  it('reports an offer that sits on another product, and keeps the rest of the listing', async () => {
+    mockProductRepo.findOne.mockResolvedValueOnce(null);
+    mockOfferComposer.compose.mockResolvedValueOnce({
+      offers: [{ id: 'offer-2' }],
+      conflicts: [
+        {
+          details: {
+            externalId: 'listing-1',
+            sellerId: 'seller-arukereso',
+            offerId: 'offer-owned',
+            existingModelId: 'other-model',
+            incomingModelId: 'model-created',
+          },
+        },
       ],
+    } as never);
+
+    const result = await service.createOrUpdateProduct(
+      contextFromTask(makeTask()),
+      makeScrapedProduct({
+        offers: [
+          { price: 1, externalId: 'listing-1' },
+          { price: 2, externalId: 'listing-2' },
+        ],
+      }),
+    );
+
+    expect(result).toBeDefined();
+    expect(mockMetricsService.offerIdentityConflict).toHaveBeenCalledWith(
+      'arukereso',
+      'model_disagreement',
+    );
+    expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues processing remaining offers and does not fail the scrape if one unkeyed offer write throws', async () => {
+    const task = makeTask();
+    // No ids and no urls: both fall back to the page's slug, collide, and are
+    // written without an externalId.
+    const scrapedProduct = makeScrapedProduct({
+      offers: [{ price: 1000 }, { price: 2000 }],
     });
 
     mockProductRepo.findOne.mockResolvedValueOnce(null);
     mockRandomUUID.mockReturnValue('model-partial-offer-failure');
-    mockOfferRepo.upsertFromScrape
+    mockOfferComposer.writeUnkeyed
       .mockRejectedValueOnce(new Error('offer upsert failed'))
-      .mockResolvedValueOnce({} as never);
+      .mockResolvedValueOnce({ id: 'offer-2' } as never);
+    mockOfferComposer.compose.mockResolvedValueOnce({ offers: [], conflicts: [] });
 
     const result = await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
 
     expect(result).toBeDefined();
-    expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(2);
+    expect(mockOfferComposer.writeUnkeyed).toHaveBeenCalledTimes(2);
     expect(mockMergeService.recomputePrice).toHaveBeenCalledTimes(1);
   });
 
   describe('offer identity', () => {
-    const upsertedExternalIds = () =>
-      mockOfferRepo.upsertFromScrape.mock.calls.map(
-        (call) => (call[0] as { externalId?: string }).externalId,
-      );
+    const storedExternalIds = () =>
+      (
+        mockSourceRecordUpdater.upsertSourceRecord.mock.calls[0][0].scrapedProduct?.offers ?? []
+      ).map((offer) => offer.resolvedExternalId);
 
     const runWithOffers = async (offers: unknown[]) => {
       const task = makeTask();
       mockProductRepo.findOne.mockResolvedValueOnce(null);
       mockRandomUUID.mockReturnValue('model-offer-identity');
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
         contextFromTask(task),
@@ -1124,7 +1202,10 @@ describe('ProductScrapeUpdaterService', () => {
         { price: 1000, url: 'https://alza.hu/kerekpar/ktm-macina' },
       ]);
 
-      expect(upsertedExternalIds()).toEqual(['kerekpar/ktm-macina']);
+      expect(storedExternalIds()).toEqual(['kerekpar/ktm-macina']);
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ externalIds: ['kerekpar/ktm-macina'] }),
+      );
     });
 
     it('prefers a source-native externalId over the slug', async () => {
@@ -1132,7 +1213,7 @@ describe('ProductScrapeUpdaterService', () => {
         { price: 1000, url: 'https://alza.hu/kerekpar/ktm-macina', externalId: 'sku-1' },
       ]);
 
-      expect(upsertedExternalIds()).toEqual(['sku-1']);
+      expect(storedExternalIds()).toEqual(['sku-1']);
     });
 
     // The failure this guard exists for, and it is completely silent without
@@ -1146,8 +1227,12 @@ describe('ProductScrapeUpdaterService', () => {
         { price: 3000, url: 'https://alza.hu/ktm-macina' },
       ]);
 
-      expect(upsertedExternalIds()).toEqual([undefined, undefined, undefined]);
-      expect(mockOfferRepo.upsertFromScrape).toHaveBeenCalledTimes(3);
+      // Null, not absent: a collided entry must never be joined by a derived id.
+      expect(storedExternalIds()).toEqual([null, null, null]);
+      expect(mockOfferComposer.writeUnkeyed).toHaveBeenCalledTimes(3);
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ externalIds: [] }),
+      );
     });
 
     it('drops a source-native externalId shared by several offers too', async () => {
@@ -1156,7 +1241,7 @@ describe('ProductScrapeUpdaterService', () => {
         { price: 2000, url: 'https://alza.hu/b', externalId: 'group-sku' },
       ]);
 
-      expect(upsertedExternalIds()).toEqual([undefined, undefined]);
+      expect(storedExternalIds()).toEqual([null, null]);
     });
 
     // A collision must not punish the offers that are fine.
@@ -1167,7 +1252,11 @@ describe('ProductScrapeUpdaterService', () => {
         { price: 3000, url: 'https://alza.hu/c', externalId: 'its-own' },
       ]);
 
-      expect(upsertedExternalIds()).toEqual([undefined, undefined, 'its-own']);
+      expect(storedExternalIds()).toEqual([null, null, 'its-own']);
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ externalIds: ['its-own'] }),
+      );
+      expect(mockOfferComposer.writeUnkeyed).toHaveBeenCalledTimes(2);
     });
 
     it('counts a collision once per colliding value, by kind', async () => {
@@ -1197,16 +1286,9 @@ describe('ProductScrapeUpdaterService', () => {
   });
 
   describe('offer identifiers', () => {
-    const upserted = () =>
-      mockOfferRepo.upsertFromScrape.mock.calls.map((call) => ({
-        gtin: (call[0] as { gtin?: string }).gtin,
-        mpn: (call[0] as { mpn?: string }).mpn,
-      }));
-
     const runWithOffers = async (offers: unknown[]) => {
       mockProductRepo.findOne.mockResolvedValueOnce(null);
       mockRandomUUID.mockReturnValue('model-offer-identifiers');
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({} as never);
 
       await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
@@ -1214,22 +1296,16 @@ describe('ProductScrapeUpdaterService', () => {
       );
     };
 
-    it('stores the normalized GTIN and MPN, not the raw values', async () => {
+    // Normalized where they are matched and stored on the Offer
+    // (OfferComposerService); the record keeps what the source published.
+    it('keeps the raw values on the stored listing, for inspection', async () => {
       await runWithOffers([
         { price: 1000, url: 'https://ebikeshop.hu/a', gtin: ' 9008594503199', mpn: '1260-040108' },
       ]);
 
-      expect(upserted()).toEqual([{ gtin: '09008594503199', mpn: '1260040108' }]);
-    });
-
-    // speedbike's GIANT rows carry 7-digit article stubs in ean_code: storing
-    // one would let it match another shop's unrelated offer.
-    it('drops an invalid GTIN but keeps the MPN beside it', async () => {
-      await runWithOffers([
-        { price: 1000, url: 'https://speedbike.hu/a', gtin: '5461000', mpn: '2300160206' },
-      ]);
-
-      expect(upserted()).toEqual([{ gtin: undefined, mpn: '2300160206' }]);
+      const [stored] =
+        mockSourceRecordUpdater.upsertSourceRecord.mock.calls[0][0].scrapedProduct?.offers ?? [];
+      expect(stored).toMatchObject({ gtin: ' 9008594503199', mpn: '1260-040108' });
     });
 
     it("counts every offer's GTIN by outcome, so a source whose barcodes stop validating is visible", async () => {
@@ -1249,116 +1325,345 @@ describe('ProductScrapeUpdaterService', () => {
     });
   });
 
-  // Regression: a scrape of one variant URL (e.g. ebikeshop's 53cm frame-size
-  // page, no offerLinks configured) must never delete a sibling variant's
-  // offer (e.g. the 48cm page's own offer) just because this pass didn't
-  // happen to re-visit it. Only offers belonging to a ProductSourceRecord
-  // this scrape actually touched are eligible to be judged stale.
-  it('does not delete a sibling variant\'s offer when this scrape only touches one ProductSourceRecord', async () => {
+  describe('offers the page stopped showing', () => {
+    const PAGE = 'https://ebikeshop.hu/termek/53cm-variant';
     const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
-    const task = {
-      ...makeTask(),
-      source: { ...makeTask().source, seller },
-    } as ProductImportTask;
-    const scrapedProduct = makeScrapedProduct({
-      offers: [
-        {
-          price: 3359000,
-          url: 'https://ebikeshop.hu/termek/53cm-variant',
-          externalId: 'sku-53cm',
+
+    /** A re-import of this page, pinned to model-1, whose record listed `before`. */
+    const reimport = async (before: string[], now: string[]) => {
+      const task = {
+        ...makeTask(),
+        url: PAGE,
+        product: { id: 'model-1' },
+        source: { ...makeTask().source, seller },
+      } as ProductImportTask;
+      const existingModel = makeExistingModel();
+      const ownRecord = {
+        id: 'record-53cm',
+        url: PAGE,
+        source: task.source,
+        scrapedProduct: {
+          offers: before.map((id) => ({ price: 1, externalId: id, resolvedExternalId: id })),
         },
-      ],
+      };
+      // A sibling size's own page, which this import does not visit.
+      const siblingRecord = {
+        id: 'record-48cm',
+        url: 'https://ebikeshop.hu/termek/48cm-variant',
+        source: task.source,
+        scrapedProduct: {
+          offers: [{ price: 1, externalId: 'sku-48cm', resolvedExternalId: 'sku-48cm' }],
+        },
+      };
+      existingModel.sources = [ownRecord, siblingRecord] as never;
+      mockProductRepo.save.mockResolvedValue(existingModel);
+      mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(ownRecord as never);
+
+      await service.createOrUpdateProduct(
+        contextFromTask(task),
+        makeScrapedProduct({
+          offers: now.map((id) => ({ price: 3359000, url: PAGE, externalId: id })),
+        }),
+      );
+      return existingModel;
+    };
+
+    // Regression: a scrape of one variant URL (e.g. ebikeshop's 53cm frame-size
+    // page) must never delete a sibling variant's offer (e.g. the 48cm page's
+    // own offer) just because this pass didn't happen to re-visit it.
+    it('leaves a sibling variant\'s offer alone', async () => {
+      await reimport(['sku-53cm'], ['sku-53cm']);
+
+      expect(mockOfferComposer.currentCarriers).not.toHaveBeenCalled();
+      expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
     });
-    const existingModel = makeExistingModel();
-    const sourceRecord48cm = {
-      id: 'source-record-48cm',
-      url: 'https://ebikeshop.hu/termek/48cm-variant',
-    };
-    const sourceRecord53cm = {
-      id: 'source-record-53cm',
-      url: 'https://ebikeshop.hu/termek/53cm-variant',
-    };
-    existingModel.sources = [sourceRecord48cm, sourceRecord53cm] as never;
 
-    mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockResolvedValue(existingModel);
-    mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
-      sourceRecord53cm as never,
-    );
+    it('deletes an offer the page no longer shows when no other source of the seller lists it', async () => {
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValueOnce([
+        { id: 'offer-53cm-stale', externalId: 'sku-53cm-old', model: { id: 'model-1' } },
+      ] as never);
 
-    const offer48cm = {
-      id: 'offer-48cm',
-      seller,
-      sourceRecord: sourceRecord48cm,
-      externalId: 'sku-48cm',
-    };
-    const offer53cmExisting = {
-      id: 'offer-53cm',
-      seller,
-      sourceRecord: sourceRecord53cm,
-      externalId: 'sku-53cm',
-    };
-    mockOfferRepo.findAllByModelAndSource.mockResolvedValueOnce([
-      offer48cm,
-      offer53cmExisting,
-    ] as never);
-    mockOfferMatching.findMatch.mockReturnValueOnce(offer53cmExisting as never);
-    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce(
-      offer53cmExisting as never,
-    );
+      const model = await reimport(['sku-53cm-old'], ['sku-53cm-new']);
 
-    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
+      expect(mockOfferComposer.currentCarriers).toHaveBeenCalledWith(
+        expect.objectContaining({ sellerId: 'seller-ebikeshop', externalId: 'sku-53cm-old' }),
+      );
+      expect(mockOfferRepo.findBySellerAndExternalIds).toHaveBeenCalledWith(
+        'seller-ebikeshop',
+        ['sku-53cm-old'],
+      );
+      expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith(['offer-53cm-stale']);
+      // What joined only that offer has nothing left to join on this product.
+      expect(mockContributorDetach.detach).toHaveBeenCalledWith({
+        model,
+        sellerId: 'seller-ebikeshop',
+        externalIds: ['sku-53cm-old'],
+      });
+    });
 
-    expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
+    it('never deletes an offer of that id sitting on another product', async () => {
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValueOnce([
+        { id: 'offer-elsewhere', model: { id: 'other-model' } },
+      ] as never);
+
+      await reimport(['sku-53cm-old'], ['sku-53cm-new']);
+
+      expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
+      expect(mockContributorDetach.detach).not.toHaveBeenCalled();
+    });
+
+    // Another source of the seller (its Google feed, say) still lists it: the
+    // offer stays, composed again without this page's values.
+    it('composes again an offer another current source of the seller still lists', async () => {
+      mockOfferComposer.currentCarriers.mockReturnValueOnce([{ id: 'record-google' }] as never);
+
+      const model = await reimport(['sku-53cm-old'], ['sku-53cm-new']);
+
+      expect(mockOfferComposer.compose).toHaveBeenLastCalledWith({
+        model,
+        seller,
+        externalIds: ['sku-53cm-old'],
+        sighted: false,
+        create: false,
+      });
+      expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
+    });
+
+    // Every offer refused or failed is no evidence about what the page shows.
+    it('judges nothing when no offer was written', async () => {
+      mockOfferComposer.compose.mockResolvedValueOnce({ offers: [], conflicts: [] });
+
+      await reimport(['sku-53cm-old'], ['sku-53cm-new']);
+
+      expect(mockOfferComposer.currentCarriers).not.toHaveBeenCalled();
+      expect(mockOfferRepo.deleteByIds).not.toHaveBeenCalled();
+      expect(mockMergeService.recomputePrice).not.toHaveBeenCalled();
+    });
   });
 
-  it('deletes an unmatched offer belonging to the ProductSourceRecord this scrape did touch', async () => {
-    const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
-    const task = {
-      ...makeTask(),
-      source: { ...makeTask().source, seller },
-    } as ProductImportTask;
-    const scrapedProduct = makeScrapedProduct({
-      offers: [
-        {
-          price: 3359000,
-          url: 'https://ebikeshop.hu/termek/53cm-variant',
-          externalId: 'sku-53cm-new',
-        },
-      ],
+  describe('records that waited for this listing\'s offers', () => {
+    it('attaches them before the product is merged, so its specs and offers include them', async () => {
+      const task = makeTask();
+      task.product = { id: 'model-1' } as never;
+      const model = makeExistingModel();
+      const waiting = {
+        id: 'record-google',
+        model: null,
+        source: { id: 'source-google', identifiesProducts: false, seller: task.source.seller },
+        scrapedProduct: { offers: [{ price: 90, resolvedExternalId: 'sku-1' }] },
+      };
+      mockSourceRecordRepo.findUnattachedBySellerAndExternalIds.mockResolvedValueOnce([
+        waiting,
+      ] as never);
+      let mergedWith: unknown[] = [];
+      mockMergeService.mergeSources.mockImplementationOnce(async (merged) => {
+        mergedWith = [...(merged.sources ?? [])];
+        return merged;
+      });
+
+      await service.createOrUpdateProduct(
+        contextFromTask(task),
+        makeScrapedProduct({ offers: [{ price: 100, externalId: 'sku-1' }] as never }),
+      );
+
+      expect(mockSourceRecordRepo.findUnattachedBySellerAndExternalIds).toHaveBeenCalledWith(
+        'seller-arukereso',
+        ['sku-1'],
+      );
+      expect(waiting.model).toBe(model);
+      expect(mergedWith).toContain(waiting);
+      // Before the listing's own record, which may be one of them.
+      expect(
+        mockSourceRecordRepo.findUnattachedBySellerAndExternalIds.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockSourceRecordUpdater.upsertSourceRecord.mock.invocationCallOrder[0]);
     });
-    const existingModel = makeExistingModel();
-    const sourceRecord53cm = {
-      id: 'source-record-53cm',
-      url: 'https://ebikeshop.hu/termek/53cm-variant',
+  });
+
+  describe('a source that does not identify products', () => {
+    const PAGE = 'https://speedbike.hu/haibike';
+    const googleSource = {
+      id: 'source-google',
+      name: 'speedbike-googleshop',
+      identifiesProducts: false,
+      seller: { id: 'seller-speedbike', name: 'speedbike.hu' },
     };
-    existingModel.sources = [sourceRecord53cm] as never;
+    const contribute = (overrides?: Partial<ScrapedProduct>) =>
+      service.createOrUpdateProduct(
+        { source: googleSource as never, url: PAGE, feedRowHash: 'hash-1' },
+        makeScrapedProduct({
+          displayName: 'HAIBIKE SDURO raw title',
+          offers: [{ price: 1499990, priceWithoutDiscount: 2269000, externalId: 'HAIBIKE-1' }] as never,
+          ...overrides,
+        }),
+      );
+    const offerOn = (modelId: string) => ({ id: 'offer-1', externalId: 'HAIBIKE-1', model: { id: modelId } });
 
-    mockProductRepo.findOne.mockResolvedValueOnce(null);
-    mockProductRepo.save.mockResolvedValue(existingModel);
-    mockSourceRecordUpdater.upsertSourceRecord.mockResolvedValueOnce(
-      sourceRecord53cm as never,
-    );
+    it('joins the offer its seller has, with no identity work and no product fields', async () => {
+      const model = makeExistingModel();
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
+        ...offerOn('model-1'),
+        model,
+      } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
 
-    const staleOfferSameRecord = {
-      id: 'offer-53cm-stale',
-      seller,
-      sourceRecord: sourceRecord53cm,
-      externalId: 'sku-53cm-old',
-    };
-    mockOfferRepo.findAllByModelAndSource.mockResolvedValueOnce([
-      staleOfferSameRecord,
-    ] as never);
-    mockOfferMatching.findMatch.mockReturnValueOnce(undefined); // no match — a new offer is created
-    mockOfferRepo.upsertFromScrape.mockResolvedValueOnce({
-      id: 'offer-53cm-new',
-    } as never);
+      const result = await contribute();
 
-    await service.createOrUpdateProduct(contextFromTask(task), scrapedProduct);
+      expect(result).toBe(model);
+      for (const identityStep of [
+        mockSpecPostProcess.extractIdentity,
+        mockBrandResolution.resolve,
+        mockKeyLookup.lookup,
+        mockListingMatch.match,
+        mockModelFactory.createShell,
+        mockImageCopyService.copyImagesFromSource,
+        mockAliasRepo.repo.createQueryBuilder as jest.Mock,
+      ]) {
+        expect(identityStep).not.toHaveBeenCalled();
+      }
+      // The product's names are its identifying sources'.
+      expect(model.displayName).toBe('Logitech MX Keys');
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ model, source: googleSource, feedRowHash: 'hash-1' }),
+      );
+      expect(mockMergeService.mergeSources).toHaveBeenCalledWith(model);
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith({
+        model,
+        seller: googleSource.seller,
+        externalIds: ['HAIBIKE-1'],
+        sighted: true,
+        create: false,
+      });
+      expect(mockMergeService.recomputePrice).toHaveBeenCalledWith(model);
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'speedbike-googleshop',
+        'contributed',
+      );
+    });
 
-    expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith([
-      'offer-53cm-stale',
-    ]);
+    it('unifies only when it first contributes to the product', async () => {
+      const model = makeExistingModel();
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
+        ...offerOn('model-1'),
+        model,
+      } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
+
+      await contribute();
+
+      expect(mockSpecPostProcess.unify).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'new_source' }),
+      );
+    });
+
+    it('brings its waiting record onto the product instead of writing a second one', async () => {
+      const model = makeExistingModel();
+      const waiting = { id: 'record-google', url: PAGE, model: null, offers: [{ id: 'x' }] };
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
+        ...offerOn('model-1'),
+        model,
+      } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
+      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValue(waiting as never);
+
+      await contribute();
+
+      expect(model.sources).toContain(waiting);
+      expect(waiting).toMatchObject({ model, source: googleSource, offers: undefined });
+    });
+
+    it('stores the listing unattached, under its offer key, when the seller has no such offer', async () => {
+      const held: unknown[][] = [];
+      mockLocks.withLocks.mockImplementation(async (keys: unknown[], work: () => Promise<unknown>) => {
+        held.push(keys);
+        return work();
+      });
+
+      const result = await contribute();
+
+      expect(result).toBeUndefined();
+      expect(held).toEqual([[{ namespace: 4, id: 'seller-speedbike:HAIBIKE-1' }]]);
+      expect(mockSourceRecordUpdater.upsertUnattached).toHaveBeenCalledWith(
+        expect.objectContaining({
+          existing: null,
+          source: googleSource,
+          sourceUrl: PAGE,
+          feedRowHash: 'hash-1',
+        }),
+      );
+      const [stored] = mockSourceRecordUpdater.upsertUnattached.mock.calls[0];
+      expect(stored.scrapedProduct.offers?.[0]).toMatchObject({ resolvedExternalId: 'HAIBIKE-1' });
+      expect(mockSourceRecordRepo.save).toHaveBeenCalledWith({ id: 'record-unattached' });
+      expect(mockOfferComposer.compose).not.toHaveBeenCalled();
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'speedbike-googleshop',
+        'unattached',
+      );
+    });
+
+    // The identifying listing wrote the offer between the lookup and the key lock.
+    it('joins the offer that turned up while it was being stored', async () => {
+      const model = makeExistingModel();
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ ...offerOn('model-1'), model: { id: 'model-1' } } as never)
+        .mockResolvedValue({ ...offerOn('model-1'), model } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
+
+      const result = await contribute();
+
+      expect(result).toBe(model);
+      expect(mockSourceRecordRepo.save).not.toHaveBeenCalled();
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ sighted: true, create: false }),
+      );
+    });
+
+    it('leaves the product its offer has left, and waits unattached', async () => {
+      const oldProduct = makeExistingModel();
+      oldProduct.id = 'model-old';
+      const own = {
+        id: 'record-google',
+        url: PAGE,
+        source: googleSource,
+        scrapedProduct: { offers: [{ price: 1, resolvedExternalId: 'HAIBIKE-1' }] },
+      };
+      oldProduct.sources = [own] as never;
+      mockSourceRecordRepo.findBySourceAndUrl
+        .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
+        .mockResolvedValue({ ...own, model: null } as never);
+
+      const result = await contribute();
+
+      expect(result).toBeUndefined();
+      expect(mockContributorDetach.detachRecords).toHaveBeenCalledWith(oldProduct, [own]);
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith({
+        model: oldProduct,
+        seller: googleSource.seller,
+        externalIds: ['HAIBIKE-1'],
+        sighted: false,
+        create: false,
+      });
+      expect(mockProductRepo.save).toHaveBeenCalledWith(oldProduct);
+      expect(mockSourceRecordUpdater.upsertUnattached).toHaveBeenCalledWith(
+        expect.objectContaining({ existing: expect.objectContaining({ id: 'record-google' }) }),
+      );
+    });
+
+    it('never creates an offer', async () => {
+      const model = makeExistingModel();
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
+        ...offerOn('model-1'),
+        model,
+      } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
+
+      await contribute();
+
+      for (const [params] of mockOfferComposer.compose.mock.calls) {
+        expect(params.create).toBe(false);
+      }
+      expect(mockOfferComposer.writeUnkeyed).not.toHaveBeenCalled();
+    });
   });
 
   describe('locks and the re-check', () => {
@@ -1385,9 +1690,8 @@ describe('ProductScrapeUpdaterService', () => {
           keys: { namespace: number; id: string }[],
           work: () => Promise<unknown>,
         ) => {
-          const labels = keys.map(
-            (key) => `${key.namespace === 1 ? 'product' : 'brand'}:${key.id}`,
-          );
+          const kinds: Record<number, string> = { 1: 'product', 2: 'brand', 4: 'offer' };
+          const labels = keys.map((key) => `${kinds[key.namespace]}:${key.id}`);
           held.push(...labels);
           try {
             return await work();
@@ -1424,7 +1728,6 @@ describe('ProductScrapeUpdaterService', () => {
         see('recordPairs');
         return 0;
       });
-      mockOfferRepo.upsertFromScrape.mockResolvedValue({ id: 'offer-1' } as never);
     });
 
     const withOfferAndImage = () =>
@@ -1462,7 +1765,7 @@ describe('ProductScrapeUpdaterService', () => {
       ]) {
         expect(seen[call]?.length).toBeGreaterThan(0);
         for (const locks of seen[call]) {
-          expect(locks).toEqual(['product:model-1']);
+          expect(locks).toEqual(['product:model-1', 'offer:seller-arukereso:sku-1']);
         }
       }
       // Pairs only add rows, with ON CONFLICT: no lock needed.
@@ -1482,7 +1785,11 @@ describe('ProductScrapeUpdaterService', () => {
       expect(seen['createShell']).toEqual([[]]);
       for (const call of ['upsertSourceRecord', 'save model-new', 'recomputePrice']) {
         for (const locks of seen[call]) {
-          expect(locks).toEqual(['brand:brand-1', 'product:model-new']);
+          expect(locks).toEqual([
+            'brand:brand-1',
+            'product:model-new',
+            'offer:seller-arukereso:sku-1',
+          ]);
         }
       }
       expect(seen['copyImages']).toEqual([['product:model-new']]);
@@ -1531,7 +1838,11 @@ describe('ProductScrapeUpdaterService', () => {
       expect(mockMetricsService.newProductCreated).not.toHaveBeenCalled();
       expect(mockProductRepo.save).toHaveBeenCalledWith(concurrent);
       for (const locks of seen['save model-concurrent']) {
-        expect(locks).toEqual(['brand:brand-1', 'product:model-concurrent']);
+        expect(locks).toEqual([
+          'brand:brand-1',
+          'product:model-concurrent',
+          'offer:seller-arukereso:sku-1',
+        ]);
       }
       // Its own product: no pair with itself.
       expect(mockKeyLookup.recordPairs).toHaveBeenCalledWith(

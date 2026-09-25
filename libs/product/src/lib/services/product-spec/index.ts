@@ -12,3 +12,4 @@ export * from './product-source-record-updater.service';
 export * from './get-latest-source-per-source';
 export * from './product-level-specs';
 export * from './identity-spec-rows';
+export * from './group-records-by-seller';

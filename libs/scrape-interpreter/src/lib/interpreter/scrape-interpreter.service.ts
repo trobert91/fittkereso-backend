@@ -20,16 +20,21 @@ export interface ListPageResult {
   products: ScrapedListProduct[];
 }
 
+/**
+ * One offer as the interpreter read it. An optional field is `null` when its
+ * sub-pipeline is configured and found nothing, and absent when it is not
+ * configured — see ScrapedOffer for why the two differ.
+ */
 export interface RawOfferRecord {
   price?: number;
-  priceWithoutDiscount?: number;
-  currency?: string;
-  availability?: string;
-  url?: string;
+  priceWithoutDiscount?: number | null;
+  currency?: string | null;
+  availability?: string | null;
+  url?: string | null;
   externalId?: string;
-  gtin?: string;
-  mpn?: string;
-  locations?: string[];
+  gtin?: string | null;
+  mpn?: string | null;
+  locations?: string[] | null;
   specs?: ProductSpecs;
 }
 

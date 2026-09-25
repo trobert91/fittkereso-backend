@@ -1,12 +1,13 @@
 import { Readable } from 'stream';
 import { ProductSourceImportSimulationService } from './product-source-import-simulation.service';
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
+import { ArukeresoProductMapperService } from '../../arukereso/arukereso-product-mapper.service';
 import type { ProductSource } from '@fittkereso-backend/database';
 
 describe('ProductSourceImportSimulationService', () => {
   let service: ProductSourceImportSimulationService;
   let nativeScraper: { stream: jest.Mock };
-  let mapper: { classify: jest.Mock; map: jest.Mock };
+  let mapper: { classify: jest.Mock; map: jest.Mock; resolveTarget: jest.Mock };
   let interpreter: { runValuePipeline: jest.Mock; runListPage: jest.Mock };
   let scraperService: { getHtml: jest.Mock };
   let scrapingImport: { planRun: jest.Mock };
@@ -14,6 +15,7 @@ describe('ProductSourceImportSimulationService', () => {
   let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
   let specPostProcess: { extractIdentity: jest.Mock };
   let feedTriage: { triage: jest.Mock };
+  let offerRepo: { findSyncStates: jest.Mock };
 
   const feedSource = {
     id: 'source-1',
@@ -65,6 +67,15 @@ describe('ProductSourceImportSimulationService', () => {
       map: jest
         .fn()
         .mockResolvedValue({ status: 'mapped', url: 'u', scrapedProduct: {} }),
+      // The real target resolution: what the previews and the tallies read.
+      resolveTarget: jest.fn((...args: Parameters<ArukeresoProductMapperService['resolveTarget']>) =>
+        new ArukeresoProductMapperService(
+          interpreter as never,
+          {} as never,
+          {} as never,
+          {} as never,
+        ).resolveTarget(...args),
+      ),
     };
     interpreter = { runValuePipeline: jest.fn(), runListPage: jest.fn() };
     scraperService = { getHtml: jest.fn().mockResolvedValue('<html></html>') };
@@ -75,6 +86,7 @@ describe('ProductSourceImportSimulationService', () => {
     };
     listRefresh = { requiredFields: ['url', 'price', 'availability'] };
     sourceRecordRepo = { findBySourceAndUrl: jest.fn().mockResolvedValue(null) };
+    offerRepo = { findSyncStates: jest.fn().mockResolvedValue([]) };
     // Every row new unless a test says otherwise.
     feedTriage = {
       triage: jest.fn().mockImplementation(async (_source, rows) => ({
@@ -100,6 +112,7 @@ describe('ProductSourceImportSimulationService', () => {
       sourceRecordRepo as never,
       specPostProcess as never,
       feedTriage as never,
+      offerRepo as never,
     );
   });
 
@@ -109,20 +122,20 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource, { limit: 2 });
 
-      expect(result.arukereso?.itemsParsed).toBe(7);
-      expect(result.arukereso?.wouldImport).toBe(7);
+      expect(result.feed?.itemsParsed).toBe(7);
+      expect(result.feed?.wouldImport).toBe(7);
       // Every eligible item is mapped (free, and what the triage needs); only
       // the previews are extracted, and the extraction is what spends LLM calls.
       expect(mapper.classify).toHaveBeenCalledTimes(7);
       expect(mapper.map).toHaveBeenCalledTimes(7);
-      expect(result.arukereso?.products).toHaveLength(2);
+      expect(result.feed?.products).toHaveLength(2);
       // Each preview shows what a first import would extract — the one part
       // of the simulation that calls the LLM — never a stored result.
       expect(specPostProcess.extractIdentity).toHaveBeenCalledTimes(2);
       expect(specPostProcess.extractIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ context: expect.objectContaining({ force: true }) }),
       );
-      expect(result.arukereso?.products[0]).toMatchObject({ nameCleaned: true });
+      expect(result.feed?.products[0]).toMatchObject({ nameCleaned: true });
     });
 
     it('reports what a run would queue and what it would only refresh', async () => {
@@ -143,7 +156,7 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso).toMatchObject({ wouldQueue: 2, wouldRefresh: 1, duplicateUrls: 0 });
+      expect(result.feed).toMatchObject({ wouldQueue: 2, wouldRefresh: 1, duplicateUrls: 0 });
       expect(feedTriage.triage.mock.calls[0][1][0]).toMatchObject({
         url: 'https://speedbike.hu/p/1',
         externalId: 'sku-1',
@@ -151,12 +164,73 @@ describe('ProductSourceImportSimulationService', () => {
       });
     });
 
+    // A contributing source joins the seller's offers; how many it would join
+    // is the number worth knowing before its first run.
+    it('counts, for a source that does not identify products, the rows matching the seller\'s offers', async () => {
+      givenFeed(feed(['a', 'b', 'c']));
+      let row = 0;
+      mapper.map.mockImplementation(async () => {
+        row += 1;
+        return {
+          status: 'mapped',
+          url: `https://speedbike.hu/p/${row}`,
+          scrapedProduct: { offers: [{ externalId: `sku-${row}` }] },
+        };
+      });
+      offerRepo.findSyncStates.mockImplementation(async (_sellerId, ids: string[]) =>
+        ids.filter((id) => id !== 'sku-2').map((id) => ({ externalId: id })),
+      );
+      const contributing = {
+        ...feedSource,
+        identifiesProducts: false,
+        seller: { id: 'seller-1' },
+      } as ProductSource;
+
+      const result = await service.simulate(contributing);
+
+      expect(result.feed?.matchingOffers).toBe(2);
+      expect(offerRepo.findSyncStates).toHaveBeenCalledWith('seller-1', ['sku-1', 'sku-2', 'sku-3']);
+      // It runs no identity extraction, so its previews cost nothing either,
+      // and what the extraction would read is no concern of its.
+      expect(specPostProcess.extractIdentity).not.toHaveBeenCalled();
+      expect(result.warnings.join(' ')).not.toMatch(/identityExtraction\.specRows/);
+    });
+
+    // Google's reason to exist next to the Árukereső feed.
+    it('counts the rows whose old price is above their price', async () => {
+      givenFeed(feed(['a', 'b', 'c']));
+      const prices = [
+        { price: 1_499_990, priceWithoutDiscount: 2_269_000 },
+        { price: 2_149_990, priceWithoutDiscount: 2_149_990 },
+        { price: 999_000, priceWithoutDiscount: null },
+      ];
+      let row = 0;
+      mapper.map.mockImplementation(async () => ({
+        status: 'mapped',
+        url: `https://speedbike.hu/p/${row}`,
+        scrapedProduct: { offers: [{ externalId: `sku-${row}`, ...prices[row++] }] },
+      }));
+
+      const result = await service.simulate(feedSource);
+
+      expect(result.feed?.rowsWithOldPrice).toBe(1);
+    });
+
+    it('leaves the offer match unreported for an identifying source', async () => {
+      givenFeed(feed(['a']));
+
+      const result = await service.simulate(feedSource);
+
+      expect(result.feed?.matchingOffers).toBeUndefined();
+      expect(offerRepo.findSyncStates).not.toHaveBeenCalled();
+    });
+
     it('warns about rows that share a URL, since a run keeps only the last', async () => {
       givenFeed(feed(['a', 'b']));
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.duplicateUrls).toBe(1);
+      expect(result.feed?.duplicateUrls).toBe(1);
       expect(result.warnings.join(' ')).toMatch(/share a URL/);
     });
 
@@ -169,9 +243,9 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.wouldImport).toBe(1);
-      expect(result.arukereso?.wouldSkip).toBe(2);
-      expect(result.arukereso?.skipReasons).toEqual({ category_not_enabled: 2 });
+      expect(result.feed?.wouldImport).toBe(1);
+      expect(result.feed?.wouldSkip).toBe(2);
+      expect(result.feed?.skipReasons).toEqual({ category_not_enabled: 2 });
     });
 
     // The check this simulator exists for. Offer is @Unique([seller, externalId]),
@@ -183,8 +257,8 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.distinctExternalIds).toBe(2);
-      expect(result.arukereso?.duplicateExternalIds).toEqual([
+      expect(result.feed?.distinctExternalIds).toBe(2);
+      expect(result.feed?.duplicateExternalIds).toEqual([
         { externalId: 'dup', count: 2 },
       ]);
       expect(result.errors.join(' ')).toMatch(/WOULD COLLAPSE onto one row/);
@@ -233,7 +307,7 @@ describe('ProductSourceImportSimulationService', () => {
 
         const result = await service.simulate(identifierSource, { limit: 1 });
 
-        expect(result.arukereso?.identifiers).toMatchObject({
+        expect(result.feed?.identifiers).toMatchObject({
           gtinMapped: true,
           gtin: { valid: 1, invalid: 1, absent: 1 },
           invalidGtinByBrand: { GIANT: 1 },
@@ -247,7 +321,7 @@ describe('ProductSourceImportSimulationService', () => {
 
         const result = await service.simulate(identifierSource, { limit: 1 });
 
-        expect(result.arukereso?.identifiers.specRows).toEqual({
+        expect(result.feed?.identifiers.specRows).toEqual({
           configured: true,
           listings: 3,
           listingsWithNoRowSent: 1,
@@ -274,7 +348,7 @@ describe('ProductSourceImportSimulationService', () => {
 
         const result = await service.simulate(identifierSource, { limit: 1 });
 
-        expect(result.arukereso?.productIdentifiers).toEqual([
+        expect(result.feed?.productIdentifiers).toEqual([
           {
             externalId: 'a',
             gtin: { raw: '9008594503199', stored: '09008594503199', outcome: 'valid' },
@@ -292,7 +366,7 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.duplicateExternalIds).toEqual([]);
+      expect(result.feed?.duplicateExternalIds).toEqual([]);
       expect(result.errors).toEqual([]);
     });
 
@@ -301,7 +375,7 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.itemsWithoutExternalId).toBe(1);
+      expect(result.feed?.itemsWithoutExternalId).toBe(1);
       expect(result.warnings.join(' ')).toMatch(/would fall back to the URL slug/);
     });
 
@@ -314,8 +388,19 @@ describe('ProductSourceImportSimulationService', () => {
 
       const result = await service.simulate(feedSource);
 
-      expect(result.arukereso?.wouldImport).toBe(0);
+      expect(result.feed?.wouldImport).toBe(0);
       expect(result.errors.join(' ')).toMatch(/No item survives the category gate/);
+    });
+
+    it('simulates a googleshop source as a feed', async () => {
+      givenFeed(feed(['a', 'b']));
+
+      const result = await service.simulate({ ...feedSource, type: 'googleshop' } as ProductSource);
+
+      expect(result.type).toBe('googleshop');
+      expect(result.feed?.itemsParsed).toBe(2);
+      expect(result.scraping).toBeUndefined();
+      expect(scrapingImport.planRun).not.toHaveBeenCalled();
     });
 
     it('reports a feed that cannot be fetched as an error, not an empty run', async () => {
@@ -324,7 +409,7 @@ describe('ProductSourceImportSimulationService', () => {
       const result = await service.simulate(feedSource);
 
       expect(result.errors).toEqual(['HTTP 404']);
-      expect(result.arukereso).toBeUndefined();
+      expect(result.feed).toBeUndefined();
     });
   });
 

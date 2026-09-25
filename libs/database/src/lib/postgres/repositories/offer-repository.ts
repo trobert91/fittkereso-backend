@@ -1,43 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { Offer } from '../models/offer.entity';
-import { ProductModel } from '../models/product-model.entity';
-import { Seller } from '../models/seller.entity';
-import { ProductSourceRecord } from '../models/product-source-record.entity';
-import { OfferCondition } from '../types/offer-condition';
-import { OfferAvailability } from '../types/offer-availability';
-import { ProductSpecs } from '../../models/product-spec';
 import { nameOf } from '@fittkereso-backend/utils';
-import { OfferIdentityConflictError } from './offer-identity-conflict.error';
-
-export interface UpsertOfferFromScrapeParams {
-  existing?: Offer;
-  model: ProductModel;
-  seller: Seller;
-  sourceRecord: ProductSourceRecord;
-  price: number;
-  /** Pre-discount price — only set when this offer is currently discounted. */
-  priceWithoutDiscount?: number;
-  currency?: string;
-  availability?: OfferAvailability;
-  url?: string;
-  externalId?: string;
-  /** Already normalized (normalizeGtin/normalizeMpn) — this layer stores what
-   *  it is given. Absent is written as null, so a source that stops
-   *  publishing one clears it rather than leaving a stale key to match on. */
-  gtin?: string;
-  mpn?: string;
-  /** Store/warehouse names where this offer is physically available —
-   *  always optional, absence is normal and must never block the upsert. */
-  locations?: string[];
-  /** Offer-level spec values (e.g. frameSize, color) — always optional,
-   *  absence is normal and must never block the upsert. */
-  specs?: ProductSpecs;
-}
 
 @Injectable()
 export class OfferRepository extends BasePostgresRepository<Offer> {
@@ -53,153 +20,6 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     return countByRelationIds(this.repo, nameOf<Offer>('model'), modelIds);
   }
 
-  // Manual fetch-then-save (not repo.upsert()) because condition defaults
-  // only on create, and lastSynced/active need business logic (always bumped
-  // on every successful scrape sighting), not a blind column overwrite.
-  // `existing` is pre-resolved by the caller (OfferMatchingService, run
-  // against a batch preload) rather than looked up here — see
-  // ProductScrapeUpdaterService.createOrUpdateOffers.
-  async upsertFromScrape(
-    params: UpsertOfferFromScrapeParams,
-  ): Promise<Offer> {
-    const {
-      existing,
-      model,
-      seller,
-      sourceRecord,
-      price,
-      priceWithoutDiscount,
-      currency,
-      availability,
-      url,
-      externalId,
-      gtin,
-      mpn,
-      locations,
-      specs,
-    } = params;
-
-    const offer = existing ?? new Offer();
-    offer.model = model;
-    offer.seller = seller;
-    offer.sourceRecord = sourceRecord;
-    offer.condition = offer.condition ?? OfferCondition.new;
-    offer.price = price;
-    offer.priceWithoutDiscount = priceWithoutDiscount;
-    offer.currency = currency ?? 'HUF';
-    // `null`, not `unknown`, when the source reports nothing: asserting
-    // `unknown` would make a feed that has no stock data at all look like one
-    // whose stock data we failed to parse. See Offer.availability.
-    offer.availability = availability ?? null;
-    offer.url = url;
-    offer.externalId = externalId;
-    offer.gtin = gtin ?? null;
-    offer.mpn = mpn ?? null;
-    offer.locations = locations;
-    offer.lastSynced = new Date();
-    offer.active = true;
-    offer.specs = specs;
-
-    try {
-      return await this.repo.save(offer);
-    } catch (error) {
-      if (!existing && externalId && this.isConflict(error)) {
-        // CROSS-SOURCE ADOPTION — read this as the normal path, not as rare
-        // concurrency handling.
-        //
-        // It was written for the latter: two workers inserting the same
-        // (seller, externalId) row between one caller's preload and its save.
-        // That still happens, but it is no longer the common case. Offers are
-        // preloaded per SOURCE, so when a second source imports a listing the
-        // first already owns, its preload cannot see that row — the insert
-        // conflicts, and this branch is what makes the two sources converge on
-        // one offer instead of failing. It runs every night.
-        const owner = await this.repo.findOne({
-          where: { seller: { id: seller.id }, externalId },
-          relations: ['model'],
-        });
-        if (owner) {
-          // The two sources disagree about WHICH PRODUCT this listing is.
-          //
-          // Assigning `model` here would silently move a listing between
-          // products; leaving it unassigned (the original behaviour) silently
-          // leaves it on the other source's product, with this model left
-          // offer-less and therefore price-less and out of price-sorted search.
-          // Both are silent, so neither is acceptable as a default: refuse the
-          // write, keep the existing row exactly as it is, and make the
-          // disagreement loud enough to be resolved by a person.
-          if (owner.model && owner.model.id !== model.id) {
-            throw new OfferIdentityConflictError({
-              externalId,
-              sellerId: seller.id,
-              offerId: owner.id,
-              existingModelId: owner.model.id,
-              incomingModelId: model.id,
-            });
-          }
-
-          owner.price = price;
-          owner.priceWithoutDiscount = priceWithoutDiscount;
-          owner.currency = currency ?? 'HUF';
-          owner.availability = availability ?? null;
-          owner.url = url;
-          // Provenance follows whichever source stamped the offer last. On an
-          // offer shared by two sources that means it alternates nightly —
-          // correct for price and freshness, meaningless as attribution. Do not
-          // read `sourceRecord` on a shared offer as "the source that owns it".
-          owner.sourceRecord = sourceRecord;
-          owner.gtin = gtin ?? null;
-          owner.mpn = mpn ?? null;
-          owner.locations = locations;
-          owner.lastSynced = new Date();
-          owner.active = true;
-          owner.specs = specs;
-          return this.repo.save(owner);
-        }
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Refresh one offer from a list card — price, availability and the freshness
-   * stamp, and nothing else.
-   *
-   * Deliberately NOT upsertFromScrape, which assigns `url`, `sourceRecord`,
-   * `locations` and `specs` unconditionally. A ScrapedListProduct carries none
-   * of those by design, so routing this path through it would blank an offer's
-   * specs and locations on every nightly list pass. Nothing else is observable
-   * from a list card, so nothing else may be written from one.
-   *
-   * `availability` is skipped when undefined rather than written as `unknown`:
-   * a card that does not expose stock must leave whatever a detail scrape
-   * established intact. A refresh may not degrade data it cannot observe.
-   */
-  async refreshFromListProduct(
-    offerId: string,
-    values: {
-      price?: number;
-      priceWithoutDiscount?: number;
-      currency?: string;
-      availability?: OfferAvailability;
-    },
-  ): Promise<void> {
-    const update: QueryDeepPartialEntity<Offer> = { lastSynced: new Date() };
-
-    if (values.price !== undefined) update.price = values.price;
-    if (values.currency !== undefined) update.currency = values.currency;
-    if (values.availability !== undefined) {
-      update.availability = values.availability;
-    }
-    // Assigned even when undefined: an offer that has come OFF discount must
-    // lose its pre-discount price, and absence is how a card says that.
-    if (values.price !== undefined) {
-      update.priceWithoutDiscount = values.priceWithoutDiscount;
-    }
-
-    await this.repo.update(offerId, update);
-  }
-
   // Batch-preload every Offer this model has from a given source, spanning
   // all of that source's ProductSourceRecords (not just one) — a
   // multi-variant scrape can persist offers under several ProductSourceRecord
@@ -207,7 +27,9 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   // enqueued tasks can each create their own record for overlapping variants.
   // Scoping by source rather than a single sourceRecord is what lets
   // OfferMatchingService find and update an offer regardless of which record
-  // originally created it. See ProductScrapeUpdaterService.createOrUpdateOffers.
+  // originally created it. Only offers without an externalId are matched this
+  // way now (ProductScrapeUpdaterService.writeUnkeyedOffers); the rest are
+  // keyed by (seller, externalId) and composed (OfferComposerService).
   async findAllByModelAndSource(
     modelId: string,
     sourceId: string,
@@ -244,6 +66,21 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   }
 
   /**
+   * A seller's offers under these externalIds, with the product each sits on:
+   * what OfferComposerService writes to, and refuses to move.
+   */
+  async findBySellerAndExternalIds(
+    sellerId: string,
+    externalIds: string[],
+  ): Promise<Offer[]> {
+    if (externalIds.length === 0) return [];
+    return this.repo.find({
+      where: { seller: { id: sellerId }, externalId: In(externalIds) },
+      relations: { model: true },
+    });
+  }
+
+  /**
    * What a feed run needs to refresh a seller's offers in place: which of
    * these externalIds already have an offer, on which product, and when each
    * was last confirmed.
@@ -265,6 +102,31 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       externalId: offer.externalId as string,
       modelId: offer.model.id,
       lastSynced: offer.lastSynced ?? null,
+    }));
+  }
+
+  /**
+   * A seller's offers on products of these categories, with each one's key and
+   * product: what a complete run of a source listing the whole catalog weighs
+   * against the rows it saw.
+   */
+  async findSellerOffersInCategories(
+    sellerId: string,
+    categorySlugs: string[],
+  ): Promise<{ id: string; externalId: string | null; modelId: string }[]> {
+    if (categorySlugs.length === 0) return [];
+    const offers = await this.repo.find({
+      where: {
+        seller: { id: sellerId },
+        model: { productCategory: { slug: In(categorySlugs) } },
+      },
+      relations: { model: { productCategory: true } },
+      select: { id: true, externalId: true, model: { id: true, productCategory: { id: true } } },
+    });
+    return offers.map((offer) => ({
+      id: offer.id,
+      externalId: offer.externalId ?? null,
+      modelId: offer.model.id,
     }));
   }
 
@@ -375,15 +237,9 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   ): Promise<Offer[]> {
     return this.repo.find({
       where: { lastSynced: LessThan(deleteCutoff) },
-      relations: [nameOf<Offer>('model')],
+      relations: [nameOf<Offer>('model'), nameOf<Offer>('seller')],
       order: { lastSynced: 'ASC' },
       take: limit,
     });
-  }
-
-  private isConflict(error: unknown): boolean {
-    return (
-      error instanceof Error && error.message.includes('duplicate key value')
-    );
   }
 }

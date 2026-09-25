@@ -15,7 +15,12 @@ export interface ProductSourceUpdateParams {
   configNote?: string;
   schedulingEnabled?: boolean;
   processingEnabled?: boolean;
+  /** Unique per seller: a taken value is refused. */
   priority?: number;
+  /** Refused when it would leave the seller with no identifying source. */
+  identifiesProducts?: boolean;
+  /** Feed sources only. */
+  hasAllProducts?: boolean;
   maxConcurrent?: number;
   requestsPerHour?: number;
   frequency?: string | null;

@@ -26,6 +26,11 @@ function toFiniteNumber(value: unknown): number | undefined {
 // undefined — dropped by forEachItem's default skipEmptyResults — when
 // price doesn't resolve, mirroring the previous single-offer
 // runDetailPageOffers required-field check.
+//
+// A configured optional field that resolves to nothing is `null`, not
+// undefined: the source speaks for the field and says "none" (an old price
+// gone because the sale ended). An unconfigured one stays undefined, so the
+// seller's other sources decide it.
 export function makeAssembleOffer(
   runner: ScrapePipelineRunnerService,
 ): OpHandler<AssembleOfferOp> {
@@ -35,21 +40,23 @@ export function makeAssembleOffer(
     if (!Number.isFinite(price)) return undefined;
 
     const priceWithoutDiscount = op.priceWithoutDiscount
-      ? toFiniteNumber(await runner.run(op.priceWithoutDiscount, ctx, input))
+      ? (toFiniteNumber(await runner.run(op.priceWithoutDiscount, ctx, input)) ??
+        null)
       : undefined;
 
     const currency = op.currency
-      ? ((await runner.run(op.currency, ctx, input)) as string | undefined)
+      ? (((await runner.run(op.currency, ctx, input)) as string | undefined) ??
+        null)
       : undefined;
 
     const availability = op.availability
-      ? ((await runner.run(op.availability, ctx, input)) as
+      ? (((await runner.run(op.availability, ctx, input)) as
           | string
-          | undefined)
+          | undefined) ?? null)
       : undefined;
 
     const url = op.url
-      ? ((await runner.run(op.url, ctx, input)) as string | undefined)
+      ? (((await runner.run(op.url, ctx, input)) as string | undefined) ?? null)
       : undefined;
 
     const externalId = op.externalId
@@ -57,19 +64,19 @@ export function makeAssembleOffer(
       : undefined;
 
     const gtin = op.gtin
-      ? toIdentifierText(await runner.run(op.gtin, ctx, input))
+      ? (toIdentifierText(await runner.run(op.gtin, ctx, input)) ?? null)
       : undefined;
 
     const mpn = op.mpn
-      ? toIdentifierText(await runner.run(op.mpn, ctx, input))
+      ? (toIdentifierText(await runner.run(op.mpn, ctx, input)) ?? null)
       : undefined;
 
-    let locations: string[] | undefined;
+    let locations: string[] | null | undefined;
     if (op.locations) {
       const rawLocations = (await runner.run(op.locations, ctx, input)) as
         | string[]
         | undefined;
-      locations = rawLocations && rawLocations.length > 0 ? rawLocations : undefined;
+      locations = rawLocations && rawLocations.length > 0 ? rawLocations : null;
     }
 
     let specs: ProductSpecs | undefined;

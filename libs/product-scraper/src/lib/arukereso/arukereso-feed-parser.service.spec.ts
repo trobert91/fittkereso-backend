@@ -167,6 +167,52 @@ describe('ArukeresoFeedParserService', () => {
 
       expect(items).toHaveLength(2);
     });
+
+    // Google's descriptions: inch marks everywhere, and nothing quoted.
+    it('reads a quote inside a cell as text, not as the start of a quoted field', async () => {
+      const tsv = 'id\tdescription\tprice\nA\tCargo e-bike 24" / 20" kerékkel\t100\nB\tMTB 29"\t200\n';
+      const { items } = await collect(tsv, { format: 'csv' as const });
+
+      expect(items).toHaveLength(2);
+      expect(feedField(items[0], 'description')).toBe('Cargo e-bike 24" / 20" kerékkel');
+      expect(feedField(items[1], 'description')).toBe('MTB 29"');
+      expect(feedField(items[1], 'price')).toBe('200');
+    });
+
+    it('reads a lone carriage return as text, not as a line break', async () => {
+      const tsv = 'id\tdescription\nA\tFOX LIVE VALVE\r...\nB\tx\n';
+      const { items } = await collect(tsv, { format: 'csv' as const });
+
+      expect(items).toHaveLength(2);
+      expect(feedField(items[0], 'description')).toBe('FOX LIVE VALVE\r...');
+    });
+  });
+
+  describe("Google Shopping's TSV", () => {
+    it('parses every row, fields as Google names them', async () => {
+      const { items, summary } = await collect(read('speedbike-google-shopping-sample.tsv'), {
+        contentType: 'text/tab-separated-values;charset=UTF-8',
+      });
+
+      expect(summary).toMatchObject({ format: 'csv', delimiter: '\t' });
+      expect(items.map((item) => feedField(item, 'id'))).toEqual([
+        'HAIBIKE-451641xx-2021',
+        '021323/2021',
+        '121210',
+        'KTM-0243111XX-2025',
+        '2103714104',
+        'GIANT-230330310X-2023',
+      ]);
+      const [haibike, , cargo, , liv] = items;
+      expect(feedField(haibike, 'price')).toBe('2269000 HUF');
+      expect(feedField(haibike, 'sale_price')).toBe('1499990 HUF');
+      expect(feedField(haibike, 'link')).toMatch(/^https:\/\/speedbike\.hu\/haibike-allmtn-5/);
+      expect(feedField(cargo, 'sale_price')).toBeUndefined();
+      expect(feedField(cargo, 'gtin')).toBe('4054571500601');
+      expect(feedField(cargo, 'description')).toContain('24" / 20"');
+      expect(feedField(liv, 'brand')).toBe('LIV');
+      expect(feedField(liv, 'description')).toBeUndefined();
+    });
   });
 
   describe('format detection', () => {

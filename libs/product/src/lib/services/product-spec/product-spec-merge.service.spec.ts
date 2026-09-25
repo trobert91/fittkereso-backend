@@ -6,7 +6,7 @@ import type {
 
 describe('ProductSpecMergeService', () => {
   let service: ProductSpecMergeService;
-  let sourceRepo: { getAll: jest.Mock };
+  let priorities: Record<string, number>;
   let categoryConfigService: {
     getJsonSchema: jest.Mock;
   };
@@ -37,27 +37,23 @@ describe('ProductSpecMergeService', () => {
   ): ProductSourceRecord {
     return {
       id,
-      source: { id } as any,
+      source: { id, priority: priorities[id] ?? 0 } as any,
       scrapedProduct: { specs, displayName: opts.sourceName ?? id },
       lastUpdated: new Date(opts.lastUpdated ?? '2026-01-01T00:00:00Z'),
     } as unknown as ProductSourceRecord;
   }
 
-  function setSourcePriorities(priorities: Record<string, number>) {
-    sourceRepo.getAll.mockResolvedValue(
-      Object.entries(priorities).map(([id, priority]) => ({ id, priority })),
-    );
+  /** Set before the records are made: each record's source carries its priority. */
+  function setSourcePriorities(byId: Record<string, number>) {
+    priorities = byId;
   }
 
   beforeEach(() => {
-    sourceRepo = { getAll: jest.fn().mockResolvedValue([]) };
+    priorities = {};
     categoryConfigService = {
       getJsonSchema: jest.fn().mockReturnValue(schema),
     };
-    service = new ProductSpecMergeService(
-      sourceRepo as any,
-      categoryConfigService as any,
-    );
+    service = new ProductSpecMergeService(categoryConfigService as any);
   });
 
   it('passes a single-source value through untouched', async () => {
@@ -191,6 +187,21 @@ describe('ProductSpecMergeService', () => {
       );
       expect(result['weight']).toBe(21);
     });
+  });
+
+  // No cache of sources to go stale: an edited priority counts on the next merge.
+  it('reads each candidate\'s priority off its own source', async () => {
+    const records = [
+      makeSource('low', { weight: 20 }, { lastUpdated: '2026-01-01T00:00:00Z' }),
+      makeSource('high', { weight: 21 }, { lastUpdated: '2026-01-01T00:00:00Z' }),
+    ];
+    const [low, high] = records.map((record) => record.source as { priority: number });
+    low.priority = 1;
+    high.priority = 10;
+    expect((await service.mergeSpecs(records, 'ebikes'))['weight']).toBe(21);
+
+    low.priority = 50;
+    expect((await service.mergeSpecs(records, 'ebikes'))['weight']).toBe(20);
   });
 
   it('sorts the merged output alphabetically by key', async () => {

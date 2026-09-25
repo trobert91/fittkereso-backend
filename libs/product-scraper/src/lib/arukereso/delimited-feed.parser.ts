@@ -8,6 +8,12 @@
  *
  * Handles: quoted fields containing the delimiter or newlines, doubled quotes
  * (`""x""`), backslash-escaped quotes (`\"x\"`), and CRLF or LF line endings.
+ *
+ * A quote opens a quoted field only at the start of a cell, as in RFC 4180;
+ * anywhere else it is text. Google Shopping's TSV quotes nothing, and its
+ * descriptions are full of inch marks (`29" / 27,5"`): a quote opening a field
+ * mid-cell swallowed the tabs and line breaks up to the next one, merging and
+ * shifting rows.
  */
 
 export type Delimiter = ',' | ';' | '\t';
@@ -52,6 +58,8 @@ export function parseDelimited(text: string, delimiter: Delimiter): string[][] {
   let row: string[] = [];
   let cell = '';
   let inQuotes = false;
+  /** Whether the current cell began with a quote, which only it may. */
+  let quotedCell = false;
   let sawAnyChar = false;
 
   let i = 0;
@@ -80,8 +88,9 @@ export function parseDelimited(text: string, delimiter: Delimiter): string[][] {
       continue;
     }
 
-    if (ch === '"') {
+    if (ch === '"' && cell === '' && !quotedCell) {
       inQuotes = true;
+      quotedCell = true;
       sawAnyChar = true;
       i += 1;
       continue;
@@ -90,17 +99,20 @@ export function parseDelimited(text: string, delimiter: Delimiter): string[][] {
     if (ch === delimiter) {
       row.push(cell);
       cell = '';
+      quotedCell = false;
       sawAnyChar = true;
       i += 1;
       continue;
     }
 
-    if (ch === '\r' || ch === '\n') {
-      const isCrLf = ch === '\r' && text[i + 1] === '\n';
+    // A lone CR is text: Google's descriptions carry a few, mid-sentence.
+    const isCrLf = ch === '\r' && text[i + 1] === '\n';
+    if (ch === '\n' || isCrLf) {
       row.push(cell);
       rows.push(row);
       row = [];
       cell = '';
+      quotedCell = false;
       sawAnyChar = false;
       i += isCrLf ? 2 : 1;
       continue;

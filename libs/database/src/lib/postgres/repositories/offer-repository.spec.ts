@@ -1,238 +1,4 @@
-import { Offer } from '../models/offer.entity';
-import { OfferCondition } from '../types/offer-condition';
-import { OfferAvailability } from '../types/offer-availability';
 import { OfferRepository } from './offer-repository';
-import { OfferIdentityConflictError } from './offer-identity-conflict.error';
-
-function makeParams(overrides: Partial<Parameters<OfferRepository['upsertFromScrape']>[0]> = {}) {
-  return {
-    model: { id: 'model-1' } as never,
-    seller: { id: 'seller-1' } as never,
-    sourceRecord: { id: 'source-record-1' } as never,
-    price: 199990,
-    currency: 'HUF',
-    availability: OfferAvailability.in_stock,
-    url: 'https://seller.example/product/1',
-    externalId: 'listing-1',
-    ...overrides,
-  };
-}
-
-describe('OfferRepository.upsertFromScrape', () => {
-  let mockRepo: { findOne: jest.Mock; find: jest.Mock; save: jest.Mock };
-  let repository: OfferRepository;
-
-  beforeEach(() => {
-    mockRepo = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
-    repository = Object.create(OfferRepository.prototype);
-    (repository as unknown as { repo: unknown }).repo = mockRepo;
-  });
-
-  it('creates a new offer defaulting condition to "new" when no existing offer is passed in', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(makeParams());
-
-    expect(mockRepo.findOne).not.toHaveBeenCalled(); // caller pre-resolves `existing`, no internal lookup
-    expect(result.condition).toBe(OfferCondition.new);
-    expect(result.price).toBe(199990);
-    expect(result.active).toBe(true);
-    expect(result.lastSynced).toBeInstanceOf(Date);
-  });
-
-  it('persists priceWithoutDiscount when the scrape reports a discount, and leaves it undefined otherwise', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const discounted = await repository.upsertFromScrape(
-      makeParams({ priceWithoutDiscount: 249990 }),
-    );
-    expect(discounted.priceWithoutDiscount).toBe(249990);
-
-    const notDiscounted = await repository.upsertFromScrape(makeParams());
-    expect(notDiscounted.priceWithoutDiscount).toBeUndefined();
-  });
-
-  it('persists locations when the scrape reports store names, and leaves it undefined otherwise', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const withLocations = await repository.upsertFromScrape(
-      makeParams({ locations: ['Törökbálinti raktár', 'Törökbálint'] }),
-    );
-    expect(withLocations.locations).toEqual(['Törökbálinti raktár', 'Törökbálint']);
-
-    const withoutLocations = await repository.upsertFromScrape(makeParams());
-    expect(withoutLocations.locations).toBeUndefined();
-  });
-
-  it('updates the passed-in existing offer in place without clobbering a non-default condition', async () => {
-    const existing = new Offer();
-    existing.id = 'offer-1';
-    existing.condition = OfferCondition.refurbished;
-    existing.price = 150000;
-    existing.active = false;
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(
-      makeParams({ existing, price: 175000 }),
-    );
-
-    expect(result).toBe(existing);
-    expect(result.condition).toBe(OfferCondition.refurbished); // not overwritten
-    expect(result.price).toBe(175000); // updated
-    expect(result.active).toBe(true); // bumped on every sighting
-  });
-
-  it('defaults currency, and leaves availability empty when the source reports none', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(
-      makeParams({ currency: undefined, availability: undefined, externalId: undefined }),
-    );
-
-    expect(result.currency).toBe('HUF');
-    // Null, NOT `unknown`. A source that publishes no stock data at all — an
-    // Árukereső feed, where delivery_time is empty on every product — must not
-    // be made to look like one whose stock data we failed to parse. `unknown`
-    // is reserved for a value the source did report and we could not map.
-    expect(result.availability).toBeNull();
-  });
-
-  it('keeps a reported availability that the source did supply', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(
-      makeParams({ availability: OfferAvailability.out_of_stock }),
-    );
-
-    expect(result.availability).toBe(OfferAvailability.out_of_stock);
-  });
-
-  it('persists the identifiers it is given', async () => {
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(
-      makeParams({ gtin: '09008594503199', mpn: '1260040108' }),
-    );
-
-    expect(result.gtin).toBe('09008594503199');
-    expect(result.mpn).toBe('1260040108');
-  });
-
-  // Identifiers are looked up across shops, so one a source has stopped
-  // publishing must not linger on the offer and keep matching.
-  it('clears identifiers an existing offer had when the source no longer publishes them', async () => {
-    const existing = new Offer();
-    existing.id = 'offer-1';
-    existing.condition = OfferCondition.new;
-    existing.gtin = '09008594503199';
-    existing.mpn = '1260040108';
-    mockRepo.save.mockImplementation(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(makeParams({ existing }));
-
-    expect(result.gtin).toBeNull();
-    expect(result.mpn).toBeNull();
-  });
-
-  // The cross-source adoption path, and the reason it stopped being rare:
-  // offers are preloaded per SOURCE, so a second source importing a listing the
-  // first already owns cannot see that row, conflicts on insert, and lands
-  // here. This runs every night, not once in a blue moon.
-  it('adopts an existing offer when the insert conflicts and no existing offer was passed in', async () => {
-    mockRepo.save.mockRejectedValueOnce(
-      new Error(
-        'duplicate key value violates unique constraint "UQ_offer_seller_externalId"',
-      ),
-    );
-    const owner = new Offer();
-    owner.id = 'offer-owned';
-    owner.condition = OfferCondition.new;
-    // Same product — no disagreement, so the update proceeds.
-    owner.model = { id: 'model-1' } as never;
-    mockRepo.findOne.mockResolvedValueOnce(owner);
-    mockRepo.save.mockImplementationOnce(async (offer: Offer) => offer);
-
-    const result = await repository.upsertFromScrape(
-      makeParams({ locations: ['Törökbálint'], gtin: '09008594503199', mpn: '1260040108' }),
-    );
-
-    expect(mockRepo.findOne).toHaveBeenCalledWith({
-      where: { seller: { id: 'seller-1' }, externalId: 'listing-1' },
-      // `model` is loaded purely so the disagreement below can be detected.
-      relations: ['model'],
-    });
-    expect(result).toBe(owner);
-    expect(result.price).toBe(199990);
-    expect(result.locations).toEqual(['Törökbálint']);
-    expect(result.gtin).toBe('09008594503199');
-    expect(result.mpn).toBe('1260040108');
-  });
-
-  // Both silent options are wrong: assigning `model` relocates a listing
-  // between products, and leaving it (the original behaviour) strands the
-  // incoming model with no offer, hence no price and no place in price-sorted
-  // search. Neither is acceptable as a default, so this refuses instead.
-  it('refuses to rebind an offer when two sources disagree about its product', async () => {
-    mockRepo.save.mockRejectedValueOnce(
-      new Error(
-        'duplicate key value violates unique constraint "UQ_offer_seller_externalId"',
-      ),
-    );
-    const owner = new Offer();
-    owner.id = 'offer-owned';
-    owner.price = 111;
-    owner.condition = OfferCondition.new;
-    owner.model = { id: 'someone-elses-model' } as never;
-    mockRepo.findOne.mockResolvedValueOnce(owner);
-
-    await expect(repository.upsertFromScrape(makeParams({}))).rejects.toThrow(
-      OfferIdentityConflictError,
-    );
-
-    // The existing row is left exactly as it was — one save attempt (the failed
-    // insert), and no second one.
-    expect(mockRepo.save).toHaveBeenCalledTimes(1);
-    expect(owner.price).toBe(111);
-  });
-
-  it('carries the identifying ids on the conflict error, so it can be investigated', async () => {
-    mockRepo.save.mockRejectedValueOnce(
-      new Error(
-        'duplicate key value violates unique constraint "UQ_offer_seller_externalId"',
-      ),
-    );
-    const owner = new Offer();
-    owner.id = 'offer-owned';
-    owner.condition = OfferCondition.new;
-    owner.model = { id: 'someone-elses-model' } as never;
-    mockRepo.findOne.mockResolvedValueOnce(owner);
-
-    await expect(
-      repository.upsertFromScrape(makeParams({})),
-    ).rejects.toMatchObject({
-      details: {
-        externalId: 'listing-1',
-        sellerId: 'seller-1',
-        offerId: 'offer-owned',
-        existingModelId: 'someone-elses-model',
-        incomingModelId: 'model-1',
-      },
-    });
-  });
-
-  it('does not attempt a race re-fetch when an existing offer was already passed in', async () => {
-    const existing = new Offer();
-    existing.id = 'offer-1';
-    mockRepo.save.mockRejectedValueOnce(
-      new Error('duplicate key value violates unique constraint "UQ_offer_seller_externalId"'),
-    );
-
-    await expect(
-      repository.upsertFromScrape(makeParams({ existing })),
-    ).rejects.toThrow();
-    expect(mockRepo.findOne).not.toHaveBeenCalled();
-  });
-});
 
 describe('OfferRepository.findAllByModelAndSource', () => {
   it('queries offers by model and the sourceRecord\'s source, not a single sourceRecord', async () => {
@@ -334,6 +100,45 @@ describe('OfferRepository identifier lookups', () => {
   it('does not query for an empty list', async () => {
     expect(await repository.findModelIdsByGtins([])).toEqual([]);
     expect(await repository.findModelIdsByMpns('brand-ktm', [])).toEqual([]);
+    expect(mockRepo.find).not.toHaveBeenCalled();
+  });
+});
+
+describe('OfferRepository.findSellerOffersInCategories', () => {
+  // What a complete run weighs against its rows: another category's offers
+  // are no part of it.
+  it("scopes the seller's offers to the products of these categories", async () => {
+    const mockRepo = {
+      find: jest.fn().mockResolvedValue([
+        { id: 'offer-1', externalId: 'sku-1', model: { id: 'model-1' } },
+        { id: 'offer-2', externalId: undefined, model: { id: 'model-2' } },
+      ]),
+    };
+    const repository = Object.create(OfferRepository.prototype);
+    (repository as unknown as { repo: unknown }).repo = mockRepo;
+
+    const offers = await repository.findSellerOffersInCategories('seller-1', ['ebikes']);
+
+    expect(mockRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seller: { id: 'seller-1' },
+          model: { productCategory: { slug: expect.objectContaining({ _value: ['ebikes'] }) } },
+        },
+      }),
+    );
+    expect(offers).toEqual([
+      { id: 'offer-1', externalId: 'sku-1', modelId: 'model-1' },
+      { id: 'offer-2', externalId: null, modelId: 'model-2' },
+    ]);
+  });
+
+  it('queries nothing without categories', async () => {
+    const mockRepo = { find: jest.fn() };
+    const repository = Object.create(OfferRepository.prototype);
+    (repository as unknown as { repo: unknown }).repo = mockRepo;
+
+    expect(await repository.findSellerOffersInCategories('seller-1', [])).toEqual([]);
     expect(mockRepo.find).not.toHaveBeenCalled();
   });
 });

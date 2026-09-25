@@ -66,7 +66,12 @@ interface SeedSourceSpec {
   configFile: string;
   maxConcurrent: number;
   requestsPerHour: number;
+  /** Unique per seller: the higher one overwrites the lower one field by field. */
   priority: number;
+  /** Whether the source creates products and offers; a seller needs one that does. */
+  identifiesProducts: boolean;
+  /** Whether a complete run may remove the offers it did not see. Feed sources only. */
+  hasAllProducts: boolean;
   frequency: string;
   seller: SeedSellerSpec;
   // Only applied when creating the row for the first time (existing rows
@@ -83,7 +88,9 @@ const SOURCES: SeedSourceSpec[] = [
     configFile: 'ebikeshop.config.json',
     maxConcurrent: 2,
     requestsPerHour: 180,
-    priority: 10,
+    priority: 50,
+    identifiesProducts: true,
+    hasAllProducts: false,
     frequency: '7 days',
     seller: {
       name: 'ebikeshop.hu',
@@ -113,7 +120,11 @@ const SOURCES: SeedSourceSpec[] = [
     // scraping source, so the row does not imply a fetch budget it never uses.
     maxConcurrent: 1,
     requestsPerHour: 10,
-    priority: 10,
+    priority: 60,
+    identifiesProducts: true,
+    // The feed is what says what the shop sells, so an item missing from a
+    // complete run is gone.
+    hasAllProducts: true,
     // Nightly: one native GET costs nothing, and the LLM post-process is
     // skipped for every product whose specs did not change.
     frequency: '1 day',
@@ -176,6 +187,8 @@ async function main(): Promise<void> {
         source.maxConcurrent = spec.maxConcurrent;
         source.requestsPerHour = spec.requestsPerHour;
         source.priority = spec.priority;
+        source.identifiesProducts = spec.identifiesProducts;
+        source.hasAllProducts = spec.hasAllProducts;
         source.schedulingEnabled = spec.schedulingEnabled ?? true;
         source.processingEnabled = true;
         source.frequency = spec.frequency as ms.StringValue;

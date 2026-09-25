@@ -13,6 +13,7 @@ import { ProductSourceSimulateScrapeTools } from './product-source-simulate-scra
 import { ProductSourceSimulateImportTools } from './product-source-simulate-import.tools';
 import { SellerTools } from './seller.tools';
 import { ScrapeRunTools } from './scrape-run.tools';
+import { ProductSourceRecordsTools } from './product-source-records.tools';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ScrapeRunTools } from './scrape-run.tools';
         ProductSourceSimulateImportTools,
         SellerTools,
         ScrapeRunTools,
+        ProductSourceRecordsTools,
       ],
       'fittkereso',
     ),
@@ -42,6 +44,7 @@ import { ScrapeRunTools } from './scrape-run.tools';
     ProductSourceSimulateImportTools,
     SellerTools,
     ScrapeRunTools,
+    ProductSourceRecordsTools,
   ],
 })
 export class ProductSourceToolsModule {}

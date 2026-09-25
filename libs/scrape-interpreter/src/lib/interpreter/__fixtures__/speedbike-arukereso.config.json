@@ -520,6 +520,28 @@
           "labels": [
             "Kitámasztó"
           ]
+        },
+        {
+          "key": "frameSize",
+          "labels": [
+            "Méret",
+            "size"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(\\d+(?:[.,]\\d+)?)\\s*cm"
+          ]
+        },
+        {
+          "key": "frameSizeLabel",
+          "labels": [
+            "Méret",
+            "size"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(?:^|\\s)(XXL|XL|XS|S|M|L)$"
+          ]
         }
       ]
     }

@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   ProductSourceRecord,
-  ProductSource,
-  ProductSourceRepository,
   ProductSpecs,
   SpecDefinitionProperty,
 } from '@fittkereso-backend/database';
@@ -49,6 +47,11 @@ interface ValueGroup {
  *           operator can still set when they know better — see the entity
  *           doc comment — but it only decides ties tiers 1-3 couldn't).
  *
+ * The candidates are what ProductMergeService passes: one per seller
+ * (groupRecordsBySeller), so "sources" above means sellers — a shop's several
+ * sources are one vote — plus the admin's record. Each candidate's priority is
+ * read off its own loaded source, so a priority edit counts on the next merge.
+ *
  * A key with only one source's value skips straight through with nothing to
  * arbitrate — most of a 100+-key category schema is this case, since
  * per-source coverage of any individual field is typically sparse.
@@ -56,19 +59,13 @@ interface ValueGroup {
 @Injectable()
 export class ProductSpecMergeService {
   private readonly logger = new CustomLogger(ProductSpecMergeService.name);
-  private sources: ProductSource[] = [];
 
-  constructor(
-    private readonly sourceRepo: ProductSourceRepository,
-    private readonly categoryConfigService: CategoryConfigService,
-  ) {}
+  constructor(private readonly categoryConfigService: CategoryConfigService) {}
 
   public async mergeSpecs(
     sourceSpecs: ProductSourceRecord[],
     categorySlug?: string | null,
   ): Promise<ProductSpecs> {
-    await this.loadSourcesIfNeeded(sourceSpecs);
-
     const jsonSchema = this.categoryConfigService.getJsonSchema(categorySlug);
     const candidatesByKey = this.buildCandidates(sourceSpecs);
 
@@ -88,9 +85,7 @@ export class ProductSpecMergeService {
     const byKey = new Map<string, SpecCandidate[]>();
 
     for (const record of sourceSpecs) {
-      const priority =
-        this.sources.find((source) => source.id === record.source?.id)
-          ?.priority ?? 0;
+      const priority = record.source?.priority ?? 0;
       const sourceLabel =
         record.source?.name ?? record.scrapedProduct?.displayName ?? record.id;
 
@@ -264,28 +259,5 @@ export class ProductSpecMergeService {
 
   private pickRepresentative(group: ValueGroup): SpecCandidate {
     return orderBy(group.candidates, ['lastUpdated', 'priority'], ['desc', 'desc'])[0];
-  }
-
-  // ─── Source priority cache ──────────────────────────────────────────────
-
-  private async loadSourcesIfNeeded(
-    sourceSpecs: ProductSourceRecord[],
-  ): Promise<void> {
-    if (!this.isLoadingNeeded(sourceSpecs)) {
-      return;
-    }
-
-    this.sources = await this.sourceRepo.getAll();
-  }
-
-  private isLoadingNeeded(sourceSpecs: ProductSourceRecord[]): boolean {
-    return (
-      this.sources.length === 0 ||
-      sourceSpecs.some(
-        (spec) =>
-          spec.source?.id &&
-          !this.sources.find((source) => source.id === spec.source?.id),
-      )
-    );
   }
 }

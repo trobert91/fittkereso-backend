@@ -49,7 +49,10 @@ const MAX_LISTED_ALLOWED_VALUES = 8;
 @Injectable()
 export class ProductSourceConfigValidatorService {
   private readonly ajv: Ajv2020;
-  /** One compiled validator per source type — the two shapes share no keys. */
+  /**
+   * One compiled validator per source type. The scraping and feed shapes share
+   * no keys; the two feed types share one.
+   */
   private readonly validators: Record<ProductSourceType, ValidateFunction>;
   private readonly schemas: Record<ProductSourceType, JsonSchemaFragment>;
 
@@ -64,11 +67,14 @@ export class ProductSourceConfigValidatorService {
     this.schemas = {
       scraping: SCRAPING_SOURCE_CONFIG_SCHEMA,
       arukereso: ARUKERESO_SOURCE_CONFIG_SCHEMA,
+      googleshop: ARUKERESO_SOURCE_CONFIG_SCHEMA,
     };
 
+    const feed = this.ajv.compile(ARUKERESO_SOURCE_CONFIG_SCHEMA);
     this.validators = {
       scraping: this.ajv.compile(SCRAPING_SOURCE_CONFIG_SCHEMA),
-      arukereso: this.ajv.compile(ARUKERESO_SOURCE_CONFIG_SCHEMA),
+      arukereso: feed,
+      googleshop: feed,
     };
   }
 

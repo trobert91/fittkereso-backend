@@ -66,15 +66,16 @@ describe('assembleOffer identifiers', () => {
     expect(offer?.gtin).toBe('9008594503199');
   });
 
-  // ebikeshop publishes `gtin: ""` for sizes without a barcode.
-  it('reports a blank value as absent', async () => {
+  // ebikeshop publishes `gtin: ""` for sizes without a barcode. The source
+  // maps the field, so "none" is what it says.
+  it('reports a blank value of a configured field as null', async () => {
     const offer = await assemble(makeContext(), { price: 1, gtin: '  ' }, {
       op: 'assembleOffer',
       price,
       gtin: [{ op: 'jsonPath', path: 'gtin' }],
     });
 
-    expect(offer?.gtin).toBeUndefined();
+    expect(offer?.gtin).toBeNull();
   });
 
   it('leaves both absent when the config does not ask for them', async () => {
@@ -82,5 +83,55 @@ describe('assembleOffer identifiers', () => {
 
     expect(offer?.gtin).toBeUndefined();
     expect(offer?.mpn).toBeUndefined();
+  });
+});
+
+describe('assembleOffer: none versus silent', () => {
+  const handler = makeAssembleOffer(makeRunner());
+  const assemble = async (...args: Parameters<typeof handler>) =>
+    (await handler(...args)) as RawOfferRecord | undefined;
+  const price = [{ op: 'jsonPath' as const, path: 'price' }];
+
+  it('gives null for configured fields that find nothing (a sale that ended)', async () => {
+    const offer = await assemble(makeContext(), { price: 1499990 }, {
+      op: 'assembleOffer',
+      price,
+      priceWithoutDiscount: [{ op: 'jsonPath', path: 'oldPrice' }],
+      currency: [{ op: 'jsonPath', path: 'currency' }],
+      availability: [{ op: 'jsonPath', path: 'stock' }],
+      url: [{ op: 'jsonPath', path: 'link' }],
+      locations: [{ op: 'jsonPath', path: 'stores' }],
+    });
+
+    expect(offer).toMatchObject({
+      price: 1499990,
+      priceWithoutDiscount: null,
+      currency: null,
+      availability: null,
+      url: null,
+      locations: null,
+    });
+  });
+
+  it('leaves unconfigured fields undefined, so other sources decide them', async () => {
+    const offer = await assemble(makeContext(), { price: 1499990, oldPrice: 2269000 }, {
+      op: 'assembleOffer',
+      price,
+    });
+
+    expect(offer).toBeDefined();
+    for (const field of ['priceWithoutDiscount', 'currency', 'availability', 'url', 'locations'] as const) {
+      expect(offer?.[field]).toBeUndefined();
+    }
+  });
+
+  it('keeps a value that is there', async () => {
+    const offer = await assemble(makeContext(), { price: 1499990, oldPrice: 2269000 }, {
+      op: 'assembleOffer',
+      price,
+      priceWithoutDiscount: [{ op: 'jsonPath', path: 'oldPrice' }],
+    });
+
+    expect(offer?.priceWithoutDiscount).toBe(2269000);
   });
 });

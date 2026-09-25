@@ -39,17 +39,11 @@ export class ProductSourceRecordUpdaterService {
     /** A feed row's hash, stored so the next feed run can tell it unchanged. */
     feedRowHash?: string;
   }): Promise<ProductSourceRecord | undefined> {
-    const {
-      model,
-      source: newSource,
-      scrapedProduct,
-      externalId,
-      normalizedSourceName,
-    } = params;
+    const { model, source: newSource, scrapedProduct } = params;
     // Trimmed/trailing-slash-stripped once here so every ProductSourceRecord.url
     // stored is already normalized — callers matching against model.sources
-    // (e.g. ProductScrapeUpdaterService.createOrUpdateOffers's per-offer
-    // sourceRecord resolution) rely on this.
+    // (e.g. ProductScrapeUpdaterService.storedExternalIdsOf, finding the record
+    // this call is about to overwrite) rely on this.
     const sourceUrl = params.sourceUrl ? normalizeUrl(params.sourceUrl) : undefined;
     // Label used only for metrics/logging — admin-entered specs have no
     // ProductSource (source: null), everything else is scraped.
@@ -83,6 +77,7 @@ export class ProductSourceRecordUpdaterService {
     // determined there is nothing new to re-extract. Report the existing row
     // as-is rather than overwriting its specs with `{}`.
     if (scrapedProduct?.specs === undefined && source) {
+      this.markSeen(source);
       return source;
     }
 
@@ -146,6 +141,82 @@ export class ProductSourceRecordUpdaterService {
       model.sources.push(source);
     }
 
+    // The admin's record also holds the admin's description: a manual-specs
+    // save merges into it instead of replacing it.
+    const written =
+      !newSource && scrapedProduct
+        ? { ...source.scrapedProduct, ...scrapedProduct }
+        : scrapedProduct;
+    this.writeListing(source, {
+      ...params,
+      scrapedProduct: written,
+      sourceUrl,
+      processedSpecs,
+      validation,
+    });
+
+    this.logger.debug(
+      `Upserted source record for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
+    );
+
+    return source;
+  }
+
+  /**
+   * A listing of a source that does not identify products, whose offer its
+   * seller does not have yet: written as any listing is, with no product, so
+   * it attaches as it is once that offer exists. `existing` is this source's
+   * record of the URL. The caller saves it.
+   */
+  public upsertUnattached(params: {
+    existing: ProductSourceRecord | null;
+    source: ProductSource;
+    scrapedProduct: ScrapedProduct;
+    externalId?: string;
+    sourceUrl: string;
+    normalizedSourceName?: string;
+    feedRowHash?: string;
+  }): ProductSourceRecord {
+    const record = params.existing ?? new ProductSourceRecord();
+    record.model = null;
+    record.source = params.source;
+
+    const categorySlug = params.scrapedProduct.category?.slug;
+    const processedSpecs = this.processSpecs(params.scrapedProduct.specs ?? {});
+    const validation = this.validatorService.validateSpecs(
+      categorySlug ? this.categoryConfigService.getJsonSchema(categorySlug) : undefined,
+      processedSpecs,
+    );
+    this.writeListing(record, {
+      ...params,
+      sourceUrl: normalizeUrl(params.sourceUrl),
+      processedSpecs,
+      validation,
+    });
+    return record;
+  }
+
+  /** Everything a listing's record keeps of one import of it. */
+  private writeListing(
+    source: ProductSourceRecord,
+    params: {
+      scrapedProduct?: Partial<ScrapedProduct>;
+      externalId?: string;
+      sourceUrl?: string;
+      normalizedSourceName?: string;
+      feedRowHash?: string;
+      processedSpecs: NonNullable<ScrapedProduct['specs']>;
+      validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
+    },
+  ): void {
+    const {
+      scrapedProduct,
+      externalId,
+      sourceUrl,
+      normalizedSourceName,
+      processedSpecs,
+      validation,
+    } = params;
     source.url = sourceUrl;
     source.scrapedProduct = scrapedProduct
       ? {
@@ -188,15 +259,19 @@ export class ProductSourceRecordUpdaterService {
     source.specValid = validation.isValid;
     source.specErrors = validation.isValid ? {} : validation.errors;
     source.lastUpdated = new Date();
+    this.markSeen(source);
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
     if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;
+  }
 
-    this.logger.debug(
-      `Upserted source record for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
-    );
-
-    return source;
+  /**
+   * A source's listing was just imported, so the source still lists it — what
+   * lets its values keep overwriting the seller's lower-priority sources. The
+   * admin's record is no sighting of anything.
+   */
+  private markSeen(record: ProductSourceRecord): void {
+    if (record.source) record.lastSeenAt = new Date();
   }
 
   private processSpecs(

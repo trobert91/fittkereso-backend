@@ -36,9 +36,10 @@ export class StaleOfferSweepScheduler extends BaseScheduler {
   async sweepStaleOffers(): Promise<void> {
     const result = await this.sweepService.sweep();
 
-    if (result.deleted === 0) return;
+    if (result.deleted === 0 && result.contributorsRecomposed === 0) return;
 
     this.log.log('Stale offer sweep finished', {
+      contributorsRecomposed: result.contributorsRecomposed,
       deleted: result.deleted,
       modelsRecomputed: result.modelsRecomputed,
       cutoff: result.cutoff.toISOString(),

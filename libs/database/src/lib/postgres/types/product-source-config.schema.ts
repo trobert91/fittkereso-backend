@@ -113,7 +113,7 @@ const filterConditionSchema: JsonSchemaFragment = {
     field: {
       type: 'string',
       description:
-        'Which field to test. For an arukereso source: ANY feed column, matched case-insensitively with _, - and spaces stripped, plus `attribute:<name>` for one of the feed\'s attribute pairs. For a scraping source: any list-card field (name, url, price, externalId, availability).',
+        'Which field to test. For a feed source (arukereso, googleshop): ANY feed column, matched case-insensitively with _, - and spaces stripped, plus `attribute:<name>` for one of the feed\'s attribute pairs. For a scraping source: any list-card field (name, url, price, externalId, availability).',
     },
     equals: { type: 'string', description: 'Exact match.' },
     notEquals: { type: 'string', description: 'Anything but this.' },
@@ -581,17 +581,18 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
 };
 
 /**
- * Config schema for `type: 'arukereso'` — a product feed.
+ * Config schema for the feed types, `arukereso` and `googleshop`.
  *
  * Shares `$defs` with the scraping schema by value rather than by reference:
  * the two compile as independent Ajv validators, so a `$ref` across them would
- * not resolve.
+ * not resolve. It adds its own `feedFieldMapping`, the one entry a mapping
+ * target takes alone or as a list of fallbacks.
  */
 export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
   $id: 'https://fittkereso.hu/schemas/arukereso-source-config.json',
-  title: 'Árukereső product source config',
+  title: 'Feed product source config',
   description:
-    'The complete definition of a type:"arukereso" source: where the feed is, how its fields map onto ours, and how its attributes map onto the category schema.',
+    'The complete definition of a feed source, type "arukereso" (an Árukereső feed) or "googleshop" (a Google Shopping TSV feed): where the feed is, how its fields map onto ours, and how its attributes map onto the category schema.',
   type: 'object',
   required: ['baseUrl', 'feedUrl', 'category', 'mapping'],
   additionalProperties: false,
@@ -690,7 +691,7 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     mapping: {
       type: 'object',
       description:
-        'Target field -> which feed field supplies it, with an optional transform. `field` does the addressing and the pipeline does the transforming, which is why this type needs no ops of its own.',
+        'Target field -> which feed field supplies it, with an optional transform. `field` does the addressing and the pipeline does the transforming, which is why this type needs no ops of its own. A target may also take a list of such mappings, tried in order: the first that gives a non-empty value wins — e.g. a Google feed\'s price is its sale_price when there is one, else its price.',
       required: ['brand', 'name', 'url', 'price'],
       // The target set is closed on purpose. A mapping key the importer does
       // not read would otherwise sit in the config looking effective while
@@ -698,20 +699,15 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
       // cannot see from the outside.
       propertyNames: { enum: ARUKERESO_MAPPING_TARGETS as unknown as string[] },
       additionalProperties: {
-        type: 'object',
-        properties: {
-          field: {
-            type: 'string',
-            description:
-              'Feed field name, seeding the pipeline. Matched case-insensitively with _, - and spaces stripped — at least three spelling families exist in the wild for the same fields (ProductUrl / producturl / product_url), and the 2021 rename left the old names valid with no published mapping. Omit only when the pipeline needs no input, e.g. a `literal` currency code the format has no field for.',
+        oneOf: [
+          { $ref: '#/$defs/feedFieldMapping' },
+          {
+            type: 'array',
+            minItems: 1,
+            items: { $ref: '#/$defs/feedFieldMapping' },
+            description: 'Fallbacks, tried in order: the first non-empty value wins.',
           },
-          pipeline: pipelineRef(
-            'Optional transform, using the same op vocabulary as scraping configs.',
-          ),
-        },
-        // One or the other must be there; `{}` is a mapping that does nothing.
-        anyOf: [{ required: ['field'] }, { required: ['pipeline'] }],
-        additionalProperties: false,
+        ],
       },
     },
 
@@ -725,5 +721,24 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     postProcess: postProcessConfigSchema,
   },
 
-  $defs: SCRAPING_SOURCE_CONFIG_SCHEMA['$defs'],
+  $defs: {
+    ...(SCRAPING_SOURCE_CONFIG_SCHEMA['$defs'] as JsonSchemaFragment),
+    feedFieldMapping: {
+      type: 'object',
+      description: 'Which feed field supplies a target, with an optional transform.',
+      properties: {
+        field: {
+          type: 'string',
+          description:
+            'Feed field name, seeding the pipeline. Matched case-insensitively with _, - and spaces stripped — at least three spelling families exist in the wild for the same fields (ProductUrl / producturl / product_url), and the 2021 rename left the old names valid with no published mapping. Omit only when the pipeline needs no input, e.g. a `literal` currency code the format has no field for.',
+        },
+        pipeline: pipelineRef(
+          'Optional transform, using the same op vocabulary as scraping configs.',
+        ),
+      },
+      // One or the other must be there; `{}` is a mapping that does nothing.
+      anyOf: [{ required: ['field'] }, { required: ['pipeline'] }],
+      additionalProperties: false,
+    },
+  },
 };

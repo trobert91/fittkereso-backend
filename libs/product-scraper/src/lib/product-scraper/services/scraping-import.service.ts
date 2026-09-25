@@ -44,7 +44,7 @@ export const MAX_PAGES_PER_LISTING = 500;
  */
 @Injectable()
 export class ScrapingImportService implements ProductSourceImporter {
-  readonly type = 'scraping' as const;
+  readonly types = ['scraping'] as const;
 
   private readonly logger = new CustomLogger(ScrapingImportService.name);
 

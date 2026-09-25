@@ -1,7 +1,17 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { ArukeresoProductMapperService } from './arukereso-product-mapper.service';
 import { ArukeresoFeedItem } from './arukereso-feed-item';
-import type { ArukeresoSourceConfig } from '@fittkereso-backend/database';
+import { ArukeresoFeedParserService } from './arukereso-feed-parser.service';
+import type { ArukeresoSourceConfig, ScrapedProduct } from '@fittkereso-backend/database';
 import { OfferAvailability } from '@fittkereso-backend/database';
+import {
+  ProductValueMapperService,
+  ScrapeInterpreterModule,
+  ScrapeInterpreterService,
+  ScrapeOpRegistryService,
+  ScrapePipelineRunnerService,
+} from '@fittkereso-backend/scrape-interpreter';
 import { hashSpecs } from '@fittkereso-backend/utils';
 
 describe('ArukeresoProductMapperService', () => {
@@ -169,13 +179,116 @@ describe('ArukeresoProductMapperService', () => {
       expect(result.scrapedProduct.offers?.[0].mpn).toBe('1260040108');
     });
 
-    it('leaves them absent when the feed row has none', async () => {
+    // Mapped but empty is the source saying "none", which another source of
+    // the seller may not override.
+    it('gives null when the feed row has none', async () => {
       const result = await call(withIdentifiers(), item({ eancode: '', sku: '' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].gtin).toBeNull();
+      expect(result.scrapedProduct.offers?.[0].mpn).toBeNull();
+    });
+
+    it('leaves them absent when the config does not map them', async () => {
+      const result = await call(config(), item({ eancode: '9008594503199' }));
 
       expect(result.status).toBe('mapped');
       if (result.status !== 'mapped') return;
       expect(result.scrapedProduct.offers?.[0].gtin).toBeUndefined();
       expect(result.scrapedProduct.offers?.[0].mpn).toBeUndefined();
+    });
+  });
+
+  describe('the old price: none versus silent', () => {
+    const withOldPrice = config({
+      mapping: { ...config().mapping, priceWithoutDiscount: { field: 'old_price' } },
+    });
+
+    it('reads it when the row has one', async () => {
+      const result = await call(withOldPrice, item({ oldprice: '2 269 000' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].priceWithoutDiscount).toBe(2_269_000);
+    });
+
+    // A sale that ended: Google's row has no sale price any more, and that must
+    // clear the old price rather than leave it to another source.
+    it('gives null when mapped and the row has none', async () => {
+      const result = await call(withOldPrice, item({ oldprice: '' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].priceWithoutDiscount).toBeNull();
+    });
+
+    // The Árukereső feed has no old-price field, so it never speaks for one.
+    it('leaves it absent when not mapped', async () => {
+      const result = await call(config(), item({ oldprice: '2 269 000' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].priceWithoutDiscount).toBeUndefined();
+      expect(result.scrapedProduct.offers?.[0].currency).toBeUndefined();
+    });
+  });
+
+  describe('fallback lists', () => {
+    const fallbackPrice = config({
+      mapping: {
+        ...config().mapping,
+        price: [{ field: 'sale_price' }, { field: 'price' }],
+        priceWithoutDiscount: [{ field: 'list_price' }, { field: 'old_price' }],
+      },
+    });
+
+    it('takes the first entry that has a value', async () => {
+      const result = await call(fallbackPrice, item({ saleprice: '899 900', price: '999 890' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].price).toBe(899_900);
+    });
+
+    it('moves past an empty entry to the next', async () => {
+      const result = await call(fallbackPrice, item({ saleprice: ' ', price: '999 890', oldprice: '1 100 000' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].price).toBe(999_890);
+      expect(result.scrapedProduct.offers?.[0].priceWithoutDiscount).toBe(1_100_000);
+    });
+
+    // Mapped, so the source says "none" when no entry has a value.
+    it('gives null for a mapped target none of whose entries has a value', async () => {
+      const result = await call(fallbackPrice, item({ saleprice: '', price: '999 890' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].priceWithoutDiscount).toBeNull();
+      expect(mapper.isMapped(fallbackPrice, 'priceWithoutDiscount')).toBe(true);
+    });
+
+    it('runs each entry through its own pipeline', async () => {
+      interpreter.runValuePipeline.mockImplementation(async (_pipeline, value) =>
+        value === undefined ? undefined : `${value}0`,
+      );
+      const piped = config({
+        mapping: {
+          ...config().mapping,
+          price: [
+            { field: 'sale_price', pipeline: [{ op: 'trim' }] },
+            { field: 'price', pipeline: [{ op: 'trim' }] },
+          ],
+        },
+      } as never);
+
+      const result = await call(piped, item({ saleprice: '89 990', price: '99 999' }));
+
+      expect(result.status).toBe('mapped');
+      if (result.status !== 'mapped') return;
+      expect(result.scrapedProduct.offers?.[0].price).toBe(899_900);
     });
   });
 
@@ -459,5 +572,80 @@ describe('ArukeresoProductMapperService', () => {
       if (result.status !== 'mapped') return;
       expect(result.scrapedProduct.offers?.[0].externalId).toBeUndefined();
     });
+  });
+});
+
+// The Google Shopping fixture, through the real parser, ops and config.
+describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", () => {
+  const googleConfig = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        __dirname,
+        '../../../../scrape-interpreter/src/lib/interpreter/__fixtures__/speedbike-googleshop.config.json',
+      ),
+      'utf8',
+    ),
+  ) as ArukeresoSourceConfig;
+  const products = new Map<string, ScrapedProduct>();
+
+  beforeAll(async () => {
+    const registry = new ScrapeOpRegistryService();
+    const runner = new ScrapePipelineRunnerService(registry);
+    new ScrapeInterpreterModule(registry, runner, new ProductValueMapperService()).onModuleInit();
+    const runtime = {
+      getCategoryBySlug: jest.fn().mockResolvedValue({ id: 'cat-1', slug: 'ebikes', name: 'Ebikes' }),
+    };
+    const mapper = new ArukeresoProductMapperService(
+      new ScrapeInterpreterService(runner, runtime as never),
+      runtime as never,
+      {
+        getConfig: () => ({ offerLevelSpecs: [] }),
+        getJsonSchema: () => ({ type: 'object', properties: {} }),
+      } as never,
+      { extractSpecs: () => ({}) } as never,
+    );
+
+    const items: ArukeresoFeedItem[] = [];
+    await new ArukeresoFeedParserService().parseString(
+      fs.readFileSync(path.join(__dirname, '__fixtures__/speedbike-google-shopping-sample.tsv'), 'utf8'),
+      (feedItem) => void items.push(feedItem),
+      { contentType: 'text/tab-separated-values;charset=UTF-8' },
+    );
+    for (const feedItem of items) {
+      const mapped = await mapper.map({ config: googleConfig, item: feedItem });
+      if (mapped.status !== 'mapped') throw new Error(`A fixture row was skipped: ${mapped.reason}`);
+      products.set(mapped.scrapedProduct.externalId as string, mapped.scrapedProduct);
+    }
+  });
+
+  const offerOf = (id: string) => products.get(id)?.offers?.[0];
+
+  it('maps every row', () => {
+    expect(products.size).toBe(6);
+  });
+
+  it('takes the sale price as the price, and the list price as the old price', () => {
+    expect(offerOf('HAIBIKE-451641xx-2021')).toMatchObject({
+      price: 1_499_990,
+      priceWithoutDiscount: 2_269_000,
+      currency: 'HUF',
+      url: expect.stringMatching(/^https:\/\/speedbike\.hu\/haibike-allmtn-5[^?]*$/),
+    });
+    expect(offerOf('021323/2021')).toMatchObject({ price: 1_019_990, priceWithoutDiscount: 1_334_600 });
+  });
+
+  // The old price equals the price, which the offer composition drops.
+  it('takes the price when there is no sale', () => {
+    expect(offerOf('121210')).toMatchObject({ price: 2_149_990, priceWithoutDiscount: 2_149_990 });
+  });
+
+  it('reads the identifiers and the category off the row', () => {
+    expect(offerOf('121210')).toMatchObject({ gtin: '4054571500601', mpn: '1212100578' });
+    expect(products.get('121210')?.category?.slug).toBe('ebikes');
+  });
+
+  it('keeps the description, and has none where the row has none', () => {
+    expect(products.get('121210')?.description).toContain('24" / 20"');
+    expect(products.get('2103714104')?.description).toBeUndefined();
   });
 });

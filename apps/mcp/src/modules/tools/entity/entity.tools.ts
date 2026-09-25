@@ -121,9 +121,24 @@ export class EntityTools {
         if (record.normalizedSourceName)
           L.push(`- **Normalized Source Name**: ${record.normalizedSourceName}`);
 
+        // What this source says, before the seller's sources are composed.
+        const entries = record.scrapedProduct?.offers ?? [];
+        if (entries.length > 0) {
+          L.push(`- **Its offer entries (${entries.length})**:`);
+          for (const entry of entries) {
+            const oldPrice =
+              entry.priceWithoutDiscount === undefined
+                ? 'old price not mapped'
+                : `old price ${entry.priceWithoutDiscount ?? 'none'}`;
+            L.push(
+              `  - key=${entry.resolvedExternalId ?? entry.externalId ?? '(none)'} · ${entry.price ?? '(no price)'} · ${oldPrice} · ${entry.availability ?? '(not reported)'}`,
+            );
+          }
+        }
+
         const recordOffers = record.offers ?? [];
         if (recordOffers.length > 0) {
-          L.push(`- **Offers on this record (${recordOffers.length})**:`);
+          L.push(`- **Offers priced from this record (${recordOffers.length})**:`);
           for (const offer of recordOffers) {
             const locationsSuffix =
               offer.locations && offer.locations.length > 0
@@ -134,7 +149,7 @@ export class EntityTools {
             );
           }
         } else {
-          L.push(`- **Offers on this record**: none`);
+          L.push(`- **Offers priced from this record**: none`);
         }
         L.push('');
       }
@@ -147,14 +162,19 @@ export class EntityTools {
       for (const offer of offers) {
         L.push(`### ${offer.seller?.name ?? '(no seller)'} — ${offer.price} ${offer.currency}`);
         L.push(`- **ID**: ${offer.id}`);
+        if (offer.priceWithoutDiscount !== null && offer.priceWithoutDiscount !== undefined) {
+          L.push(`- **Old price**: ${offer.priceWithoutDiscount} ${offer.currency}`);
+        }
         L.push(`- **Availability**: ${offer.availability ?? '(not reported by the source)'}`);
         L.push(`- **Condition**: ${offer.condition}`);
         L.push(`- **URL**: ${offer.url ?? '(none)'}`);
         L.push(`- **External ID**: ${offer.externalId ?? '(none)'}`);
         L.push(`- **GTIN**: ${offer.gtin ?? '(none)'}`);
         L.push(`- **MPN**: ${offer.mpn ?? '(none)'}`);
+        // The record that supplied the price; several sources may share its URL.
+        const priceRecord = sources.find((record) => record.id === offer.sourceRecord?.id);
         L.push(
-          `- **Source Record**: ${offer.sourceRecord?.url ?? offer.sourceRecord?.id ?? '(none)'}`,
+          `- **Source Record**: ${offer.sourceRecord ? `${priceRecord?.source?.name ?? '(no source)'} — ${offer.sourceRecord.url ?? offer.sourceRecord.id}` : '(none)'}`,
         );
         L.push(`- **Active**: ${offer.active}`);
         L.push(`- **Last Synced**: ${offer.lastSynced?.toISOString?.() ?? offer.lastSynced}`);

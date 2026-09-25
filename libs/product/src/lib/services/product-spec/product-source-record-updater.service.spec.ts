@@ -59,6 +59,63 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
 
     expect(result).toBe(existingSource);
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
+    // The source still lists it, even though nothing about it changed.
+    expect(existingSource.lastSeenAt).toBeInstanceOf(Date);
+  });
+
+  it('stamps lastSeenAt on a listing it writes, and never on the admin record', async () => {
+    const model = makeModel();
+
+    const listing = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: { specs: { weight: 22 } } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+    const manual = await service.upsertSourceRecord({
+      model,
+      source: null,
+      scrapedProduct: { specs: { weight: 23 } } as any,
+    });
+
+    expect(listing?.lastSeenAt).toBeInstanceOf(Date);
+    expect(manual?.lastSeenAt).toBeUndefined();
+  });
+
+  it("keeps the admin's description when a manual-specs save writes the admin record", async () => {
+    const adminRecord: Partial<ProductSourceRecord> = {
+      source: null,
+      scrapedProduct: { specs: { weight: 21 }, description: 'Az admin szövege.' },
+      lastUpdated: new Date('2026-01-01'),
+    };
+    const model = makeModel(adminRecord);
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source: null,
+      scrapedProduct: { specs: { weight: 23 } } as any,
+    });
+
+    expect(result).toBe(adminRecord);
+    expect(result?.scrapedProduct).toEqual({ specs: { weight: 23 }, description: 'Az admin szövege.' });
+    expect(model.sources).toHaveLength(1);
+  });
+
+  it("replaces a source's listing wholesale: a description it no longer has goes", async () => {
+    const model = makeModel({
+      source,
+      url: 'https://speedbike.hu/product-1',
+      scrapedProduct: { specs: { weight: 22 }, description: 'régi' },
+    });
+
+    const result = await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: { specs: { weight: 22 } } as any,
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(result?.scrapedProduct?.description).toBeUndefined();
   });
 
   it('creates/updates the source row when scrapedProduct is provided, persisting the hashes supplied by the caller as given', async () => {
@@ -288,5 +345,77 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
 
     expect(result?.scrapedProduct?.offerLevelDeterministicSpecs).toEqual({ frameSize: 43 });
     expect(result?.scrapedProduct?.productLevelDeterministicSpecs).toEqual({ weight: 22 });
+  });
+});
+
+describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
+  let service: ProductSourceRecordUpdaterService;
+  let validatorService: { validateSpecs: jest.Mock };
+  let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
+
+  const google = { id: 'source-google', name: 'speedbike-googleshop' } as any;
+  const listing = {
+    displayName: 'HAIBIKE SDURO',
+    category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },
+    specs: { weight: 22, motor: undefined },
+    offers: [{ price: 1499990, priceWithoutDiscount: 2269000, resolvedExternalId: 'HAIBIKE-1' }],
+  } as any;
+
+  beforeEach(() => {
+    validatorService = {
+      validateSpecs: jest.fn().mockReturnValue({ isValid: false, errors: { weight: 'bad' } }),
+    };
+    categoryConfigService = {
+      getJsonSchema: jest.fn().mockReturnValue({ type: 'object' }),
+      getConfig: jest.fn().mockReturnValue(undefined),
+    };
+    service = new ProductSourceRecordUpdaterService(
+      validatorService as any,
+      { productSourceSpecValidationFailed: jest.fn() } as any,
+      categoryConfigService as any,
+    );
+  });
+
+  // The same record an attached listing gets, so it attaches as it is.
+  it('writes the listing as any listing is, with no product', () => {
+    const record = service.upsertUnattached({
+      existing: null,
+      source: google,
+      scrapedProduct: listing,
+      externalId: 'HAIBIKE-1',
+      sourceUrl: 'https://speedbike.hu/haibike/',
+      normalizedSourceName: 'haibike sduro',
+      feedRowHash: 'hash-1',
+    });
+
+    expect(record).toMatchObject({
+      model: null,
+      source: google,
+      url: 'https://speedbike.hu/haibike',
+      externalId: 'HAIBIKE-1',
+      normalizedSourceName: 'haibike sduro',
+      feedRowHash: 'hash-1',
+      specValid: false,
+      specErrors: { weight: 'bad' },
+    });
+    expect(record.scrapedProduct?.specs).toEqual({ weight: 22 });
+    expect(record.scrapedProduct?.offers).toEqual(listing.offers);
+    expect(record.lastSeenAt).toBeInstanceOf(Date);
+    expect(categoryConfigService.getJsonSchema).toHaveBeenCalledWith('ebikes');
+  });
+
+  it('updates the record it already has for the URL', () => {
+    const existing = { id: 'record-google', model: null, feedRowHash: 'old' } as any;
+
+    const record = service.upsertUnattached({
+      existing,
+      source: google,
+      scrapedProduct: listing,
+      sourceUrl: 'https://speedbike.hu/haibike',
+      feedRowHash: 'hash-2',
+    });
+
+    expect(record).toBe(existing);
+    expect(record.feedRowHash).toBe('hash-2');
   });
 });

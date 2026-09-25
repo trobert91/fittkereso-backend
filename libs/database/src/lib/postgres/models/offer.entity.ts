@@ -38,9 +38,11 @@ export class Offer extends BasePostgresEntity {
   seller: Seller;
 
   /**
-   * The specific listing this offer belongs to — carries both the source
-   * site (via sourceRecord.source) and that listing's URL/specs, so callers
-   * don't need a second join to get from an offer to its source.
+   * The listing that supplied this offer's price — the highest-priority
+   * current record of the seller that lists it (OfferComposerService). Carries
+   * the source (via sourceRecord.source) and that listing's URL/specs, so
+   * callers don't need a second join. On a seller with several sources, the
+   * other fields may come from other records.
    */
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @ManyToOne(() => ProductSourceRecord, {
@@ -66,7 +68,7 @@ export class Offer extends BasePostgresEntity {
    */
   @Expose({ groups: [SerializeGroup.list] })
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
-  priceWithoutDiscount?: number;
+  priceWithoutDiscount?: number | null;
 
   @Expose({ groups: [SerializeGroup.list] })
   @Column({ default: 'HUF' })
@@ -74,7 +76,7 @@ export class Offer extends BasePostgresEntity {
 
   @Expose({ groups: [SerializeGroup.list] })
   @Column({ type: 'varchar', nullable: true })
-  url?: string;
+  url?: string | null;
 
   /**
    * Stock status, when the source gives grounds for one at all.
@@ -145,7 +147,7 @@ export class Offer extends BasePostgresEntity {
    */
   @Expose({ groups: [SerializeGroup.details] })
   @Column({ type: 'jsonb', nullable: true })
-  locations?: string[];
+  locations?: string[] | null;
 
   /**
    * When an import run last confirmed this offer on the source.

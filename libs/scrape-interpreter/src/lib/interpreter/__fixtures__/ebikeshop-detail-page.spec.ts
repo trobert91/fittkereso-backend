@@ -229,14 +229,14 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     expect(result.rawOffers).toEqual([
       {
         price: 3879000.0017,
-        priceWithoutDiscount: undefined,
+        priceWithoutDiscount: null,
         currency: 'HUF',
         availability: 'preorder',
         url: 'https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission',
         externalId: '1260040108',
         gtin: '9008594503199',
         mpn: '1260040108',
-        locations: undefined,
+        locations: null,
         specs: undefined,
       },
     ]);
@@ -271,7 +271,8 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.siblingIds).toBeUndefined();
-    expect(result.rawOffers[0].gtin).toBeUndefined();
+    // The config maps a barcode; this bike has none.
+    expect(result.rawOffers[0].gtin).toBeNull();
     expect(result.rawOffers[0].mpn).toBe('1260040108');
   });
 
@@ -306,7 +307,9 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     const result = await interpreter.runDetailPage(makeTask(), $, config);
 
     expect(result.rawOffers[0].price).toBe(3879000.0017);
-    expect(result.rawOffers[0].priceWithoutDiscount).toBeUndefined();
+    // Null, not absent: the config maps an old price and says there is none,
+    // which clears one a seller's other source still carries.
+    expect(result.rawOffers[0].priceWithoutDiscount).toBeNull();
   });
 
   it('maps JSON-LD InStock availability to in_stock, with real store names as locations', async () => {
@@ -339,13 +342,13 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
     expect(result.rawOffers).toHaveLength(1);
     expect(result.rawOffers[0].availability).toBe('out_of_stock');
-    expect(result.rawOffers[0].locations).toBeUndefined();
+    expect(result.rawOffers[0].locations).toBeNull();
   });
 
   // Confirmed live: a preorder-only listing's sole "Üzletek" row is literally
   // "Gyártói készlet" (manufacturer/supplier stock) — not a real physical
   // store, so it must be filtered out of locations rather than reported as one.
-  it('filters "Gyártói készlet" out of locations, leaving it undefined', async () => {
+  it('filters "Gyártói készlet" out of locations, leaving none', async () => {
     const $ = cheerio.load(
       buildHtml({ jsonLdAvailability: 'PreOrder', storeNames: ['Gyártói készlet'] }),
     );
@@ -355,6 +358,6 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
     expect(result.rawOffers).toHaveLength(1);
     expect(result.rawOffers[0].availability).toBe('preorder');
-    expect(result.rawOffers[0].locations).toBeUndefined();
+    expect(result.rawOffers[0].locations).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import { ProductMergeService } from './product-merge.service';
+import { ProductDescriptionService } from '../product-description/product-description.service';
 import type { Offer } from '@fittkereso-backend/database';
 import type { EntityManager } from 'typeorm';
 
@@ -48,6 +49,8 @@ describe('ProductMergeService.moveOffers', () => {
       {} as any, // duplicatePairRepo
       {} as any, // offerFreshness
       {} as any, // locks
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
   });
 
@@ -183,6 +186,8 @@ describe('ProductMergeService.moveProductSourceRecords', () => {
       {} as any, // duplicatePairRepo
       {} as any, // offerFreshness
       {} as any, // locks
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
   });
 
@@ -259,6 +264,8 @@ describe('ProductMergeService.movePriceHistory', () => {
       {} as any,
       {} as any, // offerFreshness
       {} as any, // locks
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
   });
 
@@ -324,6 +331,8 @@ describe('ProductMergeService.mergeProducts', () => {
       duplicatePairRepo as any, // duplicatePairRepo
       {} as any, // offerFreshness
       locks as any, // locks
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
     const steps = Object.fromEntries(
       TRANSACTION_STEPS.map((step) => [
@@ -383,6 +392,8 @@ describe('ProductMergeService.mergeProducts', () => {
       { carryDismissalsForMerge: jest.fn().mockResolvedValue(0) } as any,
       {} as any,
       locks as any,
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
     for (const step of TRANSACTION_STEPS) {
       jest.spyOn(service as any, step).mockResolvedValue([]);
@@ -414,6 +425,7 @@ describe('ProductMergeService.mergeSources', () => {
   let validatorService: { validateSpecs: jest.Mock };
   let nameMergeService: { mergeNames: jest.Mock };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
+  let sourceRepo: { find: jest.Mock };
 
   const category = { slug: 'ebikes' } as any;
 
@@ -430,6 +442,7 @@ describe('ProductMergeService.mergeSources', () => {
       getJsonSchema: jest.fn().mockReturnValue(undefined),
       getConfig: jest.fn().mockReturnValue(undefined),
     };
+    sourceRepo = { find: jest.fn().mockResolvedValue([]) };
 
     service = new ProductMergeService(
       {} as any,
@@ -444,6 +457,8 @@ describe('ProductMergeService.mergeSources', () => {
       {} as any,
       {} as any, // offerFreshness
       {} as any, // locks
+      sourceRepo as any,
+      new ProductDescriptionService(),
     );
   });
 
@@ -485,7 +500,7 @@ describe('ProductMergeService.mergeSources', () => {
     );
   });
 
-  it('dedupes to the latest row per source before merging', async () => {
+  it('dedupes the name merge to the latest row per source', async () => {
     const stale = {
       id: 'src-a-stale',
       source: { id: 'source-1' },
@@ -503,10 +518,122 @@ describe('ProductMergeService.mergeSources', () => {
 
     await service.mergeSources(model);
 
-    expect(specMergeService.mergeSpecs).toHaveBeenCalledWith(
-      [fresh],
-      'ebikes',
+    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [fresh], 'ebikes');
+  });
+
+  describe('several sources of one seller', () => {
+    const speedbike = { id: 'seller-speedbike' };
+    const ebikeshop = { id: 'seller-ebikeshop' };
+    const record = (
+      id: string,
+      source: Record<string, unknown>,
+      specs: Record<string, unknown>,
+    ) =>
+      ({
+        id,
+        source,
+        scrapedProduct: { specs, displayName: id },
+        lastUpdated: new Date('2026-09-20'),
+      }) as any;
+
+    const arukereso = record(
+      'arukereso',
+      { id: 'arukereso', priority: 60, identifiesProducts: true, seller: speedbike },
+      { weight: 22 },
     );
+    const google = record(
+      'google',
+      { id: 'google', priority: 40, identifiesProducts: false, seller: speedbike },
+      { weight: 25, motorPower: 250 },
+    );
+    const otherShop = record(
+      'ebikeshop',
+      { id: 'ebikeshop', priority: 50, identifiesProducts: true, seller: ebikeshop },
+      { weight: 23 },
+    );
+
+    it('gives each seller one spec vote, the higher priority winning key by key', async () => {
+      const model = { sources: [google, arukereso, otherShop], productCategory: category } as any;
+
+      await service.mergeSources(model);
+
+      const [candidates] = specMergeService.mergeSpecs.mock.calls[0];
+      expect(candidates).toHaveLength(2);
+      expect(candidates[0].scrapedProduct.specs).toEqual({ weight: 22, motorPower: 250 });
+      // The seller's highest-priority source, for the merge's last tie-break.
+      expect(candidates[0].source).toBe(arukereso.source);
+      expect(candidates[1]).toBe(otherShop);
+      expect(sourceRepo.find).not.toHaveBeenCalled();
+    });
+
+    // Its titles are raw, and a record without `nameCleaned` reads as cleaned.
+    it('leaves a source that does not identify products out of the name merge', async () => {
+      const model = { sources: [google, arukereso, otherShop], productCategory: category } as any;
+
+      await service.mergeSources(model);
+
+      expect(nameMergeService.mergeNames).toHaveBeenCalledWith(
+        model,
+        [arukereso, otherShop],
+        'ebikes',
+      );
+    });
+
+    it('keeps the admin record in both', async () => {
+      const manual = { id: 'manual', source: null, scrapedProduct: { specs: { weight: 21 } }, lastUpdated: new Date() } as any;
+      const model = { sources: [arukereso, manual], productCategory: category } as any;
+
+      await service.mergeSources(model);
+
+      expect(specMergeService.mergeSpecs.mock.calls[0][0]).toEqual([arukereso, manual]);
+      expect(nameMergeService.mergeNames.mock.calls[0][1]).toEqual([arukereso, manual]);
+    });
+
+    it('loads, in one query, the sellers the caller did not load', async () => {
+      const bare = (source: Record<string, unknown>) => ({ ...source, seller: undefined });
+      const model = {
+        sources: [
+          record('arukereso', bare(arukereso.source), { weight: 22 }),
+          record('google', bare(google.source), { weight: 25 }),
+        ],
+        productCategory: category,
+      } as any;
+      sourceRepo.find.mockResolvedValue([
+        { id: 'arukereso', seller: speedbike },
+        { id: 'google', seller: speedbike },
+      ]);
+
+      await service.mergeSources(model);
+
+      expect(sourceRepo.find).toHaveBeenCalledTimes(1);
+      expect(specMergeService.mergeSpecs.mock.calls[0][0]).toHaveLength(1);
+    });
+
+    // speedbike's Árukereső feed carries only the article number for many e-bikes.
+    it("sets the description from the records: Google's text where Árukereső's is only the article number", async () => {
+      const described = (base: any, description: string) => ({
+        ...base,
+        scrapedProduct: { ...base.scrapedProduct, description },
+      });
+      const googleText = 'A Haibike AllMtn 5 minden kihívásra felkészít a hegyen.';
+      const model = {
+        sources: [described(arukereso, '<p>121210</p>'), described(google, `<p>${googleText}</p>`)],
+        productCategory: category,
+        description: 'régi',
+      } as any;
+
+      await service.mergeSources(model);
+
+      expect(model.description).toBe(googleText);
+    });
+
+    it('clears the description with NULL when no record has one', async () => {
+      const model = { sources: [arukereso, google], productCategory: category, description: 'régi' } as any;
+
+      await service.mergeSources(model);
+
+      expect(model.description).toBeNull();
+    });
   });
 
   it('sets specValid/specErrors from the final validation of the merged specs', async () => {
@@ -541,6 +668,8 @@ describe('ProductMergeService.recomputePrice', () => {
       {} as any, // duplicatePairRepo
       { visibleCutoff: () => new Date('2026-09-16') } as any,
       {} as any, // locks
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
     );
 
   it('denormalizes the cheapest fresh offer onto the model', async () => {

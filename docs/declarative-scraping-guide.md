@@ -4,7 +4,7 @@
 
 Scraping used to be hardcoded per source (a TypeScript class per site, dispatched via `source.type` switch statements). It's now data-driven: every source's fetch/parse/map behavior lives in one JSONB column (`ProductSource.config`), interpreted at runtime by a single generic engine (`libs/scrape-interpreter`). Adding a new source is (in principle) inserting a row, not writing code.
 
-> **A second import type landed after this guide was written.** `ProductSource.type` is `'scraping' | 'arukereso'` — see §1 and §10, both of which used to say the type column was gone. Everything below describes the `scraping` type unless it says otherwise; an `arukereso` source imports a product feed instead of walking pages, with its own config shape and no page pipelines at all.
+> **A second import type landed after this guide was written.** `ProductSource.type` is `'scraping' | 'arukereso' | 'googleshop'` — see §1 and §10, both of which used to say the type column was gone. Everything below describes the `scraping` type unless it says otherwise; an `arukereso` or `googleshop` source imports a product feed instead of walking pages, with its own config shape and no page pipelines at all.
 
 This guide is a reading order. Each section names the file(s) to open, what they do, and how they connect to the next one. Read top to bottom and you'll have traced one full scrape from "cron fires" to "row saved in Postgres."
 
@@ -17,7 +17,7 @@ This guide is a reading order. Each section names the file(s) to open, what they
 This is the root of everything. Each row is one importable source (today: `ebikeshop` scraping pages, `speedbike-arukereso` importing a feed). **One webshop may have several sources** — `ProductSourceRecord` is unique on `(source, url)` and every URL-keyed lookup is source-scoped, so each source keeps its own records; the offers converge through `Offer`'s `(seller, externalId)` unique constraint. Key fields:
 
 - `name` — the source's identity, and the label on every log line and metric.
-- `type` — `'scraping'` or `'arukereso'`. **Fixed at creation**: the config format is bound to it, the two shapes share no keys, and `ProductSourceUpdateService` refuses an update that changes it. It selects both the config schema and the importer.
+- `type` — `'scraping'`, `'arukereso'` or `'googleshop'`. **Fixed at creation**: the config format is bound to it, the scraping and feed shapes share no keys (the two feed types share one), and `ProductSourceUpdateService` refuses an update that changes it. It selects both the config schema and the importer.
 - `config: ProductSourceConfig` (jsonb) — the entire declarative definition. Which shape it takes is decided by `type`, so it is a discriminated pair rather than one document with a mode flag.
 - `seller: Seller` — the storefront every offer from this source belongs to. Non-nullable; there is no per-offer seller in the pipeline.
 - `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs. On a feed source they govern nothing: a feed run is one HTTP GET and enqueues no tasks.
@@ -69,7 +69,9 @@ interface ScrapingSourceConfig {
 
 Everything under `listPage`/`detailPage` is a **pipeline** — an ordered array of operations (`ScrapeOperation[]`) that gets executed against the fetched HTML. That op vocabulary is the next thing to understand.
 
-### `type: 'arukereso'`
+### `type: 'arukereso'` and `type: 'googleshop'`
+
+Both are feeds with one config shape and one importer (`ArukeresoImportService`); the type only says which feed the shop publishes, so a seller can have one of each. `arukereso` reads an Árukereső XML or CSV/TSV feed; `googleshop` reads a Google Shopping **TSV** feed (a Google RSS/XML feed, with `<item>` and `g:` tags, parses no item). Field names match case-insensitively with `_`, `-` and spaces stripped, so Google's `sale_price` and `image_link` are addressed as written.
 
 ```ts
 interface ArukeresoSourceConfig {
@@ -79,7 +81,7 @@ interface ArukeresoSourceConfig {
   csv?: { delimiter?: 'auto' | ',' | ';' | '\t' };
   categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
   category: { labelFrom?: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
-  mapping: Record<ArukeresoMappingTarget, { field?: string; pipeline?: ScrapeOperation[] }>;
+  mapping: Record<ArukeresoMappingTarget, FieldMapping | FieldMapping[]>;  // FieldMapping = { field?: string; pipeline?: ScrapeOperation[] }
   specMapping?: Record<string, SourceSpecConfig>;  // same shape as detailPage.specMapping
   postProcess?: ProductSourcePostProcessConfig;    // the same block, read by the same service
 }
@@ -87,10 +89,21 @@ interface ArukeresoSourceConfig {
 
 Small on purpose: `field` does the addressing and the op pipeline does the transforming, which is why this type needs **no scrape ops of its own**. The mapping targets are a closed set (`ARUKERESO_MAPPING_TARGETS`) asserted by the schema, so a typo'd target is refused rather than silently ignored. `category` is required here though its scraping counterpart is optional — a feed is the whole catalogue, so a source that cannot categorise an item can import nothing at all.
 
+**Fallback lists.** A target may map to a list of mappings, tried in order: the first that gives a non-empty value (not undefined, null, `''` or an empty list) wins, and when none does the target is mapped but empty — the source saying "none". Google's price is the case it exists for: `sale_price` when the item is on sale, else `price`. The `coalesce` op cannot do this, as it reads pipeline variables, not feed fields. Google's prices also carry the currency (`2269000 HUF`), which a `stripPattern` removes:
+
+```json
+"price": [
+  { "field": "sale_price", "pipeline": [{ "op": "stripPattern", "pattern": "\\s*[A-Z]{3}$" }] },
+  { "field": "price", "pipeline": [{ "op": "stripPattern", "pattern": "\\s*[A-Z]{3}$" }] }
+],
+"priceWithoutDiscount": { "field": "price", "pipeline": [{ "op": "stripPattern", "pattern": "\\s*[A-Z]{3}$" }] }
+```
+
 **See the real thing:**
 - `__fixtures__/ebikeshop.config.json` — scraping, JSON-hydration/Inertia `data-page` markup.
 - `__fixtures__/speedbike.config.json` — scraping, classic `<table>` spec extraction. Kept as a style template; speedbike itself is feed-only, so this config has no source row.
 - `__fixtures__/speedbike-arukereso.config.json` — the feed config, reusing that file's 58 spec mappings unchanged, because a feed's `attribute_name` labels are the same labels the shop's own spec table uses.
+- `__fixtures__/speedbike-googleshop.config.json` — speedbike's Google Shopping feed: the fallback price, the old price, and post-processing off. Its `id` equals the Árukereső `identifier`, which is how its rows join that source's offers.
 
 ---
 
@@ -170,7 +183,7 @@ These are the two services that actually get invoked per `ProductImportTask`. Bo
 **Files:**
 - `apps/product-collector/src/modules/queue-processor/product-import-task/product-import-task-processor.service.ts` — replaces the old per-source queue processor classes. Routes purely by `task.queue` (list vs. detail), no source branching at all.
 - `libs/product-scraper/src/lib/product-scraper/services/scraping-import.service.ts` — the `scraping` importer. Replaced `GenericProductSourceSyncService`, whose whole job was running a `config.discovery` block to *find* start URLs; neither live config ever had one, so a "full sync" silently did nothing. `startUrls` names them outright.
-- `libs/product-scraper/src/lib/arukereso/arukereso-import.service.ts` — the `arukereso` importer, resolved through `ProductSourceImporterRegistry` by `source.type`.
+- `libs/product-scraper/src/lib/arukereso/arukereso-import.service.ts` — the feed importer, registered for both `arukereso` and `googleshop` and resolved through `ProductSourceImporterRegistry` by `source.type`.
 
 **Category expansion and pagination are resolved once per run, by the importer — never by a list page.** That is not a style preference: `generatePaginationLinks` had no page-1 guard and task creation did not dedupe, so a self-paginating listing re-emitted its whole page range from every page it landed on. Both live configs had to leave `categoryLinks` empty to work around it. A list-page task is now a pure "parse the items here" unit with no power to enqueue more pages, which makes that whole class of bug structurally impossible rather than guarded against.
 
@@ -188,7 +201,7 @@ This service was already the persistence core before this change and is mostly u
 2. `persistProduct` — create or update the `ProductModel`, write the per-source `ProductModelSource` row (now via `source: ProductSource` FK instead of a `type` enum — see step 10), re-merge specs across all sources by `ProductSource.priority`.
 3. `applyPostSaveSideEffects` — slug generation, alias insertion, image copying to Bunny CDN, and (new) **`createOrUpdateOffers`**.
 
-**`createOrUpdateOffers`**: if `scrapedProduct.offers` is populated, for each entry it takes the seller from the source's own `ProductSource.seller` and upserts an `Offer` via `OfferRepository.upsertFromScrape()` (`libs/database/.../repositories/offer-repository.ts` — keyed on `[seller, externalId]`, preserves `condition` on update, always bumps `lastSynced`/`active`). One bad offer doesn't fail the whole scrape — logged and skipped.
+**`createOrUpdateOffers`**: if `scrapedProduct.offers` is populated, the listing's record keeps them (each entry stamped with its `resolvedExternalId`), and `OfferComposerService.compose` then computes each `Offer` (keyed on `[seller, externalId]`) from **all** of the seller's current records, field by field by source priority — see §11. It always bumps `lastSynced`/`active`. One bad offer doesn't fail the whole scrape — logged and skipped.
 
 Two things here are load-bearing and easy to miss, because **the `(seller, externalId)` unique constraint does not error on a collision — it keeps the last writer**:
 
@@ -216,7 +229,7 @@ Not everything moved into the JSONB config. Two things were deliberately left al
 
 The **old** one was a 3-value enum (`arukereso | displaySpecs | manual`) used as an identity/grouping key — "which kind of thing produced this data". It is gone, and the rest of this section is about that removal.
 
-The **current** one is `'scraping' | 'arukereso'` and answers a different question: **which importer runs this source, and therefore which shape its config takes**. It is not a grouping key and nothing switches on it for identity — the importer registry resolves it once (`ProductSourceImporterRegistry`), the config validator dispatches the right JSON Schema off it, and that is all. It is fixed at creation because the stored config would otherwise be reinterpreted under a format that shares none of its keys.
+The **current** one is `'scraping' | 'arukereso' | 'googleshop'` and answers a different question: **which importer runs this source, and therefore which shape its config takes**. It is not a grouping key and nothing switches on it for identity — the importer registry resolves it once (`ProductSourceImporterRegistry`), the config validator dispatches the right JSON Schema off it, and that is all. It is fixed at creation because the stored config would otherwise be reinterpreted under a format that shares none of its keys.
 
 That the old name came back for a new meaning is unfortunate. The distinguishing test: the old type grouped *rows by origin*, the new type selects *code by config format*.
 
@@ -227,6 +240,29 @@ Wherever code used to switch or group on the OLD `.type`, it now uses either:
 - `ProductSource.name` as a plain string (for Prometheus metric labels — cardinality stays bounded because sources are added deliberately, not per-request).
 
 The one exception worth knowing about: **admin-entered specs** (via the product-edit UI) have no `ProductSource` at all — `ProductModelSource.source` is `null` for those rows, which is now the signal that used to be `type === 'manual'`. See `ProductUpdateMapperService.mapManualSpecs` (`libs/product/src/lib/services/update/product-update-mapper.service.ts`).
+
+---
+
+## 11. Several sources per seller
+
+A shop may have several sources: speedbike has its Árukereső feed and its Google Shopping feed. Each source keeps its own records, and the offers, the specs and the description are computed from all of them, so the sources never overwrite each other's data and the order they run in does not matter.
+
+- **`identifiesProducts`** (default on; a seller keeps at least one). An identifying source runs identity resolution and creates products and offers. A contributing source (off) runs none of it:
+  - its row joins the seller's offer with the same `externalId`, the shared fallback of `resolveOfferExternalIds`, so the id must match across the seller's sources;
+  - with no such offer yet, it is stored as an **unattached** record (`model` null). The identifying source's write of that offer attaches it at once (`attachWaitingRecords` in `writeListing`). Both sides take the offer-key advisory lock (`offerKeyLock`), so neither can miss the other;
+  - when the offer is removed (the stale sweep, or a complete source), its contributing records are detached again (`ContributorDetachService`): "unattached" always means "the seller has no offer for it".
+- **`priority`**, unique per seller, decides **field by field**: `OfferComposerService.compose` takes price, old price, currency, availability, url, GTIN, MPN, locations and offer specs from the highest-priority current record (seen within the freshness window) that speaks for the field.
+  - A source speaks only for the fields its config maps. A mapped field with no value is stored as `null`, meaning "none", and counts. An unmapped field is absent, and stays silent. That is how Google's old price fills in for an Árukereső feed that has none, and how an ended sale clears it.
+  - An old price is kept only above the resulting price, and the offer's `sourceRecord` is the record that supplied the price.
+- **Specs** vote once per seller (`groupRecordsBySeller`): within a seller, priority decides key by key; across sellers, agreement. **Names** come only from identifying sources.
+- **The description** (`ProductDescriptionService.pick`): the admin's record wins; otherwise the highest-priority source whose text is at least 40 characters as plain text (`htmlToText` drops shop HTML, Word markup and scripts); ties go to the longer text, then the lower source id, then the lower URL. The public site gets plain text with line breaks.
+- **`hasAllProducts`**: a feed source that lists the whole catalog. At the end of a complete run (no `maxItems` cap reached, no `filter`, every enabled category, no row that failed to map), the seller's offers in those categories that the run did not see are removed, even while another source still lists them. It removes nothing when that would be more than 10% of them (`MAX_COMPLETE_RUN_REMOVAL_SHARE`), or when `offers.completeSourceRemovalEnabled` is off. The run summary's `removalSkipped` says why a run removed nothing. Scraping sources cannot set it: a crawl has no single end.
+- **Seeing it:**
+  - `list_product_source_records` (`attached: false` for the waiting ones);
+  - the unattached count in `get_product_source_import_status`, and the Listings box on the admin source page;
+  - `simulate_product_source_import`, which for a contributing source counts the rows matching an existing offer, and for any feed the rows carrying an old price.
+- **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess` off, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number.
+- **Checked by** `apps/product-collector/scripts/verify-multi-source.ts` on `fittkereso_e2e`: A then G, G then A and both at once end in the same state, plus the removal and admin-description scenarios.
 
 ---
 
@@ -246,7 +282,7 @@ cron (ProductSourceSyncScheduler, every 10 min between 02:00–05:59 Europe/Buda
       (pagination.pageCount against page 1, once) and enqueues one
       list_page task per page. Then returns; the poller does the rest.
 
-  ── type 'arukereso' ─────────────────────────────────────────────
+  ── types 'arukereso' and 'googleshop' ───────────────────────────
   ArukeresoImportService
     → one native GET, streamed through ArukeresoFeedParserService, every row
       mapped (deterministic, no LLM) and triaged against its listing's stored
@@ -290,8 +326,8 @@ Everything below the converge line is import-agnostic: identity resolution, merg
 
 **Use the `add-webshop` skill** (`.claude/skills/add-webshop/`) — it is the maintained procedure, with a plan/execute split and a human review gate between them. In outline:
 
-0. **Decide the type first.** Probe for a feed before assuming you must scrape: `curl -o /dev/null -w '%{http_code}' 'https://<shop>/api/?route=export/feed&id=arukereso'` (ShopRenter's pattern — 200 enabled, 405 disabled, 401 password-protected). One GET beats thousands of paid page fetches. The type cannot be changed afterwards.
-1. Author the config for that type, against the schema `get_product_source_config_schema({ type })` returns. Copy the closest fixture: `ebikeshop.config.json` (JSON-hydration markup), `speedbike.config.json` (classic `<table>`), `speedbike-arukereso.config.json` (feed).
+0. **Decide the type first.** Probe for a feed before assuming you must scrape: `curl -o /dev/null -w '%{http_code}' 'https://<shop>/api/?route=export/feed&id=arukereso'` (ShopRenter's pattern — 200 enabled, 405 disabled, 401 password-protected; `id=google_shopping` is the same shop's Google Shopping TSV, a `googleshop` source). One GET beats thousands of paid page fetches. The type cannot be changed afterwards.
+1. Author the config for that type, against the schema `get_product_source_config_schema({ type })` returns. Copy the closest fixture: `ebikeshop.config.json` (JSON-hydration markup), `speedbike.config.json` (classic `<table>`), `speedbike-arukereso.config.json` (feed), `speedbike-googleshop.config.json` (a Google Shopping feed contributing to another source's offers). A shop that publishes both feeds gets both sources: the Árukereső one identifying, the Google one contributing at a lower priority (§11).
 2. Write golden-fixture tests under `libs/scrape-interpreter/src/lib/interpreter/__fixtures__/`, and add the config to `config-validation.spec.ts` — that spec is the pre-deploy gate.
 3. Only if the source needs a DOM pattern the current 53 ops cannot express, add one: type in `scrape-operation.ts`, handler in `ops/*.ts`, registration in `ops/register-ops.ts`, name in `SCRAPE_OPERATION_NAMES` (a spec asserts those two agree in both directions).
 4. Create the `ProductSource` row with its `type` (see `seed-product-source-configs.ts`), scheduling off.

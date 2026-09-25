@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  FeedRowState,
   OfferRepository,
   ProductSource,
   ProductSourceRecordRepository,
@@ -19,16 +20,22 @@ export interface FeedRow {
   externalId?: string;
 }
 
-/** A row identical to what its listing last imported, and the offer to refresh. */
+/**
+ * A row identical to what its listing last imported, and the offer to
+ * refresh. The offer fields are absent for a contributing source's row that
+ * waits unattached: there is no offer to refresh, only the listing to stamp.
+ */
 export interface UnchangedFeedRow {
   row: FeedRow;
-  offerId: string;
-  modelId: string;
-  lastSynced: Date | null;
+  offerId?: string;
+  modelId?: string;
+  lastSynced?: Date | null;
+  /** When this source last listed it, before this run. */
+  recordSeenAt: Date;
 }
 
 export interface FeedTriage {
-  /** Same row as last imported, and its offer exists: refresh the offer in place. */
+  /** Same row as last imported, and nothing to attach or detach: confirm it in place. */
   unchanged: UnchangedFeedRow[];
   /** New, changed, or missing its offer: a feed_entry task imports it. */
   toImport: FeedRow[];
@@ -43,6 +50,12 @@ export interface FeedTriage {
  * AND the listing's offer still exists. The second half matters: a listing
  * whose offer was swept, or whose import failed after the record was written,
  * has nothing to refresh and must be imported again.
+ *
+ * A source that does not identify products never creates the offer, so for
+ * its rows the second half is whether the listing sits where the offer is: on
+ * the offer's product, or unattached while the seller has no such offer. A
+ * listing that waits while the offer now exists, or sits on a product the
+ * offer has left, is imported again and joins or leaves accordingly.
  */
 @Injectable()
 export class ArukeresoFeedTriageService {
@@ -52,37 +65,53 @@ export class ArukeresoFeedTriageService {
   ) {}
 
   async triage(source: ProductSource, rows: FeedRow[]): Promise<FeedTriage> {
-    const hashes = await this.sourceRecordRepo.findFeedRowHashes(
+    const states = await this.sourceRecordRepo.findFeedRowStates(
       source.id,
       rows.map((row) => row.url),
     );
-    const sameRow = rows.filter(
-      (row) => row.externalId && hashes.get(row.url) === row.rowHash,
-    );
+    const isSameRow = (row: FeedRow) =>
+      !!row.externalId && states.get(row.url)?.feedRowHash === row.rowHash;
     const offers = await this.offerRepo.findSyncStates(
       source.seller.id,
-      sameRow.map((row) => row.externalId as string),
+      rows.filter(isSameRow).map((row) => row.externalId as string),
     );
     const offerByExternalId = new Map(offers.map((offer) => [offer.externalId, offer]));
 
     const unchanged: UnchangedFeedRow[] = [];
     const toImport: FeedRow[] = [];
     for (const row of rows) {
-      const offer =
-        hashes.get(row.url) === row.rowHash && row.externalId
-          ? offerByExternalId.get(row.externalId)
-          : undefined;
-      if (offer) {
+      const state = states.get(row.url);
+      if (!state || !isSameRow(row)) {
+        toImport.push(row);
+        continue;
+      }
+      const offer = offerByExternalId.get(row.externalId as string);
+      const holds =
+        source.identifiesProducts === false
+          ? this.sitsWhereItsOfferIs(state, offer)
+          : !!offer;
+      if (!holds) {
+        toImport.push(row);
+      } else if (offer) {
         unchanged.push({
           row,
           offerId: offer.id,
           modelId: offer.modelId,
           lastSynced: offer.lastSynced,
+          recordSeenAt: state.seenAt,
         });
       } else {
-        toImport.push(row);
+        unchanged.push({ row, recordSeenAt: state.seenAt });
       }
     }
     return { unchanged, toImport };
+  }
+
+  /** A contributing listing on its offer's product, or unattached with no offer to join. */
+  private sitsWhereItsOfferIs(
+    state: FeedRowState,
+    offer: { modelId: string } | undefined,
+  ): boolean {
+    return offer ? state.modelId === offer.modelId : state.modelId === null;
   }
 }

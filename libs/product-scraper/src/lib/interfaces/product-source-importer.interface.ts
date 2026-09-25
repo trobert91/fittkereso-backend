@@ -1,5 +1,19 @@
 import { ProductSource, ProductSourceType } from '@fittkereso-backend/database';
 
+/**
+ * Why a run of a source that lists the whole catalog (hasAllProducts) removed
+ * no offers although it would have: it saw only part of the catalog (capped,
+ * filtered, narrowed to some categories, rows that failed to map), the
+ * removal is switched off, or it would have removed too many to trust.
+ */
+export type RemovalSkipReason =
+  | 'capped'
+  | 'filtered'
+  | 'narrowed'
+  | 'mapping_failures'
+  | 'disabled'
+  | 'share_exceeded';
+
 export interface ImportRunOptions {
   /** Restrict the run to these category slugs. Empty/omitted means all enabled. */
   categorySlugs?: string[];
@@ -32,6 +46,22 @@ export interface ImportRunSummary {
   skipped: number;
   /** Items that errored. A few is normal; a lot means the config has rotted. */
   failed: number;
+  /**
+   * This source's listings waiting unattached when the run ended: rows of a
+   * source that does not identify products, whose offer its seller's
+   * identifying source has not written. Feed only; zero for an identifying
+   * source. The run only queues its rows, so rows it queued are not counted
+   * yet: a first run reports none, and get_product_source_import_status has
+   * the live count.
+   */
+  unattachedRecords?: number;
+  /**
+   * Offers of the seller the run did not see, removed because the source
+   * lists the whole catalog (hasAllProducts). Set only for such a source.
+   */
+  offersRemoved?: number;
+  /** Why such a run removed nothing. Set only when it skipped the removal. */
+  removalSkipped?: RemovalSkipReason;
 }
 
 export const emptyImportRunSummary = (): ImportRunSummary => ({
@@ -47,7 +77,8 @@ export const emptyImportRunSummary = (): ImportRunSummary => ({
 });
 
 /**
- * One import type's entry point.
+ * One import's entry point, for the source types it lists: the feed importer
+ * runs both `arukereso` and `googleshop`.
  *
  * Both implementations only queue ProductImportTasks and return: scraping
  * queues its list pages, a feed run its new or changed rows. The tasks then
@@ -59,7 +90,7 @@ export const emptyImportRunSummary = (): ImportRunSummary => ({
  * existing offers of its rows by (seller, externalId).
  */
 export interface ProductSourceImporter {
-  readonly type: ProductSourceType;
+  readonly types: readonly ProductSourceType[];
 
   import(
     source: ProductSource,

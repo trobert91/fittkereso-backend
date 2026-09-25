@@ -131,7 +131,12 @@ interface SeedSourceSpec {
   configFile: string;
   maxConcurrent: number;
   requestsPerHour: number;
+  /** Unique per seller: the higher one overwrites the lower one field by field. */
   priority: number;
+  /** Whether the source creates products and offers; a seller needs one that does. */
+  identifiesProducts: boolean;
+  /** Whether a complete run may remove the offers it did not see. Feed sources only. */
+  hasAllProducts: boolean;
   schedulingEnabled: boolean;
   processingEnabled: boolean;
   frequency: string;
@@ -160,7 +165,9 @@ const SOURCES: SeedSourceSpec[] = [
     configFile: 'ebikeshop.config.json',
     maxConcurrent: 2,
     requestsPerHour: 180,
-    priority: 10,
+    priority: 50,
+    identifiesProducts: true,
+    hasAllProducts: false,
     // Scheduling stays off in dev: a scheduled run would walk the shop's whole
     // catalogue on the next night tick. Runs are enqueued by hand instead (see
     // apps/product-collector/scripts/enqueue-ktm-catalog.ts). Processing is
@@ -186,7 +193,11 @@ const SOURCES: SeedSourceSpec[] = [
     // so these caps govern nothing here.
     maxConcurrent: 1,
     requestsPerHour: 10,
-    priority: 10,
+    priority: 60,
+    identifiesProducts: true,
+    // The feed is what says what the shop sells, so an item missing from a
+    // complete run is gone.
+    hasAllProducts: true,
     schedulingEnabled: false,
     processingEnabled: true,
     frequency: '1 day',
@@ -342,6 +353,8 @@ async function seedSources(app: INestApplicationContext): Promise<void> {
       source.maxConcurrent = spec.maxConcurrent;
       source.requestsPerHour = spec.requestsPerHour;
       source.priority = spec.priority;
+      source.identifiesProducts = spec.identifiesProducts;
+      source.hasAllProducts = spec.hasAllProducts;
       source.schedulingEnabled = spec.schedulingEnabled;
       source.processingEnabled = spec.processingEnabled;
       source.frequency = spec.frequency as ms.StringValue;

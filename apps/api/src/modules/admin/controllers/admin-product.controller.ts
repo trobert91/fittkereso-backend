@@ -27,6 +27,7 @@ import {
   ProductImportTaskKind,
   ProductImportTask,
   ProductImportTaskRepository,
+  isFeedSourceType,
   productLock,
   UserRole,
 } from '@fittkereso-backend/database';
@@ -388,7 +389,7 @@ export class AdminProductController {
       relations: [nameOf<ProductSourceRecord>('model')],
     });
 
-    if (!source || source.model.id !== id) {
+    if (!source || source.model?.id !== id) {
       throw new NotFoundException(
         `Source ${sourceId} not found for product ${id}`,
       );
@@ -411,7 +412,7 @@ export class AdminProductController {
       ],
     });
 
-    if (!modelSource || modelSource.model.id !== productId) {
+    if (!modelSource || modelSource.model?.id !== productId) {
       throw new NotFoundException('Product source not found for product');
     }
 
@@ -433,7 +434,7 @@ export class AdminProductController {
 
     // A feed has no page to fetch: its listing is imported again from the row
     // its last feed run stored.
-    if (modelSource.source.type === 'arukereso') {
+    if (isFeedSourceType(modelSource.source.type)) {
       const stored = await this.importTaskRepo.latestFeedPayload(
         modelSource.source.id,
         modelSource.url,

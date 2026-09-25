@@ -9,7 +9,7 @@ import {
   ProductSourceRecord,
   ProductSpecs,
 } from '@fittkereso-backend/database';
-import { isUndefined } from 'lodash';
+import { isUndefined, omit } from 'lodash';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductNormalizerService } from '../product-normalizer.service';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -49,7 +49,7 @@ export class ProductUpdateMapperService {
     }
 
     if (!isUndefined(dto.description)) {
-      entity.description = dto.description;
+      this.mapDescription(entity, dto.description);
     }
 
     if (!isUndefined(dto.enabled)) {
@@ -140,22 +140,42 @@ export class ProductUpdateMapperService {
   }
 
   private mapManualSpecs(entity: ProductModel, specs: ProductSpecs) {
+    const record = this.adminRecordOf(entity);
+    record.scrapedProduct = { ...record.scrapedProduct, specs };
+    record.lastUpdated = new Date();
+  }
+
+  /**
+   * The admin's description overrides every source's, so it lives on the
+   * admin's record and ProductDescriptionService picks it from there; an
+   * empty one removes the override. `lastUpdated` stays: it is the manual
+   * specs' recency, which the spec merge's last tie-break reads.
+   */
+  private mapDescription(entity: ProductModel, description: string) {
+    const text = description.trim();
+    if (!text && !entity.sources?.some((record) => !record.source)) return;
+
+    const record = this.adminRecordOf(entity);
+    const rest = omit(record.scrapedProduct, 'description');
+    record.scrapedProduct = text ? { ...rest, description: text } : rest;
+  }
+
+  /**
+   * Admin-entered values have no ProductSource behind them (source: null) —
+   * that's what distinguishes the admin's record from scraped ones. Created
+   * when missing; `entity.sources` must be loaded, or every edit adds another.
+   */
+  private adminRecordOf(entity: ProductModel): ProductSourceRecord {
     entity.sources = entity.sources ?? [];
+    const existing = entity.sources.find((record) => !record.source);
+    if (existing) return existing;
 
-    // Admin-entered specs have no ProductSource behind them (source: null) —
-    // that's what distinguishes them from scraped ProductSourceRecord rows.
-    const manualSource = entity.sources.find((s) => !s.source);
-
-    if (manualSource) {
-      manualSource.scrapedProduct = { ...manualSource.scrapedProduct, specs };
-      manualSource.lastUpdated = new Date();
-    } else {
-      const newSource = new ProductSourceRecord();
-      newSource.model = entity;
-      newSource.source = null;
-      newSource.scrapedProduct = { specs };
-      newSource.lastUpdated = new Date();
-      entity.sources.push(newSource);
-    }
+    const record = new ProductSourceRecord();
+    record.model = entity;
+    record.source = null;
+    record.scrapedProduct = {};
+    record.lastUpdated = new Date();
+    entity.sources.push(record);
+    return record;
   }
 }

@@ -1,14 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import {
   AdvisoryLockService,
+  Offer,
   OfferRepository,
   ProductModel,
   ProductModelRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
+  Seller,
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { compact, groupBy, uniq } from 'lodash';
 import { OfferFreshnessService } from './offer-freshness.service';
 import { ProductMergeService } from '../merge/product-merge.service';
+import { nameOf, storedOfferExternalId } from '@fittkereso-backend/utils';
+import {
+  OFFER_COMPOSER_MODEL_RELATIONS,
+  OfferComposerService,
+} from './offer-composer.service';
+import { ContributorDetachService } from './contributor-detach.service';
 
 /**
  * Most offers this may delete in one run.
@@ -20,7 +31,15 @@ import { ProductMergeService } from '../merge/product-merge.service';
  */
 export const STALE_OFFER_SWEEP_MAX_DELETIONS_PER_RUN = 500;
 
+/** Most products whose offers one run composes again after a source dropped them. */
+export const STALE_CONTRIBUTOR_MAX_PRODUCTS_PER_RUN = 500;
+
 export interface StaleOfferSweepResult {
+  /**
+   * Products whose offers were composed again because one of a seller's
+   * sources stopped listing them while another still does.
+   */
+  contributorsRecomposed: number;
   deleted: number;
   modelsRecomputed: number;
   cutoff: Date;
@@ -39,6 +58,14 @@ export interface StaleOfferSweepResult {
  * Deletion is hard, matching the in-pass sweep in
  * ProductScrapeUpdaterService.createOrUpdateOffers. Offer.active is not used —
  * nothing in production ever sets it to false.
+ *
+ * Before deleting, it composes again the offers one of a seller's sources has
+ * stopped listing while another still does: the dropping source's values stop
+ * counting, and the offer lives on with the other's. That does not depend on
+ * deletion being enabled.
+ *
+ * After deleting, the contributing records that joined a deleted offer, and
+ * joined nothing else on the product, are detached (ContributorDetachService).
  */
 @Injectable()
 export class StaleOfferSweepService {
@@ -50,9 +77,103 @@ export class StaleOfferSweepService {
     private readonly offerFreshness: OfferFreshnessService,
     private readonly mergeService: ProductMergeService,
     private readonly locks: AdvisoryLockService,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly offerComposer: OfferComposerService,
+    private readonly contributorDetach: ContributorDetachService,
   ) {}
 
   public async sweep(): Promise<StaleOfferSweepResult> {
+    const contributorsRecomposed = await this.recomposeStaleContributors();
+    return { contributorsRecomposed, ...(await this.deleteStale()) };
+  }
+
+  /**
+   * The products where a seller's source has stopped listing an offer another
+   * of its sources still lists — each picked up on the nightly runs between
+   * the record leaving the visible window and the delete cutoff. Every offer of
+   * the product is composed again, without lastSynced: the sources that still
+   * list it keep stamping it themselves.
+   */
+  private async recomposeStaleContributors(): Promise<number> {
+    const modelIds = await this.sourceRecordRepo.findModelIdsWithStaleContributors({
+      visibleCutoff: this.offerFreshness.visibleCutoff(),
+      deleteCutoff: this.offerFreshness.deleteCutoff(),
+      limit: STALE_CONTRIBUTOR_MAX_PRODUCTS_PER_RUN,
+    });
+
+    let recomposed = 0;
+    for (const modelId of modelIds) {
+      try {
+        const found = await this.locks.withLocks([productLock(modelId)], () =>
+          this.recompose(modelId),
+        );
+        if (found) recomposed += 1;
+      } catch (error) {
+        this.logger.error('Failed to compose offers after a source dropped them', error, {
+          modelId,
+        });
+      }
+    }
+    if (recomposed > 0) {
+      this.logger.log('Stale offer sweep: composed offers a source stopped listing', {
+        products: recomposed,
+      });
+    }
+    return recomposed;
+  }
+
+  private async recompose(modelId: string): Promise<boolean> {
+    const model = await this.productRepo.findOne({
+      where: { id: modelId },
+      relations: OFFER_COMPOSER_MODEL_RELATIONS,
+    });
+    if (!model) return false;
+
+    for (const { seller, externalIds } of this.offersBySeller(model.sources ?? [])) {
+      const { conflicts } = await this.offerComposer.compose({
+        model,
+        seller,
+        externalIds,
+        sighted: false,
+        create: false,
+      });
+      if (conflicts.length > 0) {
+        this.logger.warn('Stale offer sweep: an offer sits on another product', {
+          modelId,
+          offerIds: conflicts.map((conflict) => conflict.details.offerId),
+        });
+      }
+    }
+    await this.mergeService.recomputePrice(model);
+    await this.productRepo.save(model);
+    return true;
+  }
+
+  /** Every offer a product's records carry, per seller. */
+  private offersBySeller(
+    records: ProductSourceRecord[],
+  ): { seller: Seller; externalIds: string[] }[] {
+    const bySeller = new Map<string, { seller: Seller; externalIds: string[] }>();
+    for (const record of records) {
+      const seller = record.source?.seller;
+      if (!seller) continue;
+      const group = bySeller.get(seller.id) ?? { seller, externalIds: [] };
+      group.externalIds.push(
+        ...compact(
+          (record.scrapedProduct?.offers ?? []).map((entry) =>
+            storedOfferExternalId(record, entry),
+          ),
+        ),
+      );
+      bySeller.set(seller.id, group);
+    }
+    return [...bySeller.values()].map((group) => ({
+      ...group,
+      externalIds: uniq(group.externalIds),
+    }));
+  }
+
+  private async deleteStale(): Promise<Omit<StaleOfferSweepResult, 'contributorsRecomposed'>> {
     const cutoff = this.offerFreshness.deleteCutoff();
 
     const stale = await this.offerRepo.findStaleForDeletion(
@@ -67,9 +188,8 @@ export class StaleOfferSweepService {
 
     // Collected BEFORE the delete — the offers carry the only reference back to
     // their products, and after the delete there is nothing left to ask.
-    const affectedModelIds = [
-      ...new Set(stale.map((offer) => offer.model?.id).filter(Boolean)),
-    ] as string[];
+    const removedByModel = this.removedKeysByModel(stale);
+    const affectedModelIds = [...removedByModel.keys()];
 
     const capped = stale.length === STALE_OFFER_SWEEP_MAX_DELETIONS_PER_RUN;
 
@@ -103,9 +223,7 @@ export class StaleOfferSweepService {
 
     await this.offerRepo.deleteByIds(stale.map((offer) => offer.id));
 
-    const modelsRecomputed = await this.recomputeAffectedModels(
-      affectedModelIds,
-    );
+    const modelsRecomputed = await this.recomputeAffectedModels(removedByModel);
 
     return {
       deleted: stale.length,
@@ -115,8 +233,33 @@ export class StaleOfferSweepService {
     };
   }
 
+  /** Per product, the deleted offers' keys, per seller. */
+  private removedKeysByModel(
+    offers: Offer[],
+  ): Map<string, { sellerId: string; externalIds: string[] }[]> {
+    const byModel = new Map<string, { sellerId: string; externalIds: string[] }[]>();
+    for (const [modelId, modelOffers] of Object.entries(
+      groupBy(
+        offers.filter((offer) => offer.model?.id),
+        (offer) => offer.model.id,
+      ),
+    )) {
+      byModel.set(
+        modelId,
+        Object.entries(groupBy(modelOffers, (offer) => offer.seller?.id)).flatMap(
+          ([sellerId, sellerOffers]) =>
+            sellerOffers[0].seller
+              ? [{ sellerId, externalIds: compact(sellerOffers.map((offer) => offer.externalId)) }]
+              : [],
+        ),
+      );
+    }
+    return byModel;
+  }
+
   /**
-   * Recompute each affected product's denormalized price.
+   * Detach what joined the deleted offers, and recompute each affected
+   * product's denormalized price.
    *
    * Necessary rather than tidy: ProductModel.price is what the public listing
    * sorts and filters on, and recomputePrice normally only runs on a scrape
@@ -127,19 +270,28 @@ export class StaleOfferSweepService {
    * Each is reloaded and saved under its lock, so an import writing to it
    * meanwhile is not overwritten with a copy loaded before.
    */
-  private async recomputeAffectedModels(modelIds: string[]): Promise<number> {
+  private async recomputeAffectedModels(
+    removedByModel: Map<string, { sellerId: string; externalIds: string[] }[]>,
+  ): Promise<number> {
     let recomputed = 0;
 
-    for (const modelId of modelIds) {
+    for (const [modelId, removed] of removedByModel) {
       try {
         const found = await this.locks.withLocks(
           [productLock(modelId)],
           async () => {
             const model = await this.productRepo.findOne({
               where: { id: modelId },
+              relations: [
+                ...OFFER_COMPOSER_MODEL_RELATIONS,
+                nameOf<ProductModel>('productCategory'),
+              ],
             });
             if (!model) return false;
 
+            for (const { sellerId, externalIds } of removed) {
+              await this.contributorDetach.detach({ model, sellerId, externalIds });
+            }
             await this.mergeService.recomputePrice(model);
             await this.productRepo.save(model as ProductModel);
             return true;

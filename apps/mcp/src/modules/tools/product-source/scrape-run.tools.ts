@@ -165,7 +165,7 @@ export class ScrapeRunTools {
   @Tool({
     name: 'get_product_source_import_status',
     description:
-      'Get an aggregate status breakdown (pending/processing/done/failed counts per kind) of all ProductImportTasks belonging to a ProductSource. Use this to see overall progress of a source\'s scraping — e.g. after enabling scheduling, or after enqueuing a list-page task that fans out into many more tasks.',
+      "Get an aggregate status breakdown (pending/processing/done/failed counts per kind) of all ProductImportTasks belonging to a ProductSource. Use this to see overall progress of a source's scraping — e.g. after enabling scheduling, or after enqueuing a list-page task that fans out into many more tasks. Also shows how many of the source's listings wait unattached (a source that does not identify products, whose offers the seller's identifying source has not written yet).",
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID'),
     }),
@@ -191,6 +191,11 @@ export class ScrapeRunTools {
 
     const L: string[] = [];
     L.push(`# Import Status for Product Source ${args.productSourceId}`);
+    L.push('');
+    const unattached = await this.sourceRecordRepo.countUnattached(args.productSourceId);
+    L.push(
+      `**Unattached listings:** ${unattached}${unattached > 0 ? ' — waiting for the seller\'s identifying source to write their offers (list_product_source_records with attached: false)' : ''}`,
+    );
     L.push('');
 
     if (rows.length === 0) {

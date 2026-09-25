@@ -1,0 +1,99 @@
+{
+  "baseUrl": "https://speedbike.hu",
+  "maxItems": 10,
+  "feedUrl": "https://speedbike.hu/api/?route=export/feed&id=google_shopping",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "E-BIKE"
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "splitAndTake",
+        "separator": " > ",
+        "index": 1,
+        "trim": true
+      }
+    ],
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "E-BIKE"
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "id"
+    },
+    "url": {
+      "field": "link"
+    },
+    "name": {
+      "field": "title"
+    },
+    "brand": {
+      "field": "brand"
+    },
+    "gtin": {
+      "field": "gtin"
+    },
+    "mpn": {
+      "field": "mpn"
+    },
+    "imageUrl": {
+      "field": "image_link"
+    },
+    "categoryLabel": {
+      "field": "product_type"
+    },
+    "description": {
+      "field": "description"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "price": [
+      {
+        "field": "sale_price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      },
+      {
+        "field": "price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      }
+    ],
+    "priceWithoutDiscount": {
+      "field": "price",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "\\s*[A-Z]{3}$"
+        }
+      ]
+    }
+  },
+  "postProcess": {
+    "enabled": false
+  }
+}

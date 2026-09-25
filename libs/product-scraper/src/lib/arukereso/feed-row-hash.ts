@@ -6,8 +6,11 @@ import type { ArukeresoFeedItem } from './arukereso-feed-item';
  * Bump when the mapper's output changes for every row alike — a new field on
  * ScrapedProduct, say — so the next feed run re-imports each row once instead
  * of trusting hashes computed from the old shape.
+ *
+ * 2: an offer says "none" with null for a mapped field and leaves an unmapped
+ * one out (see ScrapedOffer).
  */
-export const FEED_HASH_VERSION = 1;
+export const FEED_HASH_VERSION = 2;
 
 /**
  * One feed row as the importer sees it: the MAPPED product at its canonical

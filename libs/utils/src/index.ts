@@ -12,3 +12,5 @@ export * from './lib/spec-hash';
 export * from './lib/gtin-utils';
 export * from './lib/retry';
 export * from './lib/auth-decorators';
+export * from './lib/offer-external-id';
+export * from './lib/html-to-text';

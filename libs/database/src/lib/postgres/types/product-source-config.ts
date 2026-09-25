@@ -362,7 +362,14 @@ export interface ArukeresoFieldMapping {
 }
 
 /**
- * Config for `type: 'arukereso'` — a product feed.
+ * A target's mapping, or its fallbacks: tried in order, the first that gives a
+ * non-empty value wins — a Google feed's price is its `sale_price` when there
+ * is one, else its `price`.
+ */
+export type ArukeresoMappingEntry = ArukeresoFieldMapping | ArukeresoFieldMapping[];
+
+/**
+ * Config for the feed types, `arukereso` and `googleshop` — a product feed.
  *
  * `field` does the addressing and the op pipeline does the transforming, which
  * is why this type needs no ops of its own.
@@ -406,7 +413,7 @@ export interface ArukeresoSourceConfig {
   filter?: ProductSourceFilterConfig;
   /** The feed's attribute pairs are its spec table — see ProductSourceIdentityExtractionConfig. */
   identityExtraction?: ProductSourceIdentityExtractionConfig;
-  mapping: Record<string, ArukeresoFieldMapping>;
+  mapping: Record<string, ArukeresoMappingEntry>;
   /** Keyed by category slug, exactly as detailPage.specMapping is. */
   specMapping?: Record<string, SourceSpecConfig>;
   /**

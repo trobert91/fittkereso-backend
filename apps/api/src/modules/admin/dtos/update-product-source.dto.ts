@@ -36,10 +36,22 @@ export class UpdateProductSourceDto {
   @IsBoolean()
   processingEnabled?: boolean;
 
+  // Unique per seller; the update service refuses a taken value.
   @IsOptional()
   @IsInt()
   @Min(0)
   priority?: number;
+
+  // Off, the source only contributes to the seller's existing offers. A seller
+  // keeps at least one identifying source.
+  @IsOptional()
+  @IsBoolean()
+  identifiesProducts?: boolean;
+
+  // Feed sources only: a complete run may remove the offers it did not see.
+  @IsOptional()
+  @IsBoolean()
+  hasAllProducts?: boolean;
 
   @IsOptional()
   @IsInt()

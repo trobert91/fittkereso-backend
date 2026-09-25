@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  ArukeresoFieldMapping,
   ArukeresoMappingTarget,
   ArukeresoSourceConfig,
   OfferAvailability,
@@ -81,7 +82,7 @@ export class ArukeresoProductMapperService {
       return { status: 'skipped', reason: 'filtered_out' };
     }
 
-    const rawUrl = await this.resolve(config, item, 'url');
+    const rawUrl = await this.resolveTarget(config, item, 'url');
     if (!rawUrl) return { status: 'skipped', reason: 'missing_url' };
     const url = canonicalizeProductUrl(String(rawUrl));
 
@@ -93,23 +94,23 @@ export class ArukeresoProductMapperService {
     if (categoryOutcome.status === 'skipped') return categoryOutcome;
     const { category, jsonSchema } = categoryOutcome;
 
-    const brand = this.asString(await this.resolve(config, item, 'brand'));
+    const brand = this.asString(await this.resolveTarget(config, item, 'brand'));
     if (!brand) return { status: 'skipped', reason: 'missing_brand' };
 
     // The raw marketing title, exactly as the detail path treats a page title:
     // required to be present, not required to be clean. The updater's identity
     // extraction is what turns it into a model name.
-    const rawName = this.asString(await this.resolve(config, item, 'name'));
+    const rawName = this.asString(await this.resolveTarget(config, item, 'name'));
     if (!rawName) return { status: 'skipped', reason: 'missing_name' };
 
-    const price = this.asNumber(await this.resolve(config, item, 'price'));
+    const price = this.asNumber(await this.resolveTarget(config, item, 'price'));
     if (price === undefined) return { status: 'skipped', reason: 'missing_price' };
 
     const externalId = this.asString(
-      await this.resolve(config, item, 'externalId'),
+      await this.resolveTarget(config, item, 'externalId'),
     );
     const description = this.asString(
-      await this.resolve(config, item, 'description'),
+      await this.resolveTarget(config, item, 'description'),
     );
 
     const offerLevelKeys =
@@ -126,7 +127,7 @@ export class ArukeresoProductMapperService {
       : {};
 
     const releaseYear = this.asNumber(
-      await this.resolve(config, item, 'releaseYear'),
+      await this.resolveTarget(config, item, 'releaseYear'),
     );
     if (deterministicSpecs['modelYear'] === undefined && releaseYear !== undefined) {
       deterministicSpecs['modelYear'] = releaseYear;
@@ -175,15 +176,33 @@ export class ArukeresoProductMapperService {
    * stripped, because the same field has at least three spellings in the wild —
    * and the optional pipeline does the transforming. That division is why this
    * source type needs no scrape ops of its own.
+   *
+   * A target mapped to a list tries each in order, and the first non-empty
+   * value (not undefined, null, '' or an empty list) wins; when none gives one,
+   * the last one's value stands, so a one-entry list reads as the entry alone.
+   * The simulator reads targets through this too.
    */
-  private async resolve(
+  public async resolveTarget(
     config: ArukeresoSourceConfig,
     item: ArukeresoFeedItem,
     target: ArukeresoMappingTarget,
   ): Promise<unknown> {
-    const mapping = config.mapping[target];
-    if (!mapping) return undefined;
+    const entry = config.mapping[target];
+    if (!entry) return undefined;
 
+    let value: unknown;
+    for (const mapping of Array.isArray(entry) ? entry : [entry]) {
+      value = await this.resolveMapping(config, item, mapping);
+      if (!isEmptyValue(value)) return value;
+    }
+    return value;
+  }
+
+  private async resolveMapping(
+    config: ArukeresoSourceConfig,
+    item: ArukeresoFeedItem,
+    mapping: ArukeresoFieldMapping,
+  ): Promise<unknown> {
     // No field means the pipeline supplies its own value — a `literal` currency
     // code, say, for a format that has no field to carry one.
     const raw = mapping.field ? feedField(item, mapping.field) : undefined;
@@ -192,6 +211,15 @@ export class ArukeresoProductMapperService {
     return this.interpreter.runValuePipeline(mapping.pipeline, raw, {
       baseUrl: config.baseUrl,
     });
+  }
+
+  /**
+   * Whether the config reads this target at all. A mapped target the row
+   * leaves empty is the source saying "none"; an unmapped one leaves it to the
+   * seller's other sources (see ScrapedOffer).
+   */
+  public isMapped(config: ArukeresoSourceConfig, target: ArukeresoMappingTarget): boolean {
+    return config.mapping[target] !== undefined;
   }
 
   /**
@@ -263,7 +291,7 @@ export class ArukeresoProductMapperService {
       }
   > {
     const rawLabel = this.asString(
-      await this.resolve(config, item, 'categoryLabel'),
+      await this.resolveTarget(config, item, 'categoryLabel'),
     );
     const label = config.category.labelFrom?.length
       ? this.asString(
@@ -315,6 +343,10 @@ export class ArukeresoProductMapperService {
    * A feed row is always exactly one offer: Árukereső's format has no way to
    * express several sellers or several variants under one product, so unlike a
    * detail page there is nothing here to iterate.
+   *
+   * A target the config maps but this row leaves empty is `null` — the source
+   * saying "none", which a seller's other sources may not override. A target
+   * the config does not map is absent, so they decide it (see ScrapedOffer).
    */
   private async resolveOfferFields(
     config: ArukeresoSourceConfig,
@@ -323,29 +355,36 @@ export class ArukeresoProductMapperService {
     price: number,
   ): Promise<{
     price: number;
-    priceWithoutDiscount?: number;
-    currency?: string;
+    priceWithoutDiscount?: number | null;
+    currency?: string | null;
     /** Always set on this path — see toAvailability for why silence means in stock. */
     availability: OfferAvailability;
     url: string;
     externalId?: string;
     /** As published — validated and normalized when stored on the Offer. */
-    gtin?: string;
-    mpn?: string;
+    gtin?: string | null;
+    mpn?: string | null;
   }> {
+    const mappedOrNone = <T>(target: ArukeresoMappingTarget, value: T | undefined) =>
+      this.isMapped(config, target) ? (value ?? null) : undefined;
+
     return {
       price,
-      priceWithoutDiscount: this.asNumber(
-        await this.resolve(config, item, 'priceWithoutDiscount'),
+      priceWithoutDiscount: mappedOrNone(
+        'priceWithoutDiscount',
+        this.asNumber(await this.resolveTarget(config, item, 'priceWithoutDiscount')),
       ),
-      currency: this.asString(await this.resolve(config, item, 'currency')),
+      currency: mappedOrNone(
+        'currency',
+        this.asString(await this.resolveTarget(config, item, 'currency')),
+      ),
       availability: this.toAvailability(
-        this.asString(await this.resolve(config, item, 'availability')),
+        this.asString(await this.resolveTarget(config, item, 'availability')),
       ),
       url: normalizeUrl(url),
-      externalId: this.asString(await this.resolve(config, item, 'externalId')),
-      gtin: this.asString(await this.resolve(config, item, 'gtin')),
-      mpn: this.asString(await this.resolve(config, item, 'mpn')),
+      externalId: this.asString(await this.resolveTarget(config, item, 'externalId')),
+      gtin: mappedOrNone('gtin', this.asString(await this.resolveTarget(config, item, 'gtin'))),
+      mpn: mappedOrNone('mpn', this.asString(await this.resolveTarget(config, item, 'mpn'))),
     };
   }
 
@@ -353,7 +392,7 @@ export class ArukeresoProductMapperService {
     config: ArukeresoSourceConfig,
     item: ArukeresoFeedItem,
   ): Promise<string[] | undefined> {
-    const value = await this.resolve(config, item, 'aliases');
+    const value = await this.resolveTarget(config, item, 'aliases');
     if (value === undefined) return undefined;
     return Array.isArray(value)
       ? value.map(String).filter(Boolean)
@@ -369,7 +408,7 @@ export class ArukeresoProductMapperService {
     config: ArukeresoSourceConfig,
     item: ArukeresoFeedItem,
   ): Promise<{ url: string; order: number }[] | undefined> {
-    const value = await this.resolve(config, item, 'imageUrl');
+    const value = await this.resolveTarget(config, item, 'imageUrl');
     if (value === undefined) return undefined;
 
     const urls = (Array.isArray(value) ? value : [value])
@@ -462,4 +501,11 @@ export class ArukeresoProductMapperService {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
 
+}
+
+/** What a fallback list moves past: no value at all, as a feed leaves it. */
+function isEmptyValue(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  return Array.isArray(value) && value.length === 0;
 }

@@ -66,6 +66,13 @@ export interface DynamicConfigData {
      * which is the number to watch before turning it on.
      */
     deletionEnabled?: boolean;
+    /**
+     * Whether a complete run of a source that lists the shop's whole catalog
+     * (ProductSource.hasAllProducts) removes the seller's offers it did not
+     * see. Default: TRUE. The kill switch for that removal: it acts at once,
+     * not after deleteAfterDays, and while off the offers age out as usual.
+     */
+    completeSourceRemovalEnabled?: boolean;
   };
 
   /** Import behaviour shared across every scraping source. */
@@ -401,6 +408,12 @@ export const dynamicConfigSchema = {
           description:
             'Whether the stale-offer sweep actually deletes. Ships FALSE: the sweep assumes imports are running, so on an estate where nothing imports (no frequency set, a paused source, a fresh environment) it would destroy every offer on a schedule. While off it still runs and logs what it would delete. Default: false',
           default: false,
+        },
+        completeSourceRemovalEnabled: {
+          type: 'boolean',
+          description:
+            'Whether a complete run of a source that lists the whole catalog (hasAllProducts) removes the offers it did not see, at once. The kill switch: while off, those offers age out through the stale-offer sweep as usual. Default: true',
+          default: true,
         },
       },
     },

@@ -49,9 +49,13 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   normalizedName: string;
 
+  /**
+   * Plain text, recomputed from the records by ProductMergeService.mergeSources
+   * (ProductDescriptionService). An admin edit lives on the admin's record.
+   */
   @Column({ type: 'text', nullable: true })
   @Expose({ groups: [SerializeGroup.details] })
-  description: string;
+  description: string | null;
 
   @ManyToOne(() => ProductCategory, (type) => type.models, { nullable: true })
   @Expose({ groups: [SerializeGroup.list] })

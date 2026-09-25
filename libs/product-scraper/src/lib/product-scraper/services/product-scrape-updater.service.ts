@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import {
+  AdvisoryLockKey,
   AdvisoryLockService,
   brandLock,
+  offerKeyLock,
   productLock,
   Offer,
   OfferRepository,
@@ -12,6 +14,7 @@ import {
   ProductCategory,
   ProductModel,
   ProductModelRepository,
+  ProductSource,
   ProductSourceRecord,
   ProductSourceRecordRepository,
   OfferIdentityConflictError,
@@ -28,19 +31,23 @@ import {
   ProductKeyLookupService,
 } from '@fittkereso-backend/product-identity';
 import {
+  filterDefinedSpecs,
   generateSlug,
   nameOf,
   normalize,
   inspectGtin,
   normalizeMpn,
   normalizeUrl,
-  slugFromUrl,
+  offerExternalIdOf,
+  storedOfferExternalId,
 } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BRAND_NOT_IDENTIFIED,
   BrandResolutionService,
+  ContributorDetachService,
+  OfferComposerService,
   OfferMatchingService,
   ProductImageCopyService,
   ProductMergeService,
@@ -50,9 +57,8 @@ import {
 } from '@fittkereso-backend/product';
 import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
-import { compact, isEmpty, minBy, pick } from 'lodash';
+import { compact, difference, isEmpty, minBy, pick, uniq } from 'lodash';
 import { SpecPostProcessService } from './spec-post-process.service';
-import { offerExternalIdOf } from './offer-external-id';
 import {
   IdentityRecheckVia,
   IdentityResolvedVia,
@@ -100,10 +106,15 @@ interface ListingWrite {
   context: ProductImportContext;
   /** What the identity extraction produced: the input of every identity decision. */
   extracted: ScrapedProduct;
-  /** The listing as stored: the extraction, unified when this source is new to the product. */
+  /**
+   * The listing as stored: the extraction, unified when this source is new to
+   * the product, with each offer carrying the externalId it is stored under.
+   */
   listing: ScrapedProduct;
   normalizedSourceName: string;
   identifiers: OfferIdentifiers[];
+  /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
+  externalIds: (string | undefined)[];
 }
 
 /** The product a listing was written to, and the identity it was written under. */
@@ -149,6 +160,8 @@ export class ProductScrapeUpdaterService {
     private readonly brandResolution: BrandResolutionService,
     private readonly specPostProcess: SpecPostProcessService,
     private readonly locks: AdvisoryLockService,
+    private readonly offerComposer: OfferComposerService,
+    private readonly contributorDetach: ContributorDetachService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -168,6 +181,12 @@ export class ProductScrapeUpdaterService {
       return undefined;
     }
 
+    // A source that does not identify products never decides which product a
+    // listing is: it joins its seller's offer, or waits for one.
+    if (context.source.identifiesProducts === false) {
+      return this.contributeListing(context, scrapedProduct);
+    }
+
     try {
       // Every offer belongs to its ProductSource's own seller — no per-offer
       // seller resolution needed. Path 2 keys its (seller, externalId)
@@ -176,6 +195,12 @@ export class ProductScrapeUpdaterService {
       // Normalized once, here: identity resolution looks them up and the offer
       // upsert stores them, and each GTIN's outcome must be counted once.
       const identifiers = this.normalizeOfferIdentifiers(
+        context,
+        scrapedProduct.offers ?? [],
+      );
+      // Resolved for the whole page at once, because uniqueness is a property
+      // of the SET, not of any one offer — see resolveOfferExternalIds.
+      const externalIds = this.resolveOfferExternalIds(
         context,
         scrapedProduct.offers ?? [],
       );
@@ -214,9 +239,10 @@ export class ProductScrapeUpdaterService {
       const write: ListingWrite = {
         context,
         extracted,
-        listing,
+        listing: this.withStoredOffers(listing, externalIds),
         normalizedSourceName: this.buildNormalizedSourceName(listing),
         identifiers,
+        externalIds,
       };
       const written = identity.model
         ? await this.attachToProduct(write, identity, identity.model.id)
@@ -255,6 +281,305 @@ export class ProductScrapeUpdaterService {
       displayName: scrapedProduct.displayName,
       strategy,
     });
+  }
+
+  /**
+   * A listing of a source that does not identify products — a shop's Google
+   * feed beside its Árukereső feed, say. No identity work at all: no history
+   * paths, identifiers, extraction or name matching. It joins the offer its
+   * seller already has under one of its externalIds, on that offer's
+   * product; with none, it is stored unattached, and the identifying listing
+   * that writes the offer attaches it (attachWaitingRecords).
+   *
+   * It never creates a product or an offer, and never touches a product's
+   * names, category, image or aliases: it contributes offer fields and specs,
+   * by its source's priority.
+   */
+  private async contributeListing(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
+  ): Promise<ProductModel | undefined> {
+    const seller = context.source.seller;
+    const externalIds = this.resolveOfferExternalIds(context, scrapedProduct.offers ?? []);
+    const keys = uniq(compact(externalIds));
+    if (isEmpty(keys)) {
+      this.logger.warn(
+        'A listing of a source that does not identify products carries no offer externalId, so it can never join an offer',
+        { taskId: context.task?.id, url: context.url, source: context.source.name },
+      );
+    }
+    const write: ListingWrite = {
+      context,
+      extracted: scrapedProduct,
+      listing: this.withStoredOffers(scrapedProduct, externalIds),
+      normalizedSourceName: this.buildNormalizedSourceName(scrapedProduct),
+      identifiers: [],
+      externalIds,
+    };
+
+    // Twice at most: the offer can appear, move or go between the lookup and
+    // the lock, and the second pass then takes the other branch.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const offer = await this.offerRepo.findFirstBySellerAndExternalIdsWithModelRelations(
+        seller.id,
+        keys,
+        this.getProductRelations(),
+      );
+      await this.detachOwnRecordElsewhere(context, offer?.model?.id);
+
+      if (!offer?.model) {
+        if (await this.storeUnattached(write, keys)) return undefined;
+        continue;
+      }
+
+      // Only when its own post-process config enables it, and only the first
+      // time this source contributes to the product.
+      const listing = await this.unifyForNewSource(
+        context,
+        scrapedProduct,
+        { model: offer.model, isExistingMatch: true, keyMatches: [], keyGates: {} },
+        true,
+      );
+      const model = await this.writeContribution(
+        { ...write, listing: this.withStoredOffers(listing, externalIds) },
+        offer.model.id,
+        keys,
+      );
+      if (model) return model;
+    }
+    throw new Error(
+      `The offer of ${context.url} kept changing while its listing was written; the task retries it`,
+    );
+  }
+
+  /**
+   * A contributing listing onto the product its offer is on, under the
+   * product's lock: its record (brought over while it waited unattached), the
+   * product's specs merged again, and the seller's offers composed with its
+   * values. Undefined when the offer is no longer on that product: the caller
+   * looks again.
+   */
+  private async writeContribution(
+    write: ListingWrite,
+    productId: string,
+    keys: string[],
+  ): Promise<ProductModel | undefined> {
+    const { context, listing, normalizedSourceName } = write;
+    const seller = context.source.seller;
+
+    return this.locks.withLocks([productLock(productId)], async () => {
+      const offers = await this.offerRepo.findBySellerAndExternalIds(seller.id, keys);
+      if (!offers.some((offer) => offer.model?.id === productId)) return undefined;
+
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
+      await this.adoptOwnRecord(context, model);
+      const previousExternalIds = this.storedExternalIdsOf(context, model);
+
+      await this.sourceRecordUpdater.upsertSourceRecord({
+        model,
+        scrapedProduct: listing,
+        externalId: listing.externalId,
+        source: context.source,
+        sourceUrl: context.url,
+        normalizedSourceName,
+        feedRowHash: context.feedRowHash,
+      });
+      await this.mergeService.mergeSources(model);
+      // Before the offers: an offer's sourceRecord must be saved first.
+      await this.productRepo.save(model);
+      this.productMetricsService.scrapeResolutionOutcome(context.source.name, 'contributed');
+      this.productMetricsService.productUpdated(context.source.name);
+      await this.writeBackToTask(context, model);
+
+      const composed = await this.offerComposer.compose({
+        model,
+        seller,
+        externalIds: keys,
+        sighted: true,
+        create: false,
+      });
+      this.reportConflicts(context, composed.conflicts);
+      await this.dealWithDroppedOffers({
+        context,
+        model,
+        dropped: difference(previousExternalIds, keys),
+      });
+      await this.mergeService.recomputePrice(model);
+      await this.productRepo.save(model);
+      return model;
+    });
+  }
+
+  /**
+   * Stores a contributing listing with no product, under its offer keys. An
+   * identifying listing holds the same keys from attaching the waiting records
+   * until its offers are written, so of the two, whichever comes second sees
+   * the other. False when the offer turned up meanwhile, or the record was
+   * attached: the caller joins it instead.
+   */
+  private async storeUnattached(write: ListingWrite, keys: string[]): Promise<boolean> {
+    const { context, listing } = write;
+    const seller = context.source.seller;
+
+    return this.locks.withLocks(
+      keys.map((key) => offerKeyLock(seller.id, key)),
+      async () => {
+        const offer = await this.offerRepo.findFirstBySellerAndExternalIdsWithModelRelations(
+          seller.id,
+          keys,
+          [],
+        );
+        if (offer?.model) return false;
+        const existing = await this.sourceRecordRepo.findBySourceAndUrl(
+          context.source.id,
+          normalizeUrl(context.url),
+        );
+        if (existing?.model) return false;
+        if (existing) {
+          // Saved without its loaded offers: a stale list would re-bind an
+          // offer another writer has pointed at another record since.
+          existing.offers = undefined;
+        }
+
+        const record = this.sourceRecordUpdater.upsertUnattached({
+          existing,
+          source: context.source,
+          scrapedProduct: listing,
+          externalId: listing.externalId,
+          sourceUrl: context.url,
+          normalizedSourceName: write.normalizedSourceName,
+          feedRowHash: context.feedRowHash,
+        });
+        await this.sourceRecordRepo.save(record);
+        this.productMetricsService.scrapeResolutionOutcome(context.source.name, 'unattached');
+        this.logger.debug('No offer of the seller to join yet — stored unattached', {
+          taskId: context.task?.id,
+          url: context.url,
+          source: context.source.name,
+          externalIds: keys,
+        });
+        return true;
+      },
+    );
+  }
+
+  /**
+   * This source's record of the page, when it sits on another product than the
+   * one it now joins, or on any product while it joins none (its offer was
+   * removed without detaching it): taken off that product, whose offers and
+   * specs are then composed without it.
+   */
+  private async detachOwnRecordElsewhere(
+    context: ProductImportContext,
+    targetProductId: string | undefined,
+  ): Promise<void> {
+    const own = await this.sourceRecordRepo.findBySourceAndUrl(
+      context.source.id,
+      normalizeUrl(context.url),
+    );
+    const productId = own?.model?.id;
+    if (!own || !productId || productId === targetProductId) return;
+
+    await this.locks.withLocks([productLock(productId)], async () => {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
+      const record = (model.sources ?? []).find((candidate) => candidate.id === own.id);
+      if (!record) return;
+
+      const keys = this.storedKeysOf(record);
+      await this.contributorDetach.detachRecords(model, [record]);
+      const { conflicts } = await this.offerComposer.compose({
+        model,
+        seller: context.source.seller,
+        externalIds: keys,
+        sighted: false,
+        create: false,
+      });
+      this.reportConflicts(context, conflicts);
+      await this.mergeService.recomputePrice(model);
+      await this.productRepo.save(model);
+      this.logger.log('A contributing listing left the product it had joined', {
+        taskId: context.task?.id,
+        url: context.url,
+        source: context.source.name,
+        productId,
+        joins: targetProductId ?? null,
+      });
+    });
+  }
+
+  /**
+   * This source's record of the page, when it waits unattached: brought onto
+   * the product, so the write updates it instead of inserting a second record
+   * of one (source, url).
+   */
+  private async adoptOwnRecord(
+    context: ProductImportContext,
+    model: ProductModel,
+  ): Promise<void> {
+    const url = normalizeUrl(context.url);
+    const onProduct = (model.sources ?? []).some(
+      (record) => record.source?.id === context.source.id && record.url === url,
+    );
+    if (onProduct) return;
+
+    const own = await this.sourceRecordRepo.findBySourceAndUrl(context.source.id, url);
+    if (!own) return;
+    if (own.model) {
+      throw new Error(
+        `Listing ${url} of ${context.source.name} moved to product ${own.model.id} meanwhile; the task retries it`,
+      );
+    }
+    own.offers = undefined;
+    own.source = context.source;
+    own.model = model;
+    model.sources = [...(model.sources ?? []), own];
+  }
+
+  /**
+   * The seller's records that waited unattached for one of this listing's
+   * offers: rows of its sources that do not identify products, stored before
+   * the offer existed. They join the product before its specs are merged and
+   * its offers composed, so both include them. Under the product's lock and
+   * the listing's offer keys (see storeUnattached).
+   */
+  private async attachWaitingRecords(
+    write: ListingWrite,
+    model: ProductModel,
+  ): Promise<void> {
+    const { context } = write;
+    const waiting = await this.sourceRecordRepo.findUnattachedBySellerAndExternalIds(
+      context.source.seller.id,
+      uniq(compact(write.externalIds)),
+    );
+    if (isEmpty(waiting)) return;
+
+    for (const record of waiting) record.model = model;
+    model.sources = [...(model.sources ?? []), ...waiting];
+    this.logger.log('Attached the listings that waited for this listing\'s offers', {
+      taskId: context.task?.id,
+      url: context.url,
+      source: context.source.name,
+      recordIds: waiting.map((record) => record.id),
+    });
+  }
+
+  /**
+   * The locks an identifying write holds: its product's, and its offer keys',
+   * so a contributing listing of one of those offers waits until the offers
+   * exist (see storeUnattached).
+   */
+  private writeLocks(write: ListingWrite, productId: string): AdvisoryLockKey[] {
+    const sellerId = write.context.source.seller.id;
+    return [
+      productLock(productId),
+      ...uniq(compact(write.externalIds)).map((key) => offerKeyLock(sellerId, key)),
+    ];
   }
 
   /**
@@ -600,20 +925,14 @@ export class ProductScrapeUpdaterService {
     identity: ResolvedIdentity,
     productId: string,
   ): Promise<WrittenListing> {
-    const model = await this.locks.withLocks([productLock(productId)], async () => {
+    const model = await this.locks.withLocks(this.writeLocks(write, productId), async () => {
       const model = await this.productRepo.findOneOrFail({
         where: { id: productId },
         relations: this.getProductRelations(),
       });
-      const sourceRecord = await this.writeListing(write, model, identity);
+      const written = await this.writeListing(write, model, identity);
       await this.copyFirstImage(write, model);
-      await this.createOrUpdateOffers(
-        write.context,
-        write.listing,
-        model,
-        sourceRecord,
-        write.identifiers,
-      );
+      await this.createOrUpdateOffers({ write, model, ...written });
       return model;
     });
     return { model, identity, created: false };
@@ -768,19 +1087,13 @@ export class ProductScrapeUpdaterService {
     shell: ProductModel,
   ): Promise<WrittenListing> {
     const id = randomUUID();
-    return this.locks.withLocks([productLock(id)], async () => {
-      const sourceRecord = await this.writeListing(write, shell, identity, id);
+    return this.locks.withLocks(this.writeLocks(write, id), async () => {
+      const written = await this.writeListing(write, shell, identity, id);
       this.productMetricsService.scrapeResolutionOutcome(
         write.context.source.name,
         'created',
       );
-      await this.createOrUpdateOffers(
-        write.context,
-        write.listing,
-        shell,
-        sourceRecord,
-        write.identifiers,
-      );
+      await this.createOrUpdateOffers({ write, model: shell, ...written });
       return { model: shell, identity, created: true };
     });
   }
@@ -793,16 +1106,26 @@ export class ProductScrapeUpdaterService {
    * `newId` marks a product being created. It is assigned only after the name
    * merge, which inserts aliases for products that already have a row and
    * skips a product without an id.
+   *
+   * Also answers which offers the listing's record carried before this write,
+   * so the offers it no longer shows can be dealt with.
    */
   private async writeListing(
     write: ListingWrite,
     model: ProductModel,
     identity: ResolvedIdentity,
     newId?: string,
-  ): Promise<ProductSourceRecord | undefined> {
+  ): Promise<{
+    sourceRecord: ProductSourceRecord | undefined;
+    previousExternalIds: string[];
+  }> {
     const { context, listing, normalizedSourceName } = write;
+    const previousExternalIds = this.storedExternalIdsOf(context, model);
 
     this.applyScrapedProductDetails(model, listing);
+    // Before the listing's own record: when its source used to contribute
+    // only, its record is among them, and is updated rather than duplicated.
+    await this.attachWaitingRecords(write, model);
 
     const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
       model,
@@ -835,15 +1158,7 @@ export class ProductScrapeUpdaterService {
       this.productMetricsService.productUpdated(context.source.name);
     }
 
-    // Every import runs in a task now; only scripts and simulations call without.
-    context.product = model;
-    if (context.task) {
-      context.task.product = model;
-      if (identity.decision) {
-        context.task.identityDecision = identity.decision;
-      }
-      await this.taskRepo.save(context.task);
-    }
+    await this.writeBackToTask(context, model, identity.decision);
 
     // Source-provided aliases (e.g. DisplaySpecs "Model alias" list,
     // Árukereső parenthesized part numbers). After the save, so a new
@@ -861,7 +1176,74 @@ export class ProductScrapeUpdaterService {
       );
     }
 
-    return sourceRecord;
+    return { sourceRecord, previousExternalIds };
+  }
+
+  /** The product the listing was written to, onto its task. */
+  private async writeBackToTask(
+    context: ProductImportContext,
+    model: ProductModel,
+    decision?: ListingMatchDecision,
+  ): Promise<void> {
+    // Every import runs in a task now; only scripts and simulations call without.
+    context.product = model;
+    if (context.task) {
+      context.task.product = model;
+      if (decision) {
+        context.task.identityDecision = decision;
+      }
+      await this.taskRepo.save(context.task);
+    }
+  }
+
+  /**
+   * The externalIds this source's record of this page carries now — found the
+   * way the record updater finds the record it overwrites.
+   */
+  private storedExternalIdsOf(
+    context: ProductImportContext,
+    model: ProductModel,
+  ): string[] {
+    const url = normalizeUrl(context.url);
+    const record = (model.sources ?? []).find(
+      (candidate) => candidate.source?.id === context.source.id && candidate.url === url,
+    );
+    return record ? this.storedKeysOf(record) : [];
+  }
+
+  /** The externalIds a record's offers are stored under. */
+  private storedKeysOf(record: ProductSourceRecord): string[] {
+    return uniq(
+      compact(
+        (record.scrapedProduct?.offers ?? []).map((entry) =>
+          storedOfferExternalId(record, entry),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * The listing's offers as its record keeps them: each with the externalId
+   * its offer is stored under (null where ids collided), and the page's
+   * offer-level specs where it has none of its own. The record alone is then
+   * enough to compose the offer from (OfferComposerService).
+   */
+  private withStoredOffers(
+    listing: ScrapedProduct,
+    externalIds: (string | undefined)[],
+  ): ScrapedProduct {
+    if (isEmpty(listing.offers)) return listing;
+    const offerLevelKeys =
+      this.categoryConfigService.getConfig(listing.category?.slug)?.offerLevelSpecs ?? [];
+    const pageOfferLevelSpecs = pick(filterDefinedSpecs(listing.specs ?? {}), offerLevelKeys);
+    return {
+      ...listing,
+      offers: (listing.offers ?? []).map((offer, index) => ({
+        ...offer,
+        resolvedExternalId: externalIds[index] ?? null,
+        specs: offer.specs ?? pageOfferLevelSpecs,
+      })),
+    };
   }
 
   /**
@@ -947,24 +1329,25 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  // No-op for sources whose config doesn't populate ScrapedProduct.offers.
-  // Each offer can carry its own `url` (a multi-seller/multi-listing page's
-  // itemPipeline can stamp a distinct URL per offer) — a ProductSourceRecord
-  // represents one URL, so sourceRecord is resolved per offer here rather
-  // than passed as one shared value, falling back to the primary page's own
-  // sourceRecord (the ordinary single-offer-per-page case, and the
-  // shared-URL multi-seller-table case).
-  private async createOrUpdateOffers(
-    context: ProductImportContext,
-    scrapedProduct: ScrapedProduct,
-    model: ProductModel,
-    primarySourceRecord: ProductSourceRecord | undefined,
-    identifiers: OfferIdentifiers[],
-  ): Promise<void> {
-    const offers = scrapedProduct.offers;
-    if (isEmpty(offers)) return;
+  /**
+   * The listing's offers, composed from every current record of the seller —
+   * this listing's own record was written just before, under the same lock.
+   * Which source imported last no longer decides what an offer says: a
+   * higher-priority source's value wins field by field (OfferComposerService).
+   *
+   * No-op for sources whose config doesn't populate ScrapedProduct.offers.
+   */
+  private async createOrUpdateOffers(params: {
+    write: ListingWrite;
+    model: ProductModel;
+    sourceRecord: ProductSourceRecord | undefined;
+    previousExternalIds: string[];
+  }): Promise<void> {
+    const { write, model, sourceRecord, previousExternalIds } = params;
+    const { context, listing, externalIds } = write;
+    if (isEmpty(listing.offers)) return;
 
-    if (!primarySourceRecord) {
+    if (!sourceRecord) {
       this.logger.warn(
         'No ProductSourceRecord resolved for this scrape, skipping offer upsert',
         { taskId: context.task?.id, url: context.url },
@@ -972,110 +1355,114 @@ export class ProductScrapeUpdaterService {
       return;
     }
 
-    // Page-level offer-level specs (e.g. frameSize, color), derived from the
-    // primary page's own spec set. Applied to every offer on the page by
-    // default; an individual ScrapedOffer.specs overrides this for sources
-    // that report multiple size/color variants, each with its own price.
-    // Always optional — a listing with no extractable offer-level values
-    // simply yields {}.
-    const offerLevelKeys =
-      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
-        ?.offerLevelSpecs ?? [];
-    const pageOfferLevelSpecs = pick(
-      primarySourceRecord.scrapedProduct?.specs,
-      offerLevelKeys,
+    const keyed = uniq(compact(externalIds));
+    const composed = await this.offerComposer.compose({
+      model,
+      seller: context.source.seller,
+      externalIds: keyed,
+      sighted: true,
+      create: true,
+    });
+    this.reportConflicts(context, composed.conflicts);
+    const unkeyed = await this.writeUnkeyedOffers(write, model, sourceRecord);
+
+    // Nothing written at all (every offer refused or failed) is no evidence
+    // about what the page stopped showing.
+    const written = composed.offers.length + unkeyed;
+    if (written === 0) return;
+
+    await this.dealWithDroppedOffers({
+      context,
+      model,
+      dropped: difference(previousExternalIds, keyed),
+    });
+    await this.mergeService.recomputePrice(model);
+    await this.productRepo.save(model);
+  }
+
+  /**
+   * Offers this listing's record carried and no longer does. One no other
+   * current record of the seller carries is gone from the shop and deleted at
+   * once, and the contributing records that joined only it are detached; one
+   * another source still lists is composed again without this listing's
+   * values. Offers on pages this import did not visit are left to their own
+   * imports, and to the stale-offer sweep.
+   */
+  private async dealWithDroppedOffers(params: {
+    context: ProductImportContext;
+    model: ProductModel;
+    dropped: string[];
+  }): Promise<void> {
+    const { context, model, dropped } = params;
+    if (isEmpty(dropped)) return;
+    const seller = context.source.seller;
+
+    const stillListed = dropped.filter(
+      (externalId) =>
+        !isEmpty(
+          this.offerComposer.currentCarriers({ model, sellerId: seller.id, externalId }),
+        ),
     );
+    const gone = difference(dropped, stillListed);
 
-    // Scoped by source, not by a single sourceRecord — a multi-variant
-    // scrape persists offers under several ProductSourceRecords for this
-    // source (one per URL), and two independently enqueued tasks can each
-    // create their own record for overlapping variants. Preloading by
-    // source lets OfferMatchingService find and update an offer regardless
-    // of which record originally created it.
-    const preloadedOffers = await this.offerRepo.findAllByModelAndSource(
-      model.id,
-      context.source.id,
-    );
+    if (!isEmpty(stillListed)) {
+      const recomposed = await this.offerComposer.compose({
+        model,
+        seller,
+        externalIds: stillListed,
+        sighted: false,
+        create: false,
+      });
+      this.reportConflicts(context, recomposed.conflicts);
+    }
+    if (!isEmpty(gone)) {
+      const offers = (
+        await this.offerRepo.findBySellerAndExternalIds(seller.id, gone)
+      ).filter((offer) => offer.model?.id === model.id);
+      if (isEmpty(offers)) return;
+      await this.offerRepo.deleteByIds(offers.map((offer) => offer.id));
+      await this.contributorDetach.detach({
+        model,
+        sellerId: seller.id,
+        externalIds: compact(offers.map((offer) => offer.externalId)),
+      });
+    }
+  }
 
-    const upsertedOffers: Offer[] = [];
-    // Every ProductSourceRecord this scrape actually produced an offer for —
-    // the only records whose offers this pass is entitled to judge as
-    // stale. A scrape of one variant URL never visits a sibling variant's
-    // own page (each variant is now its own independently scheduled
-    // ProductImportTask), so it has no way to know whether that sibling's own offer
-    // is still live; only records this pass actually touched get their
-    // unmatched offers deleted.
-    const touchedSourceRecordIds = new Set<string>();
-    // Resolved for the whole page at once, because uniqueness is a property of
-    // the SET, not of any one offer — see resolveOfferExternalIds.
-    const externalIds = this.resolveOfferExternalIds(context, offers!);
+  /**
+   * Offers without an externalId — several on one page collided on it (see
+   * resolveOfferExternalIds). Nothing joins another source to such an offer,
+   * so each is written from its own entry, matched within this source's own
+   * offers as before; this record's other unkeyed offers not matched this
+   * round are gone from its page. Returns how many were written.
+   */
+  private async writeUnkeyedOffers(
+    write: ListingWrite,
+    model: ProductModel,
+    sourceRecord: ProductSourceRecord,
+  ): Promise<number> {
+    const { context, listing, externalIds } = write;
+    const entries = (listing.offers ?? []).filter((_, index) => !externalIds[index]);
+    if (isEmpty(entries)) return 0;
 
-    for (const [index, scraped] of offers!.entries()) {
+    const seller = context.source.seller;
+    const preloaded = (
+      await this.offerRepo.findAllByModelAndSource(model.id, context.source.id)
+    ).filter((offer) => !offer.externalId);
+
+    const written: Offer[] = [];
+    for (const entry of entries) {
       try {
-        const normalizedScrapedUrl = scraped.url
-          ? normalizeUrl(scraped.url)
-          : undefined;
-        // Scoped to this task's source: `model.sources` spans every source, and
-        // record URLs are unique only per source, so a url-only match can
-        // return another source's record. That would both misattribute this
-        // offer's provenance and put the WRONG record id into
-        // touchedSourceRecordIds below — leaving this source's own genuinely
-        // stale offers permanently ineligible for the sweep.
-        const sourceRecord = normalizedScrapedUrl
-          ? (model.sources?.find(
-              (s) =>
-                s.source?.id === context.source.id &&
-                s.url === normalizedScrapedUrl,
-            ) ?? primarySourceRecord)
-          : primarySourceRecord;
-        touchedSourceRecordIds.add(sourceRecord.id);
-        const seller = context.source.seller;
-        const existing = this.offerMatching.findMatch(
-          preloadedOffers,
-          scraped,
-          seller.id,
+        written.push(
+          await this.offerComposer.writeUnkeyed({
+            existing: this.offerMatching.findMatch(preloaded, entry, seller.id),
+            model,
+            seller,
+            record: sourceRecord,
+            entry,
+          }),
         );
-        const offer = await this.offerRepo.upsertFromScrape({
-          existing,
-          model,
-          seller,
-          sourceRecord,
-          price: scraped.price,
-          priceWithoutDiscount: scraped.priceWithoutDiscount,
-          currency: scraped.currency,
-          availability: scraped.availability,
-          url: normalizedScrapedUrl,
-          externalId: externalIds[index],
-          gtin: identifiers[index].gtin,
-          mpn: identifiers[index].mpn,
-          locations: scraped.locations,
-          specs: scraped.specs ?? pageOfferLevelSpecs,
-        });
-        upsertedOffers.push(offer);
       } catch (error) {
-        // An identity disagreement is not a flaky write — two sources have
-        // resolved different products for one seller listing, and one of them
-        // is wrong. It still must not abandon the rest of the page, but it is
-        // logged as an error and counted, because the alternative is a product
-        // quietly sitting with no offer and therefore no price.
-        if (error instanceof OfferIdentityConflictError) {
-          this.logger.error(
-            'Offer identity disagreement between sources — refusing to rebind the offer',
-            error,
-            {
-              taskId: context.task?.id,
-              url: context.url,
-              source: context.source.name,
-              ...error.details,
-            },
-          );
-          this.productMetricsService.offerIdentityConflict(
-            context.source.name,
-            'model_disagreement',
-          );
-          continue;
-        }
-
         // Do not fail the whole product scrape if one offer fails — mirrors
         // the existing brand-resolution-failure tolerance in this service.
         this.logger.warn('Failed to upsert offer, continuing', {
@@ -1086,28 +1473,45 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    if (upsertedOffers.length > 0) {
-      // Anything preloaded, belonging to a record this scrape actually
-      // touched, but not matched this round is confirmed gone from that
-      // record's page and is hard-deleted (not soft-deactivated) — see
-      // OfferRepository/Offer.active doc comments. Offers on a
-      // ProductSourceRecord this scrape never visited (a sibling variant's
-      // own page) are left alone entirely — this pass has no evidence about
-      // whether they're still live.
-      const matchedIds = new Set(upsertedOffers.map((o) => o.id));
-      const staleIds = preloadedOffers
+    if (!isEmpty(written)) {
+      const matchedIds = new Set(written.map((offer) => offer.id));
+      const staleIds = preloaded
         .filter(
-          (o) =>
-            !matchedIds.has(o.id) &&
-            o.sourceRecord &&
-            touchedSourceRecordIds.has(o.sourceRecord.id),
+          (offer) =>
+            !matchedIds.has(offer.id) && offer.sourceRecord?.id === sourceRecord.id,
         )
-        .map((o) => o.id);
-      if (staleIds.length > 0) {
-        await this.offerRepo.deleteByIds(staleIds);
-      }
-      await this.mergeService.recomputePrice(model);
-      await this.productRepo.save(model);
+        .map((offer) => offer.id);
+      if (!isEmpty(staleIds)) await this.offerRepo.deleteByIds(staleIds);
+    }
+    return written.length;
+  }
+
+  /**
+   * An identity disagreement is not a flaky write — two sources have resolved
+   * different products for one seller listing, and one of them is wrong. It
+   * must not abandon the rest of the page, but it is logged as an error and
+   * counted, because the alternative is a product quietly sitting with no
+   * offer and therefore no price.
+   */
+  private reportConflicts(
+    context: ProductImportContext,
+    conflicts: OfferIdentityConflictError[],
+  ): void {
+    for (const conflict of conflicts) {
+      this.logger.error(
+        'Offer identity disagreement between sources — refusing to rebind the offer',
+        conflict,
+        {
+          taskId: context.task?.id,
+          url: context.url,
+          source: context.source.name,
+          ...conflict.details,
+        },
+      );
+      this.productMetricsService.offerIdentityConflict(
+        context.source.name,
+        'model_disagreement',
+      );
     }
   }
 
@@ -1272,6 +1676,8 @@ export class ProductScrapeUpdaterService {
       nameOf<ProductModel>('embedding'),
       nameOf<ProductModel>('sources'),
       `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}`,
+      // The offers are composed from the seller's records (OfferComposerService).
+      `${nameOf<ProductModel>('sources')}.${nameOf<ProductSourceRecord>('source')}.${nameOf<ProductSource>('seller')}`,
     ];
   }
 

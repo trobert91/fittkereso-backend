@@ -49,6 +49,16 @@ export class OfferFreshnessService {
     return this.dynamicConfig.offers?.deletionEnabled ?? false;
   }
 
+  /**
+   * Whether a complete run of a source listing the whole catalog removes the
+   * offers it did not see (CompleteSourceRemovalService). Defaults to TRUE:
+   * only a complete, uncapped, unfiltered run removes anything, and a share
+   * guard stops a truncated feed.
+   */
+  get completeSourceRemovalEnabled(): boolean {
+    return this.dynamicConfig.offers?.completeSourceRemovalEnabled ?? true;
+  }
+
   /** Offers with `lastSynced >= this` are publicly visible. */
   visibleCutoff(now: Date = new Date()): Date {
     return new Date(now.getTime() - this.freshnessDays * MS_PER_DAY);

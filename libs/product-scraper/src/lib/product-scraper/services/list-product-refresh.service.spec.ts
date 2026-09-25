@@ -1,10 +1,11 @@
-import { OfferAvailability } from '@fittkereso-backend/database';
+import { OfferAvailability, type ScrapedOffer } from '@fittkereso-backend/database';
 import {
   DEFAULT_LIST_REFRESH_REQUIRED_FIELDS,
   ListProductRefreshService,
 } from './list-product-refresh.service';
 
-const SOURCE = { id: 'source-1', name: 'speedbike' } as never;
+const SELLER = { id: 'seller-1' };
+const SOURCE = { id: 'source-1', name: 'speedbike', seller: SELLER } as never;
 
 /** A card carrying everything the default minimum set asks for. */
 const completeItem = () => ({
@@ -17,18 +18,48 @@ const completeItem = () => ({
 
 describe('ListProductRefreshService', () => {
   let service: ListProductRefreshService;
-  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
-  let offerRepo: { refreshFromListProduct: jest.Mock };
+  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; save: jest.Mock };
+  let productRepo: { findOne: jest.Mock; save: jest.Mock };
+  let mergeService: { recomputePrice: jest.Mock };
+  let offerComposer: { compose: jest.Mock };
+  let locks: { withLocks: jest.Mock };
   let dynamicConfig: { import?: { listRefreshRequiredFields?: string[] } };
 
+  /** This source's record of the page, on product model-1. */
+  const givenRecord = (offers: ScrapedOffer[], overrides: Record<string, unknown> = {}) => {
+    const record = {
+      id: 'record-1',
+      url: 'https://speedbike.hu/termek/macina',
+      model: { id: 'model-1' },
+      source: { id: 'source-1', seller: SELLER },
+      scrapedProduct: { offers },
+      lastUpdated: new Date('2026-09-01'),
+      lastSeenAt: undefined as Date | undefined,
+      ...overrides,
+    };
+    sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(record);
+    productRepo.findOne.mockResolvedValue({ id: 'model-1', sources: [record] });
+    return record;
+  };
+  const savedEntries = (): ScrapedOffer[] =>
+    sourceRecordRepo.save.mock.calls[0][0].scrapedProduct.offers;
+
   beforeEach(() => {
-    sourceRecordRepo = { findBySourceAndUrl: jest.fn() };
-    offerRepo = { refreshFromListProduct: jest.fn() };
+    sourceRecordRepo = { findBySourceAndUrl: jest.fn(), save: jest.fn() };
+    productRepo = { findOne: jest.fn(), save: jest.fn() };
+    mergeService = { recomputePrice: jest.fn() };
+    offerComposer = {
+      compose: jest.fn().mockResolvedValue({ offers: [{ id: 'offer-1' }], conflicts: [] }),
+    };
+    locks = { withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()) };
     dynamicConfig = {};
 
     service = new ListProductRefreshService(
       sourceRecordRepo as never,
-      offerRepo as never,
+      productRepo as never,
+      mergeService as never,
+      offerComposer as never,
+      locks as never,
       dynamicConfig as never,
     );
   });
@@ -91,90 +122,138 @@ describe('ListProductRefreshService', () => {
       await expect(
         service.tryRefresh(SOURCE, completeItem() as never),
       ).resolves.toBe('unknown');
-      expect(offerRepo.refreshFromListProduct).not.toHaveBeenCalled();
+      expect(offerComposer.compose).not.toHaveBeenCalled();
     });
 
     it('reports incomplete and writes nothing when the card is too thin', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [{ id: 'offer-1', externalId: 'SKU-1' }],
-      });
+      givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }]);
 
       const item = { ...completeItem(), availability: undefined };
 
       await expect(service.tryRefresh(SOURCE, item as never)).resolves.toBe(
         'incomplete',
       );
-      expect(offerRepo.refreshFromListProduct).not.toHaveBeenCalled();
+      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
+      expect(offerComposer.compose).not.toHaveBeenCalled();
     });
 
-    it('refreshes the offer matching the card externalId', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [
-          { id: 'offer-other', externalId: 'SKU-OTHER' },
-          { id: 'offer-1', externalId: 'SKU-1' },
-        ],
-      });
+    it('writes the card into the record, then composes the offer under the product lock', async () => {
+      const record = givenRecord([
+        { price: 1, externalId: 'SKU-OTHER', resolvedExternalId: 'SKU-OTHER' },
+        {
+          price: 1_499_990,
+          priceWithoutDiscount: 1_599_990,
+          externalId: 'SKU-1',
+          resolvedExternalId: 'SKU-1',
+          availability: OfferAvailability.out_of_stock,
+        },
+      ]);
 
       await expect(
         service.tryRefresh(SOURCE, completeItem() as never),
       ).resolves.toBe('refreshed');
 
-      expect(offerRepo.refreshFromListProduct).toHaveBeenCalledWith('offer-1', {
-        price: 1_339_990,
-        priceWithoutDiscount: undefined,
-        currency: 'HUF',
-        availability: OfferAvailability.in_stock,
+      expect(locks.withLocks.mock.calls[0][0]).toEqual([{ namespace: 1, id: 'model-1' }]);
+      expect(savedEntries()).toEqual([
+        { price: 1, externalId: 'SKU-OTHER', resolvedExternalId: 'SKU-OTHER' },
+        {
+          price: 1_339_990,
+          // A card with a price and no old price: no longer discounted.
+          priceWithoutDiscount: null,
+          currency: 'HUF',
+          externalId: 'SKU-1',
+          resolvedExternalId: 'SKU-1',
+          availability: OfferAvailability.in_stock,
+        },
+      ]);
+      // The source still lists it.
+      expect(record.lastSeenAt).toBeInstanceOf(Date);
+      expect(offerComposer.compose).toHaveBeenCalledWith({
+        model: { id: 'model-1', sources: [record] },
+        seller: SELLER,
+        externalIds: ['SKU-1'],
+        sighted: true,
+        create: false,
       });
+      expect(mergeService.recomputePrice).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'model-1' }),
+      );
+      expect(productRepo.save).toHaveBeenCalled();
+    });
+
+    it('leaves the stored availability alone when the card shows none', async () => {
+      dynamicConfig.import = { listRefreshRequiredFields: ['url', 'price'] };
+      givenRecord([
+        {
+          price: 1,
+          externalId: 'SKU-1',
+          resolvedExternalId: 'SKU-1',
+          availability: OfferAvailability.out_of_stock,
+        },
+      ]);
+
+      await service.tryRefresh(SOURCE, { ...completeItem(), availability: undefined } as never);
+
+      expect(savedEntries()[0].availability).toBe(OfferAvailability.out_of_stock);
     });
 
     it('falls back to the sole offer when the card has no externalId', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [{ id: 'offer-only', externalId: 'SKU-WHATEVER' }],
-      });
+      givenRecord([{ price: 1, externalId: 'SKU-WHATEVER', resolvedExternalId: 'SKU-WHATEVER' }]);
 
       const item = { ...completeItem(), externalId: undefined };
 
       await expect(service.tryRefresh(SOURCE, item as never)).resolves.toBe(
         'refreshed',
       );
-      expect(offerRepo.refreshFromListProduct).toHaveBeenCalledWith(
-        'offer-only',
-        expect.anything(),
+      expect(offerComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ externalIds: ['SKU-WHATEVER'] }),
       );
     });
 
     // Guessing here would write one variant's price onto another, which is
     // worse than paying for the detail fetch that resolves it properly.
     it('refuses to guess between several offers with no usable externalId', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [
-          { id: 'offer-m', externalId: 'SKU-M' },
-          { id: 'offer-l', externalId: 'SKU-L' },
-        ],
-      });
+      givenRecord([
+        { price: 1, externalId: 'SKU-M', resolvedExternalId: 'SKU-M' },
+        { price: 1, externalId: 'SKU-L', resolvedExternalId: 'SKU-L' },
+      ]);
 
       const item = { ...completeItem(), externalId: undefined };
 
       await expect(service.tryRefresh(SOURCE, item as never)).resolves.toBe(
         'no_offer',
       );
-      expect(offerRepo.refreshFromListProduct).not.toHaveBeenCalled();
+      expect(offerComposer.compose).not.toHaveBeenCalled();
     });
 
     it('reports no_offer for a known record that has no offer yet', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [],
+      givenRecord([]);
+
+      await expect(
+        service.tryRefresh(SOURCE, completeItem() as never),
+      ).resolves.toBe('no_offer');
+      expect(offerComposer.compose).not.toHaveBeenCalled();
+    });
+
+    it('reports no_offer for a record not attached to a product', async () => {
+      givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
+        model: null,
       });
 
       await expect(
         service.tryRefresh(SOURCE, completeItem() as never),
       ).resolves.toBe('no_offer');
-      expect(offerRepo.refreshFromListProduct).not.toHaveBeenCalled();
+      expect(locks.withLocks).not.toHaveBeenCalled();
+    });
+
+    it('reports no_offer when the offer does not exist to compose onto', async () => {
+      givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }]);
+      offerComposer.compose.mockResolvedValue({ offers: [], conflicts: [] });
+
+      await expect(
+        service.tryRefresh(SOURCE, completeItem() as never),
+      ).resolves.toBe('no_offer');
+      expect(mergeService.recomputePrice).not.toHaveBeenCalled();
     });
 
     it('looks the record up scoped to this source, with a normalized URL', async () => {

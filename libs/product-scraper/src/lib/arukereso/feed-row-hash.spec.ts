@@ -1,4 +1,9 @@
-import { asFeedEntryPayload, feedRowHash, stableStringify } from './feed-row-hash';
+import {
+  asFeedEntryPayload,
+  FEED_HASH_VERSION,
+  feedRowHash,
+  stableStringify,
+} from './feed-row-hash';
 
 const product = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -35,6 +40,20 @@ describe('feedRowHash', () => {
 
   it('treats an undefined field as absent, as the stored JSON will', () => {
     expect(feedRowHash('u', product({ description: undefined }))).toBe(feedRowHash('u', product()));
+  });
+
+  // A mapped field left empty (null) and an unmapped one (absent) mean
+  // different things to the offer, so a config change between them re-imports.
+  it('tells a null offer field from an absent one', () => {
+    const none = product({ offers: [{ externalId: '1260040108', price: 3879000, priceWithoutDiscount: null }] });
+    const silent = product({ offers: [{ externalId: '1260040108', price: 3879000 }] });
+
+    expect(feedRowHash('u', none)).not.toBe(feedRowHash('u', silent));
+  });
+
+  // Bumped for the null/absent distinction: every row imports once more.
+  it('is on version 2', () => {
+    expect(FEED_HASH_VERSION).toBe(2);
   });
 });
 

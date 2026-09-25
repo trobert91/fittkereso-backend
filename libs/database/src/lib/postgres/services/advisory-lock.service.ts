@@ -17,6 +17,14 @@ export enum AdvisoryLockNamespace {
    * ProductImportTaskRepository.claimBatch inside its own transaction.
    */
   ImportTaskClaim = 3,
+  /**
+   * One seller's offer identity, whether or not the offer exists yet. A
+   * contributing listing that finds no offer is stored unattached under it,
+   * and an identifying listing holds it from attaching the waiting records
+   * until its offers are written — so the two can never miss each other.
+   * Held on its own, never while waiting for another lock.
+   */
+  OfferKey = 4,
 }
 
 export interface AdvisoryLockKey {
@@ -32,6 +40,11 @@ export const productLock = (id: string): AdvisoryLockKey => ({
 export const brandLock = (id: string): AdvisoryLockKey => ({
   namespace: AdvisoryLockNamespace.Brand,
   id,
+});
+
+export const offerKeyLock = (sellerId: string, externalId: string): AdvisoryLockKey => ({
+  namespace: AdvisoryLockNamespace.OfferKey,
+  id: `${sellerId}:${externalId}`,
 });
 
 /**
@@ -55,6 +68,8 @@ const LOCK_TIMEOUT = '120s';
  * Keys are taken in one sorted order, so two callers locking the same set can
  * never deadlock on each other. Callers that nest (a brand lock, then the
  * product lock inside it) must always nest in that order: brand, then product.
+ * Offer keys are taken in the same call as the product lock they go with, or
+ * alone by a caller that waits for nothing while holding them.
  *
  * Each call holds one pooled connection for as long as `fn` runs, on top of
  * whatever `fn` itself uses, so the pool must be sized for about two

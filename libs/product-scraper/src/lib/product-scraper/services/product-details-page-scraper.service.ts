@@ -1,5 +1,4 @@
 import {
-  OfferAvailability,
   ProductImportTaskKind,
   ProductImportTask,
   SourceSpecConfig,
@@ -17,17 +16,14 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { normalizeUrl } from '@fittkereso-backend/utils';
 import {
   ProductSourceImage,
-  ScrapedOffer,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecExtractionService,
   SpecTranslationSelectorService,
 } from '@fittkereso-backend/product';
 import { splitDeterministicSpecs } from './deterministic-specs';
-import {
-  DetailPageResult,
-  RawOfferRecord,
-} from '@fittkereso-backend/scrape-interpreter';
+import { toScrapedOffers } from './scraped-offers';
+import { DetailPageResult } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
 import {
   RuntimeDataProviderService,
@@ -112,6 +108,15 @@ export class ProductDetailsPageScraperService {
           model: scrapedProduct.model,
           categorySlug: scrapedProduct.category.slug,
           offersFound: scrapedProduct.offers?.length ?? 0,
+        });
+        this.scrapingMetrics.recordExtractionOutcome(sourceName, 'success');
+      } else if (task.source.identifiesProducts === false) {
+        // Not a failure: a source that does not identify products stores a
+        // listing whose offer its seller does not have yet without a product.
+        this.logger.debug('Listing stored unattached — no offer of the seller to join yet', {
+          taskId: task.id,
+          url: task.url,
+          sourceName,
         });
         this.scrapingMetrics.recordExtractionOutcome(sourceName, 'success');
       } else {
@@ -340,37 +345,10 @@ export class ProductDetailsPageScraperService {
         siblingExternalIds: detail.siblingIds,
         aliases: detail.aliases,
         images: this.toScrapedImages(detail.imageUrls),
-        offers: this.toScrapedOffers(detail.rawOffers),
+        offers: toScrapedOffers(detail.rawOffers),
       },
       offerLinks: detail.offerLinks,
     };
-  }
-
-  // RawOfferRecord's fields are all optional (interpreter output before
-  // validation); ScrapedOffer requires price, so entries missing it are
-  // dropped here rather than persisted as broken Offer rows.
-  // Only an offer's OWN specs are set here (an assembleOffer op's per-item
-  // `specs` sub-pipelines, e.g. frameSize varying per variant). Every other
-  // offer gets the page's listing-level values once the identity extraction
-  // has produced them — see SpecPostProcessService.
-  private toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
-    return rawOffers
-      .filter(
-        (offer): offer is RawOfferRecord & { price: number } =>
-          typeof offer.price === 'number' && Number.isFinite(offer.price),
-      )
-      .map((offer) => ({
-        price: offer.price,
-        priceWithoutDiscount: offer.priceWithoutDiscount,
-        currency: offer.currency,
-        availability: this.parseAvailability(offer.availability),
-        url: offer.url ? normalizeUrl(offer.url) : offer.url,
-        externalId: offer.externalId,
-        gtin: offer.gtin,
-        mpn: offer.mpn,
-        locations: offer.locations,
-        specs: offer.specs,
-      }));
   }
 
   // The interpreter pipeline only ever produces a flat, ordered string[]
@@ -378,14 +356,6 @@ export class ProductDetailsPageScraperService {
   // source config can express, so it's what order is derived from here.
   private toScrapedImages(imageUrls: string[]): ProductSourceImage[] {
     return imageUrls.map((url, order) => ({ url, order }));
-  }
-
-  private parseAvailability(
-    value: string | undefined,
-  ): OfferAvailability | undefined {
-    return value && (Object.values(OfferAvailability) as string[]).includes(value)
-      ? (value as OfferAvailability)
-      : undefined;
   }
 
   private async buildTranslator(

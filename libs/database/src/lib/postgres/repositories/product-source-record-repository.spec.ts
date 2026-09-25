@@ -1,0 +1,152 @@
+import { ProductSourceRecordRepository } from './product-source-record-repository';
+
+/** A query builder that records its calls and answers with the given results. */
+function makeQueryBuilder(results: { getMany?: unknown; getCount?: number; getRawMany?: unknown }) {
+  const builder: Record<string, jest.Mock> = {};
+  for (const method of [
+    'select',
+    'addSelect',
+    'leftJoin',
+    'innerJoin',
+    'innerJoinAndSelect',
+    'where',
+    'andWhere',
+    'orderBy',
+    'addOrderBy',
+    'offset',
+    'limit',
+  ]) {
+    builder[method] = jest.fn().mockReturnValue(builder);
+  }
+  builder['getMany'] = jest.fn().mockResolvedValue(results.getMany ?? []);
+  builder['getCount'] = jest.fn().mockResolvedValue(results.getCount ?? 0);
+  builder['getRawMany'] = jest.fn().mockResolvedValue(results.getRawMany ?? []);
+  return builder;
+}
+
+function repositoryWith(builder: Record<string, jest.Mock>) {
+  const repository = Object.create(ProductSourceRecordRepository.prototype);
+  (repository as unknown as { repo: unknown }).repo = {
+    createQueryBuilder: jest.fn().mockReturnValue(builder),
+  };
+  return repository as ProductSourceRecordRepository;
+}
+
+const clauses = (builder: Record<string, jest.Mock>) =>
+  [...builder['where'].mock.calls, ...builder['andWhere'].mock.calls].map(([clause]) =>
+    String(clause),
+  );
+
+describe('ProductSourceRecordRepository.findFeedRowStates', () => {
+  it('answers each URL with its hash, last sighting and product, null while unattached', async () => {
+    const seen = new Date('2026-09-20');
+    const builder = makeQueryBuilder({
+      getMany: [
+        { url: 'https://shop/a', feedRowHash: 'h1', lastSeenAt: seen, model: { id: 'model-1' } },
+        { url: 'https://shop/b', feedRowHash: 'h2', lastUpdated: seen, model: null },
+      ],
+    });
+
+    const states = await repositoryWith(builder).findFeedRowStates('source-1', [
+      'https://shop/a',
+      'https://shop/b',
+    ]);
+
+    expect(builder['leftJoin']).toHaveBeenCalledWith('record.model', 'model');
+    expect(states.get('https://shop/a')).toEqual({ feedRowHash: 'h1', seenAt: seen, modelId: 'model-1' });
+    expect(states.get('https://shop/b')).toEqual({ feedRowHash: 'h2', seenAt: seen, modelId: null });
+  });
+});
+
+describe('ProductSourceRecordRepository.findUnattachedBySellerAndExternalIds', () => {
+  it('queries nothing without ids', async () => {
+    const builder = makeQueryBuilder({});
+
+    expect(await repositoryWith(builder).findUnattachedBySellerAndExternalIds('seller-1', [])).toEqual([]);
+    expect(builder['getMany']).not.toHaveBeenCalled();
+  });
+
+  it("looks only at the seller's unattached records, by their offers' stored keys", async () => {
+    const builder = makeQueryBuilder({ getMany: [{ id: 'record-google' }] });
+
+    const found = await repositoryWith(builder).findUnattachedBySellerAndExternalIds('seller-1', [
+      'HAIBIKE-1',
+    ]);
+
+    expect(found).toEqual([{ id: 'record-google' }]);
+    // With the source and its seller, as a product's records are loaded.
+    expect(builder['innerJoinAndSelect'].mock.calls).toEqual([
+      ['record.source', 'source'],
+      ['source.seller', 'seller'],
+    ]);
+    const where = clauses(builder);
+    expect(where).toContain('record."modelId" IS NULL');
+    expect(where).toContain('seller.id = :sellerId');
+    expect(where.some((clause) => clause.includes("entry ->> 'resolvedExternalId' IN (:...externalIds)"))).toBe(true);
+    expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), { externalIds: ['HAIBIKE-1'] });
+  });
+});
+
+describe('ProductSourceRecordRepository.countUnattached', () => {
+  it("counts the source's records with no product", async () => {
+    const builder = makeQueryBuilder({ getCount: 3 });
+
+    expect(await repositoryWith(builder).countUnattached('source-1')).toBe(3);
+    expect(clauses(builder)).toEqual(['record."sourceId" = :sourceId', 'record."modelId" IS NULL']);
+  });
+});
+
+describe('ProductSourceRecordRepository.searchRecords', () => {
+  it('filters by source, attachment and text, and shapes each row', async () => {
+    const seen = new Date('2026-09-20');
+    const builder = makeQueryBuilder({
+      getCount: 1,
+      getRawMany: [
+        {
+          id: 'record-google',
+          sourceId: 'source-1',
+          sourceName: 'speedbike-googleshop',
+          url: 'https://shop/a',
+          externalId: 'HAIBIKE-1',
+          offerExternalIds: ['HAIBIKE-1', null],
+          title: 'HAIBIKE SDURO',
+          price: '1499990',
+          productId: null,
+          productName: null,
+          seenAt: seen,
+        },
+      ],
+    });
+
+    const result = await repositoryWith(builder).searchRecords({
+      productSourceId: 'source-1',
+      attached: false,
+      search: 'haibike',
+      skip: 50,
+      take: 25,
+    });
+
+    expect(result).toEqual({
+      total: 1,
+      items: [
+        expect.objectContaining({ offerExternalIds: ['HAIBIKE-1'], price: 1499990, productId: null }),
+      ],
+    });
+    const where = clauses(builder);
+    expect(where).toContain('source.id = :sourceId');
+    expect(where).toContain('record."modelId" IS NULL');
+    expect(builder['andWhere']).toHaveBeenCalledWith(expect.anything(), { search: '%haibike%' });
+    expect(builder['offset']).toHaveBeenCalledWith(50);
+    expect(builder['limit']).toHaveBeenCalledWith(25);
+  });
+
+  it('filters by seller, and only attached ones when asked', async () => {
+    const builder = makeQueryBuilder({});
+
+    await repositoryWith(builder).searchRecords({ sellerId: 'seller-1', attached: true });
+
+    const where = clauses(builder);
+    expect(where).toContain('source."sellerId" = :sellerId');
+    expect(where).toContain('record."modelId" IS NOT NULL');
+  });
+});

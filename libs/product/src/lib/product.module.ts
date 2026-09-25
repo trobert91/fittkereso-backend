@@ -43,17 +43,22 @@ import { DebugModule } from '@fittkereso-backend/debug';
 import { MetricsModule } from '@fittkereso-backend/metrics';
 import { ProductMergeService } from './services/merge/product-merge.service';
 import { ProductSplitService } from './services/merge/product-split.service';
+import { ProductDescriptionService } from './services/product-description/product-description.service';
 import { ProductModelFactoryService } from './services/product-model-factory.service';
 import { SearchModule } from '@fittkereso-backend/search';
 import { BrandResolutionService } from './services/brand/brand-resolution.service';
 import { OfferMatchingService } from './services/offer/offer-matching.service';
 import { OfferFreshnessService } from './services/offer/offer-freshness.service';
+import { OfferComposerService } from './services/offer/offer-composer.service';
 import { StaleOfferSweepService } from './services/offer/stale-offer-sweep.service';
+import { ContributorDetachService } from './services/offer/contributor-detach.service';
+import { CompleteSourceRemovalService } from './services/offer/complete-source-removal.service';
 import { SellerCreateService } from './services/seller/seller-create.service';
 import { SellerDetailService } from './services/seller/seller-detail.service';
 import { SellerProductSourceCreateService } from './services/seller/seller-product-source-create.service';
 import { SellerUpdateService } from './services/seller/seller-update.service';
 import { ProductSourceUpdateService } from './services/product-source/product-source-update.service';
+import { ProductSourceSellerRulesService } from './services/product-source/product-source-seller-rules.service';
 import { ProductSourceVersionService } from './services/product-source/product-source-version.service';
 
 @Module({
@@ -98,6 +103,7 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     ProductNormalizerService,
     ProductEmbeddingService,
     ProductMergeService,
+    ProductDescriptionService,
     ProductSplitService,
     ProductModelFactoryService,
     ProductNameMergeService,
@@ -108,12 +114,16 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     BrandResolutionService,
     OfferMatchingService,
     OfferFreshnessService,
+    OfferComposerService,
+    ContributorDetachService,
+    CompleteSourceRemovalService,
     StaleOfferSweepService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,
     SellerUpdateService,
     ProductSourceUpdateService,
+    ProductSourceSellerRulesService,
     ProductSourceVersionService,
   ],
   exports: [
@@ -141,6 +151,7 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     ProductNormalizerService,
     ProductEmbeddingService,
     ProductMergeService,
+    ProductDescriptionService,
     ProductSplitService,
     ProductModelFactoryService,
     ProductNameMergeService,
@@ -151,12 +162,16 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     BrandResolutionService,
     OfferMatchingService,
     OfferFreshnessService,
+    OfferComposerService,
+    ContributorDetachService,
+    CompleteSourceRemovalService,
     StaleOfferSweepService,
     SellerCreateService,
     SellerDetailService,
     SellerProductSourceCreateService,
     SellerUpdateService,
     ProductSourceUpdateService,
+    ProductSourceSellerRulesService,
     ProductSourceVersionService,
   ],
 })

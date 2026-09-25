@@ -14,24 +14,28 @@ import {
   ProductImage,
   ProductModel,
   ProductModelRepository,
+  ProductSource,
   ProductSourceRecord,
+  ProductSourceRepository,
   ProductImportTask,
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
-import { EntityManager } from 'typeorm';
-import { isEmpty } from 'lodash';
+import { EntityManager, In } from 'typeorm';
+import { isEmpty, keyBy, uniq } from 'lodash';
 import { ProductSpecMergeService } from '../product-spec/product-spec-merge.service';
 import { ProductSpecSortService } from '../product-spec/product-spec-sort.service';
 import { ProductSpecValidatorService } from '../product-spec/product-spec-validator.service';
 import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
+import { groupRecordsBySeller } from '../product-spec/group-records-by-seller';
 import { getProductLevelSpecs } from '../product-spec/product-level-specs';
 import { ProductNameMergeService } from '../product-name/product-name-merge.service';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductDetailService } from '../product-detail.service';
 import { OfferFreshnessService } from '../offer/offer-freshness.service';
+import { ProductDescriptionService } from '../product-description/product-description.service';
 
 interface MergeProductsParams {
   sourceId: string;
@@ -67,6 +71,8 @@ export class ProductMergeService {
     private readonly duplicatePairRepo: ProductDuplicatePairRepository,
     private readonly offerFreshness: OfferFreshnessService,
     private readonly locks: AdvisoryLockService,
+    private readonly sourceRepo: ProductSourceRepository,
+    private readonly descriptionService: ProductDescriptionService,
   ) {}
 
   /**
@@ -106,8 +112,9 @@ export class ProductMergeService {
 
   /**
    * The single idempotent "recompute ProductModel from its
-   * ProductSourceRecords" operation — specs (via ProductSpecMergeService)
-   * and name fields (via ProductNameMergeService) alike. Purely a
+   * ProductSourceRecords" operation — specs (via ProductSpecMergeService),
+   * name fields (via ProductNameMergeService) and the description (via
+   * ProductDescriptionService) alike. Purely a
    * function of model.sources (already-persisted ProductSourceRecords), so
    * it's safe to call repeatedly, from any trigger (a fresh scrape's
    * source-record upsert, a manual admin retry, or post-model-merge
@@ -129,10 +136,10 @@ export class ProductMergeService {
       return model;
     }
 
-    const latestPerSource = getLatestSourcePerSource(model.sources);
-
+    // Specs vote once per seller; within a seller, priority decides.
+    await this.loadSellers(model.sources);
     model.specs = await this.specMergeService.mergeSpecs(
-      latestPerSource,
+      groupRecordsBySeller(model.sources),
       categorySlug,
     );
     model.specs = getProductLevelSpecs(
@@ -157,13 +164,45 @@ export class ProductMergeService {
       ? finalValidation.errors
       : undefined;
 
+    // A source that does not identify products only contributes to offers
+    // and specs: its titles are raw (it runs no identity extraction), and the
+    // name merge would read a record without `nameCleaned` as cleaned.
     await this.nameMergeService.mergeNames(
       model,
-      latestPerSource,
+      getLatestSourcePerSource(
+        model.sources.filter((record) => record.source?.identifiesProducts !== false),
+      ),
       categorySlug,
     );
 
+    model.description = this.descriptionService.pick(model.sources);
+
     return model;
+  }
+
+  /**
+   * Makes sure every record's source carries its seller, which the spec vote
+   * groups by — in one query, whatever relations the caller loaded.
+   */
+  private async loadSellers(records: ProductSourceRecord[]): Promise<void> {
+    const missing = uniq(
+      records.flatMap((record) =>
+        record.source && !record.source.seller ? [record.source.id] : [],
+      ),
+    );
+    if (isEmpty(missing)) return;
+
+    const loaded = keyBy(
+      await this.sourceRepo.find({
+        where: { id: In(missing) },
+        relations: { [nameOf<ProductSource>('seller')]: true },
+      }),
+      (source) => source.id,
+    );
+    for (const record of records) {
+      const seller = record.source && loaded[record.source.id]?.seller;
+      if (record.source && seller) record.source.seller = seller;
+    }
   }
 
   public async mergeProducts(
@@ -280,8 +319,8 @@ export class ProductMergeService {
    * each holds its own source's view of the listing.
    *
    * Keeping them all is also what makes a merge reversible: the returned ids are
-   * the complete set to split back out, and `mergeSources` reduces per-source
-   * via getLatestSourcePerSource anyway, so spec merging is unaffected.
+   * the complete set to split back out, and `mergeSources` reduces them per
+   * seller (groupRecordsBySeller) anyway, so spec merging is unaffected.
    */
   private async moveProductSourceRecords(
     manager: EntityManager,

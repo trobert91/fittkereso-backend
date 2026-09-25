@@ -18,7 +18,7 @@ export class ProductSourceSimulateImportTools {
   @Tool({
     name: 'simulate_product_source_import',
     description:
-      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ProductImportTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For an "arukereso" source: fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), maps every eligible item and reports what a run would do with it right now — queue a feed_entry task (new, changed, or missing its offer) or only refresh the offer in place — and runs the identity extraction on the first few. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
+      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ProductImportTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For a feed source ("arukereso" or "googleshop"): fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), maps every eligible item and reports what a run would do with it right now — queue a feed_entry task (new, changed, or missing its offer) or only refresh the offer in place — and runs the identity extraction on the first few. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to simulate a run for'),
       listUrl: z
@@ -88,14 +88,14 @@ export class ProductSourceSimulateImportTools {
       L.push('');
     }
 
-    if (result.arukereso) this.formatFeed(result.arukereso, L);
+    if (result.feed) this.formatFeed(result.feed, L);
     if (result.scraping) this.formatScraping(result.scraping, L);
 
     return L.join('\n');
   }
 
   private formatFeed(
-    feed: NonNullable<ProductSourceImportSimulationResult['arukereso']>,
+    feed: NonNullable<ProductSourceImportSimulationResult['feed']>,
     L: string[],
   ): void {
     L.push('## Feed');
@@ -112,6 +112,12 @@ export class ProductSourceSimulateImportTools {
     L.push(
       `  - right now: would queue ${feed.wouldQueue} feed_entry tasks (new, changed, or missing their offer) · would refresh ${feed.wouldRefresh} offers in place`,
     );
+    if (feed.matchingOffers !== undefined) {
+      L.push(
+        `  - this source does not identify products: ${feed.matchingOffers} of ${feed.wouldImport} rows match an existing offer of the seller and would join it; the rest would wait unattached`,
+      );
+    }
+    L.push(`  - ${feed.rowsWithOldPrice} rows carry an old price above their price`);
     if (feed.duplicateUrls > 0) {
       L.push(`  - ${feed.duplicateUrls} rows share a URL with an earlier row; only the last of each is imported`);
     }
@@ -152,7 +158,7 @@ export class ProductSourceSimulateImportTools {
   }
 
   private formatFeedIdentifiers(
-    feed: NonNullable<ProductSourceImportSimulationResult['arukereso']>,
+    feed: NonNullable<ProductSourceImportSimulationResult['feed']>,
     L: string[],
   ): void {
     const { gtin, mpn, specRows } = feed.identifiers;
@@ -186,7 +192,9 @@ export class ProductSourceSimulateImportTools {
     L.push('');
 
     L.push('## Spec rows sent to the identity extraction');
-    if (!specRows.configured) {
+    if (feed.matchingOffers !== undefined) {
+      L.push('_This source does not identify products: no identity extraction runs._');
+    } else if (!specRows.configured) {
       L.push(
         `_identityExtraction.specRows is not set — every listing sends its whole table (${specRows.meanRowsTotal} rows on average)._`,
       );

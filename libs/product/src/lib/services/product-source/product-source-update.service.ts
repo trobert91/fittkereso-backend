@@ -11,6 +11,7 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import ms from 'ms';
 import { ProductSourceUpdateParams } from '../../models/product-source-update-params';
 import { ProductSourceVersionService } from './product-source-version.service';
+import { ProductSourceSellerRulesService } from './product-source-seller-rules.service';
 
 /**
  * Who a change is attributed to when the caller did not say.
@@ -29,6 +30,7 @@ export class ProductSourceUpdateService {
     private readonly productSourceRepo: ProductSourceRepository,
     private readonly sellerRepo: SellerRepository,
     private readonly versionService: ProductSourceVersionService,
+    private readonly sellerRules: ProductSourceSellerRulesService,
   ) {}
 
   public async updateProductSource(
@@ -69,6 +71,9 @@ export class ProductSourceUpdateService {
       seller: source.seller,
       schedulingEnabled: source.schedulingEnabled,
       processingEnabled: source.processingEnabled,
+      priority: source.priority,
+      identifiesProducts: source.identifiesProducts,
+      hasAllProducts: source.hasAllProducts,
     };
 
     if (params.sellerId !== undefined) {
@@ -90,6 +95,14 @@ export class ProductSourceUpdateService {
 
     if (params.priority !== undefined) {
       source.priority = params.priority;
+    }
+
+    if (params.identifiesProducts !== undefined) {
+      source.identifiesProducts = params.identifiesProducts;
+    }
+
+    if (params.hasAllProducts !== undefined) {
+      source.hasAllProducts = params.hasAllProducts;
     }
 
     if (params.maxConcurrent !== undefined) {
@@ -114,7 +127,13 @@ export class ProductSourceUpdateService {
       );
     }
 
-    await this.productSourceRepo.save(source);
+    await this.assertSellerRules(source, previous);
+
+    try {
+      await this.productSourceRepo.save(source);
+    } catch (error: unknown) {
+      throw this.sellerRules.translateSaveError(error, source.priority);
+    }
 
     const actor = params.actor ?? UNATTRIBUTED;
 
@@ -147,11 +166,55 @@ export class ProductSourceUpdateService {
   }
 
   /**
+   * The rules a seller's sources keep together (ProductSourceSellerRulesService),
+   * checked only for what this update changes, so an untouched source is never
+   * refused for a state it already had.
+   */
+  private async assertSellerRules(
+    source: ProductSource,
+    previous: {
+      seller?: Seller;
+      priority: number;
+      identifiesProducts: boolean;
+      hasAllProducts: boolean;
+    },
+  ): Promise<void> {
+    const sellerMoved = previous.seller?.id !== source.seller.id;
+
+    if (source.hasAllProducts !== previous.hasAllProducts) {
+      this.sellerRules.assertCompletenessAllowed({
+        type: source.type,
+        hasAllProducts: source.hasAllProducts,
+      });
+    }
+
+    if (sellerMoved || source.identifiesProducts !== previous.identifiesProducts) {
+      await this.sellerRules.assertKeepsIdentifyingSource({
+        next: {
+          id: source.id,
+          sellerId: source.seller.id,
+          identifiesProducts: source.identifiesProducts,
+        },
+        previousSellerId: previous.seller?.id,
+      });
+    }
+
+    if (sellerMoved || source.priority !== previous.priority) {
+      await this.sellerRules.assertPriorityFree({
+        sellerId: source.seller.id,
+        priority: source.priority,
+        excludingSourceId: source.id,
+      });
+    }
+  }
+
+  /**
    * Writes an audit row for each non-config field that actually changed.
    *
    * Only the ones worth a timeline entry: scheduling and processing decide
-   * whether the source runs at all, and the seller decides who every future
-   * offer belongs to. Renaming it or nudging an interval is visible in the row
+   * whether the source runs at all, the seller decides who every future
+   * offer belongs to, and the two flags decide whether the source creates
+   * products and whether its runs may remove offers. Renaming it or nudging an interval is visible in the row
    * itself and not worth a row of its own.
    *
    * Never fails the update. The change is already committed by the time this
@@ -165,6 +228,8 @@ export class ProductSourceUpdateService {
       seller?: Seller;
       schedulingEnabled: boolean;
       processingEnabled: boolean;
+      identifiesProducts: boolean;
+      hasAllProducts: boolean;
     },
     actor: ProductSourceActor,
   ): Promise<void> {
@@ -189,6 +254,30 @@ export class ProductSourceUpdateService {
           source,
           'processing_changed',
           { from: previous.processingEnabled, to: source.processingEnabled },
+          actor,
+        );
+      }
+
+      if (
+        params.identifiesProducts !== undefined &&
+        params.identifiesProducts !== previous.identifiesProducts
+      ) {
+        await this.versionService.recordAction(
+          source,
+          'identifies_products_changed',
+          { from: previous.identifiesProducts, to: source.identifiesProducts },
+          actor,
+        );
+      }
+
+      if (
+        params.hasAllProducts !== undefined &&
+        params.hasAllProducts !== previous.hasAllProducts
+      ) {
+        await this.versionService.recordAction(
+          source,
+          'has_all_products_changed',
+          { from: previous.hasAllProducts, to: source.hasAllProducts },
           actor,
         );
       }

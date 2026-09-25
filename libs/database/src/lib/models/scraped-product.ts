@@ -130,42 +130,60 @@ export interface ProductSourceImage {
 
 // Seller-listing data (price/availability/etc.) captured alongside a scraped
 // product, populated when a source's config defines detailPage.offers.
+//
+// A field speaks for its source only when present. `null` means the source
+// maps the field and has no value for this item (a sale that ended clears the
+// old price); an absent key means the source does not map it at all, so the
+// seller's other sources decide it (OfferComposerService). Entries stored
+// before this distinction only carry keys for real values, so an absent key
+// reads as silent there too.
 export interface ScrapedOffer {
   price: number;
   /**
    * The pre-discount price, only set when the source shows this offer as
    * currently discounted (e.g. a struck-through original price alongside
-   * the current one). Absent when the offer isn't on discount.
+   * the current one). Null when the source maps it and the offer isn't
+   * discounted.
    */
-  priceWithoutDiscount?: number;
-  currency?: string;
-  availability?: OfferAvailability;
-  url?: string;
+  priceWithoutDiscount?: number | null;
+  currency?: string | null;
+  availability?: OfferAvailability | null;
+  url?: string | null;
   externalId?: string;
+  /**
+   * The `Offer.externalId` this entry is stored under, after the page-wide
+   * collision guard (ProductScrapeUpdaterService.resolveOfferExternalIds).
+   * Set on the copy kept in ProductSourceRecord.scrapedProduct, so a seller's
+   * records join its offers without re-deriving it. Null on an entry whose id
+   * collided with another on its page (its offer has no externalId); absent on
+   * entries stored before it existed.
+   */
+  resolvedExternalId?: string | null;
   /**
    * The barcode exactly as the source published it (EAN-13, UPC-12, or
    * whatever the shop put in that field). Normalized and validated only when
    * written to Offer.gtin, so an invalid value stays inspectable here.
    */
-  gtin?: string;
+  gtin?: string | null;
   /**
    * The manufacturer's article number exactly as the source published it,
    * after the source config's own clean-up. Normalized when written to
    * Offer.mpn.
    */
-  mpn?: string;
+  mpn?: string | null;
   /**
    * Store/warehouse names where this offer is physically available (e.g.
    * ["Törökbálinti raktár", "Törökbálint"]). Optional — most sources have no
    * per-location breakdown.
    */
-  locations?: string[];
+  locations?: string[] | null;
   /**
    * Offer-level spec values (e.g. frameSize, color) for this specific
    * listing — overrides the page-level offer-level specs derived from
    * ProductSourceRecord.specs when a source reports multiple size/color
    * variants on a single product page, each with its own price. Optional:
    * most sources have nothing to put here and rely on the page-level default.
+   * The copy stored on a record carries that default when the offer had none.
    */
   specs?: ProductSpecs;
 }

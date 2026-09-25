@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import {
-  ArukeresoFieldMapping,
+  ArukeresoMappingEntry,
   ArukeresoMappingTarget,
   asArukeresoConfig,
   asScrapingConfig,
   OfferAvailability,
+  OfferRepository,
   ProductSource,
   ProductSourceRecordRepository,
   ProductSourceType,
@@ -13,6 +14,7 @@ import {
   ScrapedProduct,
   ScrapedProductSpec,
   ProductImportTask,
+  isFeedSourceType,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { NativeScraperService, ScraperService } from '@fittkereso-backend/scraper';
@@ -23,14 +25,13 @@ import {
   normalizeMpn,
   normalizeUrl,
 } from '@fittkereso-backend/utils';
+import { compact } from 'lodash';
 import { selectIdentitySpecRows } from '@fittkereso-backend/product';
+import { offerExternalIdOf } from '@fittkereso-backend/utils';
 import { ScrapingImportService } from './scraping-import.service';
 import { ListProductRefreshService } from './list-product-refresh.service';
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
-import {
-  ArukeresoFeedItem,
-  feedField,
-} from '../../arukereso/arukereso-feed-item';
+import { ArukeresoFeedItem } from '../../arukereso/arukereso-feed-item';
 import {
   previewListingIdentifiers,
   SimulatedListingIdentifiers,
@@ -45,7 +46,6 @@ import {
   FeedRow,
 } from '../../arukereso/arukereso-feed-triage.service';
 import { feedRowHash } from '../../arukereso/feed-row-hash';
-import { offerExternalIdOf } from './offer-external-id';
 
 /** What a run would do with one list card, and why. */
 export interface SimulatedListItemDecision {
@@ -89,6 +89,17 @@ export interface SimulatedArukeresoImport {
    */
   wouldQueue: number;
   wouldRefresh: number;
+  /**
+   * For a source that does not identify products: eligible rows whose
+   * externalId the seller already has an offer under, which they would join.
+   * The rest would wait unattached. Undefined for an identifying source.
+   */
+  matchingOffers?: number;
+  /**
+   * Mapped rows whose old price is above their price: what the source would
+   * put on the offers as a discount, when no higher-priority source says one.
+   */
+  rowsWithOldPrice: number;
   /** Eligible rows sharing a URL with an earlier row: only the last is imported. */
   duplicateUrls: number;
   wouldSkip: number;
@@ -97,7 +108,11 @@ export interface SimulatedArukeresoImport {
   distinctExternalIds: number;
   duplicateExternalIds: { externalId: string; count: number }[];
   itemsWithoutExternalId: number;
-  /** Fully mapped previews, identity extraction included — the only part that costs LLM calls. */
+  /**
+   * Fully mapped previews, identity extraction included — the only part that
+   * costs LLM calls. A source that does not identify products runs no
+   * extraction, so its previews are the mapping alone.
+   */
   products: ScrapedProduct[];
   /** Per preview, aligned with `products`: what identity resolution would look up. */
   productIdentifiers: SimulatedListingIdentifiers[];
@@ -142,7 +157,8 @@ export interface ProductSourceImportSimulationResult {
   type: ProductSourceType;
   sourceName: string;
   scraping?: SimulatedScrapingImport;
-  arukereso?: SimulatedArukeresoImport;
+  /** A feed source's run: `arukereso` or `googleshop`. */
+  feed?: SimulatedArukeresoImport;
   warnings: string[];
   errors: string[];
 }
@@ -184,6 +200,7 @@ export class ProductSourceImportSimulationService {
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly specPostProcess: SpecPostProcessService,
     private readonly feedTriage: ArukeresoFeedTriageService,
+    private readonly offerRepo: OfferRepository,
   ) {}
 
   public async simulate(
@@ -198,8 +215,8 @@ export class ProductSourceImportSimulationService {
     };
 
     try {
-      if (source.type === 'arukereso') {
-        result.arukereso = await this.simulateFeed(source, options, result);
+      if (isFeedSourceType(source.type)) {
+        result.feed = await this.simulateFeed(source, options, result);
       } else {
         result.scraping = await this.simulateScraping(source, options, result);
       }
@@ -372,6 +389,9 @@ export class ProductSourceImportSimulationService {
     let wouldRefresh = 0;
     let duplicateUrls = 0;
     let mappingFailures = 0;
+    const contributes = source.identifiesProducts === false;
+    let matchingOffers = 0;
+    let rowsWithOldPrice = 0;
     const triageBatch = async () => {
       const unique = [...new Map(batch.map((row) => [row.url, row])).values()];
       batch = [];
@@ -379,6 +399,14 @@ export class ProductSourceImportSimulationService {
       const triage = await this.feedTriage.triage(source, unique);
       wouldQueue += triage.toImport.length;
       wouldRefresh += triage.unchanged.length;
+      if (contributes) {
+        matchingOffers += (
+          await this.offerRepo.findSyncStates(
+            source.seller.id,
+            compact(unique.map((row) => row.externalId)),
+          )
+        ).length;
+      }
     };
 
     const summary = await this.feedParser.parseStream(
@@ -436,6 +464,9 @@ export class ProductSourceImportSimulationService {
           if (seenUrls.has(mapped.url)) duplicateUrls += 1;
           seenUrls.add(mapped.url);
           const offer = mapped.scrapedProduct.offers?.[0];
+          if (offer?.priceWithoutDiscount && offer.priceWithoutDiscount > offer.price) {
+            rowsWithOldPrice += 1;
+          }
           batch.push({
             url: mapped.url,
             item,
@@ -451,10 +482,12 @@ export class ProductSourceImportSimulationService {
             // The mapping itself is free; the preview then runs the identity
             // extraction a first import would, which is the part that costs.
             // `force` rules out reusing a stored result.
-            const extracted = await this.specPostProcess.extractIdentity({
-              context: { source, url: mapped.url, force: true },
-              scrapedProduct: mapped.scrapedProduct,
-            });
+            const extracted = contributes
+              ? mapped.scrapedProduct
+              : await this.specPostProcess.extractIdentity({
+                  context: { source, url: mapped.url, force: true },
+                  scrapedProduct: mapped.scrapedProduct,
+                });
             products.push(extracted);
             const offer = extracted.offers?.[0];
             productIdentifiers.push(
@@ -518,7 +551,8 @@ export class ProductSourceImportSimulationService {
         `More GTINs are invalid (${identifierSummary.gtin.invalid}) than valid (${identifierSummary.gtin.valid}). Invalid ones are dropped rather than matched on, but this many usually means mapping.gtin points at a field that is not a barcode.`,
       );
     }
-    if (identifierSummary.specRows.listingsWithNoRowSent > 0) {
+    // A source that does not identify products runs no identity extraction.
+    if (!contributes && identifierSummary.specRows.listingsWithNoRowSent > 0) {
       result.warnings.push(
         `${identifierSummary.specRows.listingsWithNoRowSent} eligible items match none of identityExtraction.specRows, so their identity extraction would see the title alone. Check the labels against the feed's attribute names.`,
       );
@@ -544,6 +578,8 @@ export class ProductSourceImportSimulationService {
       wouldImport,
       wouldQueue,
       wouldRefresh,
+      matchingOffers: contributes ? matchingOffers : undefined,
+      rowsWithOldPrice,
       duplicateUrls,
       wouldSkip: Object.values(skipReasons).reduce((a, b) => a + b, 0),
       skipReasons,
@@ -569,23 +605,13 @@ export class ProductSourceImportSimulationService {
     return this.previewTarget(config, item, 'externalId');
   }
 
-  /** One mapping target's value, resolved the way the mapper resolves it. */
+  /** One mapping target's value, as the mapper resolves it (fallback lists included). */
   private async previewTarget(
     config: Parameters<ArukeresoProductMapperService['classify']>[0],
     item: Parameters<ArukeresoProductMapperService['classify']>[1],
     target: ArukeresoMappingTarget,
   ): Promise<string | undefined> {
-    const mapping = config.mapping[target];
-    if (!mapping) return undefined;
-
-    const raw = mapping.field ? feedField(item, mapping.field) : undefined;
-
-    const value = mapping.pipeline?.length
-      ? await this.interpreter.runValuePipeline(mapping.pipeline, raw, {
-          baseUrl: config.baseUrl,
-        })
-      : raw;
-
+    const value = await this.mapper.resolveTarget(config, item, target);
     const text = value === undefined || value === null ? '' : String(value).trim();
     return text === '' ? undefined : text;
   }
@@ -612,7 +638,7 @@ class FeedIdentifierTally {
   private rowsTotal = 0;
 
   constructor(
-    private readonly mapping: Record<string, ArukeresoFieldMapping>,
+    private readonly mapping: Record<string, ArukeresoMappingEntry>,
     private readonly specRows: string[] | undefined,
   ) {
     this.labelHits = new Map((specRows ?? []).map((label) => [label, 0]));

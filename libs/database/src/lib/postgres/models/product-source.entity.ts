@@ -1,7 +1,7 @@
-import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { Expose, Transform } from 'class-transformer';
-import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
+import { SerializeGroup, nameOf, transfromExposeAll } from '@fittkereso-backend/utils';
 import { ProductImportTask } from './product-import-task.entity';
 import { Seller } from './seller.entity';
 import { ProductSourceConfig } from '../types/product-source-config';
@@ -11,6 +11,9 @@ import { ProductSourceAction } from './product-source-action.entity';
 import ms from 'ms';
 
 @Entity()
+// A seller's sources overwrite each other field by field in priority order
+// (OfferComposerService), so a tie would leave the winner to arrival order.
+@Unique([nameOf<ProductSource>('seller'), nameOf<ProductSource>('priority')])
 export class ProductSource extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
   @Column({ unique: true })
@@ -18,7 +21,8 @@ export class ProductSource extends BasePostgresEntity {
 
   /**
    * Which importer runs this source, and therefore which shape `config` takes:
-   * 'scraping' drives the page pipelines, 'arukereso' drives the feed mapping.
+   * 'scraping' drives the page pipelines, 'arukereso' and 'googleshop' drive
+   * the feed mapping.
    *
    * FIXED AT CREATION. The two config formats share no keys, so reinterpreting
    * a stored config under a different type reads the wrong ones — the config
@@ -83,9 +87,34 @@ export class ProductSource extends BasePostgresEntity {
   @Column({ type: 'int', nullable: false, default: 60 })
   requestsPerHour: number;
 
+  /**
+   * Higher wins. Among one seller's sources it decides whose value an offer,
+   * the specs and the description take, field by field; across sellers it only
+   * breaks ties. Unique per seller.
+   */
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'int', nullable: false, default: 10 })
   priority: number;
+
+  /**
+   * Whether this source's listings run identity resolution and may create
+   * products and offers. Off, a listing only contributes its values to the
+   * seller's existing offer with the same externalId, or waits unattached until
+   * an identifying source creates it. Every seller keeps at least one
+   * identifying source.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ nullable: false, default: true })
+  identifiesProducts: boolean;
+
+  /**
+   * Whether this source lists the shop's whole catalog for its enabled
+   * categories, so a complete run may remove the seller's offers it did not
+   * see. Feed sources only.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ nullable: false, default: false })
+  hasAllProducts: boolean;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Index()

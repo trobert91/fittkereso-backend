@@ -17,13 +17,16 @@ import { ProductSourceImporter } from '../../interfaces/product-source-importer.
 export class ProductSourceImporterRegistry {
   private readonly importers = new Map<ProductSourceType, ProductSourceImporter>();
 
+  /** Under each type the importer lists. */
   register(importer: ProductSourceImporter): void {
-    if (this.importers.has(importer.type)) {
-      throw new Error(
-        `An importer is already registered for product source type "${importer.type}"`,
-      );
+    for (const type of importer.types) {
+      if (this.importers.has(type)) {
+        throw new Error(
+          `An importer is already registered for product source type "${type}"`,
+        );
+      }
     }
-    this.importers.set(importer.type, importer);
+    for (const type of importer.types) this.importers.set(type, importer);
   }
 
   types(): ProductSourceType[] {

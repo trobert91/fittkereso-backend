@@ -16,17 +16,21 @@ import { Offer } from './offer.entity';
 export class ProductSourceRecord extends BasePostgresEntity {
   /** The product this listing currently sits on. Exposed to `adminList` because
    *  the resolution review queue's whole job is showing where a listing ended
-   *  up — a merge can move it after the decision was recorded. */
+   *  up — a merge can move it after the decision was recorded.
+   *
+   *  Null for an unattached listing: a row of a source that does not identify
+   *  products, whose offer the seller's identifying source has not created yet
+   *  (or has removed). It attaches once that offer exists. */
   @Expose({ groups: [SerializeGroup.adminList] })
   // `disable`: saving a ProductModel with a loaded, stale sources array must
   // never detach a row another writer attached meanwhile. TypeORM's default
   // (`nullify`) sets modelId to NULL on every row the array does not list.
   @ManyToOne(() => ProductModel, (model) => model.sources, {
-    nullable: false,
+    nullable: true,
     onDelete: 'CASCADE',
     orphanedRowAction: 'disable',
   })
-  model: ProductModel;
+  model: ProductModel | null;
 
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
@@ -137,6 +141,17 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Column({ type: 'timestamptz', nullable: false })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   lastUpdated: Date;
+
+  /**
+   * When this source last listed the item: every import of the listing and
+   * every sighting of an unchanged feed row or list card. Only a source that
+   * still lists an item may overwrite the seller's offer (OfferComposerService).
+   * Null on rows written before the column existed, and on the admin's record;
+   * readers fall back to lastUpdated.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  lastSeenAt?: Date | null;
 
   /**
    * Normalized identity key derived from scrapedProduct.{brand,model,

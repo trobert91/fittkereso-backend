@@ -84,3 +84,40 @@ fail on real TSV feeds.
 The XML is a trimmed slice of the live feed (descriptions cut to 240 chars except the stress record);
 the CSV and TSV are derived from it. Re-capture only if the field set changes — the measured counts
 above would then need re-measuring too.
+
+# Google Shopping feed fixture
+
+`speedbike-google-shopping-sample.tsv`: 6 rows, captured on 2026-09-25 from the live ShopRenter feed
+that a `googleshop` source reads:
+
+```
+https://speedbike.hu/api/?route=export/feed&id=google_shopping
+```
+
+`HTTP 200 · text/tab-separated-values;charset=UTF-8 · 3,770,477 bytes · 2079 products · 34 columns`
+
+The rows are copied from that capture unchanged, except that descriptions are cut to 300 characters
+(and marked `…(trimmed for fixture)`), apart from the last row's.
+
+| Row | Why it is here |
+|---|---|
+| `HAIBIKE-451641xx-2021` | On sale: `price` 2269000 HUF, `sale_price` 1499990 HUF. Also an Árukereső sample row. |
+| `021323/2021` | On sale. Also an Árukereső sample row. |
+| `121210` | Not on sale; a real description where the Árukereső feed has only the article number; GTIN and MPN; inch marks (`24" / 20"`) inside the description. |
+| `KTM-0243111XX-2025` | Not on sale, no GTIN or MPN. |
+| `2103714104` | A Liv row (`brand` LIV), on sale, with an empty description. Also an Árukereső sample row. |
+| `GIANT-230330310X-2023` | The full description, which holds a lone carriage return. |
+
+## Facts measured across the whole live feed
+
+- **Its `id` equals the Árukereső `identifier`**, which is how a `googleshop` source joins the
+  Árukereső source's offers.
+- Every row is an e-bike (`product_type` under `E-BIKE`); **590 of 2079 are on sale** (`sale_price`
+  filled), which is the only place speedbike publishes an old price.
+- **Prices carry the currency** (`2269000 HUF`), so every price mapping strips it.
+- **Nothing is quoted**, but 147 rows hold a `"` inside a cell (inch marks). A quote opens a quoted
+  field only at the start of a cell; before that rule, a mid-cell quote swallowed the tabs up to the next
+  one, and the parser read 1787 rows, 35 of them misaligned.
+- **3 descriptions hold a lone CR** (no LF): text, not a line break.
+- Descriptions are plain text, cut by the shop to about 1500 characters; 71 rows have none.
+- `size` is empty on every row.

@@ -3,8 +3,9 @@ import { Offer, ScrapedOffer } from '@fittkereso-backend/database';
 
 // Matches a scraped offer against a preloaded batch of this model's existing
 // offers from the same source (see OfferRepository.findAllByModelAndSource),
-// so ProductScrapeUpdaterService.createOrUpdateOffers can update the right
-// row in place instead of blindly inserting on every scrape.
+// so ProductScrapeUpdaterService.writeUnkeyedOffers can update the right row
+// in place instead of blindly inserting on every scrape. Only for offers
+// without an externalId; keyed ones are found by (seller, externalId).
 @Injectable()
 export class OfferMatchingService {
   findMatch(

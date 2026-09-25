@@ -276,4 +276,46 @@ describe('ProductSourceConfigValidatorService', () => {
   it('exposes the schema for the config editor', () => {
     expect(validator.schemaFor('scraping')).toMatchObject({ type: 'object' });
   });
+
+  describe('feed sources', () => {
+    const strip = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
+    const feedConfig = (mapping: Record<string, unknown> = {}) => ({
+      baseUrl: 'https://speedbike.hu',
+      feedUrl: 'https://speedbike.hu/api/?route=export/feed&id=google_shopping',
+      category: { slugLookup: [{ when: { always: true }, slug: 'ebikes' }] },
+      mapping: {
+        brand: { field: 'brand' },
+        name: { field: 'title' },
+        url: { field: 'link' },
+        price: { field: 'price', pipeline: strip },
+        ...mapping,
+      },
+    });
+
+    it('validates a googleshop source against the feed schema', () => {
+      expect(validator.schemaFor('googleshop')).toBe(validator.schemaFor('arukereso'));
+      expect(validator.problems('googleshop', feedConfig())).toBeNull();
+      expect(validator.problems('googleshop', MINIMAL_CONFIG)).not.toBeNull();
+    });
+
+    it('accepts a list of fallbacks for a target', () => {
+      const config = feedConfig({
+        price: [
+          { field: 'sale_price', pipeline: strip },
+          { field: 'price', pipeline: strip },
+        ],
+      });
+
+      expect(validator.problems('googleshop', config)).toBeNull();
+      expect(validator.problems('arukereso', config)).toBeNull();
+    });
+
+    it('rejects an empty fallback list, and a bad entry inside one', () => {
+      expect(validator.problems('googleshop', feedConfig({ price: [] }))).not.toBeNull();
+      expect(
+        validator.problems('googleshop', feedConfig({ price: [{ field: 'price' }, { feild: 'sale_price' }] })),
+      ).not.toBeNull();
+      expect(validator.problems('googleshop', feedConfig({ price: [{ field: 'price' }, {}] }))).not.toBeNull();
+    });
+  });
 });
