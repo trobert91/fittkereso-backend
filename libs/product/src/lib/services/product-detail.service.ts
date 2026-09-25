@@ -3,6 +3,7 @@ import {
   Offer,
   ProductModel,
   ProductModelRepository,
+  ProductSource,
   ProductSourceRecord,
   ProductImportTask,
 } from '@fittkereso-backend/database';
@@ -29,6 +30,8 @@ export class ProductDetailService {
         nameOf<ProductModel>('mainImage'),
         nameOf<ProductModel>('sources'),
         `sources.${nameOf<ProductSourceRecord>('source')}`,
+        // The admin Sources tab groups a product's listings by shop.
+        `sources.${nameOf<ProductSourceRecord>('source')}.${nameOf<ProductSource>('seller')}`,
         `sources.${nameOf<ProductSourceRecord>('offers')}`,
         `sources.${nameOf<ProductSourceRecord>('offers')}.${nameOf<Offer>('seller')}`,
         nameOf<ProductModel>('offers'),
