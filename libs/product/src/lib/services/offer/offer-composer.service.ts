@@ -20,7 +20,7 @@ import {
   storedOfferExternalId,
 } from '@fittkereso-backend/utils';
 import { isEmpty, orderBy, uniq } from 'lodash';
-import { OfferFreshnessService } from './offer-freshness.service';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 
 const DEFAULT_CURRENCY = 'HUF';
 
@@ -310,10 +310,7 @@ export class OfferComposerService {
     offer.locations = fields.locations;
     offer.specs = fields.specs;
     offer.sourceRecord = fields.sourceRecord;
-    if (sighted) {
-      offer.lastSynced = new Date();
-      offer.active = true;
-    }
+    if (sighted) offer.lastSynced = new Date();
   }
 
   private isUniqueViolation(error: unknown): boolean {

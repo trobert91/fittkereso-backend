@@ -36,11 +36,12 @@ export interface DynamicConfigData {
   };
 
   /**
-   * Offer freshness — the whole delisting mechanism.
+   * Offer freshness — the whole delisting mechanism. Read from `offers.json`.
    *
    * An import run stamps Offer.lastSynced; nothing else marks an offer gone.
-   * So a source that stops seeing a product simply stops stamping it, and the
-   * offer first disappears from the site and is then deleted. There are no
+   * So a source that stops seeing a product simply stops stamping it: the
+   * offer becomes inactive (hidden, and no longer sets its product's price —
+   * the nightly sweep reprices the product), and is later deleted. There are no
    * miss counters and no separate gone-sweep.
    *
    * deleteAfterDays must stay comfortably larger than freshnessDays: the gap is
@@ -48,22 +49,23 @@ export interface DynamicConfigData {
    * without its catalog being destroyed.
    */
   offers?: {
-    /** Offers synced within this many days are publicly visible. Default: 7 */
+    /**
+     * Offers not synced for this many days are inactive: hidden, and no longer
+     * set their product's price. Default: 3
+     */
     freshnessDays?: number;
     /** Offers not synced for this many days are hard-deleted. Default: 14 */
     deleteAfterDays?: number;
     /**
-     * Whether the sweep actually deletes. Default: FALSE.
+     * Whether the sweep actually deletes. Default: FALSE; `offers.json` turns it on.
      *
-     * Ships off because the sweep's whole premise is that imports are running:
-     * an offer is only "gone" because a run that DID happen stopped confirming
-     * it. Point it at an estate where nothing is importing — a fresh
-     * environment, a source with no `frequency` set, a paused catalog — and
-     * every offer ages out and is destroyed on a schedule, with the absence of
-     * evidence read as evidence of absence.
+     * The sweep's premise is that imports are running: an offer is only "gone"
+     * because a run that DID happen stopped confirming it. So it keeps the
+     * offers of any seller none of whose offers was confirmed within
+     * freshnessDays — a broken or paused source, or an environment that is not
+     * importing — and this switch stays as the kill switch on top of that.
      *
-     * With this off the sweep still runs and logs exactly what it WOULD delete,
-     * which is the number to watch before turning it on.
+     * With this off the sweep still runs and logs exactly what it WOULD delete.
      */
     deletionEnabled?: boolean;
     /**
@@ -75,7 +77,7 @@ export interface DynamicConfigData {
     completeSourceRemovalEnabled?: boolean;
   };
 
-  /** Import behaviour shared across every scraping source. */
+  /** Import behaviour shared across every scraping source. Read from `import.json`. */
   import?: {
     /**
      * Which ScrapedListProduct fields a list card must carry before an
@@ -385,15 +387,15 @@ export const dynamicConfigSchema = {
     offers: {
       type: 'object',
       description:
-        'Offer freshness. Offer.lastSynced is stamped by every import run and is the only delisting signal — an offer that stops being stamped goes invisible, then is deleted.',
+        'Offer freshness. Offer.lastSynced is stamped by every import run and is the only delisting signal — an offer that stops being stamped goes inactive (its product is repriced nightly), then is deleted.',
       properties: {
         freshnessDays: {
           type: 'number',
           minimum: 1,
           maximum: 365,
           description:
-            'Offers synced within this many days are publicly visible. Default: 7',
-          default: 7,
+            'Offers not synced for this many days are inactive: hidden, and no longer set their product\'s price. Default: 3',
+          default: 3,
         },
         deleteAfterDays: {
           type: 'number',
@@ -406,7 +408,7 @@ export const dynamicConfigSchema = {
         deletionEnabled: {
           type: 'boolean',
           description:
-            'Whether the stale-offer sweep actually deletes. Ships FALSE: the sweep assumes imports are running, so on an estate where nothing imports (no frequency set, a paused source, a fresh environment) it would destroy every offer on a schedule. While off it still runs and logs what it would delete. Default: false',
+            'Whether the stale-offer sweep actually deletes. The sweep keeps the offers of any seller none of whose offers was confirmed within freshnessDays (a broken or paused source, or an environment that is not importing); this is the kill switch on top of that. While off it still runs and logs what it would delete. Default: false (offers.json turns it on)',
           default: false,
         },
         completeSourceRemovalEnabled: {

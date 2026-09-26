@@ -1,0 +1,3 @@
+{
+  "listRefreshRequiredFields": ["url", "price", "availability"]
+}

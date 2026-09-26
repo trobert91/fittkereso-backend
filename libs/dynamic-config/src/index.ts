@@ -3,3 +3,4 @@ export * from './lib/dynamic-config-file-loader.service';
 export * from './lib/dynamic-config.service';
 export * from './lib/dynamic-config-validator.service';
 export * from './lib/dynamic-config.module';
+export * from './lib/offer-freshness.service';

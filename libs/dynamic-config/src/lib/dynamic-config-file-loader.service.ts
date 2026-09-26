@@ -30,6 +30,8 @@ export class DynamicConfigFileLoaderService {
     const claude = this.readJsonFile<DynamicConfigData['claude']>('claude.json');
     const webSearch = this.readJsonFile<DynamicConfigData['webSearch']>('webSearch.json');
     const translation = this.readJsonFile<DynamicConfigData['translation']>('translation.json');
+    const offers = this.readJsonFile<DynamicConfigData['offers']>('offers.json');
+    const importConfig = this.readJsonFile<DynamicConfigData['import']>('import.json');
 
     const debugFromGeneral = general['debug'] as { traceEnabled?: boolean } | undefined;
 
@@ -43,6 +45,8 @@ export class DynamicConfigFileLoaderService {
       ...(claude && { claude }),
       ...(webSearch && { webSearch }),
       ...(translation && { translation }),
+      ...(offers && { offers }),
+      ...(importConfig && { import: importConfig }),
     };
 
     this.validator.validateOrThrowError(data);

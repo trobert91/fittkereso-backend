@@ -13,9 +13,10 @@ import {
   UserSearchService,
 } from './services';
 import { DatabaseModule } from '@fittkereso-backend/database';
+import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, DynamicConfigModule],
   controllers: [],
   providers: [
     BrandSearchService,

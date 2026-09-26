@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
+import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { Offer } from '../models/offer.entity';
+import { ProductModel } from '../models/product-model.entity';
+import { Seller } from '../models/seller.entity';
 import { nameOf } from '@fittkereso-backend/utils';
 
 @Injectable()
@@ -135,7 +137,7 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     if (ids.length === 0) return;
     await this.repo.update(
       { id: In(ids) },
-      { lastSynced: () => 'NOW()', active: true },
+      { lastSynced: () => 'NOW()' },
     );
   }
 
@@ -190,8 +192,9 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   // scope keeps setting a product's headline price after the listing is gone.
   // Callers pass OfferFreshnessService.visibleCutoff().
   //
-  // Note this filters on lastSynced, NOT `active` — nothing in production ever
-  // sets active to false, so an `active: true` predicate matches everything.
+  // Ordered by price, then id: two offers at the same price must always give
+  // the same answer, or findModelIdsToReprice (which uses the same order) sees
+  // a difference every night.
   async findCheapestFreshOffer(
     modelId: string,
     freshnessCutoff: Date,
@@ -201,8 +204,44 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
         model: { id: modelId },
         lastSynced: MoreThanOrEqual(freshnessCutoff),
       },
-      order: { price: 'ASC' },
+      order: { price: 'ASC', id: 'ASC' },
     });
+  }
+
+  /**
+   * The products whose stored price is not their cheapest fresh offer's: what
+   * recomputePrice would change. Mostly products whose cheapest offer went
+   * stale since they were last written (their price becomes the next fresh
+   * offer's, or null when none is left), but any other difference too.
+   *
+   * Picks the cheapest offer exactly as findCheapestFreshOffer does, so a
+   * product it recomputed is not returned again.
+   */
+  async findModelIdsToReprice(freshnessCutoff: Date): Promise<string[]> {
+    const offerTable = this.repo.metadata.tableName;
+    const productTable = this.repo.manager.getRepository(ProductModel).metadata.tableName;
+    const modelId = `"${nameOf<Offer>('model')}Id"`;
+    const lastSynced = `"${nameOf<Offer>('lastSynced')}"`;
+    const price = `"${nameOf<Offer>('price')}"`;
+    const withoutDiscount = `"${nameOf<Offer>('priceWithoutDiscount')}"`;
+    const productPrice = `"${nameOf<ProductModel>('price')}"`;
+    const productWithoutDiscount = `"${nameOf<ProductModel>('priceWithoutDiscount')}"`;
+
+    const rows: { id: string }[] = await this.repo.query(
+      `SELECT product.id
+       FROM "${productTable}" AS product
+       LEFT JOIN LATERAL (
+         SELECT offer.${price}, offer.${withoutDiscount}
+         FROM "${offerTable}" AS offer
+         WHERE offer.${modelId} = product.id AND offer.${lastSynced} >= $1
+         ORDER BY offer.${price} ASC, offer.id ASC
+         LIMIT 1
+       ) AS cheapest ON true
+       WHERE (product.${productPrice}, product.${productWithoutDiscount})
+         IS DISTINCT FROM (cheapest.${price}, cheapest.${withoutDiscount})`,
+      [freshnessCutoff],
+    );
+    return rows.map((row) => row.id);
   }
 
   /**
@@ -224,7 +263,14 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   }
 
   /**
-   * Offers nothing has confirmed since `deleteCutoff`, oldest first.
+   * Offers nothing has confirmed since `deleteCutoff`, oldest first — of the
+   * sellers that some import still confirms, meaning at least one of their
+   * offers was synced since `freshnessCutoff`.
+   *
+   * A seller with nothing confirmed that recently has a broken or paused
+   * source, or sits in an environment that is not importing. Its offers going
+   * unconfirmed says nothing about whether the shop still lists them, so they
+   * are not candidates (see countStaleOfSilentSellers).
    *
    * `lastSynced IS NULL` rows are excluded by the comparison itself, which is
    * deliberate: those predate the freshness column and have never been stamped,
@@ -233,13 +279,48 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
    */
   async findStaleForDeletion(
     deleteCutoff: Date,
+    freshnessCutoff: Date,
     limit: number,
   ): Promise<Offer[]> {
-    return this.repo.find({
-      where: { lastSynced: LessThan(deleteCutoff) },
-      relations: [nameOf<Offer>('model'), nameOf<Offer>('seller')],
-      order: { lastSynced: 'ASC' },
-      take: limit,
-    });
+    return this.repo
+      .createQueryBuilder('offer')
+      .leftJoinAndSelect(`offer.${nameOf<Offer>('model')}`, 'model')
+      .leftJoinAndSelect(`offer.${nameOf<Offer>('seller')}`, 'seller')
+      .where(`offer.${nameOf<Offer>('lastSynced')} < :deleteCutoff`, { deleteCutoff })
+      .andWhere(`EXISTS ${this.freshOfferOfSameSeller()}`, { freshnessCutoff })
+      .orderBy(`offer.${nameOf<Offer>('lastSynced')}`, 'ASC')
+      .limit(limit)
+      .getMany();
+  }
+
+  /**
+   * Per seller none of whose offers was confirmed since `freshnessCutoff`, how
+   * many of its offers are past `deleteCutoff`: what findStaleForDeletion
+   * keeps.
+   */
+  async countStaleOfSilentSellers(
+    deleteCutoff: Date,
+    freshnessCutoff: Date,
+  ): Promise<{ sellerId: string; sellerName: string; count: number }[]> {
+    const rows: { sellerId: string; sellerName: string; count: string }[] = await this.repo
+      .createQueryBuilder('offer')
+      .innerJoin(`offer.${nameOf<Offer>('seller')}`, 'seller')
+      .select('seller.id', 'sellerId')
+      .addSelect(`seller.${nameOf<Seller>('name')}`, 'sellerName')
+      .addSelect('COUNT(*)', 'count')
+      .where(`offer.${nameOf<Offer>('lastSynced')} < :deleteCutoff`, { deleteCutoff })
+      .andWhere(`NOT EXISTS ${this.freshOfferOfSameSeller()}`, { freshnessCutoff })
+      .groupBy('seller.id')
+      .addGroupBy(`seller.${nameOf<Seller>('name')}`)
+      .getRawMany();
+    return rows.map((row) => ({ ...row, count: Number(row.count) }));
+  }
+
+  /** A subquery: an offer of `offer`'s seller synced since `:freshnessCutoff`. */
+  private freshOfferOfSameSeller(): string {
+    const sellerId = `"${nameOf<Offer>('seller')}Id"`;
+    return `(SELECT 1 FROM "${this.repo.metadata.tableName}" AS fresh
+      WHERE fresh.${sellerId} = offer.${sellerId}
+        AND fresh."${nameOf<Offer>('lastSynced')}" >= :freshnessCutoff)`;
   }
 }

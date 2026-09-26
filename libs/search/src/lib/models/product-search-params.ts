@@ -51,7 +51,7 @@ export class ProductSearchParams {
   id?: string;
 
   /**
-   * A barcode: the products with an offer carrying it, from any shop, active
+   * A barcode: the products with an offer carrying it, from any shop, stale
    * or not. Normalized the way an imported one is (normalizeGtin), so an EAN-13
    * and its zero-padded GTIN-14 find the same product. A value that is not a
    * valid GTIN finds nothing.
@@ -100,7 +100,7 @@ export class ProductSearchParams {
    * "wheelSize"). Value is either an exact match (string/number) or a
    * [min, max] range. Keys flagged as offer-level in the relevant
    * category's ProductCategoryConfig.offerLevelSpecs are matched against
-   * Offer.specs (any active offer on the product may satisfy the filter);
+   * Offer.specs (any current offer on the product may satisfy the filter);
    * all other keys are matched against ProductModel.specs directly.
    */
   @IsOptional()

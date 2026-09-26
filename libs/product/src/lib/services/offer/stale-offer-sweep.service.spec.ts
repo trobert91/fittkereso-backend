@@ -1,20 +1,29 @@
+import { CustomLogger } from '@fittkereso-backend/logger';
 import { StaleOfferSweepService } from './stale-offer-sweep.service';
 
 describe('StaleOfferSweepService', () => {
   let service: StaleOfferSweepService;
-  let offerRepo: { findStaleForDeletion: jest.Mock; deleteByIds: jest.Mock };
+  let offerRepo: {
+    findStaleForDeletion: jest.Mock;
+    countStaleOfSilentSellers: jest.Mock;
+    deleteByIds: jest.Mock;
+  };
   let productRepo: { findOne: jest.Mock; save: jest.Mock };
   let mergeService: { recomputePrice: jest.Mock };
   let locks: { withLocks: jest.Mock };
   let freshness: {
     deleteCutoff: jest.Mock;
     visibleCutoff: jest.Mock;
+    freshnessDays: number;
     deleteAfterDays: number;
     deletionEnabled: boolean;
   };
   let sourceRecordRepo: { findModelIdsWithStaleContributors: jest.Mock };
   let offerComposer: { compose: jest.Mock };
   let contributorDetach: { detach: jest.Mock };
+  let reprice: { reprice: jest.Mock };
+  let sourceRepo: { find: jest.Mock };
+  let warn: jest.SpyInstance;
 
   const CUTOFF = new Date('2026-09-09T00:00:00Z');
   const VISIBLE_CUTOFF = new Date('2026-09-16T00:00:00Z');
@@ -29,6 +38,7 @@ describe('StaleOfferSweepService', () => {
   beforeEach(() => {
     offerRepo = {
       findStaleForDeletion: jest.fn().mockResolvedValue(staleOffers()),
+      countStaleOfSilentSellers: jest.fn().mockResolvedValue([]),
       deleteByIds: jest.fn().mockResolvedValue(undefined),
     };
     productRepo = {
@@ -44,12 +54,16 @@ describe('StaleOfferSweepService', () => {
     freshness = {
       deleteCutoff: jest.fn().mockReturnValue(CUTOFF),
       visibleCutoff: jest.fn().mockReturnValue(VISIBLE_CUTOFF),
+      freshnessDays: 3,
       deleteAfterDays: 14,
       deletionEnabled: true,
     };
     sourceRecordRepo = { findModelIdsWithStaleContributors: jest.fn().mockResolvedValue([]) };
     offerComposer = { compose: jest.fn().mockResolvedValue({ offers: [], conflicts: [] }) };
     contributorDetach = { detach: jest.fn().mockResolvedValue([]) };
+    reprice = { reprice: jest.fn().mockResolvedValue(0) };
+    sourceRepo = { find: jest.fn().mockResolvedValue([]) };
+    warn = jest.spyOn(CustomLogger.prototype, 'warn').mockImplementation(() => undefined);
 
     service = new StaleOfferSweepService(
       offerRepo as never,
@@ -60,7 +74,88 @@ describe('StaleOfferSweepService', () => {
       sourceRecordRepo as never,
       offerComposer as never,
       contributorDetach as never,
+      reprice as never,
+      sourceRepo as never,
     );
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  describe('products whose cheapest offer went stale', () => {
+    it('are repriced after the contributors are composed and before anything is deleted', async () => {
+      reprice.reprice.mockResolvedValue(4);
+
+      const result = await service.sweep();
+
+      expect(result.productsRepriced).toBe(4);
+      expect(reprice.reprice.mock.invocationCallOrder[0]).toBeGreaterThan(
+        sourceRecordRepo.findModelIdsWithStaleContributors.mock.invocationCallOrder[0],
+      );
+      expect(reprice.reprice.mock.invocationCallOrder[0]).toBeLessThan(
+        offerRepo.findStaleForDeletion.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('are repriced even while deletion is disabled', async () => {
+      freshness.deletionEnabled = false;
+      reprice.reprice.mockResolvedValue(2);
+
+      const result = await service.sweep();
+
+      expect(result.productsRepriced).toBe(2);
+    });
+  });
+
+  describe('sellers nothing has confirmed recently', () => {
+    beforeEach(() => {
+      offerRepo.countStaleOfSilentSellers.mockResolvedValue([
+        { sellerId: 'seller-2', sellerName: 'broken.hu', count: 4 },
+      ]);
+    });
+
+    it('are left out of the candidates, by the visible cutoff', async () => {
+      await service.sweep();
+
+      expect(offerRepo.findStaleForDeletion).toHaveBeenCalledWith(
+        CUTOFF,
+        VISIBLE_CUTOFF,
+        500,
+      );
+      expect(offerRepo.countStaleOfSilentSellers).toHaveBeenCalledWith(
+        CUTOFF,
+        VISIBLE_CUTOFF,
+      );
+    });
+
+    it('keep their offers, with one warning per seller', async () => {
+      const result = await service.sweep();
+
+      expect(result.keptForSilentSellers).toBe(4);
+      const sellerWarnings = warn.mock.calls.filter(([, meta]) => meta?.sellerId === 'seller-2');
+      expect(sellerWarnings).toHaveLength(1);
+      expect(sellerWarnings[0][1]).toMatchObject({ seller: 'broken.hu', kept: 4 });
+    });
+  });
+
+  describe('scheduled sources that run less often than offers go stale', () => {
+    it('are warned about, each once', async () => {
+      sourceRepo.find.mockResolvedValue([
+        { name: 'weekly', frequency: '7 days' },
+        { name: 'every-three-days', frequency: '3 days' },
+        { name: 'daily', frequency: '1 day' },
+        { name: 'unscheduled', frequency: null },
+      ]);
+
+      await service.sweep();
+
+      expect(sourceRepo.find).toHaveBeenCalledWith({ where: { schedulingEnabled: true } });
+      const warned = warn.mock.calls
+        .filter(([, meta]) => meta?.frequency !== undefined)
+        .map(([, meta]) => meta.source);
+      expect(warned).toEqual(['weekly', 'every-three-days']);
+    });
   });
 
   describe('offers a source stopped listing while another still does', () => {
@@ -174,8 +269,10 @@ describe('StaleOfferSweepService', () => {
 
     expect(result).toEqual({
       contributorsRecomposed: 0,
+      productsRepriced: 0,
       deleted: 0,
       modelsRecomputed: 0,
+      keptForSilentSellers: 0,
       cutoff: CUTOFF,
       capped: false,
     });
@@ -211,6 +308,7 @@ describe('StaleOfferSweepService', () => {
 
       expect(offerRepo.findStaleForDeletion).toHaveBeenCalledWith(
         CUTOFF,
+        VISIBLE_CUTOFF,
         expect.any(Number),
       );
     });

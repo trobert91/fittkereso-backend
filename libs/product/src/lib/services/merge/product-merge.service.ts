@@ -34,7 +34,7 @@ import { ProductNameMergeService } from '../product-name/product-name-merge.serv
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
 import { ProductDetailService } from '../product-detail.service';
-import { OfferFreshnessService } from '../offer/offer-freshness.service';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import { ProductDescriptionService } from '../product-description/product-description.service';
 
 interface MergeProductsParams {
@@ -90,10 +90,10 @@ export class ProductMergeService {
     // is what the public listing sorts and filters on.
     //
     // Consequence worth knowing: once every offer on a model ages out, price
-    // goes null rather than keeping a knowingly-false value. But recomputePrice
-    // only runs on a scrape pass or an admin merge, so a model whose offers all
-    // go stale is not recomputed until something touches it — the stale sweep
-    // recomputes the models it affects for exactly this reason.
+    // goes null rather than keeping a knowingly-false value. An offer ageing out
+    // writes nothing by itself, so the nightly stale-offer sweep calls this for
+    // every product whose stored price no longer matches
+    // (StaleProductRepriceService).
     const cheapest = await this.offerRepo.findCheapestFreshOffer(
       model.id,
       this.offerFreshness.visibleCutoff(),

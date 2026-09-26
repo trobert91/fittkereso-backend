@@ -37,7 +37,7 @@ export class SearchTools {
         .string()
         .optional()
         .describe(
-          'Products with an offer (any shop, active or not) carrying this GTIN. EAN-13 and GTIN-14 forms both work; a value with a bad check digit matches nothing.',
+          'Products with an offer (any shop, stale or not) carrying this GTIN. EAN-13 and GTIN-14 forms both work; a value with a bad check digit matches nothing.',
         ),
       mpn: z
         .string()

@@ -144,16 +144,18 @@ export class ProductModel extends BasePostgresEntity {
   offers?: Offer[];
 
   /**
-   * Denormalized from the cheapest active Offer whenever offers are
-   * (re)computed for this model, so callers can filter/sort by price
-   * without joining Offers.
+   * Denormalized from the cheapest current Offer (synced within
+   * offers.freshnessDays) whenever offers are (re)computed for this model, and
+   * nightly once that offer goes stale (StaleProductRepriceService), so callers
+   * can filter/sort by price without joining Offers. Null when no offer is
+   * current.
    */
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   @Index()
   @Expose({ groups: [SerializeGroup.list] })
   price?: number | null;
 
-  /** Mirrors that same cheapest active Offer's priceWithoutDiscount. */
+  /** Mirrors that same cheapest current Offer's priceWithoutDiscount. */
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   @Expose({ groups: [SerializeGroup.list] })
   priceWithoutDiscount?: number | null;

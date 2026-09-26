@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
+import { DynamicConfigService } from './dynamic-config.service';
 
-/** Offers synced within this many days are publicly visible. */
-export const DEFAULT_OFFER_FRESHNESS_DAYS = 7;
+/**
+ * Offers synced within this many days are current: visible, and allowed to set
+ * their product's price. Older ones are inactive.
+ */
+export const DEFAULT_OFFER_FRESHNESS_DAYS = 3;
 
 /** Offers not synced for this many days are hard-deleted. */
 export const DEFAULT_OFFER_DELETE_AFTER_DAYS = 14;
@@ -14,12 +17,15 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  *
  * Every import run stamps lastSynced on the offers it confirms. Nothing marks
  * an offer as gone: a source that stops seeing a product simply stops stamping
- * it, so the offer falls out of `visibleCutoff` first and past `deleteCutoff`
- * later. That is why there are no miss counters and no gone-sweep.
+ * it, so the offer falls out of `visibleCutoff` first — the nightly sweep then
+ * reprices its product — and past `deleteCutoff` later.
  *
- * Both cutoffs come from dynamic config so they can be widened without a
- * deploy — useful precisely when something has gone wrong and a catalog is
- * ageing out that shouldn't be.
+ * Lives here rather than in libs/product because the product search (in
+ * libs/search, which libs/product imports) needs the same cutoff.
+ *
+ * Both cutoffs come from dynamic config (`offers.json`) so they can be widened
+ * without a code change — useful precisely when something has gone wrong and a
+ * catalog is ageing out that shouldn't be.
  */
 @Injectable()
 export class OfferFreshnessService {
@@ -39,11 +45,12 @@ export class OfferFreshnessService {
   }
 
   /**
-   * Whether the sweep may actually delete. Defaults to FALSE.
+   * Whether the sweep may actually delete. Defaults to FALSE; `offers.json`
+   * turns it on.
    *
-   * Off by default because the sweep reads "not stamped recently" as "gone",
-   * which is only sound while imports are running. On an estate where nothing
-   * imports, every offer ages out and is destroyed on a schedule.
+   * The sweep reads "not stamped recently" as "gone", which is only sound while
+   * imports are running. It keeps the offers of a seller nothing has confirmed
+   * recently (StaleOfferSweepService), and this stays as the kill switch.
    */
   get deletionEnabled(): boolean {
     return this.dynamicConfig.offers?.deletionEnabled ?? false;
@@ -59,7 +66,7 @@ export class OfferFreshnessService {
     return this.dynamicConfig.offers?.completeSourceRemovalEnabled ?? true;
   }
 
-  /** Offers with `lastSynced >= this` are publicly visible. */
+  /** Offers with `lastSynced >= this` are current; older ones are inactive. */
   visibleCutoff(now: Date = new Date()): Date {
     return new Date(now.getTime() - this.freshnessDays * MS_PER_DAY);
   }

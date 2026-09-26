@@ -9,10 +9,10 @@ import {
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import {
   OFFER_COMPOSER_MODEL_RELATIONS,
   OfferComposerService,
-  OfferFreshnessService,
   ProductMergeService,
 } from '@fittkereso-backend/product';
 import { UnchangedFeedRow } from './arukereso-feed-triage.service';

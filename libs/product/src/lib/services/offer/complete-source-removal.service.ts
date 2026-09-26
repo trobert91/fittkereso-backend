@@ -10,7 +10,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { nameOf } from '@fittkereso-backend/utils';
 import { compact, groupBy, isEmpty } from 'lodash';
-import { OfferFreshnessService } from './offer-freshness.service';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import { OFFER_COMPOSER_MODEL_RELATIONS } from './offer-composer.service';
 import { ContributorDetachService } from './contributor-detach.service';
 import { ProductMergeService } from '../merge/product-merge.service';

@@ -10,7 +10,7 @@ import {
   Seller,
 } from '@fittkereso-backend/database';
 import { OfferComposerService } from './offer-composer.service';
-import { OfferFreshnessService } from './offer-freshness.service';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 
 const NOW = new Date('2026-09-25T12:00:00Z');
 const CUTOFF = new Date('2026-09-18T12:00:00Z');
@@ -91,7 +91,6 @@ describe('OfferComposerService', () => {
         condition: OfferCondition.new,
         price: 1499990,
         externalId: 'HAIBIKE-451641xx-2021',
-        active: true,
         lastSynced: NOW,
       });
       expect(offer.model).toEqual(expect.objectContaining({ id: 'model-1' }));
@@ -104,7 +103,7 @@ describe('OfferComposerService', () => {
         externalId: 'HAIBIKE-451641xx-2021',
         condition: OfferCondition.refurbished,
         price: 150000,
-        active: false,
+        lastSynced: new Date('2026-09-01T00:00:00Z'),
         model: { id: 'model-1' },
       });
       offerRepo.findBySellerAndExternalIds.mockResolvedValue([existing]);
@@ -114,7 +113,7 @@ describe('OfferComposerService', () => {
       expect(offer).toBe(existing);
       expect(offer.condition).toBe(OfferCondition.refurbished);
       expect(offer.price).toBe(1499990);
-      expect(offer.active).toBe(true);
+      expect(offer.lastSynced).toEqual(NOW);
     });
 
     it('defaults the currency, and leaves availability null when no source reports one', async () => {

@@ -59,6 +59,7 @@ describe('ProductSearchService', () => {
     service = new ProductSearchService(
       { repo: { createQueryBuilder: () => recorded.query } } as never,
       { getAllSlugs: () => [], getConfig: () => undefined } as never,
+      { visibleCutoff: () => new Date('2026-09-23T06:30:00Z') } as never,
     );
   });
 
@@ -118,6 +119,45 @@ describe('ProductSearchService', () => {
       await service.searchProducts({ mpn: '126' });
 
       expect(recorded.wheres).toEqual([{ sql: '1 = 0', params: undefined }]);
+    });
+  });
+
+  describe('by an offer-level spec', () => {
+    const CUTOFF = new Date('2026-09-23T06:30:00Z');
+
+    beforeEach(() => {
+      service = new ProductSearchService(
+        { repo: { createQueryBuilder: () => recorded.query } } as never,
+        {
+          getAllSlugs: () => ['ebikes'],
+          getConfig: () => ({ offerLevelSpecs: ['frameSize'] }),
+        } as never,
+        { visibleCutoff: () => CUTOFF } as never,
+      );
+    });
+
+    // A stale offer's size is no evidence the product comes in it any more.
+    it('matches current offers only', async () => {
+      await service.searchProducts({ specFilters: { frameSize: 'M' } });
+
+      expect(recorded.joins).toContain('product.offers');
+      expect(recorded.wheres).toEqual([
+        {
+          sql: "offer.lastSynced >= :offerFreshnessCutoff AND offer.specs->>'frameSize' = :specFilterValue0",
+          params: { offerFreshnessCutoff: CUTOFF, specFilterValue0: 'M' },
+        },
+      ]);
+    });
+
+    it('leaves a product-level spec alone', async () => {
+      await service.searchProducts({ specFilters: { motorBrand: 'Bosch' } });
+
+      expect(recorded.wheres).toEqual([
+        {
+          sql: "product.specs->>'motorBrand' = :specFilterValue0",
+          params: { specFilterValue0: 'Bosch' },
+        },
+      ]);
     });
   });
 

@@ -7,6 +7,7 @@ import {
   ProductModelRepository,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import { ProductSearchParams } from '../models/product-search-params';
 import { ProductSearchResult } from '../models/product-search-result';
 import { SelectQueryBuilder } from 'typeorm';
@@ -31,6 +32,7 @@ export class ProductSearchService {
   constructor(
     private readonly productRepo: ProductModelRepository,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly offerFreshness: OfferFreshnessService,
   ) {}
 
   public async searchProducts(
@@ -190,7 +192,7 @@ export class ProductSearchService {
   }
 
   /**
-   * `EXISTS` an offer of this product — any shop's, active or not — whose
+   * `EXISTS` an offer of this product — any shop's, stale or not — whose
    * column meets the condition. A subquery rather than a join, so a product
    * whose three sizes all match is still one row: getManyAndCount with
    * skip/take counts and pages products, not offers.
@@ -226,16 +228,18 @@ export class ProductSearchService {
   }
 
   // Offer-level keys (e.g. frameSize, color) live on Offer.specs, not
-  // ProductModel.specs — a product matches if ANY of its active offers
-  // carries the filtered value. Uses leftJoin, not innerJoin: a product
-  // whose offers happen to have no value for a given key must still be
-  // findable by searches that don't filter on that key, and must simply
-  // not match a search that does — never treated as an error either way.
+  // ProductModel.specs — a product matches if ANY of its current offers
+  // (synced within offers.freshnessDays) carries the filtered value. Uses
+  // leftJoin, not innerJoin: a product whose offers happen to have no value
+  // for a given key must still be findable by searches that don't filter on
+  // that key, and must simply not match a search that does — never treated as
+  // an error either way.
   private applySpecFilters(
     query: SelectQueryBuilder<ProductModel>,
     specFilters: Record<string, string | number | [number, number]>,
   ): SelectQueryBuilder<ProductModel> {
     let offerJoined = false;
+    const offerFreshnessCutoff = this.offerFreshness.visibleCutoff();
 
     Object.entries(specFilters).forEach(([key, value], idx) => {
       const isOfferLevel = this.isOfferLevelSpecKey(key);
@@ -244,11 +248,11 @@ export class ProductSearchService {
         : `product.${nameOf<ProductModel>('specs')}`;
 
       if (isOfferLevel && !offerJoined) {
-        // Plain leftJoin (no ON-clause restriction to active offers): an
-        // inactive offer's spec values still shouldn't satisfy the filter,
-        // but that's enforced per-condition below via offer.active, not by
+        // Plain leftJoin (no ON-clause restriction to current offers): a
+        // stale offer's spec values still shouldn't satisfy the filter, but
+        // that's enforced per-condition below via lastSynced, not by
         // narrowing the join — narrowing the join here would also drop
-        // products whose only offers are inactive from the base result set
+        // products whose only offers are stale from the base result set
         // entirely, which isn't what an unrelated filter should do.
         query = query.leftJoin(
           `product.${nameOf<ProductModel>('offers')}`,
@@ -257,20 +261,21 @@ export class ProductSearchService {
         offerJoined = true;
       }
 
-      const activeGuard = isOfferLevel
-        ? `offer.${nameOf<Offer>('active')} = true AND `
+      const freshGuard = isOfferLevel
+        ? `offer.${nameOf<Offer>('lastSynced')} >= :offerFreshnessCutoff AND `
         : '';
+      const guardParams = isOfferLevel ? { offerFreshnessCutoff } : {};
       const valueParam = `specFilterValue${idx}`;
       if (isArray(value)) {
         const [min, max] = value;
         query = query.andWhere(
-          `${activeGuard}(${column}->>'${key}')::numeric BETWEEN :${valueParam}Min AND :${valueParam}Max`,
-          { [`${valueParam}Min`]: min, [`${valueParam}Max`]: max },
+          `${freshGuard}(${column}->>'${key}')::numeric BETWEEN :${valueParam}Min AND :${valueParam}Max`,
+          { ...guardParams, [`${valueParam}Min`]: min, [`${valueParam}Max`]: max },
         );
       } else {
         query = query.andWhere(
-          `${activeGuard}${column}->>'${key}' = :${valueParam}`,
-          { [valueParam]: String(value) },
+          `${freshGuard}${column}->>'${key}' = :${valueParam}`,
+          { ...guardParams, [valueParam]: String(value) },
         );
       }
     });

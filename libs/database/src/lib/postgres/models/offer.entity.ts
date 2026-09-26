@@ -152,28 +152,22 @@ export class Offer extends BasePostgresEntity {
   /**
    * When an import run last confirmed this offer on the source.
    *
-   * The single freshness signal in the system: the public site shows offers
-   * synced within `offers.freshnessDays` (7), and StaleOfferSweepService
-   * hard-deletes those untouched for `offers.deleteAfterDays` (14). Time-based
-   * staleness is deliberately the whole mechanism — there are no miss counters
-   * and no delisting sweep; a source that stops seeing a product simply stops
-   * stamping it.
+   * The single freshness signal in the system, and the only one: there is no
+   * active flag. An offer synced within `offers.freshnessDays` (3) is current
+   * — it may set its product's price, and the site shows it. Older, it is
+   * inactive: the nightly StaleOfferSweepService reprices its product without
+   * it, and hard-deletes it once untouched for `offers.deleteAfterDays` (14).
+   * Time-based staleness is deliberately the whole mechanism — there are no
+   * miss counters and no delisting sweep; a source that stops seeing a product
+   * simply stops stamping it.
    *
    * Nullable, and null reads as "not confirmed recently": such rows are hidden
    * from the site but never swept, because `lastSynced < cutoff` is false for
    * NULL. That is what makes rows written before this column existed safe.
-   *
-   * Do NOT gate visibility on `active` instead — nothing in production ever
-   * sets it to false, so every `active = true` guard is a no-op.
    */
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastSynced?: Date | null;
-
-  @Expose({ groups: [SerializeGroup.adminList] })
-  @Index()
-  @Column({ nullable: false, default: true })
-  active: boolean;
 
   @Expose({ groups: [SerializeGroup.details] })
   @Column({ type: 'int', nullable: true })

@@ -7,12 +7,14 @@ import {
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
+  ProductSourceRepository,
   Seller,
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { compact, groupBy, uniq } from 'lodash';
-import { OfferFreshnessService } from './offer-freshness.service';
+import { compact, groupBy, sumBy, uniq } from 'lodash';
+import ms from 'ms';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import { ProductMergeService } from '../merge/product-merge.service';
 import { nameOf, storedOfferExternalId } from '@fittkereso-backend/utils';
 import {
@@ -20,6 +22,7 @@ import {
   OfferComposerService,
 } from './offer-composer.service';
 import { ContributorDetachService } from './contributor-detach.service';
+import { StaleProductRepriceService } from './stale-product-reprice.service';
 
 /**
  * Most offers this may delete in one run.
@@ -40,32 +43,45 @@ export interface StaleOfferSweepResult {
    * sources stopped listing them while another still does.
    */
   contributorsRecomposed: number;
+  /** Products whose price changed because their cheapest offer went stale. */
+  productsRepriced: number;
   deleted: number;
   modelsRecomputed: number;
+  /**
+   * Offers past the delete cutoff kept because nothing of their seller was
+   * confirmed recently (see OfferRepository.findStaleForDeletion).
+   */
+  keptForSilentSellers: number;
   cutoff: Date;
   /** True when the per-run cap was hit and more remain for the next run. */
   capped: boolean;
 }
 
 /**
- * Deletes offers nothing has confirmed for `offers.deleteAfterDays`.
+ * The nightly offer lifecycle: an offer nothing has confirmed for
+ * `offers.freshnessDays` stops setting its product's price, and one nothing
+ * has confirmed for `offers.deleteAfterDays` is deleted.
  *
  * This is the entire delisting mechanism. There are no miss counters, no
  * per-record evidence grading and no separate gone-sweep: an import run stamps
  * what it sees, and anything it stops stamping ages out of visibility first and
  * out of the database second.
  *
- * Deletion is hard, matching the in-pass sweep in
- * ProductScrapeUpdaterService.createOrUpdateOffers. Offer.active is not used —
- * nothing in production ever sets it to false.
+ * In order:
+ * 1. It composes again the offers one of a seller's sources has stopped
+ *    listing while another still does: the dropping source's values stop
+ *    counting, and the offer lives on with the other's.
+ * 2. It reprices the products whose cheapest offer went stale
+ *    (StaleProductRepriceService).
+ * 3. It deletes the offers past the delete cutoff — only of sellers some import
+ *    still confirms, and only while `offers.deletionEnabled` is on. Deletion is
+ *    hard, matching the in-pass sweep in
+ *    ProductScrapeUpdaterService.createOrUpdateOffers. The contributing records
+ *    that joined a deleted offer, and joined nothing else on the product, are
+ *    detached (ContributorDetachService).
  *
- * Before deleting, it composes again the offers one of a seller's sources has
- * stopped listing while another still does: the dropping source's values stop
- * counting, and the offer lives on with the other's. That does not depend on
- * deletion being enabled.
- *
- * After deleting, the contributing records that joined a deleted offer, and
- * joined nothing else on the product, are detached (ContributorDetachService).
+ * It also warns about scheduled sources that run less often than offers go
+ * stale: their offers would drop out of their products' prices between runs.
  */
 @Injectable()
 export class StaleOfferSweepService {
@@ -80,11 +96,37 @@ export class StaleOfferSweepService {
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerComposer: OfferComposerService,
     private readonly contributorDetach: ContributorDetachService,
+    private readonly reprice: StaleProductRepriceService,
+    private readonly sourceRepo: ProductSourceRepository,
   ) {}
 
   public async sweep(): Promise<StaleOfferSweepResult> {
+    await this.warnAboutSlowSources();
     const contributorsRecomposed = await this.recomposeStaleContributors();
-    return { contributorsRecomposed, ...(await this.deleteStale()) };
+    const productsRepriced = await this.reprice.reprice();
+    return { contributorsRecomposed, productsRepriced, ...(await this.deleteStale()) };
+  }
+
+  /**
+   * A scheduled source that runs no more often than offers go stale leaves its
+   * offers stale for part of every cycle, and their products priced without
+   * them. Only logged: the fix is the source's frequency, or freshnessDays.
+   */
+  private async warnAboutSlowSources(): Promise<void> {
+    const freshnessDays = this.offerFreshness.freshnessDays;
+    const staleAfterMs = ms(`${freshnessDays} days`);
+    const sources = await this.sourceRepo.find({ where: { schedulingEnabled: true } });
+    for (const source of sources) {
+      if (!source.frequency) continue;
+      const frequencyMs = ms(source.frequency);
+      if (!Number.isFinite(frequencyMs) || frequencyMs < staleAfterMs) continue;
+      this.logger.warn('A scheduled source runs less often than its offers go stale', {
+        source: source.name,
+        frequency: source.frequency,
+        freshnessDays,
+        hint: 'Its offers stop setting their products\' prices between runs. Shorten the source\'s frequency, or raise offers.freshnessDays.',
+      });
+    }
   }
 
   /**
@@ -173,17 +215,23 @@ export class StaleOfferSweepService {
     }));
   }
 
-  private async deleteStale(): Promise<Omit<StaleOfferSweepResult, 'contributorsRecomposed'>> {
+  private async deleteStale(): Promise<
+    Omit<StaleOfferSweepResult, 'contributorsRecomposed' | 'productsRepriced'>
+  > {
     const cutoff = this.offerFreshness.deleteCutoff();
+    const freshnessCutoff = this.offerFreshness.visibleCutoff();
+
+    const keptForSilentSellers = await this.warnAboutSilentSellers(cutoff, freshnessCutoff);
 
     const stale = await this.offerRepo.findStaleForDeletion(
       cutoff,
+      freshnessCutoff,
       STALE_OFFER_SWEEP_MAX_DELETIONS_PER_RUN,
     );
 
     if (stale.length === 0) {
       this.logger.debug('Stale offer sweep: nothing to delete', { cutoff });
-      return { deleted: 0, modelsRecomputed: 0, cutoff, capped: false };
+      return { deleted: 0, modelsRecomputed: 0, keptForSilentSellers, cutoff, capped: false };
     }
 
     // Collected BEFORE the delete — the offers carry the only reference back to
@@ -193,10 +241,10 @@ export class StaleOfferSweepService {
 
     const capped = stale.length === STALE_OFFER_SWEEP_MAX_DELETIONS_PER_RUN;
 
-    // Dry run unless explicitly enabled. The sweep's premise is that imports
-    // ARE running — an offer is only "gone" because a run that happened stopped
-    // confirming it. Where nothing imports, absence of evidence is not evidence
-    // of absence, and enabling this would destroy the catalog on a schedule.
+    // Dry run unless enabled. The sweep's premise is that imports ARE running —
+    // an offer is only "gone" because a run that happened stopped confirming
+    // it. The candidates are already limited to sellers something still
+    // confirms; this switch is the kill switch on top of that.
     if (!this.offerFreshness.deletionEnabled) {
       this.logger.warn(
         'Stale offer sweep: deletion DISABLED — would have deleted offers',
@@ -206,11 +254,11 @@ export class StaleOfferSweepService {
           deleteAfterDays: this.offerFreshness.deleteAfterDays,
           affectedModels: affectedModelIds.length,
           capped,
-          hint: 'Set offers.deletionEnabled once imports have been running for a full deleteAfterDays window.',
+          hint: 'offers.deletionEnabled is off in offers.json — the kill switch.',
         },
       );
 
-      return { deleted: 0, modelsRecomputed: 0, cutoff, capped };
+      return { deleted: 0, modelsRecomputed: 0, keptForSilentSellers, cutoff, capped };
     }
 
     this.logger.warn('Stale offer sweep: deleting offers', {
@@ -228,9 +276,36 @@ export class StaleOfferSweepService {
     return {
       deleted: stale.length,
       modelsRecomputed,
+      keptForSilentSellers,
       cutoff,
       capped,
     };
+  }
+
+  /**
+   * The offers past the delete cutoff that deletion leaves alone because
+   * nothing of their seller was confirmed within freshnessDays — a broken or
+   * paused source, or an environment that is not importing. One warning per
+   * such seller; returns how many offers they hold.
+   */
+  private async warnAboutSilentSellers(
+    deleteCutoff: Date,
+    freshnessCutoff: Date,
+  ): Promise<number> {
+    const silent = await this.offerRepo.countStaleOfSilentSellers(
+      deleteCutoff,
+      freshnessCutoff,
+    );
+    for (const seller of silent) {
+      this.logger.warn('Stale offer sweep: keeping a seller\'s stale offers — nothing of it was confirmed recently', {
+        sellerId: seller.sellerId,
+        seller: seller.sellerName,
+        kept: seller.count,
+        freshnessDays: this.offerFreshness.freshnessDays,
+        hint: 'Its sources are not importing. Fix or re-enable them; the offers are deleted once the seller is confirmed again.',
+      });
+    }
+    return sumBy(silent, (seller) => seller.count);
   }
 
   /** Per product, the deleted offers' keys, per seller. */
