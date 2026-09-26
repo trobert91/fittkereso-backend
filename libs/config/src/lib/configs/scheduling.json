@@ -1,8 +1,8 @@
 {
   "staleTaskTimeoutMinutes": 240,
   "staleImportTaskTimeoutMinutes": 240,
-  "importTaskTickMs": 30000,
-  "importTaskBatchSize": 4,
+  "importTaskTickMs": 15000,
+  "importTaskBatchSize": 8,
   "productRating": {
     "batchLimit": 100
   },
