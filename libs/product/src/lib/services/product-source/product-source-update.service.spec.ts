@@ -118,4 +118,29 @@ describe('ProductSourceUpdateService', () => {
     expect(sourceRepo.find).not.toHaveBeenCalled();
     expect(sourceRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'renamed' }));
   });
+
+  describe('detailRefreshInterval', () => {
+    it('stores an ms interval', async () => {
+      await service.updateProductSource(arukereso().id, { detailRefreshInterval: '8w' });
+
+      expect(sourceRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ detailRefreshInterval: '8w' }),
+      );
+    });
+
+    it.each([
+      ['a string ms cannot read', '60 napig', /Invalid detailRefreshInterval format/],
+      ['an empty string', ' ', /cannot be cleared/],
+      ['null', null, /cannot be cleared/],
+      ['a negative interval', '-1d', /must be a positive interval/],
+      ['zero', '0', /must be a positive interval/],
+    ])('refuses %s', async (_label, value, message) => {
+      await expect(
+        service.updateProductSource(arukereso().id, {
+          detailRefreshInterval: value as string,
+        }),
+      ).rejects.toThrow(message);
+      expect(sourceRepo.save).not.toHaveBeenCalled();
+    });
+  });
 });

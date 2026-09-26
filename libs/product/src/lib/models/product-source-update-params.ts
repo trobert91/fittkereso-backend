@@ -24,6 +24,8 @@ export interface ProductSourceUpdateParams {
   maxConcurrent?: number;
   requestsPerHour?: number;
   frequency?: string | null;
+  /** An `ms` interval ('60 days'); it cannot be cleared. */
+  detailRefreshInterval?: string;
   nextRunAt?: string | null;
   /**
    * Who is making this change, for the history rows it writes.

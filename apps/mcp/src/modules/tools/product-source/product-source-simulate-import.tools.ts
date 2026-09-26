@@ -240,12 +240,16 @@ export class ProductSourceSimulateImportTools {
       `- **would refresh in place**: ${scraping.wouldRefreshInline} (no detail fetch spent)`,
     );
     L.push(`- **would cost a detail fetch**: ${scraping.wouldScrapeDetail}`);
+    const outcomes = Object.entries(scraping.outcomes)
+      .map(([outcome, count]) => `${outcome} ${count}`)
+      .join(' · ');
+    if (outcomes) L.push(`- **by outcome**: ${outcomes}`);
     L.push('');
 
     L.push('## Per-card decisions');
     for (const decision of scraping.decisions) {
       L.push(
-        `- ${decision.wouldScrapeDetail ? 'DETAIL FETCH' : 'refresh'} — ${decision.url}`,
+        `- ${decision.wouldScrapeDetail ? `DETAIL FETCH (${decision.outcome})` : 'refresh'} — ${decision.url}`,
       );
       L.push(`  - ${decision.reason}`);
       L.push(

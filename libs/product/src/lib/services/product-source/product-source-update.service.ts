@@ -120,6 +120,13 @@ export class ProductSourceUpdateService {
       );
     }
 
+    if (params.detailRefreshInterval !== undefined) {
+      source.detailRefreshInterval = this.parseRequiredInterval(
+        params.detailRefreshInterval,
+        'detailRefreshInterval',
+      );
+    }
+
     if (params.nextRunAt !== undefined) {
       source.nextRunAt = this.parseDate(
         params.nextRunAt,
@@ -322,6 +329,19 @@ export class ProductSourceUpdateService {
     }
 
     return value as ms.StringValue;
+  }
+
+  // For an interval the source cannot do without: clearing it is refused
+  // rather than read as "never", and so is one that is not a positive span.
+  private parseRequiredInterval(value: string | null, fieldName: string): ms.StringValue {
+    const interval = this.parseInterval(value, fieldName);
+    if (interval === null) {
+      throw new BadRequestException(`${fieldName} cannot be cleared`);
+    }
+    if (ms(interval) <= 0) {
+      throw new BadRequestException(`${fieldName} must be a positive interval`);
+    }
+    return interval.trim() as ms.StringValue;
   }
 
   // Clearing a next-sync timestamp is meaningful — ProductSourceSyncScheduler

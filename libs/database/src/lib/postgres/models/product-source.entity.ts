@@ -10,6 +10,9 @@ import { ProductSourceVersion } from './product-source-version.entity';
 import { ProductSourceAction } from './product-source-action.entity';
 import ms from 'ms';
 
+/** ProductSource.detailRefreshInterval of a source that never set one. */
+export const DEFAULT_DETAIL_REFRESH_INTERVAL = '60 days' satisfies ms.StringValue;
+
 @Entity()
 // A seller's sources overwrite each other field by field in priority order
 // (OfferComposerService), so a tie would leave the winner to arrival order.
@@ -136,6 +139,22 @@ export class ProductSource extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ type: 'text', nullable: true })
   frequency?: ms.StringValue | null;
+
+  /**
+   * How old a known listing's detail import may get — an `ms`-compatible
+   * string ('60 days', '8w') — before the listing is fetched in full again,
+   * even though its list card alone could refresh its price and stock.
+   *
+   * A card never shows a new GTIN, spec, description or store list, so
+   * without this a listing refreshed from its cards would keep what its first
+   * detail scrape found forever. Acts on scraping sources' list cards (see
+   * ListProductRefreshService); a feed row is the whole listing, and is
+   * re-imported whenever it changes. A column rather than a `config` key for
+   * the same reason as `frequency`.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ type: 'text', nullable: false, default: DEFAULT_DETAIL_REFRESH_INTERVAL })
+  detailRefreshInterval: ms.StringValue;
 
   /**
    * When this source is next due. Always lands inside the nightly 02:00–06:00

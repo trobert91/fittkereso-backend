@@ -96,6 +96,40 @@ describe('ProductSourceRecordRepository.countUnattached', () => {
   });
 });
 
+describe('ProductSourceRecordRepository.findUniqueBySourceAndExternalId', () => {
+  function repositoryFinding(records: unknown[]) {
+    const repository = Object.create(ProductSourceRecordRepository.prototype);
+    const find = jest.fn().mockResolvedValue(records);
+    (repository as unknown as { repo: unknown }).repo = { find };
+    return { repository: repository as ProductSourceRecordRepository, find };
+  }
+
+  it("returns the source's one record with that externalId, with its product and offers", async () => {
+    const record = { id: 'record-1' };
+    const { repository, find } = repositoryFinding([record]);
+
+    await expect(repository.findUniqueBySourceAndExternalId('source-1', 'SKU-1')).resolves.toBe(record);
+    expect(find).toHaveBeenCalledWith({
+      where: { source: { id: 'source-1' }, externalId: 'SKU-1' },
+      relations: ['model', 'offers'],
+      take: 2,
+    });
+  });
+
+  // A group-level id shared by a product's sizes names no single listing.
+  it('returns null when several records share the externalId', async () => {
+    const { repository } = repositoryFinding([{ id: 'record-1' }, { id: 'record-2' }]);
+
+    await expect(repository.findUniqueBySourceAndExternalId('source-1', 'GROUP-1')).resolves.toBeNull();
+  });
+
+  it('returns null when no record has it', async () => {
+    const { repository } = repositoryFinding([]);
+
+    await expect(repository.findUniqueBySourceAndExternalId('source-1', 'SKU-1')).resolves.toBeNull();
+  });
+});
+
 describe('ProductSourceRecordRepository.searchRecords', () => {
   it('filters by source, attachment and text, and shapes each row', async () => {
     const seen = new Date('2026-09-20');

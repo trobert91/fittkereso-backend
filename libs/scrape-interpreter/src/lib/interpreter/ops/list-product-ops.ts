@@ -7,6 +7,7 @@ import {
 import { get } from 'lodash';
 import { OpHandler } from '../services/scrape-op-registry.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
+import { indexedObjectsToArrays } from './json-ops';
 
 function toFiniteNumber(value: unknown): number | undefined {
   const num =
@@ -29,9 +30,12 @@ function toTrimmedString(value: unknown): string | undefined {
  *
  * `path` is optional so the op can also be used purely to cast — `jsonPath`
  * with only a `cast` turns the item itself into a number/string/boolean.
+ *
+ * An object keyed "0", "1", "15"… in the result reads as an array, as in
+ * parseJsonAttr (see indexedObjectsToArrays).
  */
 export const jsonPath: OpHandler<JsonPathOp> = (_ctx, input, op) => {
-  const value = op.path ? get(input as object, op.path) : input;
+  const value = indexedObjectsToArrays(op.path ? get(input as object, op.path) : input);
 
   if (value === undefined || value === null) return undefined;
 

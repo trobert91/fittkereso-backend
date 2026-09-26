@@ -2,6 +2,8 @@ export * from './product-details-page-scraper.service';
 export * from './product-list-page-scraper.service';
 export * from './scrape-url-deduplication.service';
 export * from './list-product-refresh.service';
+export * from './detail-task-cap.service';
+export * from './list-page-task-payload';
 export * from './scraping-import.service';
 export * from './product-source-importer-registry.service';
 export * from './product-source-simulation.service';

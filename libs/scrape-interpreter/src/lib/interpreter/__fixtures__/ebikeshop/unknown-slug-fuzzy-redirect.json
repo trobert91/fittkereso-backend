@@ -1,0 +1,142 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/fittkereso-nem-letezo-termek",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "An unknown product slug: ebikeshop 301-redirects it to a fuzzy-matched, UNRELATED product (here a Powunity cable). data-page.url is the real path; it differs from the requested one.",
+  "dataPage": {
+    "component": "products/Show",
+    "url": "/termek/powunity-biketrax-kabel-gen4-nem-smart",
+    "props": {
+      "product": {
+        "id": 17833,
+        "name": "Powunity Biketrax kábel (Gen4 nem smart)",
+        "productCode": "AKA-B002-X",
+        "longDesc": "<p>Powunity Biketrax kábel </p>\r\n<p>Bosch Gen4 (nem Smart System) motorhoz. </p>\r\n<p>A 12voltos plusz kimenetre csatlakozik. </p>",
+        "ogTitle": "",
+        "ogDescription": "",
+        "metaTitle": "",
+        "metaDescription": "",
+        "gtin": "",
+        "special1": "",
+        "special2": "",
+        "special3": "",
+        "special4": "",
+        "shortTitle": "",
+        "shortDesc": "",
+        "h1Title": "",
+        "prices": {
+          "price": 9989.9978,
+          "priceFormatted": "9 990 Ft",
+          "priceSale": 0,
+          "priceSaleFormatted": "",
+          "lowestPrice": 0,
+          "lowestPriceFormatted": "",
+          "sale": false,
+          "salePercent": 0,
+          "vat": 27,
+          "lowestPriceDateInterval": 30,
+          "distinctVatProduct": false,
+          "currentSaleStartDateFormatted": null
+        },
+        "images": [
+          {
+            "images": [
+              {
+                "code": "thumb_640",
+                "url": "https://ebikeshop.hu/storage/documents/file/powunity-biketrax-kabel-gen4-nem-smart-p1470499-17209-thumb_640.webp",
+                "altText": "Powunity Biketrax kábel (Gen4 nem smart)"
+              },
+              {
+                "code": "thumb_1280",
+                "url": "https://ebikeshop.hu/storage/documents/file/powunity-biketrax-kabel-gen4-nem-smart-p1470499-17209-thumb_1280.webp",
+                "altText": "Powunity Biketrax kábel (Gen4 nem smart)"
+              },
+              {
+                "code": "original",
+                "url": "https://ebikeshop.hu/storage/documents/file/powunity-biketrax-kabel-gen4-nem-smart-p1470499-17209.webp",
+                "altText": "Powunity Biketrax kábel (Gen4 nem smart)"
+              }
+            ],
+            "type": "gallery",
+            "image360Url": null
+          }
+        ],
+        "category": {
+          "id": 64,
+          "name": "Bosch alkatrészek",
+          "slug": "bosch-alkatreszek",
+          "orderNum": 5,
+          "parentId": 52
+        },
+        "promotion": null,
+        "addToCartButtonEnabled": true,
+        "isBike": false,
+        "isUsed": false,
+        "isRentable": false,
+        "manufacturer": {
+          "id": 1416,
+          "title": "Powunity",
+          "url": "https://ebikeshop.hu/powunity",
+          "slug": "powunity",
+          "categorySlug": "gyarto"
+        },
+        "inCompareList": false,
+        "inWishlist": false,
+        "highlightedProperties": [],
+        "vat": 27,
+        "variations": null,
+        "smartFitOnlineSizing": null,
+        "documents": [],
+        "youtubeVideos": [],
+        "catalog": null,
+        "rentableData": null,
+        "resellerData": null,
+        "showUrl": "https://ebikeshop.hu/termek/powunity-biketrax-kabel-gen4-nem-smart",
+        "stocks": [
+          {
+            "stockType": "stock",
+            "shopId": 7,
+            "title": "Törökbálinti raktár",
+            "productCode": "AKA-B002-X",
+            "preorder": 0,
+            "qty": 1,
+            "slug": "tb-dobozos-raktar",
+            "shopFullUrl": null,
+            "preorderFormFullUrl": null,
+            "arrivalDate": null,
+            "preorderTypeTitle": "Készleten",
+            "expired": false,
+            "isVirtualWarehouse": true
+          }
+        ],
+        "properties": [
+          {
+            "id": 869,
+            "propertyCategoryId": 41,
+            "shortTitle": "",
+            "value": "Új",
+            "categoryTitle": "Állapot",
+            "orderNumber": 0,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1416,
+            "propertyCategoryId": 4,
+            "shortTitle": "",
+            "value": "Powunity",
+            "categoryTitle": "Gyártó",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          }
+        ],
+        "leasingUrl": "https://ebikeshop.hu/lizingkonstrukcio-cegeknek?termek=powunity-biketrax-kabel-gen4-nem-smart",
+        "locations": [],
+        "manufacturerUrl": null,
+        "legalManufacturerName": "PowUnity GmbH",
+        "legalManufacturerAddress": "Feldstrasse 9d, 6020 Innsbruck, AUSTRIA"
+      }
+    }
+  },
+  "jsonLd": "\n                    [{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"name\":\"Főoldal\",\"@id\":\"https://ebikeshop.hu/\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"name\":\"Termékek\",\"@id\":\"https://ebikeshop.hu/termekek\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"name\":\"Alkatrészek\",\"@id\":\"https://ebikeshop.hu/termekek/alkatreszek\"}},{\"@type\":\"ListItem\",\"position\":4,\"item\":{\"name\":\"Bosch alkatrészek\",\"@id\":\"https://ebikeshop.hu/termekek/alkatreszek/bosch-alkatreszek\"}},{\"@type\":\"ListItem\",\"position\":5,\"item\":{\"name\":\"Powunity\",\"@id\":\"https://ebikeshop.hu/termekek/alkatreszek/bosch-alkatreszek?gyarto%5B0%5D=powunity\"}},{\"@type\":\"ListItem\",\"position\":6,\"item\":{\"name\":\"Powunity Biketrax kábel (Gen4 nem smart)\",\"@id\":\"https://ebikeshop.hu/termek/powunity-biketrax-kabel-gen4-nem-smart\"}}]},{\"@context\":\"https://schema.org/\",\"@type\":\"Product\",\"name\":\"Powunity Biketrax kábel (Gen4 nem smart)\",\"description\":\"Powunity Biketrax kábel \\r\\nBosch Gen4 (nem Smart System) motorhoz. \\r\\nA 12voltos plusz kimenetre csatlakozik. \",\"image\":\"https://ebikeshop.hu/storage/documents/file/powunity-biketrax-kabel-gen4-nem-smart-p1470499-17209-thumb_640.webp\",\"sku\":\"AKA-B002-X\",\"brand\":{\"@type\":\"Brand\",\"name\":\"Powunity\"},\"offers\":{\"@type\":\"Offer\",\"url\":\"https://ebikeshop.hu/termek/powunity-biketrax-kabel-gen4-nem-smart\",\"priceCurrency\":\"HUF\",\"price\":9990,\"itemCondition\":\"https://schema.org/NewCondition\",\"availability\":\"https://schema.org/InStock\",\"seller\":\"https://ebikeshop.hu\"}}]\n                ",
+  "storesHtml": "<div class=\"space-y-2\"><h3 class=\"mb-3 text-lg leading-snug font-bold [&amp;:last-child]:mb-0\"><!--[-->Üzletek<!--]--></h3><ul class=\"space-y-2\"><!--[--><li class=\"\"><div class=\"flex flex-wrap items-center gap-4\"><!--[--><span>Törökbálinti raktár</span><!--]--><div class=\"flex items-center gap-2\"><em class=\"inline-block size-2 rounded-full ring-3 bg-success-saturated ring-success-saturated/50\"></em><span class=\"font-condensed text-xs font-normal uppercase text-success\">Elérhető</span></div></div></li><!--]--></ul></div>"
+}

@@ -25,6 +25,13 @@ export enum AdvisoryLockNamespace {
    * Held on its own, never while waiting for another lock.
    */
   OfferKey = 4,
+  /**
+   * One source's run-wide cap on the detail tasks it queues
+   * (ScrapingSourceConfig.maxItems). A run's list pages are separate tasks
+   * that can finish at once; holding this makes "count the run's detail tasks,
+   * then queue up to the cap" one step. Held on its own.
+   */
+  SourceTaskCap = 5,
 }
 
 export interface AdvisoryLockKey {
@@ -45,6 +52,11 @@ export const brandLock = (id: string): AdvisoryLockKey => ({
 export const offerKeyLock = (sellerId: string, externalId: string): AdvisoryLockKey => ({
   namespace: AdvisoryLockNamespace.OfferKey,
   id: `${sellerId}:${externalId}`,
+});
+
+export const sourceTaskCapLock = (sourceId: string): AdvisoryLockKey => ({
+  namespace: AdvisoryLockNamespace.SourceTaskCap,
+  id: sourceId,
 });
 
 /**

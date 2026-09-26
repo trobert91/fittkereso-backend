@@ -8,7 +8,6 @@ import {
   OfferAvailability,
   OfferRepository,
   ProductSource,
-  ProductSourceRecordRepository,
   ProductSourceType,
   ScrapedListProduct,
   ScrapedProduct,
@@ -23,13 +22,15 @@ import {
   GtinOutcome,
   inspectGtin,
   normalizeMpn,
-  normalizeUrl,
 } from '@fittkereso-backend/utils';
-import { compact } from 'lodash';
+import { compact, countBy } from 'lodash';
 import { selectIdentitySpecRows } from '@fittkereso-backend/product';
 import { offerExternalIdOf } from '@fittkereso-backend/utils';
 import { ScrapingImportService } from './scraping-import.service';
-import { ListProductRefreshService } from './list-product-refresh.service';
+import {
+  ListItemDecision,
+  ListProductRefreshService,
+} from './list-product-refresh.service';
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
 import { ArukeresoFeedItem } from '../../arukereso/arukereso-feed-item';
 import {
@@ -53,11 +54,17 @@ export interface SimulatedListItemDecision {
   externalId?: string;
   price?: number;
   availability?: OfferAvailability;
-  /** Whether THIS source already has a ProductSourceRecord for the URL. */
+  /** Whether THIS source already has a ProductSourceRecord for the listing. */
   known: boolean;
+  /** ListProductRefreshService's decision; `refresh` is a refresh in place. */
+  outcome: ListItemDecision['outcome'];
   satisfiesMinimumSet: boolean;
   /** Fields the minimum set asks for that this card does not carry. */
   missingFields: string[];
+  /** The record's URL, when the card found it by externalId under another one. */
+  movedFrom?: string;
+  /** When a known listing's detail page falls due again (detailRefreshInterval). */
+  detailDueAt?: Date;
   wouldScrapeDetail: boolean;
   reason: string;
 }
@@ -74,6 +81,8 @@ export interface SimulatedScrapingImport {
   /** On this page: the split that says whether the minimum set is buying anything. */
   wouldRefreshInline: number;
   wouldScrapeDetail: number;
+  /** The previewed cards by decision. */
+  outcomes: Partial<Record<ListItemDecision['outcome'], number>>;
 }
 
 export interface SimulatedArukeresoImport {
@@ -197,7 +206,6 @@ export class ProductSourceImportSimulationService {
     private readonly listRefresh: ListProductRefreshService,
     private readonly feedParser: ArukeresoFeedParserService,
     private readonly mapper: ArukeresoProductMapperService,
-    private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly specPostProcess: SpecPostProcessService,
     private readonly feedTriage: ArukeresoFeedTriageService,
     private readonly offerRepo: OfferRepository,
@@ -267,6 +275,7 @@ export class ProductSourceImportSimulationService {
         decisions: [],
         wouldRefreshInline: 0,
         wouldScrapeDetail: 0,
+        outcomes: {},
       };
     }
 
@@ -299,12 +308,13 @@ export class ProductSourceImportSimulationService {
       decisions,
       wouldRefreshInline: decisions.filter((d) => !d.wouldScrapeDetail).length,
       wouldScrapeDetail: decisions.filter((d) => d.wouldScrapeDetail).length,
+      outcomes: countBy(decisions, (d) => d.outcome),
     };
   }
 
   /**
-   * The minimum-set decision for one card, made by the same service the real
-   * run uses — minus the write.
+   * The decision for one card, made by the same service the real run uses —
+   * minus the write.
    *
    * Reporting the reason per item is what makes the minimum set tunable against
    * a real shop instead of guessed at: "every card is missing availability" is
@@ -314,34 +324,21 @@ export class ProductSourceImportSimulationService {
     source: ProductSource,
     item: ScrapedListProduct,
   ): Promise<SimulatedListItemDecision> {
-    const record = item.url
-      ? await this.sourceRecordRepo.findBySourceAndUrl(
-          source.id,
-          normalizeUrl(item.url),
-        )
-      : null;
+    const decision = await this.listRefresh.decide(source, item);
+    const { outcome, missingFields, movedFrom, detailDueAt } = decision;
+    const dueOn = detailDueAt?.toISOString().slice(0, 10);
 
-    const missingFields = this.listRefresh.requiredFields.filter((field) => {
-      const value = (item as unknown as Record<string, unknown>)[field];
-      return value === undefined || value === null || value === '';
-    });
-    const satisfiesMinimumSet = missingFields.length === 0;
-
-    let reason: string;
-    let wouldScrapeDetail: boolean;
-
-    if (!record) {
-      reason = 'not seen by this source before — only a detail page has its specs, brand and model';
-      wouldScrapeDetail = true;
-    } else if (!satisfiesMinimumSet) {
-      reason = `known listing, but the card is missing ${missingFields.join(', ')}`;
-      wouldScrapeDetail = true;
-    } else if (!record.offers?.length) {
-      reason = 'known listing with no offer row to refresh yet';
-      wouldScrapeDetail = true;
-    } else {
-      reason = 'refreshed in place from the card — no detail fetch spent';
-      wouldScrapeDetail = false;
+    const reasons: Record<ListItemDecision['outcome'], string> = {
+      unknown: 'not seen by this source before — only a detail page has its specs, brand and model',
+      moved: `known by its externalId under ${movedFrom}, but another record of this source holds this URL — a detail fetch sorts it out`,
+      incomplete: `known listing, but the card is missing ${missingFields.join(', ')}`,
+      stale: `known listing whose detail page was due again on ${dueOn} (detailRefreshInterval: ${source.detailRefreshInterval})`,
+      no_offer: 'known listing with no offer to refresh yet',
+      refresh: `refreshed in place from the card — no detail fetch spent; detail page due again on ${dueOn}`,
+    };
+    let reason = reasons[outcome];
+    if (movedFrom && outcome !== 'moved') {
+      reason += `; the listing moves here from ${movedFrom}`;
     }
 
     return {
@@ -349,10 +346,13 @@ export class ProductSourceImportSimulationService {
       externalId: item.externalId,
       price: item.price,
       availability: item.availability,
-      known: !!record,
-      satisfiesMinimumSet,
+      known: !!decision.record,
+      outcome,
+      satisfiesMinimumSet: missingFields.length === 0,
       missingFields,
-      wouldScrapeDetail,
+      movedFrom,
+      detailDueAt,
+      wouldScrapeDetail: outcome !== 'refresh',
       reason,
     };
   }

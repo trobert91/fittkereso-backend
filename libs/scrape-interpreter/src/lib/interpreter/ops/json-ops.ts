@@ -59,9 +59,43 @@ export const parseJsonAttr: OpHandler<ParseJsonAttrOp> = (ctx, _input, op) => {
     return undefined;
   }
 
-  const decoded = decodeEntitiesDeep(parsed);
-  return op.path ? get(decoded, op.path) : decoded;
+  const value = op.path ? get(parsed, op.path) : parsed;
+  return indexedObjectsToArrays(decodeEntitiesDeep(value));
 };
+
+const ARRAY_INDEX = /^(0|[1-9]\d*)$/;
+
+/**
+ * PHP's json_encode writes an array whose keys are not exactly 0…n-1 (say,
+ * after a filter dropped rows) as an object keyed "0", "1", "15"…. Laravel
+ * does this to paginated collections, so a listing read as `props.products`
+ * can arrive as an object, and every array op would then see no items at all.
+ *
+ * This turns any plain object whose keys are all array indices back into an
+ * array, in key order (the order JS enumerates integer keys), recursively.
+ * The ops resolve their own `path` first, so a path such as `products.15`
+ * still addresses the raw key.
+ */
+export function indexedObjectsToArrays(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(indexedObjectsToArrays);
+  if (!isPlainObject(value)) return value;
+
+  const entries = Object.entries(value).map(
+    ([key, inner]) => [key, indexedObjectsToArrays(inner)] as const,
+  );
+  if (entries.length > 0 && entries.every(([key]) => ARRAY_INDEX.test(key))) {
+    return entries.map(([, inner]) => inner);
+  }
+  return Object.fromEntries(entries);
+}
+
+// Only what JSON.parse builds: a cheerio selection is array-like too, with
+// keys "0"…"n", and must pass through untouched.
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
 
 // Projects each item of an array (previously stashed in `vars` via a prior
 // op's `as`) into a plain object using dot-paths per output field, with

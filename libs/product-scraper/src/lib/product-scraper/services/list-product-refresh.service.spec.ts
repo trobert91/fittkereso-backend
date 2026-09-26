@@ -5,7 +5,14 @@ import {
 } from './list-product-refresh.service';
 
 const SELLER = { id: 'seller-1' };
-const SOURCE = { id: 'source-1', name: 'speedbike', seller: SELLER } as never;
+const SOURCE = {
+  id: 'source-1',
+  name: 'speedbike',
+  seller: SELLER,
+  detailRefreshInterval: '60 days',
+} as never;
+const DAY = 24 * 60 * 60 * 1000;
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY);
 
 /** A card carrying everything the default minimum set asks for. */
 const completeItem = () => ({
@@ -18,7 +25,12 @@ const completeItem = () => ({
 
 describe('ListProductRefreshService', () => {
   let service: ListProductRefreshService;
-  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; save: jest.Mock };
+  let sourceRecordRepo: {
+    findBySourceAndUrl: jest.Mock;
+    findUniqueBySourceAndExternalId: jest.Mock;
+    findById: jest.Mock;
+    save: jest.Mock;
+  };
   let productRepo: { findOne: jest.Mock; save: jest.Mock };
   let mergeService: { recomputePrice: jest.Mock };
   let offerComposer: { compose: jest.Mock };
@@ -33,11 +45,13 @@ describe('ListProductRefreshService', () => {
       model: { id: 'model-1' },
       source: { id: 'source-1', seller: SELLER },
       scrapedProduct: { offers },
-      lastUpdated: new Date('2026-09-01'),
+      // Well inside the interval: its detail page is not due yet.
+      lastUpdated: daysAgo(1),
       lastSeenAt: undefined as Date | undefined,
       ...overrides,
     };
     sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(record);
+    sourceRecordRepo.findById.mockResolvedValue(record);
     productRepo.findOne.mockResolvedValue({ id: 'model-1', sources: [record] });
     return record;
   };
@@ -45,7 +59,13 @@ describe('ListProductRefreshService', () => {
     sourceRecordRepo.save.mock.calls[0][0].scrapedProduct.offers;
 
   beforeEach(() => {
-    sourceRecordRepo = { findBySourceAndUrl: jest.fn(), save: jest.fn() };
+    sourceRecordRepo = {
+      findBySourceAndUrl: jest.fn(),
+      // Unmatched by externalId unless a test says so: looked up by URL.
+      findUniqueBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+      findById: jest.fn(),
+      save: jest.fn(),
+    };
     productRepo = { findOne: jest.fn(), save: jest.fn() };
     mergeService = { recomputePrice: jest.fn() };
     offerComposer = {
@@ -271,6 +291,187 @@ describe('ListProductRefreshService', () => {
         'source-1',
         'https://speedbike.hu/termek/macina',
       );
+    });
+  });
+
+  // A card never shows a new GTIN, spec, description or store list, so a
+  // listing refreshed from its cards alone would keep its first detail
+  // scrape's forever. Each listing falls due between 75% and 100% of the
+  // interval after its last detail import (detail-refresh-schedule).
+  describe('stale listings', () => {
+    const entry = { price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' };
+
+    it('sends a listing past the interval to a detail scrape, however complete its card', async () => {
+      givenRecord([entry], { lastUpdated: daysAgo(61) });
+
+      await expect(service.tryRefresh(SOURCE, completeItem() as never)).resolves.toBe('stale');
+      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
+      expect(offerComposer.compose).not.toHaveBeenCalled();
+    });
+
+    it('refreshes in place a listing younger than the earliest due date', async () => {
+      givenRecord([entry], { lastUpdated: daysAgo(44) });
+
+      await expect(service.tryRefresh(SOURCE, completeItem() as never)).resolves.toBe('refreshed');
+    });
+
+    it("reads the source's own interval", async () => {
+      givenRecord([entry], { lastUpdated: daysAgo(8) });
+      const weekly = { ...(SOURCE as object), detailRefreshInterval: '7 days' };
+
+      await expect(service.tryRefresh(weekly as never, completeItem() as never)).resolves.toBe('stale');
+    });
+
+    it('reports a thin card as incomplete before its age', async () => {
+      givenRecord([entry], { lastUpdated: daysAgo(61) });
+
+      await expect(
+        service.tryRefresh(SOURCE, { ...completeItem(), availability: undefined } as never),
+      ).resolves.toBe('incomplete');
+    });
+
+    // lastUpdated is what dates the detail import; the in-place refresh only
+    // says the source still lists the item.
+    it('leaves lastUpdated alone when refreshing in place', async () => {
+      const lastUpdated = daysAgo(10);
+      const record = givenRecord([entry], { lastUpdated });
+
+      await service.tryRefresh(SOURCE, completeItem() as never);
+
+      expect(record.lastUpdated).toBe(lastUpdated);
+      expect(record.lastSeenAt).toBeInstanceOf(Date);
+    });
+
+    it('says when the detail page falls due', async () => {
+      const record = givenRecord([entry], { lastUpdated: daysAgo(1) });
+
+      const decision = await service.decide(SOURCE, completeItem() as never);
+
+      expect(decision.outcome).toBe('refresh');
+      const age = (decision.detailDueAt as Date).getTime() - record.lastUpdated.getTime();
+      expect(age).toBeGreaterThanOrEqual(45 * DAY);
+      expect(age).toBeLessThanOrEqual(60 * DAY);
+    });
+  });
+
+  // A shop that renames a product changes its slug but keeps its code: found
+  // by (source, externalId), the card refreshes the listing it always was, and
+  // the record follows it to the new URL.
+  describe('listings found by externalId', () => {
+    const OLD_URL = 'https://ebikeshop.hu/termek/ktm-macina-old-name';
+    const NEW_URL = 'https://ebikeshop.hu/termek/ktm-macina-new-name';
+    const card = () => ({ ...completeItem(), url: NEW_URL, externalId: 'SKU-1' });
+
+    /** This source's record of SKU-1, still under its old URL. */
+    const givenMovedRecord = (offers: ScrapedOffer[], overrides: Record<string, unknown> = {}) => {
+      const record = givenRecord(offers, { url: OLD_URL, externalId: 'SKU-1', ...overrides });
+      sourceRecordRepo.findUniqueBySourceAndExternalId.mockResolvedValue(record);
+      // Nothing else of this source holds the new URL.
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(null);
+      return record;
+    };
+
+    it('refreshes it in place and moves the record and its offer entry to the new URL', async () => {
+      const record = givenMovedRecord([
+        { price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1', url: OLD_URL },
+        { price: 1, externalId: 'SKU-2', resolvedExternalId: 'SKU-2', url: 'https://ebikeshop.hu/termek/other' },
+      ]);
+
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('refreshed');
+
+      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
+      expect(record.url).toBe(NEW_URL);
+      const entries = record.scrapedProduct.offers as ScrapedOffer[];
+      expect(entries.map((offer) => offer.url)).toEqual([NEW_URL, 'https://ebikeshop.hu/termek/other']);
+      expect(entries[0].price).toBe(1_339_990);
+      // One lock for the move and the refresh together.
+      expect(locks.withLocks).toHaveBeenCalledTimes(1);
+      expect(offerComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ externalIds: ['SKU-1'] }),
+      );
+    });
+
+    // Otherwise the detail scrape it still needs would write a second record
+    // under the new URL, beside the old one.
+    it('moves it even when the card sends it to a detail scrape', async () => {
+      const record = givenMovedRecord(
+        [{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1', url: OLD_URL }],
+        { lastUpdated: daysAgo(61) },
+      );
+
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('stale');
+
+      expect(record.url).toBe(NEW_URL);
+      expect(sourceRecordRepo.save).toHaveBeenCalledTimes(1);
+      expect(offerComposer.compose).not.toHaveBeenCalled();
+    });
+
+    it('pins the id an entry derived from its old URL before moving it', async () => {
+      const record = givenMovedRecord([{ price: 1, url: OLD_URL }]);
+
+      await service.tryRefresh(SOURCE, card() as never);
+
+      expect((record.scrapedProduct.offers as ScrapedOffer[])[0]).toMatchObject({
+        url: NEW_URL,
+        resolvedExternalId: 'termek/ktm-macina-old-name',
+      });
+    });
+
+    it('does not guess when another record of the source holds the new URL', async () => {
+      const record = givenMovedRecord([
+        { price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1', url: OLD_URL },
+      ]);
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({ id: 'record-2', url: NEW_URL });
+
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('moved');
+
+      expect(record.url).toBe(OLD_URL);
+      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
+      expect(locks.withLocks).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing when the record moved meanwhile', async () => {
+      const record = givenMovedRecord([
+        { price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1', url: OLD_URL },
+      ]);
+      sourceRecordRepo.findById.mockResolvedValue({ ...record, url: 'https://ebikeshop.hu/termek/elsewhere' });
+      productRepo.findOne.mockResolvedValue({ id: 'model-1', sources: [] });
+
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('no_offer');
+
+      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
+    });
+
+    // The repository answers null for an id several records share (a
+    // group-level id), and the card is then looked up by its URL.
+    it('falls back to the URL when no single record carries the externalId', async () => {
+      givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }]);
+
+      await expect(service.tryRefresh(SOURCE, completeItem() as never)).resolves.toBe('refreshed');
+
+      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
+      expect(sourceRecordRepo.findBySourceAndUrl).toHaveBeenCalledWith(
+        'source-1',
+        'https://speedbike.hu/termek/macina',
+      );
+    });
+
+    // No product lock to move it under; it keeps its URL, as before.
+    it('falls back to the URL for an unattached record', async () => {
+      givenMovedRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
+        model: null,
+      });
+
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('unknown');
+      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('looks a card without an externalId up by URL only', async () => {
+      givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }]);
+
+      await service.tryRefresh(SOURCE, { ...completeItem(), externalId: undefined } as never);
+
+      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).not.toHaveBeenCalled();
     });
   });
 });

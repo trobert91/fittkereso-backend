@@ -10,6 +10,9 @@ import { Offer } from './offer.entity';
 @Entity()
 @Index(['model', 'source'])
 @Index(['source', 'productSpecsHash'])
+// A list card is matched to its record by (source, externalId) before its URL
+// (ListProductRefreshService), and identity's Path 3 asks the same pair.
+@Index(['source', 'externalId'])
 // One record per (source, url). Manual/admin rows carry source: null and no
 // url; Postgres treats NULLs as distinct, so they are unconstrained here.
 @Unique(['source', 'url'])

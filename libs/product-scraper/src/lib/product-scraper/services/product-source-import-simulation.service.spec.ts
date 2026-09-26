@@ -2,7 +2,10 @@ import { Readable } from 'stream';
 import { ProductSourceImportSimulationService } from './product-source-import-simulation.service';
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
 import { ArukeresoProductMapperService } from '../../arukereso/arukereso-product-mapper.service';
+import { ListProductRefreshService } from './list-product-refresh.service';
 import type { ProductSource } from '@fittkereso-backend/database';
+
+const DAY = 24 * 60 * 60 * 1000;
 
 describe('ProductSourceImportSimulationService', () => {
   let service: ProductSourceImportSimulationService;
@@ -11,8 +14,7 @@ describe('ProductSourceImportSimulationService', () => {
   let interpreter: { runValuePipeline: jest.Mock; runListPage: jest.Mock };
   let scraperService: { getHtml: jest.Mock };
   let scrapingImport: { planRun: jest.Mock };
-  let listRefresh: { requiredFields: string[] };
-  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock };
+  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; findUniqueBySourceAndExternalId: jest.Mock };
   let specPostProcess: { extractIdentity: jest.Mock };
   let feedTriage: { triage: jest.Mock };
   let offerRepo: { findSyncStates: jest.Mock };
@@ -33,6 +35,7 @@ describe('ProductSourceImportSimulationService', () => {
     id: 'source-2',
     name: 'ebikeshop',
     type: 'scraping',
+    detailRefreshInterval: '60 days',
     config: {
       baseUrl: 'https://ebikeshop.hu',
       startUrls: ['https://ebikeshop.hu/termekek'],
@@ -84,8 +87,10 @@ describe('ProductSourceImportSimulationService', () => {
         .fn()
         .mockResolvedValue({ categoryUrls: ['c1'], pageUrls: ['p1', 'p2'] }),
     };
-    listRefresh = { requiredFields: ['url', 'price', 'availability'] };
-    sourceRecordRepo = { findBySourceAndUrl: jest.fn().mockResolvedValue(null) };
+    sourceRecordRepo = {
+      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
+      findUniqueBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+    };
     offerRepo = { findSyncStates: jest.fn().mockResolvedValue([]) };
     // Every row new unless a test says otherwise.
     feedTriage = {
@@ -105,11 +110,19 @@ describe('ProductSourceImportSimulationService', () => {
       nativeScraper as never,
       interpreter as never,
       scrapingImport as never,
-      listRefresh as never,
+      // The real decision: the simulation reports what a run would do, so a
+      // stub here would check the wrong thing. It only reads.
+      new ListProductRefreshService(
+        sourceRecordRepo as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+      ),
       // The real parser: a stub would leave the wiring untested.
       new ArukeresoFeedParserService(),
       mapper as never,
-      sourceRecordRepo as never,
       specPostProcess as never,
       feedTriage as never,
       offerRepo as never,
@@ -421,6 +434,16 @@ describe('ProductSourceImportSimulationService', () => {
       ...overrides,
     });
 
+    /** This source's record of the card's page, on a product, with one offer entry. */
+    const knownRecord = (overrides: Record<string, unknown> = {}) => ({
+      id: 'record-1',
+      url: 'https://ebikeshop.hu/p/1',
+      model: { id: 'model-1' },
+      scrapedProduct: { offers: [{ price: 90, resolvedExternalId: 'p/1' }] },
+      lastUpdated: new Date(Date.now() - DAY),
+      ...overrides,
+    });
+
     it('reports the whole page walk without enqueueing anything', async () => {
       interpreter.runListPage.mockResolvedValue({ products: [card()] });
 
@@ -447,10 +470,7 @@ describe('ProductSourceImportSimulationService', () => {
     // reason that makes it tunable: "every card is missing availability" is a
     // one-line config change, and invisible from a total.
     it('names the missing fields when a known listing is too thin to refresh', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [{ id: 'offer-1' }],
-      });
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(knownRecord());
       interpreter.runListPage.mockResolvedValue({
         products: [card({ availability: undefined })],
       });
@@ -459,6 +479,7 @@ describe('ProductSourceImportSimulationService', () => {
 
       expect(result.scraping?.decisions[0]).toMatchObject({
         known: true,
+        outcome: 'incomplete',
         satisfiesMinimumSet: false,
         missingFields: ['availability'],
         wouldScrapeDetail: true,
@@ -467,29 +488,55 @@ describe('ProductSourceImportSimulationService', () => {
     });
 
     it('refreshes in place when a known listing satisfies the minimum set', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [{ id: 'offer-1' }],
-      });
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(knownRecord());
       interpreter.runListPage.mockResolvedValue({ products: [card()] });
 
       const result = await service.simulate(scrapingSource);
 
-      expect(result.scraping?.decisions[0].wouldScrapeDetail).toBe(false);
+      expect(result.scraping?.decisions[0]).toMatchObject({ outcome: 'refresh', wouldScrapeDetail: false });
+      expect(result.scraping?.decisions[0].reason).toMatch(/detail page due again on \d{4}-\d{2}-\d{2}/);
       expect(result.scraping?.wouldRefreshInline).toBe(1);
+      expect(result.scraping?.outcomes).toEqual({ refresh: 1 });
     });
 
-    it('still needs a detail fetch for a known listing with no offer row yet', async () => {
-      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({
-        id: 'record-1',
-        offers: [],
-      });
+    it('still needs a detail fetch for a known listing with no offer yet', async () => {
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(
+        knownRecord({ scrapedProduct: { offers: [] } }),
+      );
       interpreter.runListPage.mockResolvedValue({ products: [card()] });
 
       const result = await service.simulate(scrapingSource);
 
-      expect(result.scraping?.decisions[0].reason).toMatch(/no offer row/);
+      expect(result.scraping?.decisions[0].reason).toMatch(/no offer to refresh/);
       expect(result.scraping?.decisions[0].wouldScrapeDetail).toBe(true);
+    });
+
+    it('fetches the detail page of a listing past its detailRefreshInterval', async () => {
+      sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(
+        knownRecord({ lastUpdated: new Date(Date.now() - 61 * DAY) }),
+      );
+      interpreter.runListPage.mockResolvedValue({ products: [card()] });
+
+      const result = await service.simulate(scrapingSource);
+
+      expect(result.scraping?.decisions[0]).toMatchObject({ outcome: 'stale', wouldScrapeDetail: true });
+      expect(result.scraping?.decisions[0].reason).toMatch(/due again on \d{4}-\d{2}-\d{2} \(detailRefreshInterval: 60 days\)/);
+    });
+
+    it('says when a listing found by its externalId moves to the card’s URL', async () => {
+      sourceRecordRepo.findUniqueBySourceAndExternalId.mockResolvedValue(
+        knownRecord({ url: 'https://ebikeshop.hu/p/old-name' }),
+      );
+      interpreter.runListPage.mockResolvedValue({ products: [card({ externalId: 'CODE-1' })] });
+
+      const result = await service.simulate(scrapingSource);
+
+      expect(result.scraping?.decisions[0]).toMatchObject({
+        known: true,
+        outcome: 'refresh',
+        movedFrom: 'https://ebikeshop.hu/p/old-name',
+      });
+      expect(result.scraping?.decisions[0].reason).toContain('moves here from https://ebikeshop.hu/p/old-name');
     });
 
     it('calls a page that yields no cards an error', async () => {

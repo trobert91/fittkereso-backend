@@ -1,4 +1,5 @@
 import {
+  ListingExternalIdMismatchError,
   ProductSourceConfigInvalidError,
   ProductImportTaskKind,
   ProductImportTask,
@@ -120,6 +121,30 @@ describe('BaseProductImportTaskManagerService failure handling', () => {
       kind: 'product_source_config_invalid',
       sourceName: 'speedbike',
       problems: [{ path: '/detailPage/brand', message: 'must be array' }],
+    });
+  });
+
+  // The URL answers with another product on every retry, and every retry is a
+  // paid fetch.
+  it('marks a page showing another product terminal, with both ids on the task', async () => {
+    const { task } = await run(
+      new ListingExternalIdMismatchError({
+        source: { id: 'source-1', name: 'ebikeshop' },
+        url: 'https://ebikeshop.hu/termek/ktm-macina-old',
+        expectedExternalId: '1250158236',
+        pageExternalIds: ['AKA-B002-X'],
+      }),
+    );
+
+    expect(task.status).toBe(TaskStatus.FAILED);
+    expect(task.terminal).toBe(true);
+    expect(task.attempts).toBe(1);
+    expect(task.scheduledAt).toBeNull();
+    expect(task.error).toMatchObject({
+      kind: 'listing_external_id_mismatch',
+      url: 'https://ebikeshop.hu/termek/ktm-macina-old',
+      expectedExternalId: '1250158236',
+      pageExternalIds: ['AKA-B002-X'],
     });
   });
 

@@ -91,7 +91,7 @@ const SOURCES: SeedSourceSpec[] = [
     priority: 50,
     identifiesProducts: true,
     hasAllProducts: false,
-    frequency: '7 days',
+    frequency: '1 day',
     seller: {
       name: 'ebikeshop.hu',
       slug: 'ebikeshop-hu',

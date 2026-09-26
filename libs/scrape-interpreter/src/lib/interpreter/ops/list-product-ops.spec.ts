@@ -54,6 +54,18 @@ describe('jsonPath', () => {
     ).toBeUndefined();
   });
 
+  // Laravel writes a filtered collection as an object keyed by the surviving
+  // indices.
+  it('reads an object keyed by array indices as an array', () => {
+    const item = { rows: { '0': 'a', '1': 'b', '15': 'c' } };
+    expect(jsonPath(ctx, item, { op: 'jsonPath', path: 'rows' })).toEqual(['a', 'b', 'c']);
+  });
+
+  it('resolves its path against the raw keys', () => {
+    const item = { rows: { '0': 'a', '15': 'c' } };
+    expect(jsonPath(ctx, item, { op: 'jsonPath', path: 'rows.15' })).toBe('c');
+  });
+
   // Boolean() would call all of these true, which is exactly the trap: a JSON
   // payload rendered into a DOM attribute arrives as strings.
   it.each([

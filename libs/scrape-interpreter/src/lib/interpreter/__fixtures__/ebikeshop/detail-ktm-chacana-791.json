@@ -1,0 +1,422 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "KTM '23 whose longDesc is only the 'A gyártóról' manufacturer blurb (447 chars); on sale; in stock in one store.",
+  "dataPage": {
+    "component": "products/Show",
+    "url": "/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+    "props": {
+      "product": {
+        "id": 8713,
+        "name": "KTM MACINA CHACANA 791 43 cm fehér elektromos kerékpár",
+        "productCode": "023316103",
+        "longDesc": "<p>A gyártóról: A KTM egy nagy múltú cég, mely nem csak a kerékpárok gyártásával tett szert a nagy hírnévre. Az első elektromos modell 2009-ben gördült le a gyártósorról, napjainkban pedig modellpalettájuk nagy részét már csak az elektromos kerékpárok teszik ki. Az oszrák székhelyű gyártó túrakerékpárok gyártásában a legerősebb, ebben a szegmensben többször is korszakalkotó újításokat vittek véghez, melyeket később más gyártók is követtek.</p>",
+        "ogTitle": null,
+        "ogDescription": null,
+        "metaTitle": "KTM Macina Chacana 791 43 cm e-bike",
+        "metaDescription": "KTM Macina Chacana 791 43 cm elektromos mountain bike erős Bosch rendszerrel és kényelmes rugózással.",
+        "gtin": "9008594471078",
+        "special1": null,
+        "special2": null,
+        "special3": null,
+        "special4": null,
+        "shortTitle": null,
+        "shortDesc": "",
+        "h1Title": null,
+        "prices": {
+          "price": 2099000.0057,
+          "priceFormatted": "2 099 000 Ft",
+          "priceSale": 1899000,
+          "priceSaleFormatted": "1 899 000 Ft",
+          "lowestPrice": 2099000.0057,
+          "lowestPriceFormatted": "2 099 000 Ft",
+          "sale": true,
+          "salePercent": 9,
+          "vat": 27,
+          "lowestPriceDateInterval": 30,
+          "distinctVatProduct": false,
+          "currentSaleStartDateFormatted": "2026. febr. 20."
+        },
+        "images": [
+          {
+            "images": [
+              {
+                "code": "thumb_640",
+                "url": "https://ebikeshop.hu/storage/documents/file/2023-ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-p28b453e-5538-thumb_640.webp",
+                "altText": "KTM MACINA CHACANA 791 53 cm '23 fehér elektromos kerékpár"
+              },
+              {
+                "code": "thumb_1280",
+                "url": "https://ebikeshop.hu/storage/documents/file/2023-ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-p28b453e-5538-thumb_1280.webp",
+                "altText": "KTM MACINA CHACANA 791 53 cm '23 fehér elektromos kerékpár"
+              },
+              {
+                "code": "original",
+                "url": "https://ebikeshop.hu/storage/documents/file/2023-ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-p28b453e-5538.webp",
+                "altText": "KTM MACINA CHACANA 791 53 cm '23 fehér elektromos kerékpár"
+              }
+            ],
+            "type": "gallery",
+            "image360Url": null
+          }
+        ],
+        "category": {
+          "id": 12,
+          "name": "Elektromos kerékpárok",
+          "slug": "elektromos-kerekparok",
+          "orderNum": 0,
+          "parentId": null
+        },
+        "promotion": null,
+        "addToCartButtonEnabled": true,
+        "isBike": true,
+        "isUsed": false,
+        "isRentable": false,
+        "manufacturer": {
+          "id": 218,
+          "title": "KTM",
+          "url": "https://ebikeshop.hu/ktm",
+          "slug": "ktm",
+          "categorySlug": "gyarto"
+        },
+        "inCompareList": false,
+        "inWishlist": false,
+        "highlightedProperties": [
+          {
+            "title": "Maximális rásegítés",
+            "shortTitle": "",
+            "value": "25",
+            "orderNumber": 0,
+            "quantityUnit": "km/h",
+            "iconName": "#ebk-icon-speedometer"
+          },
+          {
+            "title": "Motor gyártója",
+            "shortTitle": "",
+            "value": "Bosch",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-settings"
+          },
+          {
+            "title": "Akku kapacitás",
+            "shortTitle": "",
+            "value": "750",
+            "orderNumber": 0,
+            "quantityUnit": "Wh",
+            "iconName": "#ebk-icon-battery"
+          },
+          {
+            "title": "Motor típusa",
+            "shortTitle": "Perf. CX Smart System",
+            "value": "Bosch performance Line CX (Smart System)",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-accessory"
+          }
+        ],
+        "vat": 27,
+        "variations": [
+          {
+            "label": "Vázméret",
+            "type": "frame_size",
+            "items": [
+              {
+                "label": "43 cm",
+                "value": "43",
+                "selected": true,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+                "gtin": "9008594471078",
+                "productCode": "023316103"
+              },
+              {
+                "label": "48 cm",
+                "value": "48",
+                "selected": false,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-48-cm-23-feher-elektromos-kerekpar-8709",
+                "gtin": "9008594471085",
+                "productCode": "023316108"
+              },
+              {
+                "label": "53 cm",
+                "value": "53",
+                "selected": false,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-8706",
+                "gtin": "9008594471092",
+                "productCode": "023316113"
+              }
+            ]
+          },
+          {
+            "label": "Váz típus",
+            "type": "frame_shape",
+            "items": [
+              {
+                "label": "Összteleszkópos",
+                "value": "Összteleszkópos",
+                "selected": true,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+                "gtin": "9008594471078",
+                "productCode": "023316103"
+              }
+            ]
+          }
+        ],
+        "smartFitOnlineSizing": {
+          "name": "KTM MACINA CHACANA 791 43 cm fehér elektromos kerékpár",
+          "code": "023316103",
+          "price": 1899000,
+          "image": "https://ebikeshop.hu/storage/documents/file/2023-ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-p28b453e-5538-thumb_640.webp"
+        },
+        "documents": [],
+        "youtubeVideos": [],
+        "catalog": {
+          "id": 7788,
+          "title": "KTM23 fully",
+          "url": "https://ebikeshop.hu/flipbook/documents/file/18adb-ktm23-fully.pdf?page=24",
+          "downloadUrl": "https://ebikeshop.hu/storage/documents/file/18adb-ktm23-fully.pdf",
+          "fileSize": "12.75 MB"
+        },
+        "rentableData": null,
+        "resellerData": null,
+        "showUrl": "https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+        "stocks": [
+          {
+            "stockType": "stock",
+            "shopId": 3,
+            "title": "Pécs",
+            "productCode": "023316103",
+            "preorder": 0,
+            "qty": 1,
+            "slug": "pecs",
+            "shopFullUrl": "https://ebikeshop.hu/uzletek/pecs",
+            "preorderFormFullUrl": null,
+            "arrivalDate": null,
+            "preorderTypeTitle": "Készleten",
+            "expired": false,
+            "isVirtualWarehouse": false
+          }
+        ],
+        "properties": [
+          {
+            "id": 869,
+            "propertyCategoryId": 41,
+            "shortTitle": "",
+            "value": "Új",
+            "categoryTitle": "Állapot",
+            "orderNumber": 0,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1496,
+            "propertyCategoryId": 66,
+            "shortTitle": "Nyomaték",
+            "value": "85",
+            "categoryTitle": "Nyomaték",
+            "orderNumber": 0,
+            "quantityUnit": "Nm"
+          },
+          {
+            "id": 218,
+            "propertyCategoryId": 4,
+            "shortTitle": "",
+            "value": "KTM",
+            "categoryTitle": "Gyártó",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1527,
+            "propertyCategoryId": 1,
+            "shortTitle": "",
+            "value": "23",
+            "categoryTitle": "Modellév",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 187,
+            "propertyCategoryId": 7,
+            "shortTitle": "",
+            "value": "43",
+            "categoryTitle": "Vázméret",
+            "orderNumber": 2,
+            "quantityUnit": "cm"
+          },
+          {
+            "id": 531,
+            "propertyCategoryId": 6,
+            "shortTitle": "",
+            "value": "Összteleszkópos",
+            "categoryTitle": "Váztípus",
+            "orderNumber": 2,
+            "quantityUnit": ""
+          },
+          {
+            "id": 812,
+            "propertyCategoryId": 26,
+            "shortTitle": "",
+            "value": "MTB",
+            "categoryTitle": "Felhasználás módja",
+            "orderNumber": 3,
+            "quantityUnit": ""
+          },
+          {
+            "id": 23,
+            "propertyCategoryId": 8,
+            "shortTitle": "",
+            "value": "25",
+            "categoryTitle": "Maximális rásegítés",
+            "orderNumber": 4,
+            "quantityUnit": "km/h"
+          },
+          {
+            "id": 888,
+            "propertyCategoryId": 16,
+            "shortTitle": "",
+            "value": "Bosch Kiox 300",
+            "categoryTitle": "Kijelző típus",
+            "orderNumber": 6,
+            "quantityUnit": ""
+          },
+          {
+            "id": 666,
+            "propertyCategoryId": 34,
+            "shortTitle": "",
+            "value": "Vázba integrált",
+            "categoryTitle": "Akku elhelyezkedése",
+            "orderNumber": 8,
+            "quantityUnit": ""
+          },
+          {
+            "id": 716,
+            "propertyCategoryId": 35,
+            "shortTitle": "",
+            "value": "29",
+            "categoryTitle": "Kerékméret",
+            "orderNumber": 9,
+            "quantityUnit": "\""
+          },
+          {
+            "id": 175,
+            "propertyCategoryId": 12,
+            "shortTitle": "",
+            "value": "Lánc",
+            "categoryTitle": "Erőátvitel",
+            "orderNumber": 10,
+            "quantityUnit": ""
+          },
+          {
+            "id": 690,
+            "propertyCategoryId": 38,
+            "shortTitle": "",
+            "value": "Első teleszkóp, hátsó rugóstag",
+            "categoryTitle": "Rugózás",
+            "orderNumber": 11,
+            "quantityUnit": ""
+          },
+          {
+            "id": 789,
+            "propertyCategoryId": 13,
+            "shortTitle": "",
+            "value": "Shimano Deore XT",
+            "categoryTitle": "Féktípus",
+            "orderNumber": 12,
+            "quantityUnit": ""
+          },
+          {
+            "id": 664,
+            "propertyCategoryId": 28,
+            "shortTitle": "",
+            "value": "Tárcsa",
+            "categoryTitle": "Fékfajta",
+            "orderNumber": 13,
+            "quantityUnit": ""
+          },
+          {
+            "id": 770,
+            "propertyCategoryId": 37,
+            "shortTitle": "",
+            "value": "12",
+            "categoryTitle": "Váltó sebességfokozatainak száma",
+            "orderNumber": 26,
+            "quantityUnit": ""
+          },
+          {
+            "id": 997,
+            "propertyCategoryId": 22,
+            "shortTitle": "",
+            "value": "Shimano Deore XT",
+            "categoryTitle": "Váltó",
+            "orderNumber": 27,
+            "quantityUnit": ""
+          },
+          {
+            "id": 560,
+            "propertyCategoryId": 39,
+            "shortTitle": "",
+            "value": "Láncváltó",
+            "categoryTitle": "Váltó típusa",
+            "orderNumber": 28,
+            "quantityUnit": ""
+          },
+          {
+            "id": 563,
+            "propertyCategoryId": 40,
+            "shortTitle": "",
+            "value": "Mechanikus",
+            "categoryTitle": "Váltó működése",
+            "orderNumber": 29,
+            "quantityUnit": ""
+          },
+          {
+            "id": 540,
+            "propertyCategoryId": 31,
+            "shortTitle": "",
+            "value": "Bosch",
+            "categoryTitle": "Motor gyártója",
+            "orderNumber": 40,
+            "quantityUnit": ""
+          },
+          {
+            "id": 902,
+            "propertyCategoryId": 15,
+            "shortTitle": "",
+            "value": "Bosch performance Line CX (Smart System)",
+            "categoryTitle": "Motor típusa",
+            "orderNumber": 42,
+            "quantityUnit": ""
+          },
+          {
+            "id": 889,
+            "propertyCategoryId": 3,
+            "shortTitle": "",
+            "value": "750",
+            "categoryTitle": "Akku kapacitás",
+            "orderNumber": 44,
+            "quantityUnit": "Wh"
+          },
+          {
+            "id": 539,
+            "propertyCategoryId": 30,
+            "shortTitle": "Emelt teherbírás: Bruttó 130kg< ",
+            "value": "Nem",
+            "categoryTitle": "Emelt teherbírás",
+            "orderNumber": 99,
+            "quantityUnit": ""
+          }
+        ],
+        "leasingUrl": "https://ebikeshop.hu/lizingkonstrukcio-cegeknek?termek=ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713",
+        "locations": [
+          "Pécs"
+        ],
+        "manufacturerUrl": null,
+        "legalManufacturerName": null,
+        "legalManufacturerAddress": null
+      }
+    }
+  },
+  "jsonLd": "\n                    [{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"name\":\"Főoldal\",\"@id\":\"https://ebikeshop.hu/\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"name\":\"Termékek\",\"@id\":\"https://ebikeshop.hu/termekek\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"name\":\"Elektromos kerékpárok\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok\"}},{\"@type\":\"ListItem\",\"position\":4,\"item\":{\"name\":\"KTM\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok?gyarto%5B0%5D=ktm\"}},{\"@type\":\"ListItem\",\"position\":5,\"item\":{\"name\":\"KTM MACINA CHACANA 791 43 cm fehér elektromos kerékpár\",\"@id\":\"https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713\"}}]},{\"@context\":\"https://schema.org/\",\"@type\":\"Product\",\"name\":\"KTM MACINA CHACANA 791 43 cm fehér elektromos kerékpár\",\"description\":\"A gyártóról: A KTM egy nagy múltú cég, mely nem csak a kerékpárok gyártásával tett szert a nagy hírnévre. Az első elektromos modell 2009-ben gördült le a gyártósorról, napjainkban pedig modellpalettájuk nagy részét már csak az elektromos kerékpárok teszik ki. Az oszrák székhelyű gyártó túrakerékpárok gyártásában a legerősebb, ebben a szegmensben többször is korszakalkotó újításokat vittek véghez, melyeket később más gyártók is követtek.\",\"image\":\"https://ebikeshop.hu/storage/documents/file/2023-ktm-macina-chacana-791-53-cm-23-feher-elektromos-kerekpar-p28b453e-5538-thumb_640.webp\",\"sku\":\"023316103\",\"brand\":{\"@type\":\"Brand\",\"name\":\"KTM\"},\"offers\":{\"@type\":\"Offer\",\"url\":\"https://ebikeshop.hu/termek/ktm-macina-chacana-791-43-cm-23-feher-elektromos-kerekpar-8713-8713\",\"priceCurrency\":\"HUF\",\"price\":1899000,\"itemCondition\":\"https://schema.org/NewCondition\",\"availability\":\"https://schema.org/InStock\",\"seller\":\"https://ebikeshop.hu\"}}]\n                ",
+  "storesHtml": "<div class=\"space-y-2\"><h3 class=\"mb-3 text-lg leading-snug font-bold [&amp;:last-child]:mb-0\"><!--[-->Üzletek<!--]--></h3><ul class=\"space-y-2\"><!--[--><li class=\"\"><div class=\"flex flex-wrap items-center gap-4\"><!--[--><a class=\"flex items-center gap-2 text-brand underline underline-offset-2 hover:text-brand-alt\" href=\"https://ebikeshop.hu/uzletek/pecs\">Pécs</a><!--]--><div class=\"flex items-center gap-2\"><em class=\"inline-block size-2 rounded-full ring-3 bg-success-saturated ring-success-saturated/50\"></em><span class=\"font-condensed text-xs font-normal uppercase text-success\">Elérhető</span></div></div></li><!--]--></ul></div>"
+}

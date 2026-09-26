@@ -102,7 +102,7 @@ const maxItemsSchema: JsonSchemaFragment = {
   type: 'integer',
   minimum: 1,
   description:
-    'Hard ceiling on how many items ONE RUN imports, counted in items imported rather than items seen. Omit for no ceiling, which is what a production source wants. A feed run honours this exactly; on a scraping source it caps items PER LIST PAGE (each page is its own task, so they share no counter) and additionally restricts the run to the first page of each listing.',
+    'Hard ceiling on how much ONE RUN imports. Omit for no ceiling. A feed run counts the rows it takes. A scraping run counts the detail tasks it queues, across all its list pages: once it has queued this many it queues no more, while it still walks every page and refreshes every known card in place.',
 };
 
 const filterConditionSchema: JsonSchemaFragment = {

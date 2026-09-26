@@ -1,0 +1,407 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "R&M, 45 km/h (S-Pedelec), Enviolo hub gear, 27,5\" wheels, on sale, in stock in one store, no variations, no GTIN.",
+  "dataPage": {
+    "component": "products/Show",
+    "url": "/termek/rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333",
+    "props": {
+      "product": {
+        "id": 14333,
+        "name": "RM Delite4 GT vario HS HE51 cm szürke elektromos kerékpár (750Wh, kiox 500, ABS )",
+        "productCode": "F01153_04013712091408",
+        "longDesc": "<h3 class=\"product-desc-block-title\">Általános</h3>\r\n<p class=\"product-desc-block-content\"><br />Ezen az oldalon <a href=\"https://ebikeshop.hu/hasznalati-utasitasok\" target=\"_blank\" rel=\"noopener\">megtalálható az összes használati utasítás</a> az általunk forgalmazott kerékpárokhoz.<br /><br />Ha pedig arra vagy kíváncsi hány km-t tudsz megtenni, a <a href=\"https://ebikeshop.hu/bosch-hatotav-kalkulator\" target=\"_blank\" rel=\"noopener\">Bosch hatótáv kalkulátor</a> lehet a segítségedre.<br /><br /><b>Figyelem!</b> A hatótáv kalkulátor alapvetően Bosch rendszerekhez készült, de egy hasonló nyomatékú motort és egy hasonló kapacitású akkumulátort kiválasztva egy becsült értéket kaphatunk más gyártók rendszereihez is!</p>",
+        "ogTitle": null,
+        "ogDescription": null,
+        "metaTitle": "R&M Delite4 GT Vario HS 51 cm 750 Wh e-bike",
+        "metaDescription": null,
+        "gtin": "",
+        "special1": null,
+        "special2": null,
+        "special3": null,
+        "special4": null,
+        "shortTitle": null,
+        "shortDesc": "",
+        "h1Title": null,
+        "prices": {
+          "price": 3319000.0041,
+          "priceFormatted": "3 319 000 Ft",
+          "priceSale": 2999000,
+          "priceSaleFormatted": "2 999 000 Ft",
+          "lowestPrice": 3319000.0041,
+          "lowestPriceFormatted": "3 319 000 Ft",
+          "sale": true,
+          "salePercent": 9,
+          "vat": 27,
+          "lowestPriceDateInterval": 30,
+          "distinctVatProduct": false,
+          "currentSaleStartDateFormatted": "2026. febr. 20."
+        },
+        "images": [
+          {
+            "images": [
+              {
+                "code": "thumb_640",
+                "url": "https://ebikeshop.hu/storage/documents/file/2024-rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-p34e3f36-10822-thumb_640.webp",
+                "altText": "RM Delite4 GT vario HS HE51 cm '24 szürke elektromos kerékpár (750Wh, kiox 500, ABS )"
+              },
+              {
+                "code": "thumb_1280",
+                "url": "https://ebikeshop.hu/storage/documents/file/2024-rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-p34e3f36-10822-thumb_1280.webp",
+                "altText": "RM Delite4 GT vario HS HE51 cm '24 szürke elektromos kerékpár (750Wh, kiox 500, ABS )"
+              },
+              {
+                "code": "original",
+                "url": "https://ebikeshop.hu/storage/documents/file/2024-rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-p34e3f36-10822.webp",
+                "altText": "RM Delite4 GT vario HS HE51 cm '24 szürke elektromos kerékpár (750Wh, kiox 500, ABS )"
+              }
+            ],
+            "type": "gallery",
+            "image360Url": null
+          }
+        ],
+        "category": {
+          "id": 12,
+          "name": "Elektromos kerékpárok",
+          "slug": "elektromos-kerekparok",
+          "orderNum": 0,
+          "parentId": null
+        },
+        "promotion": null,
+        "addToCartButtonEnabled": true,
+        "isBike": true,
+        "isUsed": false,
+        "isRentable": false,
+        "manufacturer": {
+          "id": 185,
+          "title": "Riese und Müller",
+          "url": "https://ebikeshop.hu/riese-und-muller",
+          "slug": "riese-und-muller",
+          "categorySlug": "gyarto"
+        },
+        "inCompareList": false,
+        "inWishlist": false,
+        "highlightedProperties": [
+          {
+            "title": "Maximális rásegítés",
+            "shortTitle": "",
+            "value": "45",
+            "orderNumber": 0,
+            "quantityUnit": "km/h",
+            "iconName": "#ebk-icon-speedometer"
+          },
+          {
+            "title": "Motor gyártója",
+            "shortTitle": "",
+            "value": "Bosch",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-settings"
+          },
+          {
+            "title": "Akku kapacitás",
+            "shortTitle": "",
+            "value": "750",
+            "orderNumber": 0,
+            "quantityUnit": "Wh",
+            "iconName": "#ebk-icon-battery"
+          },
+          {
+            "title": "Motor típusa",
+            "shortTitle": "Perf. Sp. (Smart System)",
+            "value": "Bosch Performance Line Speed (Smart System)",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-accessory"
+          }
+        ],
+        "vat": 27,
+        "variations": null,
+        "smartFitOnlineSizing": {
+          "name": "RM Delite4 GT vario HS HE51 cm szürke elektromos kerékpár (750Wh, kiox 500, ABS )",
+          "code": "F01153_04013712091408",
+          "price": 2999000,
+          "image": "https://ebikeshop.hu/storage/documents/file/2024-rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-p34e3f36-10822-thumb_640.webp"
+        },
+        "documents": [
+          {
+            "id": 2223,
+            "docType": "pdf",
+            "title": "Bosch SmartCharger használati útmutató",
+            "url": "https://ebikeshop.hu/storage/documents/file/ef05a-bosch-smartcharger-hasznalati-utmutato.pdf",
+            "previewUrl": "https://ebikeshop.hu/storage/documents/preview_image/2f1e7-csm-bosch-ebike-visual-4a-charger-bes3-my2022-en-a97405a388-2223.webp"
+          },
+          {
+            "id": 2226,
+            "docType": "pdf",
+            "title": "Bosch Performance Line Cx (gen.4) használati útmutató",
+            "url": "https://ebikeshop.hu/storage/documents/file/e923a-bosch-cx-gen4.-motor-hasznalati-utmutato.pdf",
+            "previewUrl": "https://ebikeshop.hu/storage/documents/preview_image/986bb-4genpng-2226.webp"
+          },
+          {
+            "id": 2228,
+            "docType": "pdf",
+            "title": "Bosch Smart Led távirányító használati útmutató",
+            "url": "https://ebikeshop.hu/storage/documents/file/ad9c6-bosch-smart-led-taviranyito-hasznalati-utmutato.pdf",
+            "previewUrl": "https://ebikeshop.hu/storage/documents/preview_image/042a4-kiox300-remotepng-2228.webp"
+          },
+          {
+            "id": 2243,
+            "docType": "pdf",
+            "title": "Shimano, Rohloff, Enviolo használati utasításShimano, Rohloff, Enviolo használati utasítás",
+            "url": "https://ebikeshop.hu/storage/documents/file/9709d-shimano-rohloff-enviolo-valtorendszerek-hasznalati-utmutato.pdf",
+            "previewUrl": "https://ebikeshop.hu/storage/documents/preview_image/8c049-shimanoenviolorohloff-2243.webp"
+          },
+          {
+            "id": 2246,
+            "docType": "pdf",
+            "title": "Bosch gyorsindítási útmutató",
+            "url": "https://ebikeshop.hu/storage/documents/file/6664a-gyorsinditasui-utmutato-bosch-rendszerhez.pdf",
+            "previewUrl": "https://ebikeshop.hu/storage/documents/preview_image/aa7c6-bosch-ebike-logo-2246.webp"
+          }
+        ],
+        "youtubeVideos": [],
+        "catalog": null,
+        "rentableData": null,
+        "resellerData": null,
+        "showUrl": "https://ebikeshop.hu/termek/rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333",
+        "stocks": [
+          {
+            "stockType": "stock",
+            "shopId": 5,
+            "title": "Győr",
+            "productCode": "F01153_04013712091408",
+            "preorder": 0,
+            "qty": 1,
+            "slug": "gyor",
+            "shopFullUrl": "https://ebikeshop.hu/uzletek/gyor",
+            "preorderFormFullUrl": null,
+            "arrivalDate": null,
+            "preorderTypeTitle": "Készleten",
+            "expired": false,
+            "isVirtualWarehouse": false
+          }
+        ],
+        "properties": [
+          {
+            "id": 869,
+            "propertyCategoryId": 41,
+            "shortTitle": "",
+            "value": "Új",
+            "categoryTitle": "Állapot",
+            "orderNumber": 0,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1496,
+            "propertyCategoryId": 66,
+            "shortTitle": "Nyomaték",
+            "value": "85",
+            "categoryTitle": "Nyomaték",
+            "orderNumber": 0,
+            "quantityUnit": "Nm"
+          },
+          {
+            "id": 185,
+            "propertyCategoryId": 4,
+            "shortTitle": "",
+            "value": "Riese und Müller",
+            "categoryTitle": "Gyártó",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1528,
+            "propertyCategoryId": 1,
+            "shortTitle": "",
+            "value": "24",
+            "categoryTitle": "Modellév",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 193,
+            "propertyCategoryId": 7,
+            "shortTitle": "",
+            "value": "51",
+            "categoryTitle": "Vázméret",
+            "orderNumber": 2,
+            "quantityUnit": "cm"
+          },
+          {
+            "id": 533,
+            "propertyCategoryId": 6,
+            "shortTitle": "",
+            "value": "Magas",
+            "categoryTitle": "Váztípus",
+            "orderNumber": 2,
+            "quantityUnit": ""
+          },
+          {
+            "id": 649,
+            "propertyCategoryId": 26,
+            "shortTitle": "",
+            "value": "Trekking ",
+            "categoryTitle": "Felhasználás módja",
+            "orderNumber": 3,
+            "quantityUnit": ""
+          },
+          {
+            "id": 24,
+            "propertyCategoryId": 8,
+            "shortTitle": "",
+            "value": "45",
+            "categoryTitle": "Maximális rásegítés",
+            "orderNumber": 4,
+            "quantityUnit": "km/h"
+          },
+          {
+            "id": 1304,
+            "propertyCategoryId": 16,
+            "shortTitle": "",
+            "value": "Bosch Kiox 500",
+            "categoryTitle": "Kijelző típus",
+            "orderNumber": 6,
+            "quantityUnit": ""
+          },
+          {
+            "id": 666,
+            "propertyCategoryId": 34,
+            "shortTitle": "",
+            "value": "Vázba integrált",
+            "categoryTitle": "Akku elhelyezkedése",
+            "orderNumber": 8,
+            "quantityUnit": ""
+          },
+          {
+            "id": 644,
+            "propertyCategoryId": 35,
+            "shortTitle": "",
+            "value": "27,5",
+            "categoryTitle": "Kerékméret",
+            "orderNumber": 9,
+            "quantityUnit": "\""
+          },
+          {
+            "id": 247,
+            "propertyCategoryId": 12,
+            "shortTitle": "",
+            "value": "Szíj",
+            "categoryTitle": "Erőátvitel",
+            "orderNumber": 10,
+            "quantityUnit": ""
+          },
+          {
+            "id": 690,
+            "propertyCategoryId": 38,
+            "shortTitle": "",
+            "value": "Első teleszkóp, hátsó rugóstag",
+            "categoryTitle": "Rugózás",
+            "orderNumber": 11,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1149,
+            "propertyCategoryId": 13,
+            "shortTitle": "",
+            "value": "Magura ABS",
+            "categoryTitle": "Féktípus",
+            "orderNumber": 12,
+            "quantityUnit": ""
+          },
+          {
+            "id": 664,
+            "propertyCategoryId": 28,
+            "shortTitle": "",
+            "value": "Tárcsa",
+            "categoryTitle": "Fékfajta",
+            "orderNumber": 13,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1057,
+            "propertyCategoryId": 37,
+            "shortTitle": "",
+            "value": "Fokozatmentes",
+            "categoryTitle": "Váltó sebességfokozatainak száma",
+            "orderNumber": 26,
+            "quantityUnit": ""
+          },
+          {
+            "id": 743,
+            "propertyCategoryId": 22,
+            "shortTitle": "",
+            "value": "Enviolo",
+            "categoryTitle": "Váltó",
+            "orderNumber": 27,
+            "quantityUnit": ""
+          },
+          {
+            "id": 561,
+            "propertyCategoryId": 39,
+            "shortTitle": "",
+            "value": "Agyváltó",
+            "categoryTitle": "Váltó típusa",
+            "orderNumber": 28,
+            "quantityUnit": ""
+          },
+          {
+            "id": 563,
+            "propertyCategoryId": 40,
+            "shortTitle": "",
+            "value": "Mechanikus",
+            "categoryTitle": "Váltó működése",
+            "orderNumber": 29,
+            "quantityUnit": ""
+          },
+          {
+            "id": 540,
+            "propertyCategoryId": 31,
+            "shortTitle": "",
+            "value": "Bosch",
+            "categoryTitle": "Motor gyártója",
+            "orderNumber": 40,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1198,
+            "propertyCategoryId": 15,
+            "shortTitle": "",
+            "value": "Bosch Performance Line Speed (Smart System)",
+            "categoryTitle": "Motor típusa",
+            "orderNumber": 42,
+            "quantityUnit": ""
+          },
+          {
+            "id": 889,
+            "propertyCategoryId": 3,
+            "shortTitle": "",
+            "value": "750",
+            "categoryTitle": "Akku kapacitás",
+            "orderNumber": 44,
+            "quantityUnit": "Wh"
+          },
+          {
+            "id": 538,
+            "propertyCategoryId": 30,
+            "shortTitle": "Emelt teherbírás: Bruttó 130kg< ",
+            "value": "Igen",
+            "categoryTitle": "Emelt teherbírás",
+            "orderNumber": 99,
+            "quantityUnit": ""
+          }
+        ],
+        "leasingUrl": "https://ebikeshop.hu/lizingkonstrukcio-cegeknek?termek=rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333",
+        "locations": [
+          "Győr"
+        ],
+        "manufacturerUrl": null,
+        "legalManufacturerName": null,
+        "legalManufacturerAddress": null
+      }
+    }
+  },
+  "jsonLd": "\n                    [{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"name\":\"Főoldal\",\"@id\":\"https://ebikeshop.hu/\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"name\":\"Termékek\",\"@id\":\"https://ebikeshop.hu/termekek\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"name\":\"Elektromos kerékpárok\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok\"}},{\"@type\":\"ListItem\",\"position\":4,\"item\":{\"name\":\"Riese und Müller\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok?gyarto%5B0%5D=riese-und-muller\"}},{\"@type\":\"ListItem\",\"position\":5,\"item\":{\"name\":\"RM Delite4 GT vario HS HE51 cm szürke elektromos kerékpár (750Wh, kiox 500, ABS )\",\"@id\":\"https://ebikeshop.hu/termek/rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333\"}}]},{\"@context\":\"https://schema.org/\",\"@type\":\"Product\",\"name\":\"RM Delite4 GT vario HS HE51 cm szürke elektromos kerékpár (750Wh, kiox 500, ABS )\",\"description\":\"Általános\\r\\nEzen az oldalon megtalálható az összes használati utasítás az általunk forgalmazott kerékpárokhoz.Ha pedig arra vagy kíváncsi hány km-t tudsz megtenni, a Bosch hatótáv kalkulátor lehet a segítségedre.Figyelem! A hatótáv kalkulátor alapvetően Bosch rendszerekhez készült, de egy hasonló nyomatékú motort és egy hasonló kapacitású akkumulátort kiválasztva egy becsült értéket kaphatunk más gyártók rendszereihez is!\",\"image\":\"https://ebikeshop.hu/storage/documents/file/2024-rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-p34e3f36-10822-thumb_640.webp\",\"sku\":\"F01153_04013712091408\",\"brand\":{\"@type\":\"Brand\",\"name\":\"Riese und Müller\"},\"offers\":{\"@type\":\"Offer\",\"url\":\"https://ebikeshop.hu/termek/rm-delite4-gt-vario-hs-he51-cm-24-szurke-elektromos-kerekpar-750wh-kiox-500-abs-14333\",\"priceCurrency\":\"HUF\",\"price\":2999000,\"itemCondition\":\"https://schema.org/NewCondition\",\"availability\":\"https://schema.org/InStock\",\"seller\":\"https://ebikeshop.hu\"}}]\n                ",
+  "storesHtml": "<div class=\"space-y-2\"><h3 class=\"mb-3 text-lg leading-snug font-bold [&amp;:last-child]:mb-0\"><!--[-->Üzletek<!--]--></h3><ul class=\"space-y-2\"><!--[--><li class=\"\"><div class=\"flex flex-wrap items-center gap-4\"><!--[--><a class=\"flex items-center gap-2 text-brand underline underline-offset-2 hover:text-brand-alt\" href=\"https://ebikeshop.hu/uzletek/gyor\">Győr</a><!--]--><div class=\"flex items-center gap-2\"><em class=\"inline-block size-2 rounded-full ring-3 bg-success-saturated ring-success-saturated/50\"></em><span class=\"font-condensed text-xs font-normal uppercase text-success\">Elérhető</span></div></div></li><!--]--></ul></div>"
+}

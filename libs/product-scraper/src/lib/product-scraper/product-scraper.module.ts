@@ -5,6 +5,7 @@ import { ScraperModule } from '@fittkereso-backend/scraper';
 import { ProductScrapeUpdaterService } from './services/product-scrape-updater.service';
 import { ScrapeUrlDeduplicationService } from './services/scrape-url-deduplication.service';
 import { ListProductRefreshService } from './services/list-product-refresh.service';
+import { DetailTaskCapService } from './services/detail-task-cap.service';
 import { ScrapingImportService } from './services/scraping-import.service';
 import { ProductSourceImporterRegistry } from './services/product-source-importer-registry.service';
 import { ProductSourceSimulationService } from './services/product-source-simulation.service';
@@ -49,6 +50,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductScrapeUpdaterService,
     ScrapeUrlDeduplicationService,
     ListProductRefreshService,
+    DetailTaskCapService,
     ScrapingImportService,
     SpecPostProcessService,
     ArukeresoFeedParserService,

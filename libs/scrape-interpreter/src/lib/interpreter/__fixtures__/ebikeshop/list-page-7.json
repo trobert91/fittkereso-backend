@@ -1,0 +1,458 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termekek/elektromos-kerekparok?oldal=7",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "props.products trimmed from 32 to 5 rows; everything else in props dropped except what a list page reads.",
+  "dataPage": {
+    "component": "products/Search",
+    "url": "/termekek/elektromos-kerekparok?oldal=7",
+    "props": {
+      "meta": {
+        "h1Title": "Elektromos kerékpárok"
+      },
+      "products": [
+        {
+          "id": 17546,
+          "productCode": "1250158236",
+          "productName": "KTM MACINA STYLE 820 TR46cm fehér elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/macina-style-820-d-46-white-black-red-1x11-shimano-cues",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2025-ktm-macina-style-820-tr46cm-25-feher-elektromos-kerekpar-p2db5f59-17016-thumb_640.webp",
+            "fileName": "documents/file/2025-ktm-macina-style-820-tr46cm-25-feher-elektromos-kerekpar-p2db5f59-17016.webp",
+            "altText": "KTM MACINA STYLE 820 TR46cm '25 fehér elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 218,
+            "title": "KTM",
+            "url": "https://ebikeshop.hu/ktm",
+            "slug": "ktm",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Bosch Perf. Line CX BDU38",
+              "value": "Bosch Perf. Line CX BDU38",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "800",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1848999.9977,
+            "priceFormatted": "1 849 000 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Gyártói készlet"
+        },
+        {
+          "id": 17449,
+          "productCode": "1250155116",
+          "productName": "KTM MACINA STYLE 830 ABS HE56cm fekete elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/macina-style-830-abs-diamond-blk-mt-grey-orange-1x10-shimano-deore-lg",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2025-ktm-macina-style-830-abs-he56cm-25-fekete-elektromos-kerekpar-p1e85452-17026-thumb_640.webp",
+            "fileName": "documents/file/2025-ktm-macina-style-830-abs-he56cm-25-fekete-elektromos-kerekpar-p1e85452-17026.webp",
+            "altText": "KTM MACINA STYLE 830 ABS HE56cm '25 fekete elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 218,
+            "title": "KTM",
+            "url": "https://ebikeshop.hu/ktm",
+            "slug": "ktm",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Bosch Perf. Line CX BDU38",
+              "value": "Bosch Perf. Line CX BDU38",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "800",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1848999.9977,
+            "priceFormatted": "1 849 000 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Gyártói készlet"
+        },
+        {
+          "id": 18276,
+          "productCode": "1260131120",
+          "productName": "KTM MACINA GRAN 810 HE60cm '26 szürke elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/macina-gran-810-h-60-machine-grey-matt-silver-blk-1x11-shimano-cues",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-gran-810-he56cm-26-szurke-elektromos-kerekpar-pc5359d1-18637-thumb_640.webp",
+            "fileName": "documents/file/2026-ktm-macina-gran-810-he56cm-26-szurke-elektromos-kerekpar-pc5359d1-18637.webp",
+            "altText": "KTM MACINA GRAN 810 HE56cm '26 szürke elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": "2026. szept. 28.",
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 218,
+            "title": "KTM",
+            "url": "https://ebikeshop.hu/ktm",
+            "slug": "ktm",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Bosch Perf. Line CX BDU38",
+              "value": "Bosch Perf. Line CX BDU38",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "800",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1818999.9942,
+            "priceFormatted": "1 819 000 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Gyártói tervezet"
+        },
+        {
+          "id": 14328,
+          "productCode": "F01240_34010424060509",
+          "productName": "RM Tinker2 vario cm fehér elektromos kerékpár (545Wh, Kiox 300 , Zár táskával)",
+          "showPageUrl": "https://ebikeshop.hu/termek/rm-tinker2-vario-cm-24-feher-elektromos-kerekpar-545wh-kiox-300-zar-taskaval",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2024-rm-tinker2-vario-cm-24-feher-elektromos-kerekpar-545wh-kiox-300-zar-taskaval-pb3bda1d-10598-thumb_640.webp",
+            "fileName": "documents/file/2024-rm-tinker2-vario-cm-24-feher-elektromos-kerekpar-545wh-kiox-300-zar-taskaval-pb3bda1d-10598.webp",
+            "altText": "RM Tinker2 vario cm '24 fehér elektromos kerékpár (545Wh, Kiox 300 , Zár táskával)",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 185,
+            "title": "Riese und Müller",
+            "url": "https://ebikeshop.hu/riese-und-muller",
+            "slug": "riese-und-muller",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Perf. Line Smart System",
+              "value": "Bosch Performance Line (Smart System)",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "545",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1818999.9942,
+            "priceFormatted": "1 819 000 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        {
+          "id": 5695,
+          "productCode": "45161247",
+          "productName": "Haibike AllMtn CF 11 i750Wh 47 cm lila-kék elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/haibike-allmtn-cf-11-i750wh-47-cm-22-lila-elektromos-kerekpar-5695",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2022-haibike-allmtn-cf-11-i750wh-47-cm-22-lila-elektromos-kerekpar-p60da3a1-5022-thumb_640.webp",
+            "fileName": "documents/file/2022-haibike-allmtn-cf-11-i750wh-47-cm-22-lila-elektromos-kerekpar-p60da3a1-5022.webp",
+            "altText": "Haibike AllMtn CF 11 i750Wh 47 cm '22 lila elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": true,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 7,
+            "title": "Haibike",
+            "url": "https://ebikeshop.hu/haibike",
+            "slug": "haibike",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "750",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Perf. CX Smart System",
+              "value": "Bosch performance Line CX (Smart System)",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1999000.0025,
+            "priceFormatted": "1 999 000 Ft",
+            "priceSale": 1799000,
+            "priceSaleFormatted": "1 799 000 Ft",
+            "lowestPrice": 1999000.0025,
+            "lowestPriceFormatted": "1 999 000 Ft",
+            "sale": true,
+            "salePercent": 10,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": "2026. ápr. 28."
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Készleten"
+        }
+      ],
+      "total": 603,
+      "currentPage": 7,
+      "lastPage": 19,
+      "perPage": 32,
+      "sortOrder": {
+        "orderParamName": "rendezes",
+        "pageParamName": "oldal",
+        "items": [
+          {
+            "title": "Olcsóbbak",
+            "urlParamName": "ar_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 0
+          },
+          {
+            "title": "Drágábbak",
+            "urlParamName": "ar_szerint_csokkeno",
+            "selected": true,
+            "isDefault": true,
+            "orderNumber": 1
+          },
+          {
+            "title": "Név szerint",
+            "urlParamName": "nev_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 2
+          }
+        ]
+      }
+    }
+  }
+}

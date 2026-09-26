@@ -1,0 +1,414 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "KTM '26, three frame sizes with a GTIN on this size only; manufacturer stock (JSON-LD PreOrder); not on sale; the stores list holds only 'Gyártói készlet'.",
+  "dataPage": {
+    "component": "products/Show",
+    "url": "/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+    "props": {
+      "product": {
+        "id": 18097,
+        "name": "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár",
+        "productCode": "1260040108",
+        "longDesc": "<h3 class=\"product-desc-block-title\">A gyártóról:</h3>\r\n<p class=\"product-desc-block-content\">A nagymúltú cég, mely nem csak a motorjai miatt híres. 1964 óta szolgálják ki a kerékpárok szerelmeseit, vágyjanak bárhová. Komfortos kerékpárutak, felfedezésre váró városok vagy meredek hegyek, a <a href=\"https://www.ktm-bikes.at/\" target=\"_blank\" rel=\"noopener\">KTM</a>-nek biztos hogy lesz egy bringája a számunkra.</p>\r\n<h3 class=\"product-desc-block-title\">A kerékpár felhasználási módja:</h3>\r\n<p class=\"product-desc-block-content\"><b>Masszív felépítés, és vastag, 27,5” és 29″-es kerekek jellemzik az mtb-ket, melyek alkalmassá teszik a terepen való biciklizésre</b>, viszont hosszú távú országúti közlekedésre ezek a kerékpárok nem optimálisak. Csomagtartó, kitámasztó nincs rajtuk, ezeknek az utólagos felszerelése nem minden esetben megoldható.</p>\r\n<h3 class=\"product-desc-block-title\">A motorról:</h3>\r\n<p class=\"product-desc-block-content\">A <b>Performance Line SX</b> a Bosch legújabb generációja. Ezt a motor két kulcsszó jellemzi: sportosság és könnyűség. 55 Nm-es nyomatékkal rendelkezik, melyet nagy pedálfordulat mellett képes leadni, tehát ennél a motornál szükség lesz az emberi erőre is. A mindössze két kilogrammos súlyának köszönhetően a Performance Line SX motorral szerelt kerékpárok lényegesen könnyebbek lehetnek, mint az átlagos elektromos kerékpárok.</p>\r\n<h3 class=\"product-desc-block-title\">Általános</h3>\r\n<p class=\"product-desc-block-content\"><br />Ezen az oldalon <a href=\"https://ebikeshop.hu/hasznalati-utasitasok\" target=\"_blank\" rel=\"noopener\">megtalálható az összes használati utasítás</a> az általunk forgalmazott kerékpárokhoz.<br /><br />Ha pedig arra vagy kíváncsi hány km-t tudsz megtenni, a <a href=\"https://ebikeshop.hu/bosch-hatotav-kalkulator\" target=\"_blank\" rel=\"noopener\">Bosch hatótáv kalkulátor</a> lehet a segítségedre.<br /><br /><b>Figyelem!</b> A hatótáv kalkulátor alapvetően Bosch rendszerekhez készült, de egy hasonló nyomatékú motort és egy hasonló kapacitású akkumulátort kiválasztva egy becsült értéket kaphatunk más gyártók rendszereihez is!</p>",
+        "ogTitle": null,
+        "ogDescription": null,
+        "metaTitle": "KTM Macina Scarp SX Exonic e-bike",
+        "metaDescription": null,
+        "gtin": "9008594503199",
+        "special1": null,
+        "special2": null,
+        "special3": null,
+        "special4": null,
+        "shortTitle": null,
+        "shortDesc": "",
+        "h1Title": null,
+        "prices": {
+          "price": 3879000.0017,
+          "priceFormatted": "3 879 000 Ft",
+          "priceSale": 0,
+          "priceSaleFormatted": "",
+          "lowestPrice": 0,
+          "lowestPriceFormatted": "",
+          "sale": false,
+          "salePercent": 0,
+          "vat": 27,
+          "lowestPriceDateInterval": 30,
+          "distinctVatProduct": false,
+          "currentSaleStartDateFormatted": null
+        },
+        "images": [
+          {
+            "images": [
+              {
+                "code": "thumb_640",
+                "url": "https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-scarp-sx-exonicx-t-type-48cm-26-narancs-elektromos-kerekpar-pe9b59e7-18790-thumb_640.webp",
+                "altText": "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár"
+              },
+              {
+                "code": "thumb_1280",
+                "url": "https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-scarp-sx-exonicx-t-type-48cm-26-narancs-elektromos-kerekpar-pe9b59e7-18790-thumb_1280.webp",
+                "altText": "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár"
+              },
+              {
+                "code": "original",
+                "url": "https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-scarp-sx-exonicx-t-type-48cm-26-narancs-elektromos-kerekpar-pe9b59e7-18790.webp",
+                "altText": "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár"
+              }
+            ],
+            "type": "gallery",
+            "image360Url": null
+          }
+        ],
+        "category": {
+          "id": 12,
+          "name": "Elektromos kerékpárok",
+          "slug": "elektromos-kerekparok",
+          "orderNum": 0,
+          "parentId": null
+        },
+        "promotion": null,
+        "addToCartButtonEnabled": true,
+        "isBike": true,
+        "isUsed": false,
+        "isRentable": false,
+        "manufacturer": {
+          "id": 218,
+          "title": "KTM",
+          "url": "https://ebikeshop.hu/ktm",
+          "slug": "ktm",
+          "categorySlug": "gyarto"
+        },
+        "inCompareList": false,
+        "inWishlist": false,
+        "highlightedProperties": [
+          {
+            "title": "Maximális rásegítés",
+            "shortTitle": "",
+            "value": "25",
+            "orderNumber": 0,
+            "quantityUnit": "km/h",
+            "iconName": "#ebk-icon-speedometer"
+          },
+          {
+            "title": "Akku kapacitás",
+            "shortTitle": "",
+            "value": "400",
+            "orderNumber": 0,
+            "quantityUnit": "Wh",
+            "iconName": "#ebk-icon-battery"
+          },
+          {
+            "title": "Motor gyártója",
+            "shortTitle": "",
+            "value": "Bosch",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-settings"
+          },
+          {
+            "title": "Motor típusa",
+            "shortTitle": "Bosch Sx (Smart System)",
+            "value": "Bosch Performance SX (Smart System)",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-accessory"
+          }
+        ],
+        "vat": 27,
+        "variations": [
+          {
+            "label": "Vázméret",
+            "type": "frame_size",
+            "items": [
+              {
+                "label": "43 cm",
+                "value": "43",
+                "selected": false,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-scarp-sx-exonicx-t-type-43cm-26-narancs-elektromos-kerekpar-18986",
+                "gtin": "",
+                "productCode": "1260040103"
+              },
+              {
+                "label": "48 cm",
+                "value": "48",
+                "selected": true,
+                "productUrl": "https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+                "gtin": "9008594503199",
+                "productCode": "1260040108"
+              },
+              {
+                "label": "53 cm",
+                "value": "53",
+                "selected": false,
+                "productUrl": "https://ebikeshop.hu/termek/ktm-macina-scarp-sx-exonicx-t-type-53cm-26-narancs-elektromos-kerekpar-18987",
+                "gtin": "",
+                "productCode": "1260040113"
+              }
+            ]
+          },
+          {
+            "label": "Váz típus",
+            "type": "frame_shape",
+            "items": [
+              {
+                "label": "Összteleszkópos",
+                "value": "Összteleszkópos",
+                "selected": true,
+                "productUrl": "https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+                "gtin": "9008594503199",
+                "productCode": "1260040108"
+              }
+            ]
+          }
+        ],
+        "smartFitOnlineSizing": {
+          "name": "KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár",
+          "code": "1260040108",
+          "price": 3879000.0017,
+          "image": "https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-scarp-sx-exonicx-t-type-48cm-26-narancs-elektromos-kerekpar-pe9b59e7-18790-thumb_640.webp"
+        },
+        "documents": [],
+        "youtubeVideos": [],
+        "catalog": null,
+        "rentableData": null,
+        "resellerData": null,
+        "showUrl": "https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+        "stocks": [
+          {
+            "stockType": "manufacturer_planning",
+            "shopId": null,
+            "title": "Gyártói készlet",
+            "productCode": "1260040108",
+            "preorder": 2,
+            "qty": 18,
+            "slug": null,
+            "shopFullUrl": null,
+            "preorderFormFullUrl": "https://ebikeshop.hu/elorendeles/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+            "arrivalDate": null,
+            "preorderTypeTitle": "Gyártói készlet",
+            "expired": false,
+            "isVirtualWarehouse": false
+          }
+        ],
+        "properties": [
+          {
+            "id": 869,
+            "propertyCategoryId": 41,
+            "shortTitle": "",
+            "value": "Új",
+            "categoryTitle": "Állapot",
+            "orderNumber": 0,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1492,
+            "propertyCategoryId": 66,
+            "shortTitle": "Nyomaték",
+            "value": "60",
+            "categoryTitle": "Nyomaték",
+            "orderNumber": 0,
+            "quantityUnit": "Nm"
+          },
+          {
+            "id": 218,
+            "propertyCategoryId": 4,
+            "shortTitle": "",
+            "value": "KTM",
+            "categoryTitle": "Gyártó",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1531,
+            "propertyCategoryId": 1,
+            "shortTitle": "",
+            "value": "26",
+            "categoryTitle": "Modellév",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 213,
+            "propertyCategoryId": 7,
+            "shortTitle": "",
+            "value": "48",
+            "categoryTitle": "Vázméret",
+            "orderNumber": 2,
+            "quantityUnit": "cm"
+          },
+          {
+            "id": 531,
+            "propertyCategoryId": 6,
+            "shortTitle": "",
+            "value": "Összteleszkópos",
+            "categoryTitle": "Váztípus",
+            "orderNumber": 2,
+            "quantityUnit": ""
+          },
+          {
+            "id": 812,
+            "propertyCategoryId": 26,
+            "shortTitle": "",
+            "value": "MTB",
+            "categoryTitle": "Felhasználás módja",
+            "orderNumber": 3,
+            "quantityUnit": ""
+          },
+          {
+            "id": 23,
+            "propertyCategoryId": 8,
+            "shortTitle": "",
+            "value": "25",
+            "categoryTitle": "Maximális rásegítés",
+            "orderNumber": 4,
+            "quantityUnit": "km/h"
+          },
+          {
+            "id": 1306,
+            "propertyCategoryId": 16,
+            "shortTitle": "",
+            "value": "Bosch Mini Remote",
+            "categoryTitle": "Kijelző típus",
+            "orderNumber": 6,
+            "quantityUnit": ""
+          },
+          {
+            "id": 666,
+            "propertyCategoryId": 34,
+            "shortTitle": "",
+            "value": "Vázba integrált",
+            "categoryTitle": "Akku elhelyezkedése",
+            "orderNumber": 8,
+            "quantityUnit": ""
+          },
+          {
+            "id": 716,
+            "propertyCategoryId": 35,
+            "shortTitle": "",
+            "value": "29",
+            "categoryTitle": "Kerékméret",
+            "orderNumber": 9,
+            "quantityUnit": "\""
+          },
+          {
+            "id": 175,
+            "propertyCategoryId": 12,
+            "shortTitle": "",
+            "value": "Lánc",
+            "categoryTitle": "Erőátvitel",
+            "orderNumber": 10,
+            "quantityUnit": ""
+          },
+          {
+            "id": 690,
+            "propertyCategoryId": 38,
+            "shortTitle": "",
+            "value": "Első teleszkóp, hátsó rugóstag",
+            "categoryTitle": "Rugózás",
+            "orderNumber": 11,
+            "quantityUnit": ""
+          },
+          {
+            "id": 801,
+            "propertyCategoryId": 13,
+            "shortTitle": "",
+            "value": "Shimano XTR",
+            "categoryTitle": "Féktípus",
+            "orderNumber": 12,
+            "quantityUnit": ""
+          },
+          {
+            "id": 664,
+            "propertyCategoryId": 28,
+            "shortTitle": "",
+            "value": "Tárcsa",
+            "categoryTitle": "Fékfajta",
+            "orderNumber": 13,
+            "quantityUnit": ""
+          },
+          {
+            "id": 770,
+            "propertyCategoryId": 37,
+            "shortTitle": "",
+            "value": "12",
+            "categoryTitle": "Váltó sebességfokozatainak száma",
+            "orderNumber": 26,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1293,
+            "propertyCategoryId": 22,
+            "shortTitle": "",
+            "value": "Sram XX Eagle",
+            "categoryTitle": "Váltó",
+            "orderNumber": 27,
+            "quantityUnit": ""
+          },
+          {
+            "id": 560,
+            "propertyCategoryId": 39,
+            "shortTitle": "",
+            "value": "Láncváltó",
+            "categoryTitle": "Váltó típusa",
+            "orderNumber": 28,
+            "quantityUnit": ""
+          },
+          {
+            "id": 562,
+            "propertyCategoryId": 40,
+            "shortTitle": "",
+            "value": "Elektromos",
+            "categoryTitle": "Váltó működése",
+            "orderNumber": 29,
+            "quantityUnit": ""
+          },
+          {
+            "id": 540,
+            "propertyCategoryId": 31,
+            "shortTitle": "",
+            "value": "Bosch",
+            "categoryTitle": "Motor gyártója",
+            "orderNumber": 40,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1302,
+            "propertyCategoryId": 15,
+            "shortTitle": "",
+            "value": "Bosch Performance SX (Smart System)",
+            "categoryTitle": "Motor típusa",
+            "orderNumber": 42,
+            "quantityUnit": ""
+          },
+          {
+            "id": 172,
+            "propertyCategoryId": 3,
+            "shortTitle": "",
+            "value": "400",
+            "categoryTitle": "Akku kapacitás",
+            "orderNumber": 44,
+            "quantityUnit": "Wh"
+          },
+          {
+            "id": 539,
+            "propertyCategoryId": 30,
+            "shortTitle": "Emelt teherbírás: Bruttó 130kg< ",
+            "value": "Nem",
+            "categoryTitle": "Emelt teherbírás",
+            "orderNumber": 99,
+            "quantityUnit": ""
+          }
+        ],
+        "leasingUrl": "https://ebikeshop.hu/lizingkonstrukcio-cegeknek?termek=macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097",
+        "locations": [],
+        "manufacturerUrl": null,
+        "legalManufacturerName": "KTM Fahrrad GmbH",
+        "legalManufacturerAddress": "Harlochnerstr. 13, 5230 Mattighofen, AUSTRIA"
+      }
+    }
+  },
+  "jsonLd": "\n                    [{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"name\":\"Főoldal\",\"@id\":\"https://ebikeshop.hu/\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"name\":\"Termékek\",\"@id\":\"https://ebikeshop.hu/termekek\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"name\":\"Elektromos kerékpárok\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok\"}},{\"@type\":\"ListItem\",\"position\":4,\"item\":{\"name\":\"KTM\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok?gyarto%5B0%5D=ktm\"}},{\"@type\":\"ListItem\",\"position\":5,\"item\":{\"name\":\"KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár\",\"@id\":\"https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097\"}}]},{\"@context\":\"https://schema.org/\",\"@type\":\"Product\",\"name\":\"KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs elektromos kerékpár\",\"description\":\"A gyártóról:\\r\\nA nagymúltú cég, mely nem csak a motorjai miatt híres. 1964 óta szolgálják ki a kerékpárok szerelmeseit, vágyjanak bárhová. Komfortos kerékpárutak, felfedezésre váró városok vagy meredek hegyek, a KTM-nek biztos hogy lesz egy bringája a számunkra.\\r\\nA kerékpár felhasználási módja:\\r\\nMasszív felépítés, és vastag, 27,5” és 29″-es kerekek jellemzik az mtb-ket, melyek alkalmassá teszik a terepen való biciklizésre, viszont hosszú távú országúti közleked\",\"image\":\"https://ebikeshop.hu/storage/documents/file/2026-ktm-macina-scarp-sx-exonicx-t-type-48cm-26-narancs-elektromos-kerekpar-pe9b59e7-18790-thumb_640.webp\",\"sku\":\"1260040108\",\"brand\":{\"@type\":\"Brand\",\"name\":\"KTM\"},\"offers\":{\"@type\":\"Offer\",\"url\":\"https://ebikeshop.hu/termek/macina-scarp-sx-exonic-fresh-orange-dark-chrome-1x12a-srama-xxa-transmission-18097\",\"priceCurrency\":\"HUF\",\"price\":3879000,\"itemCondition\":\"https://schema.org/NewCondition\",\"availability\":\"https://schema.org/PreOrder\",\"seller\":\"https://ebikeshop.hu\"}}]\n                ",
+  "storesHtml": "<div class=\"space-y-2\"><h3 class=\"mb-3 text-lg leading-snug font-bold [&amp;:last-child]:mb-0\"><!--[-->Üzletek<!--]--></h3><ul class=\"space-y-2\"><!--[--><li class=\"\"><div class=\"flex flex-wrap items-center gap-4\"><!--[--><span>Gyártói készlet</span><!--]--><div class=\"flex items-center gap-2\"><em class=\"inline-block size-2 rounded-full ring-3 bg-success-saturated ring-success-saturated/50\"></em><span class=\"font-condensed text-xs font-normal uppercase text-success\">Elérhető</span></div></div></li><!--]--></ul></div>"
+}

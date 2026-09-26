@@ -69,6 +69,7 @@ export const SCRAPE_OPERATION_NAMES = [
   'parseJsonAttr',
   'prependPrefix',
   'regexCapture',
+  'round',
   'selectAll',
   'selectAttr',
   'selectFirst',
@@ -272,6 +273,11 @@ const OP_PARAMS: Record<
       prefix: str('Prefix to prepend. Supports {{var}} interpolation.'),
     },
     required: ['prefix'],
+  },
+  round: {
+    description:
+      'Round a number, or a numeric string, to `decimals` places (default 0) — e.g. a shop price with float noise, 3898999.9998, to the 3899000 it displays. Anything else resolves to undefined, so a missing price never becomes 0.',
+    properties: { decimals: int('Decimal places to keep; default 0.') },
   },
   stripPattern: {
     description: 'Remove every match of a regular expression.',

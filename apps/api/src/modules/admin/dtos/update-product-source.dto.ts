@@ -67,6 +67,11 @@ export class UpdateProductSourceDto {
   @IsString()
   frequency?: string | null;
 
+  // Required on the entity, so it can be changed but never cleared.
+  @IsOptional()
+  @IsString()
+  detailRefreshInterval?: string;
+
   // Scheduler inputs, not audit fields: ProductSourceSyncScheduler treats a
   // null/past value as "due now", so clearing it forces the next cron tick to
   // queue a sync. The last*/lastRunAt timestamps stay read-only.

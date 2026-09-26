@@ -242,6 +242,27 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
       .getMany();
   }
 
+  /**
+   * How many tasks of these kinds a source has had created since `since`,
+   * whatever became of them since. A run-wide cap counts its run with it.
+   */
+  async countCreatedSince(params: {
+    sourceId: string;
+    kinds: ProductImportTaskKind[];
+    since: Date;
+  }): Promise<number> {
+    const t = (field: keyof ProductImportTask) =>
+      `task.${nameOf<ProductImportTask>(field)}`;
+    return this.repo
+      .createQueryBuilder('task')
+      .where(`task."${nameOf<ProductImportTask>('source')}Id" = :sourceId`, {
+        sourceId: params.sourceId,
+      })
+      .andWhere(`${t('kind')} IN (:...kinds)`, { kinds: params.kinds })
+      .andWhere(`${t('createdAt')} >= :since`, { since: params.since })
+      .getCount();
+  }
+
   /** A task's payload, which is not selected by default. */
   async loadPayload(id: string): Promise<Record<string, any> | null> {
     const task = await this.repo

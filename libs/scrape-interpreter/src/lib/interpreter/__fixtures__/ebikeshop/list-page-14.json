@@ -1,0 +1,294 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termekek/elektromos-kerekparok?oldal=14",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "props.products trimmed from 32 to 3 rows; everything else in props dropped except what a list page reads.",
+  "dataPage": {
+    "component": "products/Search",
+    "url": "/termekek/elektromos-kerekparok?oldal=14",
+    "props": {
+      "meta": {
+        "h1Title": "Elektromos kerékpárok"
+      },
+      "products": [
+        {
+          "id": 18219,
+          "productCode": "1260240117",
+          "productName": "KTM MACINA URBANATOR SX 57cm '26 olíva elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/macina-urbanator-sx-l-57-olive-pearl-matt-black-amber-1x9-shimano-cues-18219-18219",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/kepernyokep-2026-09-07-140646-a6xz0s-thumb_640.webp",
+            "fileName": "documents/file/kepernyokep-2026-09-07-140646-a6xz0s.webp",
+            "altText": "Képernyőkép 2026-09-07 140646",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 218,
+            "title": "KTM",
+            "url": "https://ebikeshop.hu/ktm",
+            "slug": "ktm",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "400",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Bosch Sx (Smart System)",
+              "value": "Bosch Performance SX (Smart System)",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1423999.9968,
+            "priceFormatted": "1 424 000 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        {
+          "id": 5096,
+          "productCode": "93AS1002",
+          "productName": "Ghost E-ASX 160 Essential 625Wh 43 cm szürke-kék elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/ghost-e-asx-160-essential-625wh-43-cm-22-kek-elektromos-kerekpar",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2022-ghost-e-asx-160-essential-625wh-47-cm-22-kek-elektromos-kerekpar-p3809369-2190-thumb_640.webp",
+            "fileName": "documents/file/2022-ghost-e-asx-160-essential-625wh-47-cm-22-kek-elektromos-kerekpar-p3809369-2190.webp",
+            "altText": "Ghost E-ASX 160 Essential 625Wh 47 cm '22 kék elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": true,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 6,
+            "title": "Ghost",
+            "url": "https://ebikeshop.hu/ghost",
+            "slug": "ghost",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "625",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Perf. CX",
+              "value": "Bosch Performance Line CX",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1549000.0008,
+            "priceFormatted": "1 549 000 Ft",
+            "priceSale": 1399000,
+            "priceSaleFormatted": "1 399 000 Ft",
+            "lowestPrice": 1549000.0008,
+            "lowestPriceFormatted": "1 549 000 Ft",
+            "sale": true,
+            "salePercent": 9,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": "2026. ápr. 28."
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        {
+          "id": 19187,
+          "productCode": "MY26_114500-46E",
+          "productName": "CUBE Supreme Hybrid deluxe Pro 600 US46cm '26 szürke elektromos kerékpár",
+          "showPageUrl": "https://ebikeshop.hu/termek/cube-supreme-hybrid-deluxe-one-600-us46cm-26-szurke-elektromos-kerekpar-19187d154-19187",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/2026-cube-supreme-hybrid-deluxe-one-600-us46cm-26-szurke-elektromos-kerekpar-pac4ea64-18358-thumb_640.webp",
+            "fileName": "documents/file/2026-cube-supreme-hybrid-deluxe-one-600-us46cm-26-szurke-elektromos-kerekpar-pac4ea64-18358.webp",
+            "altText": "CUBE Supreme Hybrid deluxe ONE 600 US46cm '26 szürke elektromos kerékpár",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": "2026. szept. 26.",
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 1432,
+            "title": "CUBE",
+            "url": "https://ebikeshop.hu/cube",
+            "slug": "cube",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [
+            {
+              "title": "Maximális rásegítés",
+              "shortTitle": "",
+              "value": "25",
+              "orderNumber": 0,
+              "quantityUnit": "km/h",
+              "iconName": "#ebk-icon-speedometer"
+            },
+            {
+              "title": "Akku kapacitás",
+              "shortTitle": "",
+              "value": "600",
+              "orderNumber": 0,
+              "quantityUnit": "Wh",
+              "iconName": "#ebk-icon-battery"
+            },
+            {
+              "title": "Motor gyártója",
+              "shortTitle": "",
+              "value": "Bosch",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-settings"
+            },
+            {
+              "title": "Motor típusa",
+              "shortTitle": "Perf. Line Smart System",
+              "value": "Bosch Performance Line (Smart System)",
+              "orderNumber": 0,
+              "quantityUnit": "",
+              "iconName": "#ebk-icon-accessory"
+            }
+          ],
+          "vat": 27,
+          "prices": {
+            "price": 1379990.001,
+            "priceFormatted": "1 379 990 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 12,
+            "name": "Elektromos kerékpárok",
+            "slug": "elektromos-kerekparok",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Várható gyártás"
+        }
+      ],
+      "total": 603,
+      "currentPage": 14,
+      "lastPage": 19,
+      "perPage": 32,
+      "sortOrder": {
+        "orderParamName": "rendezes",
+        "pageParamName": "oldal",
+        "items": [
+          {
+            "title": "Olcsóbbak",
+            "urlParamName": "ar_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 0
+          },
+          {
+            "title": "Drágábbak",
+            "urlParamName": "ar_szerint_csokkeno",
+            "selected": true,
+            "isDefault": true,
+            "orderNumber": 1
+          },
+          {
+            "title": "Név szerint",
+            "urlParamName": "nev_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 2
+          }
+        ]
+      }
+    }
+  }
+}

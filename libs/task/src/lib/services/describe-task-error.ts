@@ -1,4 +1,19 @@
-import { isProductSourceConfigInvalidError } from '@fittkereso-backend/database';
+import {
+  isListingExternalIdMismatchError,
+  isProductSourceConfigInvalidError,
+} from '@fittkereso-backend/database';
+
+/**
+ * Whether retrying cannot change this failure, so the task is parked at once
+ * (`terminal`) rather than repeated on a backoff for the same answer:
+ *
+ * - an invalid source config: a retry reads the same config;
+ * - a page showing another product than the one stored under its URL: a
+ *   retry fetches the same page.
+ */
+export function isTerminalTaskError(error: unknown): boolean {
+  return isProductSourceConfigInvalidError(error) || isListingExternalIdMismatchError(error);
+}
 
 /**
  * What goes into a failed task's `error` jsonb column.
@@ -13,10 +28,11 @@ import { isProductSourceConfigInvalidError } from '@fittkereso-backend/database'
  *
  * A structured failure keeps its structure: a config-invalid error carries the
  * source it belongs to and every bad path, so the task row says what to fix
- * rather than pointing at the guard that threw.
+ * rather than pointing at the guard that threw. An externalId mismatch carries
+ * the URL and both ids.
  */
 export function describeTaskError(error: unknown): Record<string, unknown> {
-  if (isProductSourceConfigInvalidError(error)) {
+  if (isProductSourceConfigInvalidError(error) || isListingExternalIdMismatchError(error)) {
     return { ...error.detail };
   }
 

@@ -4,7 +4,7 @@ import type {
   ProductImportTask,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
-import { asScrapingConfig } from '@fittkereso-backend/database';
+import { ListingExternalIdMismatchError, asScrapingConfig } from '@fittkereso-backend/database';
 
 describe('ProductDetailsPageScraperService.extractProduct', () => {
   let service: ProductDetailsPageScraperService;
@@ -12,6 +12,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
   let runtime: { getCategoryBySlug: jest.Mock };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
   let specExtraction: { extractSpecs: jest.Mock };
+  let scrapingMetrics: { recordExtractionSkipReason: jest.Mock };
 
   const category = { id: 'cat-1', slug: 'ebikes', name: 'Ebikes' } as ProductCategory;
   const jsonSchema: SpecDefinitionJsonSchema = {
@@ -63,6 +64,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       getConfig: jest.fn().mockReturnValue({ offerLevelSpecs: ['frameSize'] }),
     };
     specExtraction = { extractSpecs: jest.fn().mockReturnValue({}) };
+    scrapingMetrics = { recordExtractionSkipReason: jest.fn() };
 
     // No LLM service and no record repository among the dependencies: this
     // importer cannot spend a call or decide to skip one. The updater does
@@ -70,7 +72,7 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     service = new ProductDetailsPageScraperService(
       {} as any, // scraperService
       {} as any, // productUpdaterService
-      { recordExtractionSkipReason: jest.fn() } as any, // scrapingMetrics
+      scrapingMetrics as any,
       interpreter as any,
       runtime as any,
       categoryConfigService as any,
@@ -192,6 +194,71 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       expect(result.scrapedProduct.offers).toEqual([
         expect.objectContaining({ gtin: '9008594503199', mpn: '1260040108' }),
       ]);
+    });
+  });
+
+  // A detail task queued from a list card carries the card's externalId, and
+  // the page must state it. ebikeshop never 404s a product URL: a delisted one
+  // redirects to some other product, and the fetch follows the redirect.
+  describe('the externalId of the list card that queued the task', () => {
+    const taskFromCard = (externalId: string | null) => ({ ...buildTask(), externalId }) as ProductImportTask;
+
+    it('fails the task when the page shows another product, before anything is extracted', async () => {
+      const failure = callExtractProduct(taskFromCard('1250158236'));
+
+      await expect(failure).rejects.toBeInstanceOf(ListingExternalIdMismatchError);
+      await expect(failure).rejects.toMatchObject({
+        detail: {
+          kind: 'listing_external_id_mismatch',
+          sourceId: 'source-1',
+          url: 'https://speedbike.hu/product/1',
+          expectedExternalId: '1250158236',
+          pageExternalIds: ['sku-1'],
+        },
+      });
+      expect(scrapingMetrics.recordExtractionSkipReason).toHaveBeenCalledWith(
+        'speedbike',
+        'external_id_mismatch',
+      );
+      expect(runtime.getCategoryBySlug).not.toHaveBeenCalled();
+      expect(specExtraction.extractSpecs).not.toHaveBeenCalled();
+    });
+
+    it('imports the page when it states the same one', async () => {
+      const result = await callExtractProduct(taskFromCard('sku-1'));
+
+      expect(result.scrapedProduct.externalId).toBe('sku-1');
+    });
+
+    // A card may carry a size's id where the page's own is its product's.
+    it("accepts it as one of the page's offers' ids", async () => {
+      interpreter.runDetailPage.mockResolvedValueOnce({
+        ...detail,
+        externalId: 'group-1',
+        rawOffers: [{ price: 1, externalId: 'size-M' }, { price: 1, externalId: 'size-L' }],
+      });
+
+      await expect(callExtractProduct(taskFromCard('size-L'))).resolves.toBeTruthy();
+    });
+
+    // A page's JSON may hold the code as a number.
+    it('compares the ids as text', async () => {
+      interpreter.runDetailPage.mockResolvedValueOnce({ ...detail, externalId: 1260040108 });
+
+      await expect(callExtractProduct(taskFromCard(' 1260040108 '))).resolves.toBeTruthy();
+    });
+
+    // A block page states no id either, and a retry may get past it; the
+    // category check after this one fails it, as before.
+    it('leaves a page stating no id to the later checks', async () => {
+      interpreter.runDetailPage.mockResolvedValueOnce({ ...detail, externalId: undefined });
+
+      await expect(callExtractProduct(taskFromCard('1250158236'))).resolves.toBeTruthy();
+      expect(scrapingMetrics.recordExtractionSkipReason).not.toHaveBeenCalled();
+    });
+
+    it('checks nothing on a task no card queued', async () => {
+      await expect(callExtractProduct(taskFromCard(null))).resolves.toBeTruthy();
     });
   });
 });

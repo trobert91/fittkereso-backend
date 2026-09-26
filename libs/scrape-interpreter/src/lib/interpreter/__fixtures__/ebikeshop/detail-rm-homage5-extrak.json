@@ -1,0 +1,371 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "R&M with an '(Extrák: …)' name suffix, on sale, in stock in one store, no variations, no GTIN.",
+  "dataPage": {
+    "component": "products/Show",
+    "url": "/termek/rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428",
+    "props": {
+      "product": {
+        "id": 15428,
+        "name": "RM Homage5 GT rohloff US56 cm kék elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)",
+        "productCode": "F01526_05023211170916141806",
+        "longDesc": "<h3 class=\"product-desc-block-title\">A gyártóról:</h3>\r\n<p class=\"product-desc-block-content\">Történetünk 1993-ban kezdődik Heiko Müller szüleinek garázsában. Markus Riese és Heiko Müller kerékpárok iránti szeretete hozta létre a mára gigászi méretű márkát. A mai napig erős barátságot alkotó páros eleinte egy összecsukható kerékpárt hozott létre, amit Birdy névre kereszteltek. Mára a <a href=\"https://www.r-m.de/en-us/\" target=\"_blank\" rel=\"noopener\">Riese&Müller</a> a <b>piacvezető márkák egyikévé vált</b> az elektromos és cargo kerékpárok terén. Az elektromos kerékpárok gyártásába 2013-ban vágtak bele. Legfőbb feladatuknak a folyamatos fejlődést és egy jobb kerékpáros jövő megteremtését tűzték ki.</p>\r\n<h3 class=\"product-desc-block-title\">A kerékpár felhasználási módja:</h3>\r\n<p class=\"product-desc-block-content\">Ezt a kerékpárt első sorban túrázásra, vagy mindennapi használatra ajánljuk . <b>A geometriának köszönhetően komfortosan, hosszú távokat tudunk letekerni hátfájás nélkül. </b> Felszereltsége miatt bármilyen napszakban és időjárásban megállja a helyét, így csak rajtunk múlik, hogy mikor pattanunk nyeregbe.</p>\r\n<h3 class=\"product-desc-block-title\">A motorról:</h3>\r\n<p class=\"product-desc-block-content\">A <a href=\"https://www.bosch-ebike.com/en/\" target=\"_blank\" rel=\"noopener\">Bosch</a> legmasszívabb hajtásrendszere már <b>Smart Systemmel.</b> Könnyű és kompakt kialakítású, a pedál ellenállását szinte érezni sem fogjuk. A CX erőteljes gyorsulást biztosít és késedelem nélkül reagál. Az <b>akár 340%-ot is elérő rásegítés</b> maximalizálja a hegyi kerékpározás élményét.</p>\r\n<h3 class=\"product-desc-block-title\">A kijelzőről:</h3>\r\n<p class=\"product-desc-block-content\">A <b>Bosch Purion 200</b> a Smart Systemes kijelzők új generációja. Méretét tekintve nem sokkal nagyobb mint a korábbról ismert Led remote, de köszönhetően az 1,6 hüvelykes TFT kijelzőnek több adatot tud megjeleníteni és precízebben, mint azt elődje tette. Egy teljes értékű kijelző ami rendkívül kompakt méretének köszönhetően nehezen sérül, de mindent tud amire szükségünk lehet. Ha mégis több információra lenne szükségünk, a Smrtphone Grip segítségével a telefonunk is használható mint kijelző, ráadásul a Purion 200-al egyidejűleg.</p>\r\n<h3 class=\"product-desc-block-title\">Általános információk</h3>\r\n<p class=\"product-desc-block-content\"><br />Ezen az oldalon <a href=\"https://ebikeshop.hu/hasznalati-utasitasok\" target=\"_blank\" rel=\"noopener\">megtalálható az összes használati utasítás</a> az általunk forgalmazott kerékpárokhoz.<br /><br />Ha pedig arra vagy kíváncsi hány km-t tudsz megtenni, a <a href=\"https://ebikeshop.hu/bosch-hatotav-kalkulator\" target=\"_blank\" rel=\"noopener\">Bosch hatótáv kalkulátor</a> lehet a segítségedre.<br /><br /><b>Figyelem!</b> A hatótáv kalkulátor alapvetően Bosch rendszerekhez készült, de egy hasonló nyomatékú motort és egy hasonló kapacitású akkumulátort kiválasztva egy becsült értéket kaphatunk más gyártók rendszereihez is!</p>",
+        "ogTitle": null,
+        "ogDescription": null,
+        "metaTitle": "R&M Homage5 GT Rohloff HS 56 cm 800 Wh e-bike",
+        "metaDescription": "Riese & Müller Homage5 GT Rohloff HS elektromos kerékpár 800Wh akkumulátorral és prémium komfort felszereltséggel.",
+        "gtin": "",
+        "special1": null,
+        "special2": null,
+        "special3": null,
+        "special4": null,
+        "shortTitle": null,
+        "shortDesc": "",
+        "h1Title": null,
+        "prices": {
+          "price": 4099000.0062,
+          "priceFormatted": "4 099 000 Ft",
+          "priceSale": 3699000,
+          "priceSaleFormatted": "3 699 000 Ft",
+          "lowestPrice": 4099000.0062,
+          "lowestPriceFormatted": "4 099 000 Ft",
+          "sale": true,
+          "salePercent": 9,
+          "vat": 27,
+          "lowestPriceDateInterval": 30,
+          "distinctVatProduct": false,
+          "currentSaleStartDateFormatted": "2026. júl. 10."
+        },
+        "images": [
+          {
+            "images": [
+              {
+                "code": "thumb_640",
+                "url": "https://ebikeshop.hu/storage/documents/file/2025-rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-pb52445d-16296-thumb_640.webp",
+                "altText": "RM Homage5 GT rohloff HS US56 cm '25 kék színű elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)"
+              },
+              {
+                "code": "thumb_1280",
+                "url": "https://ebikeshop.hu/storage/documents/file/2025-rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-pb52445d-16296-thumb_1280.webp",
+                "altText": "RM Homage5 GT rohloff HS US56 cm '25 kék színű elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)"
+              },
+              {
+                "code": "original",
+                "url": "https://ebikeshop.hu/storage/documents/file/2025-rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-pb52445d-16296.webp",
+                "altText": "RM Homage5 GT rohloff HS US56 cm '25 kék színű elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)"
+              }
+            ],
+            "type": "gallery",
+            "image360Url": null
+          }
+        ],
+        "category": {
+          "id": 12,
+          "name": "Elektromos kerékpárok",
+          "slug": "elektromos-kerekparok",
+          "orderNum": 0,
+          "parentId": null
+        },
+        "promotion": null,
+        "addToCartButtonEnabled": true,
+        "isBike": true,
+        "isUsed": false,
+        "isRentable": false,
+        "manufacturer": {
+          "id": 185,
+          "title": "Riese und Müller",
+          "url": "https://ebikeshop.hu/riese-und-muller",
+          "slug": "riese-und-muller",
+          "categorySlug": "gyarto"
+        },
+        "inCompareList": false,
+        "inWishlist": false,
+        "highlightedProperties": [
+          {
+            "title": "Maximális rásegítés",
+            "shortTitle": "",
+            "value": "25",
+            "orderNumber": 0,
+            "quantityUnit": "km/h",
+            "iconName": "#ebk-icon-speedometer"
+          },
+          {
+            "title": "Motor gyártója",
+            "shortTitle": "",
+            "value": "Bosch",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-settings"
+          },
+          {
+            "title": "Motor típusa",
+            "shortTitle": "Perf. CX Smart System",
+            "value": "Bosch performance Line CX (Smart System)",
+            "orderNumber": 0,
+            "quantityUnit": "",
+            "iconName": "#ebk-icon-accessory"
+          },
+          {
+            "title": "Akku kapacitás",
+            "shortTitle": "",
+            "value": "800",
+            "orderNumber": 0,
+            "quantityUnit": "Wh",
+            "iconName": "#ebk-icon-battery"
+          }
+        ],
+        "vat": 27,
+        "variations": null,
+        "smartFitOnlineSizing": {
+          "name": "RM Homage5 GT rohloff US56 cm kék elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)",
+          "code": "F01526_05023211170916141806",
+          "price": 3699000,
+          "image": "https://ebikeshop.hu/storage/documents/file/2025-rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-pb52445d-16296-thumb_640.webp"
+        },
+        "documents": [],
+        "youtubeVideos": [],
+        "catalog": null,
+        "rentableData": null,
+        "resellerData": null,
+        "showUrl": "https://ebikeshop.hu/termek/rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428",
+        "stocks": [
+          {
+            "stockType": "stock",
+            "shopId": 1,
+            "title": "Törökbálint",
+            "productCode": "F01526_05023211170916141806",
+            "preorder": 0,
+            "qty": 1,
+            "slug": "torokbalint",
+            "shopFullUrl": "https://ebikeshop.hu/uzletek/torokbalint",
+            "preorderFormFullUrl": null,
+            "arrivalDate": null,
+            "preorderTypeTitle": "Készleten",
+            "expired": false,
+            "isVirtualWarehouse": false
+          }
+        ],
+        "properties": [
+          {
+            "id": 869,
+            "propertyCategoryId": 41,
+            "shortTitle": "",
+            "value": "Új",
+            "categoryTitle": "Állapot",
+            "orderNumber": 0,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1497,
+            "propertyCategoryId": 66,
+            "shortTitle": "Nyomaték",
+            "value": "100",
+            "categoryTitle": "Nyomaték",
+            "orderNumber": 0,
+            "quantityUnit": "Nm"
+          },
+          {
+            "id": 185,
+            "propertyCategoryId": 4,
+            "shortTitle": "",
+            "value": "Riese und Müller",
+            "categoryTitle": "Gyártó",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1529,
+            "propertyCategoryId": 1,
+            "shortTitle": "",
+            "value": "25",
+            "categoryTitle": "Modellév",
+            "orderNumber": 1,
+            "quantityUnit": ""
+          },
+          {
+            "id": 210,
+            "propertyCategoryId": 7,
+            "shortTitle": "",
+            "value": "56",
+            "categoryTitle": "Vázméret",
+            "orderNumber": 2,
+            "quantityUnit": "cm"
+          },
+          {
+            "id": 534,
+            "propertyCategoryId": 6,
+            "shortTitle": "",
+            "value": "Alacsony",
+            "categoryTitle": "Váztípus",
+            "orderNumber": 2,
+            "quantityUnit": ""
+          },
+          {
+            "id": 649,
+            "propertyCategoryId": 26,
+            "shortTitle": "",
+            "value": "Trekking ",
+            "categoryTitle": "Felhasználás módja",
+            "orderNumber": 3,
+            "quantityUnit": ""
+          },
+          {
+            "id": 23,
+            "propertyCategoryId": 8,
+            "shortTitle": "",
+            "value": "25",
+            "categoryTitle": "Maximális rásegítés",
+            "orderNumber": 4,
+            "quantityUnit": "km/h"
+          },
+          {
+            "id": 1303,
+            "propertyCategoryId": 16,
+            "shortTitle": "",
+            "value": "Bosch Purion 200",
+            "categoryTitle": "Kijelző típus",
+            "orderNumber": 6,
+            "quantityUnit": ""
+          },
+          {
+            "id": 666,
+            "propertyCategoryId": 34,
+            "shortTitle": "",
+            "value": "Vázba integrált",
+            "categoryTitle": "Akku elhelyezkedése",
+            "orderNumber": 8,
+            "quantityUnit": ""
+          },
+          {
+            "id": 644,
+            "propertyCategoryId": 35,
+            "shortTitle": "",
+            "value": "27,5",
+            "categoryTitle": "Kerékméret",
+            "orderNumber": 9,
+            "quantityUnit": "\""
+          },
+          {
+            "id": 247,
+            "propertyCategoryId": 12,
+            "shortTitle": "",
+            "value": "Szíj",
+            "categoryTitle": "Erőátvitel",
+            "orderNumber": 10,
+            "quantityUnit": ""
+          },
+          {
+            "id": 690,
+            "propertyCategoryId": 38,
+            "shortTitle": "",
+            "value": "Első teleszkóp, hátsó rugóstag",
+            "categoryTitle": "Rugózás",
+            "orderNumber": 11,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1404,
+            "propertyCategoryId": 13,
+            "shortTitle": "",
+            "value": "TRP HD-EU835",
+            "categoryTitle": "Féktípus",
+            "orderNumber": 12,
+            "quantityUnit": ""
+          },
+          {
+            "id": 664,
+            "propertyCategoryId": 28,
+            "shortTitle": "",
+            "value": "Tárcsa",
+            "categoryTitle": "Fékfajta",
+            "orderNumber": 13,
+            "quantityUnit": ""
+          },
+          {
+            "id": 759,
+            "propertyCategoryId": 37,
+            "shortTitle": "",
+            "value": "14",
+            "categoryTitle": "Váltó sebességfokozatainak száma",
+            "orderNumber": 26,
+            "quantityUnit": ""
+          },
+          {
+            "id": 758,
+            "propertyCategoryId": 22,
+            "shortTitle": "",
+            "value": "Rohloff Speedhub",
+            "categoryTitle": "Váltó",
+            "orderNumber": 27,
+            "quantityUnit": ""
+          },
+          {
+            "id": 561,
+            "propertyCategoryId": 39,
+            "shortTitle": "",
+            "value": "Agyváltó",
+            "categoryTitle": "Váltó típusa",
+            "orderNumber": 28,
+            "quantityUnit": ""
+          },
+          {
+            "id": 562,
+            "propertyCategoryId": 40,
+            "shortTitle": "",
+            "value": "Elektromos",
+            "categoryTitle": "Váltó működése",
+            "orderNumber": 29,
+            "quantityUnit": ""
+          },
+          {
+            "id": 540,
+            "propertyCategoryId": 31,
+            "shortTitle": "",
+            "value": "Bosch",
+            "categoryTitle": "Motor gyártója",
+            "orderNumber": 40,
+            "quantityUnit": ""
+          },
+          {
+            "id": 902,
+            "propertyCategoryId": 15,
+            "shortTitle": "",
+            "value": "Bosch performance Line CX (Smart System)",
+            "categoryTitle": "Motor típusa",
+            "orderNumber": 42,
+            "quantityUnit": ""
+          },
+          {
+            "id": 1376,
+            "propertyCategoryId": 3,
+            "shortTitle": "",
+            "value": "800",
+            "categoryTitle": "Akku kapacitás",
+            "orderNumber": 44,
+            "quantityUnit": "Wh"
+          },
+          {
+            "id": 539,
+            "propertyCategoryId": 30,
+            "shortTitle": "Emelt teherbírás: Bruttó 130kg< ",
+            "value": "Nem",
+            "categoryTitle": "Emelt teherbírás",
+            "orderNumber": 99,
+            "quantityUnit": ""
+          }
+        ],
+        "leasingUrl": "https://ebikeshop.hu/lizingkonstrukcio-cegeknek?termek=rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428",
+        "locations": [
+          "Törökbálint"
+        ],
+        "manufacturerUrl": null,
+        "legalManufacturerName": null,
+        "legalManufacturerAddress": null
+      }
+    }
+  },
+  "jsonLd": "\n                    [{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"position\":1,\"item\":{\"name\":\"Főoldal\",\"@id\":\"https://ebikeshop.hu/\"}},{\"@type\":\"ListItem\",\"position\":2,\"item\":{\"name\":\"Termékek\",\"@id\":\"https://ebikeshop.hu/termekek\"}},{\"@type\":\"ListItem\",\"position\":3,\"item\":{\"name\":\"Elektromos kerékpárok\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok\"}},{\"@type\":\"ListItem\",\"position\":4,\"item\":{\"name\":\"Riese und Müller\",\"@id\":\"https://ebikeshop.hu/termekek/elektromos-kerekparok?gyarto%5B0%5D=riese-und-muller\"}},{\"@type\":\"ListItem\",\"position\":5,\"item\":{\"name\":\"RM Homage5 GT rohloff US56 cm kék elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)\",\"@id\":\"https://ebikeshop.hu/termek/rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428\"}}]},{\"@context\":\"https://schema.org/\",\"@type\":\"Product\",\"name\":\"RM Homage5 GT rohloff US56 cm kék elektromos kerékpár (Extrák: 800Wh, csomagtartó, Cockpit, Purion 200, komfort kit, zár táskával, GX, RX chip)\",\"description\":\"A gyártóról:\\r\\nTörténetünk 1993-ban kezdődik Heiko Müller szüleinek garázsában. Markus Riese és Heiko Müller kerékpárok iránti szeretete hozta létre a mára gigászi méretű márkát. A mai napig erős barátságot alkotó páros eleinte egy összecsukható kerékpárt hozott létre, amit Birdy névre kereszteltek. Mára a Riese&Müller a piacvezető márkák egyikévé vált az elektromos és cargo kerékpárok terén. Az elektromos kerékpárok gyártásába 2013-ban vágtak bele. Legfőb\",\"image\":\"https://ebikeshop.hu/storage/documents/file/2025-rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-pb52445d-16296-thumb_640.webp\",\"sku\":\"F01526_05023211170916141806\",\"brand\":{\"@type\":\"Brand\",\"name\":\"Riese und Müller\"},\"offers\":{\"@type\":\"Offer\",\"url\":\"https://ebikeshop.hu/termek/rm-homage5-gt-rohloff-hs-us56-cm-25-kek-szinu-elektromos-kerekpar-extrak-800wh-csomagtarto-cockpit-purion-200-komfort-kit-zar-taskaval-gx-rx-chip-15428-15428\",\"priceCurrency\":\"HUF\",\"price\":3699000,\"itemCondition\":\"https://schema.org/NewCondition\",\"availability\":\"https://schema.org/InStock\",\"seller\":\"https://ebikeshop.hu\"}}]\n                ",
+  "storesHtml": "<div class=\"space-y-2\"><h3 class=\"mb-3 text-lg leading-snug font-bold [&amp;:last-child]:mb-0\"><!--[-->Üzletek<!--]--></h3><ul class=\"space-y-2\"><!--[--><li class=\"\"><div class=\"flex flex-wrap items-center gap-4\"><!--[--><a class=\"flex items-center gap-2 text-brand underline underline-offset-2 hover:text-brand-alt\" href=\"https://ebikeshop.hu/uzletek/torokbalint\">Törökbálint</a><!--]--><div class=\"flex items-center gap-2\"><em class=\"inline-block size-2 rounded-full ring-3 bg-success-saturated ring-success-saturated/50\"></em><span class=\"font-condensed text-xs font-normal uppercase text-success\">Elérhető</span></div></div></li><!--]--></ul></div>"
+}

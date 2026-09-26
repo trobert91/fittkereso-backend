@@ -22,6 +22,7 @@ This is the root of everything. Each row is one importable source (today: `ebike
 - `seller: Seller` — the storefront every offer from this source belongs to. Non-nullable; there is no per-offer seller in the pipeline.
 - `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs. On a feed source they govern nothing: a feed run is one HTTP GET and enqueues no tasks.
 - `frequency` / `nextRunAt` — how often this source runs, and when it is next due. Runs are **started overnight, 02:00–06:00 Europe/Budapest**; `nextRunAt` is always snapped into that window, with jitter so ten shops do not all start at 02:00.
+- `detailRefreshInterval` — how old a known listing's detail import may get (an `ms` string, default `'60 days'`, never null) before a run fetches its detail page again, even though its list card could refresh it in place: a card never shows a new GTIN, spec, description or store list. Each listing falls due somewhere in the interval's last quarter, by a hash of its URL, so a whole first import does not fall due on one night. Acts on scraping sources' list cards; a feed row is the whole listing and is re-imported whenever it changes.
 
 **Why read this first:** everything downstream is either producing a `ProductSource` row, reading its `config`, or scheduling work against it.
 
@@ -132,7 +133,7 @@ This is the new library that turns config + HTML into structured data. Read it i
 1. **`scrape-interpreter.service.ts`** — the public facade. Three methods: `runListPage`, `runDetailPage`, `runDiscovery`. This is the only class the rest of the app calls into. Note the strict ordering inside `runDetailPage`: raw specs are extracted first, then category is resolved (because category rules can inspect specs — e.g. "headphones vs. headsets" depends on a spec value), then brand/model/images run (they can reference the resolved category name via `{{categoryName}}`).
 2. **`services/scrape-pipeline-runner.service.ts`** — executes one `ScrapeOperation[]` array left-to-right against a context, threading `vars`. Also handles `PipelineHalt` — a couple of ops (`assertContains`, `filterByNonEmpty`) can short-circuit the *entire* pipeline early, not just their own step (mirrors an early `return` in the old hand-written code, e.g. "if this isn't page 1, produce no pagination links at all").
 3. **`services/scrape-op-registry.service.ts`** — a name → handler map. `ops/register-ops.ts` populates it at module init with every op's implementation function.
-4. **`ops/*.ts`** — the actual op implementations, grouped by kind: `selection-ops.ts`, `string-ops.ts`, `regex-ops.ts`, `filter-ops.ts`, `link-ops.ts`, `spec-table-ops.ts`, `image-ops.ts`, `value-map-ops.ts`, `control-ops.ts`.
+4. **`ops/*.ts`** — the actual op implementations, grouped by kind: `selection-ops.ts`, `string-ops.ts`, `number-ops.ts` (`round`, for prices with float noise), `regex-ops.ts`, `filter-ops.ts`, `link-ops.ts`, `spec-table-ops.ts`, `image-ops.ts`, `value-map-ops.ts`, `control-ops.ts`.
 5. **`services/runtime-data-provider.service.ts`** — the escape hatch for the two things a pipeline can't get purely from the DOM: the list of known brand names (`getBrandNames`, backed by `BrandCacheService`) and category-slug → `ProductCategory` entity lookup (`getCategoryBySlug`, backed by `ProductCategoryRepository`). Referenced in configs via `"source": "runtime:brandCache"` etc. — a small, fixed, reviewable set, not arbitrary DB access.
 
 **Mental model:** `ScrapeInterpreterService` is a pure function of `(task, cheerio-loaded-HTML, config) → structured result`. It never fetches HTML itself and never talks to `TranslationService`/`SpecExtractionService` — those integrations happen one layer up, in step 6.
@@ -298,10 +299,27 @@ ProductImportTaskManagerService (every tick, 30s by default)
                                 → interpreter.runListPage → ScrapedListProduct[]
                                 → per card, ListProductRefreshService decides:
                                     refresh the offer in place (no detail fetch
-                                    spent), or enqueue a detail_page task.
+                                    spent), or enqueue a detail_page task —
+                                    for an unknown listing, a card missing a
+                                    required field, or a listing past its
+                                    detailRefreshInterval (`stale`). A card is
+                                    matched to its record by (source,
+                                    externalId) first, then by URL; a listing
+                                    found under another URL moves to the
+                                    card's, unless another record of the
+                                    source holds it (`moved`, a detail task).
+                                → detail tasks go through DetailTaskCapService:
+                                  with maxItems set, the run queues no more once
+                                  it has queued that many, counted across all its
+                                  list pages (each carries the run's start)
                                 → enqueues NO further list pages, by design
       detail_page          → ProductDetailsPageScraperService
-                                → interpreter.runDetailPage, spec extraction,
+                                → interpreter.runDetailPage; a task queued
+                                  from a list card carries the card's
+                                  externalId, and a page stating other ids
+                                  (a redirect to another product) fails the
+                                  task terminally, unimported
+                                → spec extraction,
                                   SpecPostProcessService (hash-skipped when
                                   nothing changed)
                                 → ScrapedProduct

@@ -21,6 +21,7 @@ import {
   ImportRunSummary,
   ProductSourceImporter,
 } from '../../interfaces/product-source-importer.interface';
+import { listPageTaskPayload } from './list-page-task-payload';
 
 /**
  * Sanity ceiling on pages enumerated from one listing.
@@ -60,13 +61,14 @@ export class ScrapingImportService implements ProductSourceImporter {
     _options?: ImportRunOptions,
   ): Promise<ImportRunSummary> {
     const startTime = Date.now();
+    const runStartedAt = new Date(startTime);
     const summary = emptyImportRunSummary();
     const config = asScrapingConfig(source.config, source.name);
 
     try {
       const { categoryUrls, pageUrls } = await this.planRun(source, config);
 
-      summary.listTasksEnqueued = await this.createListTasks(source, pageUrls);
+      summary.listTasksEnqueued = await this.createListTasks(source, pageUrls, runStartedAt);
 
       this.productCollectionMetrics.recordCategoriesDiscovered(
         source.name,
@@ -177,19 +179,9 @@ export class ScrapingImportService implements ProductSourceImporter {
     const pagination = config.listPage.pagination;
     if (!pagination) return categoryUrls;
 
-    // A capped run is a test run, and walking 42 pages to take 10 items from
-    // the first is not what anybody means by that. The cap itself is enforced
-    // per page (see ScrapingSourceConfig.maxItems for why it cannot be
-    // otherwise), so stopping at page 1 is also what makes it predictable.
-    if (config.maxItems !== undefined) {
-      this.logger.log('maxItems is set — walking only the first page of each listing', {
-        source: source.name,
-        maxItems: config.maxItems,
-        listings: categoryUrls.length,
-      });
-      return categoryUrls;
-    }
-
+    // Every page is walked even when `maxItems` is set: the cap limits the
+    // detail tasks a run queues, across all its pages (DetailTaskCapService),
+    // while every card can still be refreshed in place.
     const all: string[] = [];
 
     for (const categoryUrl of categoryUrls) {
@@ -237,9 +229,14 @@ export class ScrapingImportService implements ProductSourceImporter {
     return uniq(all);
   }
 
+  /**
+   * One list task per page, each stamped with the run's start: the pages are
+   * separate tasks, and that is what lets them share the run's `maxItems`.
+   */
   private async createListTasks(
     source: ProductSource,
     urls: string[],
+    runStartedAt: Date,
   ): Promise<number> {
     const validUrls = uniq(urls.filter((url) => !isEmpty(url)));
     if (isEmpty(validUrls)) return 0;
@@ -251,6 +248,7 @@ export class ScrapingImportService implements ProductSourceImporter {
         task.source = source;
         task.url = url;
         task.priority = DEFAULT_IMPORT_TASK_PRIORITY;
+        task.payload = { ...listPageTaskPayload(runStartedAt) };
         return this.importTaskPublisher.addTask(task);
       }),
     );

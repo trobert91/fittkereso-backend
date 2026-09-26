@@ -133,6 +133,26 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
+   * This source's record carrying this externalId, with the same relations
+   * as findBySourceAndUrl — or null when none does, or when several do.
+   *
+   * Several do where a source stores a group-level id shared by its sizes
+   * (ShopRenter's parent.sku, say): that id does not name one listing, and
+   * the caller falls back to the URL.
+   */
+  async findUniqueBySourceAndExternalId(
+    sourceId: string,
+    externalId: string,
+  ): Promise<ProductSourceRecord | null> {
+    const records = await this.repo.find({
+      where: { source: { id: sourceId }, externalId },
+      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
+      take: 2,
+    });
+    return records.length === 1 ? records[0] : null;
+  }
+
+  /**
    * Each of these URLs' feed row hash, last sighting and product, for one
    * source: a feed run's whole question about a row is whether its listing
    * already holds that hash, whether it had stopped counting as current, and

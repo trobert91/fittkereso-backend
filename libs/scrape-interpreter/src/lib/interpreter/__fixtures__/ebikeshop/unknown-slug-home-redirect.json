@@ -1,0 +1,11 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termek/qxzvw-jkqyp-zzzz",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "An unknown product slug with no plausible match: ebikeshop redirects it to the home page. There is no props.product; props trimmed to nothing.",
+  "dataPage": {
+    "component": "home/Home",
+    "url": "/",
+    "props": {}
+  }
+}

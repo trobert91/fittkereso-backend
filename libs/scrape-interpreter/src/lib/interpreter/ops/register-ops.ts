@@ -24,6 +24,7 @@ import {
   wrapInArray,
 } from './string-ops';
 import { findScriptContaining, regexCapture } from './regex-ops';
+import { round } from './number-ops';
 import {
   filterJsonArray,
   flattenJsonArray,
@@ -94,6 +95,7 @@ export function registerOps(
   registry.register('appendSuffix', appendSuffix);
   registry.register('prependPrefix', prependPrefix);
   registry.register('stripPattern', stripPattern);
+  registry.register('round', round);
   registry.register('stripPrefix', stripPrefix);
   registry.register('splitAndTake', splitAndTake);
   registry.register('splitAndSlice', splitAndSlice);

@@ -1,4 +1,5 @@
 import {
+  ListingExternalIdMismatchError,
   ProductImportTaskKind,
   ProductImportTask,
   SourceSpecConfig,
@@ -30,7 +31,7 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
-import { uniqBy } from 'lodash';
+import { compact, uniq, uniqBy } from 'lodash';
 import ms from 'ms';
 
 interface ExtractedPage {
@@ -203,12 +204,54 @@ export class ProductDetailsPageScraperService {
     }
   }
 
+  /**
+   * Refuses a page that shows another product than the list card that queued
+   * this task (ProductImportTask.externalId).
+   *
+   * A shop that never answers a product URL with a 404 (ebikeshop) redirects a
+   * delisted product's URL to some other product, and the fetch follows the
+   * redirect: importing that page would file the other product under this
+   * card's URL. Checked before anything is written or sent to an LLM. The error
+   * fails the task terminally, since every retry fetches the same page.
+   *
+   * The card's id is matched against the page's own and its offers', since a
+   * source's card may carry either (a product code, or a size's). A page that
+   * states no id at all is left to the checks after this one: it may be a
+   * block page, which a retry can get past.
+   */
+  private assertCardsProduct(task: ProductImportTask, detail: DetailPageResult): void {
+    const expected = toExternalId(task.externalId);
+    if (!expected) return;
+
+    const onPage = uniq(
+      compact([detail.externalId, ...detail.rawOffers.map((offer) => offer.externalId)].map(toExternalId)),
+    );
+    if (onPage.length === 0 || onPage.includes(expected)) return;
+
+    const url = normalizeUrl(task.url);
+    this.logger.warn('The page shows another product than the list card that queued it', {
+      taskId: task.id,
+      url,
+      expectedExternalId: expected,
+      pageExternalIds: onPage,
+    });
+    this.scrapingMetrics.recordExtractionSkipReason(task.source.name, 'external_id_mismatch');
+    throw new ListingExternalIdMismatchError({
+      source: task.source,
+      url,
+      expectedExternalId: expected,
+      pageExternalIds: onPage,
+    });
+  }
+
   private async extractProduct(
     task: ProductImportTask,
     $: cheerio.CheerioAPI,
   ): Promise<ExtractedPage | null> {
     const config = asScrapingConfig(task.source.config, task.source.name);
     const detail = await this.interpreter.runDetailPage(task, $, config);
+
+    this.assertCardsProduct(task, detail);
 
     if (!detail.categorySlug) {
       this.logger.warn(
@@ -405,4 +448,11 @@ export class ProductDetailsPageScraperService {
 
     return lookup;
   }
+}
+
+/** An externalId as text, or undefined when there is none: a page's JSON may hold a number. */
+function toExternalId(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  return text || undefined;
 }

@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://ebikeshop.hu",
-  "maxItems": 10,
+  "maxItems": 100,
   "startUrls": [
-    "https://ebikeshop.hu/termekek/elektromos-kerekparok"
+    "https://ebikeshop.hu/termekek/elektromos-kerekparok?rendezes=nev_szerint_novekvo"
   ],
   "categories": {
     "ebikes": {
@@ -20,7 +20,7 @@
       }
     ],
     "pagination": {
-      "urlTemplate": "{{startUrl}}?oldal={{page}}",
+      "urlTemplate": "{{startUrl}}&oldal={{page}}",
       "pageCount": [
         {
           "op": "parseJsonAttr",
@@ -70,8 +70,38 @@
         "price": [
           {
             "op": "jsonPath",
-            "path": "prices.priceSale",
-            "cast": "number"
+            "on": "item",
+            "path": "prices.sale",
+            "cast": "boolean",
+            "as": "onSale"
+          },
+          {
+            "op": "branch",
+            "condition": {
+              "equals": {
+                "value": "onSale",
+                "to": true
+              }
+            },
+            "ifTrue": [
+              {
+                "op": "jsonPath",
+                "on": "item",
+                "path": "prices.priceSale",
+                "cast": "number"
+              }
+            ],
+            "ifFalse": [
+              {
+                "op": "jsonPath",
+                "on": "item",
+                "path": "prices.price",
+                "cast": "number"
+              }
+            ]
+          },
+          {
+            "op": "round"
           }
         ],
         "priceWithoutDiscount": [
@@ -96,6 +126,9 @@
                 "on": "item",
                 "path": "prices.price",
                 "cast": "number"
+              },
+              {
+                "op": "round"
               }
             ],
             "ifFalse": []
@@ -105,6 +138,22 @@
           {
             "op": "literal",
             "value": "HUF"
+          }
+        ],
+        "availability": [
+          {
+            "op": "jsonPath",
+            "on": "item",
+            "path": "preorderTypeTitle"
+          },
+          {
+            "op": "mapValue",
+            "cases": {
+              "Készleten": "in_stock",
+              "Gyártói készlet": "preorder",
+              "Várható gyártás": "preorder",
+              "Gyártói tervezet": "preorder"
+            }
           }
         ]
       }
@@ -134,17 +183,40 @@
         }
       }
     ],
+    "description": [
+      {
+        "op": "parseJsonAttr",
+        "selector": "#app",
+        "attr": "data-page",
+        "path": "props.product.longDesc"
+      },
+      {
+        "op": "stripPattern",
+        "pattern": "^\\s*(<h3[^>]*>\\s*A gyártóról:?\\s*</h3>\\s*<p[^>]*>[\\s\\S]*?</p>|<p[^>]*>\\s*A gyártóról:[\\s\\S]*?</p>)\\s*"
+      },
+      {
+        "op": "stripPattern",
+        "pattern": "\\s*<h3[^>]*>\\s*Általános[^<]*</h3>[\\s\\S]*$"
+      },
+      {
+        "op": "regexCapture",
+        "pattern": "\\S[\\s\\S]*",
+        "group": 0
+      }
+    ],
     "category": {
       "breadcrumbOrSource": [
         {
-          "op": "literal",
-          "value": "Elektromos kerékpárok"
+          "op": "parseJsonAttr",
+          "selector": "#app",
+          "attr": "data-page",
+          "path": "props.product.category.slug"
         }
       ],
       "slugLookup": [
         {
           "when": {
-            "always": true
+            "equalsIgnoreCase": "elektromos-kerekparok"
           },
           "slug": "ebikes"
         }
@@ -251,12 +323,17 @@
         "single": true
       },
       {
+        "op": "regexCapture",
+        "pattern": "(\\d{2})\\s*$",
+        "group": 1
+      },
+      {
         "op": "prependPrefix",
         "prefix": "20"
       },
       {
         "op": "regexCapture",
-        "pattern": "\\d+",
+        "pattern": "\\d{4}",
         "group": 0,
         "cast": "number"
       }
@@ -298,9 +375,11 @@
           {
             "key": "gender",
             "labels": [
-              "Nem",
               "Váztípus"
-            ]
+            ],
+            "valueMap": {
+              "Cross női": "Női"
+            }
           },
           {
             "key": "frameType",
@@ -319,7 +398,11 @@
             "key": "usageType",
             "labels": [
               "Felhasználás módja"
-            ]
+            ],
+            "valueMap": {
+              "Cross": "Cross Trekking",
+              "Városi": "City"
+            }
           },
           {
             "key": "condition",
@@ -330,14 +413,19 @@
           {
             "key": "batteryPosition",
             "labels": [
-              "Akku elhelyezkedése",
-              "Akkumulátor elhelyezkedése"
+              "Akku elhelyezkedése"
             ]
           },
           {
             "key": "wheelSize",
             "labels": [
               "Kerékméret"
+            ],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
             ],
             "extract": "number"
           },
@@ -356,7 +444,12 @@
           {
             "key": "brakeType",
             "labels": [
-              "Fékfajta",
+              "Fékfajta"
+            ]
+          },
+          {
+            "key": "brakeModel",
+            "labels": [
               "Féktípus"
             ]
           },
@@ -388,24 +481,16 @@
           {
             "key": "batteryCapacity",
             "labels": [
-              "Akku kapacitás",
-              "Akkumulátor kapacitása"
+              "Akku kapacitás"
             ],
             "extract": "number"
           },
           {
             "key": "torque",
             "labels": [
-              "Nyomaték",
-              "Motor nyomaték"
+              "Nyomaték"
             ],
             "extract": "number"
-          },
-          {
-            "key": "motorPosition",
-            "labels": [
-              "Motor elhelyezkedése"
-            ]
           },
           {
             "key": "motorBrand",
@@ -420,71 +505,26 @@
             ]
           },
           {
-            "key": "motorPower",
-            "labels": [
-              "Motor teljesítménye"
-            ],
-            "extract": "number"
-          },
-          {
             "key": "topSpeed",
             "labels": [
-              "Maximális rásegítés",
-              "Maximális sebesség",
-              "Motoros rásegítés sebessége"
+              "Maximális rásegítés"
             ],
             "extract": "number"
           },
           {
-            "key": "range",
+            "key": "pedelecClass",
             "labels": [
-              "Hatótávolság"
+              "Maximális rásegítés"
             ],
-            "extract": "number"
+            "valueMap": {
+              "25 km/h": "Pedelec",
+              "45 km/h": "S-Pedelec"
+            }
           },
           {
-            "key": "chargingTime",
+            "key": "displayModel",
             "labels": [
-              "Töltési idő"
-            ],
-            "extract": "number"
-          },
-          {
-            "key": "display",
-            "labels": [
-              "Kijelző",
-              "Kijelzővel rendelkezik",
               "Kijelző típus"
-            ]
-          },
-          {
-            "key": "maxLoad",
-            "labels": [
-              "Maximális terhelhetőség",
-              "Emelt teherbírás"
-            ],
-            "extract": "number"
-          },
-          {
-            "key": "weight",
-            "labels": [
-              "Tömeg",
-              "Súly"
-            ],
-            "extract": "number"
-          },
-          {
-            "key": "waterResistance",
-            "labels": [
-              "Védettségi szint",
-              "Vízállóság"
-            ]
-          },
-          {
-            "key": "smartConnectivity",
-            "labels": [
-              "Applikáció",
-              "GPS követés"
             ]
           }
         ]
@@ -510,10 +550,39 @@
           "op": "assembleOffer",
           "price": [
             {
-              "op": "regexCapture",
-              "pattern": "\"price\":\\s*(\\d+(?:\\.\\d+)?)",
-              "group": 1,
-              "cast": "number"
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.prices.sale",
+              "as": "onSale"
+            },
+            {
+              "op": "branch",
+              "condition": {
+                "equals": {
+                  "value": "onSale",
+                  "to": true
+                }
+              },
+              "ifTrue": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.priceSale"
+                }
+              ],
+              "ifFalse": [
+                {
+                  "op": "parseJsonAttr",
+                  "selector": "#app",
+                  "attr": "data-page",
+                  "path": "props.product.prices.price"
+                }
+              ]
+            },
+            {
+              "op": "round"
             }
           ],
           "priceWithoutDiscount": [
@@ -538,6 +607,9 @@
                   "selector": "#app",
                   "attr": "data-page",
                   "path": "props.product.prices.price"
+                },
+                {
+                  "op": "round"
                 }
               ],
               "ifFalse": [
@@ -606,32 +678,10 @@
           ],
           "locations": [
             {
-              "op": "literal",
-              "value": "Gyártói készlet",
-              "as": "manufacturerStockLabel"
-            },
-            {
-              "op": "selectFirst",
-              "selector": "h3:contains(\"Üzletek\")"
-            },
-            {
-              "op": "selectSiblingContainer",
-              "untilSelector": "[data-slot=\"separator-root\"]",
-              "filterSelector": "*",
-              "first": false,
-              "as": "storesContainer"
-            },
-            {
-              "op": "selectAll",
-              "selector": "li span:not(.text-success):not(.text-error), li a",
-              "within": "storesContainer"
-            },
-            {
-              "op": "extractTextList"
-            },
-            {
-              "op": "filterOutEqualsIgnoreCase",
-              "against": "manufacturerStockLabel"
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.locations"
             }
           ]
         }

@@ -4,7 +4,6 @@ import {
   TaskStatus,
   Task,
   QueueName,
-  isProductSourceConfigInvalidError,
 } from '@fittkereso-backend/database';
 import {
   SCHEDULING_DEFAULTS,
@@ -13,7 +12,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { TaskMetricsService } from '@fittkereso-backend/metrics';
 import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
-import { describeTaskError } from './describe-task-error';
+import { describeTaskError, isTerminalTaskError } from './describe-task-error';
 
 export abstract class BaseTaskManagerService {
   protected readonly logger = new CustomLogger(BaseTaskManagerService.name);
@@ -84,7 +83,7 @@ export abstract class BaseTaskManagerService {
 
       // A failure retrying cannot change is parked immediately rather than
       // repeated on a backoff for the same answer. See Task.terminal.
-      if (isProductSourceConfigInvalidError(error)) {
+      if (isTerminalTaskError(error)) {
         task.terminal = true;
         task.scheduledAt = null;
       } else if (task.attempts < this.taskConfig.maxAttempts) {

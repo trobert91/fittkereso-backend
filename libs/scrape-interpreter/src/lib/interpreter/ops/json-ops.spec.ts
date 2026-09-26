@@ -67,6 +67,68 @@ describe('parseJsonAttr', () => {
     expect(result).toBe("RM Nevo5 '26 kék & fekete");
   });
 
+  // PHP's json_encode writes an array whose keys are not 0…n-1 as an object,
+  // so Laravel can serve a page's listing as {"0": …, "1": …, "15": …}.
+  it('reads an object keyed by array indices as an array, in key order, at any depth', () => {
+    const payload = JSON.stringify({
+      props: {
+        products: {
+          '15': { name: 'D', sizes: { '1': 'M', '0': 'S' } },
+          '0': { name: 'A', sizes: ['L'] },
+          '2': { name: 'C', sizes: [] },
+        },
+      },
+    });
+    const ctx = makeContext(`<div id="app" data-page="${escapeAttr(payload)}"></div>`);
+
+    const result = parseJsonAttr(ctx, undefined, {
+      op: 'parseJsonAttr',
+      selector: '#app',
+      attr: 'data-page',
+      path: 'props.products',
+    });
+
+    expect(result).toEqual([
+      { name: 'A', sizes: ['L'] },
+      { name: 'C', sizes: [] },
+      { name: 'D', sizes: ['S', 'M'] },
+    ]);
+  });
+
+  it('resolves its path against the raw keys', () => {
+    const payload = JSON.stringify({ products: { '0': { name: 'A' }, '15': { name: 'D' } } });
+    const ctx = makeContext(`<div id="app" data-page="${escapeAttr(payload)}"></div>`);
+
+    const result = parseJsonAttr(ctx, undefined, {
+      op: 'parseJsonAttr',
+      selector: '#app',
+      attr: 'data-page',
+      path: 'products.15.name',
+    });
+
+    expect(result).toBe('D');
+  });
+
+  it.each([
+    ['named keys', { a: 1, b: 2 }],
+    ['keys that are only partly indices', { '0': 1, total: 2 }],
+    ['a key that is not a canonical index', { '0': 1, '01': 2 }],
+    ['no keys', {}],
+  ])('keeps an object with %s as an object', (_label, object) => {
+    const ctx = makeContext(
+      `<div id="app" data-page="${escapeAttr(JSON.stringify({ object }))}"></div>`,
+    );
+
+    const result = parseJsonAttr(ctx, undefined, {
+      op: 'parseJsonAttr',
+      selector: '#app',
+      attr: 'data-page',
+      path: 'object',
+    });
+
+    expect(result).toEqual(object);
+  });
+
   it('returns undefined when the attribute is missing or the JSON is invalid', () => {
     const ctx = makeContext(`<div id="app"></div>`);
     expect(

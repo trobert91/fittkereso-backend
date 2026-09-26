@@ -220,16 +220,19 @@ export interface ScrapingSourceConfig {
   categoryLinks?: ScrapeOperation[];
   categories?: Record<string, ProductSourceCategoryConfig>;
   /**
-   * Hard ceiling on how many items one run imports. Unset means no ceiling,
-   * which is what a production source wants.
+   * Hard ceiling on how many detail tasks one run queues. Unset means no
+   * ceiling.
    *
-   * **On a scraping source this caps items PER LIST PAGE**, not per run, and
-   * that is a real limitation rather than a choice: each list page is its own
-   * independently scheduled ProductImportTask, so there is no run-scoped counter for
-   * them to share. To keep the cap meaningful for its actual purpose — a small
-   * test set — setting it also makes the importer enumerate only the FIRST page
-   * of each listing, since walking 42 pages to take 10 items is not what
-   * anybody means by this.
+   * Once the run has queued this many detail tasks, it queues no more; the
+   * cards left out are found again by the next run. The run still walks every
+   * list page, and still refreshes every known card in place (which queues
+   * nothing), so the cap limits what a run spends on detail pages, not what
+   * it sees.
+   *
+   * A run's list pages are separate tasks, so the count is kept in the
+   * database: each list task carries the run's start (ListPageTaskPayload),
+   * and DetailTaskCapService counts the source's detail tasks created since,
+   * under a per-source advisory lock.
    */
   maxItems?: number;
   /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */

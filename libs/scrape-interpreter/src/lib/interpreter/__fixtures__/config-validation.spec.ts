@@ -61,22 +61,44 @@ describe('hand-authored source configs', () => {
     assertConfigValid(speedbikeConfig as unknown as ScrapingSourceConfig, 'speedbike');
   });
 
-  it('ebikeshop config resolves every product to the single ebikes category', () => {
+  // By the category the product page states, not "always": ebikeshop answers
+  // an unknown product URL with a redirect to some other product (a cable,
+  // say), which must not be filed as an e-bike.
+  it('ebikeshop config files only the e-bike category as ebikes', () => {
     const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
-    expect(config.detailPage.category.slugLookup).toEqual([
-      { when: { always: true }, slug: 'ebikes' },
-    ]);
+    expect(config.detailPage.category).toEqual({
+      breadcrumbOrSource: [
+        {
+          op: 'parseJsonAttr',
+          selector: '#app',
+          attr: 'data-page',
+          path: 'props.product.category.slug',
+        },
+      ],
+      slugLookup: [{ when: { equalsIgnoreCase: 'elektromos-kerekparok' }, slug: 'ebikes' }],
+    });
   });
 
   // ebikeshop's listing paginates on `oldal` (Hungarian for "page") — the
   // param its own pagination links use. It silently ignores `?page=N` and
   // serves page 1 again, so a wrong template doesn't fail: it re-imports the
   // first 32 bikes once per page and never reaches the other 576.
-  it('ebikeshop config paginates on the query param the site actually reads', () => {
+  //
+  // Sorted by name: under the default price sort a price change between two
+  // list tasks moves a bike to another page, where one run misses it or sees
+  // it twice. The template appends with `&`, so every start URL must already
+  // carry a query string.
+  it('ebikeshop config paginates on the query param the site actually reads, sorted by name', () => {
     const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
     expect(config.listPage.pagination?.urlTemplate).toBe(
-      '{{startUrl}}?oldal={{page}}',
+      '{{startUrl}}&oldal={{page}}',
     );
+    expect(config.startUrls).toEqual([
+      'https://ebikeshop.hu/termekek/elektromos-kerekparok?rendezes=nev_szerint_novekvo',
+    ]);
+    for (const startUrl of config.startUrls ?? []) {
+      expect(new URL(startUrl).search).not.toBe('');
+    }
   });
 
   // productCode is KTM's own article number (1260040108), which is what makes
@@ -136,21 +158,25 @@ describe('hand-authored source configs', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // EVERY LIVE CONFIG IS CURRENTLY CAPPED AT 10 ITEMS FOR TESTING.
+  // EVERY LIVE CONFIG IS CURRENTLY CAPPED FOR TESTING.
   //
   // This test exists to make that impossible to forget. It is not describing a
   // property worth preserving — it is a tripwire. Before any real catalogue
   // run, remove `maxItems` from these configs and delete this test with it;
-  // otherwise a source that looks fully configured will import ten products
-  // and stop, and nothing else will say why.
+  // otherwise a source that looks fully configured will import a handful of
+  // products and stop, and nothing else will say why.
+  //
+  // ebikeshop is capped at 100 detail tasks per run (user, 2026-09-26): every
+  // list page is still walked and every known card refreshed in place; a run
+  // stops queueing detail pages once it has queued 100.
   // ─────────────────────────────────────────────────────────────────────────
   it.each([
-    ['ebikeshop', ebikeshopConfig],
-    ['speedbike', speedbikeConfig],
-    ['speedbike-arukereso', speedbikeArukeresoConfig],
-    ['speedbike-googleshop', speedbikeGoogleshopConfig],
-  ])('%s is capped at 10 items — REMOVE BEFORE A REAL RUN', (_name, config) => {
-    expect((config as { maxItems?: number }).maxItems).toBe(10);
+    ['ebikeshop', ebikeshopConfig, 100],
+    ['speedbike', speedbikeConfig, 10],
+    ['speedbike-arukereso', speedbikeArukeresoConfig, 10],
+    ['speedbike-googleshop', speedbikeGoogleshopConfig, 10],
+  ])('%s is capped — REMOVE BEFORE A REAL RUN', (_name, config, cap) => {
+    expect((config as { maxItems?: number }).maxItems).toBe(cap);
   });
 
   it('ebikeshop config has no postProcess override, so it picks up the on-by-default behavior', () => {

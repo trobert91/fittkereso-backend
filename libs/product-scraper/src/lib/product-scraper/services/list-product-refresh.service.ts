@@ -18,6 +18,7 @@ import {
 } from '@fittkereso-backend/product';
 import { normalizeUrl, storedOfferExternalId } from '@fittkereso-backend/utils';
 import { isEmpty } from 'lodash';
+import { detailRefreshDueAt, detailRefreshIntervalMs } from './detail-refresh-schedule';
 
 /**
  * The fields required by default before a list card may stand in for a detail
@@ -34,10 +35,60 @@ export type ListItemOutcome =
   | 'refreshed'
   /** Known listing, but the card was too thin; detail scrape needed. */
   | 'incomplete'
+  /**
+   * Known listing whose last detail import is older than the source's
+   * detailRefreshInterval allows: fetched in full again for what a card never
+   * shows (a new GTIN, specs, description, stores).
+   */
+  | 'stale'
   /** Not seen before; only a detail page has its specs, brand and model. */
   | 'unknown'
+  /**
+   * Known by its externalId under another URL, while another record of this
+   * source already holds the card's URL: a detail scrape sorts that out, where
+   * moving the listing would be a guess.
+   */
+  | 'moved'
   /** Known listing with no offer row to refresh yet. */
   | 'no_offer';
+
+export const LIST_ITEM_OUTCOMES: readonly ListItemOutcome[] = [
+  'refreshed',
+  'incomplete',
+  'stale',
+  'unknown',
+  'moved',
+  'no_offer',
+];
+
+/** A zero count per outcome, for a page's or a run's split. */
+export function emptyOutcomeCounts(): Record<ListItemOutcome, number> {
+  return Object.fromEntries(
+    LIST_ITEM_OUTCOMES.map((outcome) => [outcome, 0]),
+  ) as Record<ListItemOutcome, number>;
+}
+
+/** What a run does with one card, decided without writing anything. */
+export interface ListItemDecision {
+  /**
+   * `refresh` where the card refreshes its listing in place. That write can
+   * still find no offer to compose onto, and then reports `no_offer`.
+   */
+  outcome: Exclude<ListItemOutcome, 'refreshed'> | 'refresh';
+  /** This source's record of the listing, when it has one. */
+  record?: ProductSourceRecord;
+  /**
+   * The record's URL, when the card found it by its externalId under another
+   * one: the shop moved the listing, and the record follows it.
+   */
+  movedFrom?: string;
+  /** Fields the minimum set asks for that the card lacks. */
+  missingFields: string[];
+  /** When the listing's detail page falls due again, once that was asked. */
+  detailDueAt?: Date;
+  /** The offer the card refreshes, on `refresh`. */
+  externalId?: string;
+}
 
 /**
  * Decides, per list card, whether an already-known listing can be refreshed
@@ -51,6 +102,12 @@ export type ListItemOutcome =
  * that it still lists it — and the offer is then composed from all of the
  * seller's records, as an import does (OfferComposerService). Under the
  * product's lock, like every other product writer.
+ *
+ * Two things still send a known listing to its detail page: a card too thin
+ * for the minimum set, and age. A listing whose last detail import is older
+ * than the source's detailRefreshInterval (less a per-URL spread, see
+ * detail-refresh-schedule) is `stale`, because a card never shows a new GTIN,
+ * spec, description or store list.
  */
 @Injectable()
 export class ListProductRefreshService {
@@ -74,10 +131,54 @@ export class ListProductRefreshService {
 
   /** True when the card carries every field the minimum set asks for. */
   satisfiesMinimumSet(item: ScrapedListProduct): boolean {
-    return this.requiredFields.every((field) => {
+    return this.missingFields(item).length === 0;
+  }
+
+  /** The fields the minimum set asks for that this card lacks. */
+  missingFields(item: ScrapedListProduct): string[] {
+    return this.requiredFields.filter((field) => {
       const value = (item as unknown as Record<string, unknown>)[field];
-      return value !== undefined && value !== null && value !== '';
+      return value === undefined || value === null || value === '';
     });
+  }
+
+  /**
+   * What a run does with this card, without writing anything. The import
+   * simulation reports it per card; tryRefresh acts on it.
+   */
+  async decide(
+    source: ProductSource,
+    item: ScrapedListProduct,
+    now = new Date(),
+  ): Promise<ListItemDecision> {
+    const url = normalizeUrl(item.url);
+    const missingFields = this.missingFields(item);
+    const { record, movedFrom } = await this.findRecord(source.id, item, url);
+
+    // Never seen by THIS source. Even if another source knows the URL, this
+    // one still needs its own record, which only a detail scrape produces.
+    if (!record) return { outcome: 'unknown', missingFields };
+
+    const known = { record, movedFrom, missingFields };
+    if (movedFrom && (await this.sourceRecordRepo.findBySourceAndUrl(source.id, url))) {
+      return { ...known, outcome: 'moved' };
+    }
+
+    if (missingFields.length > 0) return { ...known, outcome: 'incomplete' };
+
+    // Checked before the in-place refresh, which never writes lastUpdated:
+    // only a detail import does, so it dates what the card cannot show.
+    const detailDueAt = detailRefreshDueAt({
+      url,
+      lastUpdated: record.lastUpdated,
+      intervalMs: detailRefreshIntervalMs(source),
+    });
+    if (now > detailDueAt) return { ...known, detailDueAt, outcome: 'stale' };
+
+    const externalId = record.model ? this.pickExternalId(record, item) : undefined;
+    if (!externalId) return { ...known, detailDueAt, outcome: 'no_offer' };
+
+    return { ...known, detailDueAt, externalId, outcome: 'refresh' };
   }
 
   /**
@@ -86,30 +187,104 @@ export class ListProductRefreshService {
    * Returns what happened so the caller can decide whether to enqueue a detail
    * task and can report the split — which is the number that says whether the
    * saving is real for this shop.
+   *
+   * A listing the card found under another URL moves to the card's URL first,
+   * whatever happens next, so the detail scrape a stale or thin card still
+   * needs updates this record rather than writing a second one.
    */
   async tryRefresh(
     source: ProductSource,
     item: ScrapedListProduct,
   ): Promise<ListItemOutcome> {
-    const record = await this.sourceRecordRepo.findBySourceAndUrl(
-      source.id,
-      normalizeUrl(item.url),
-    );
+    const { outcome, record, movedFrom, externalId } = await this.decide(source, item);
+    const modelId = record?.model?.id;
+    if (outcome === 'unknown' || outcome === 'moved' || !record || !modelId) {
+      return outcome === 'refresh' ? 'no_offer' : outcome;
+    }
 
-    // Never seen by THIS source. Even if another source knows the URL, this
-    // one still needs its own record, which only a detail scrape produces.
-    if (!record) return 'unknown';
+    const move = movedFrom
+      ? { recordId: record.id, from: movedFrom, to: normalizeUrl(item.url) }
+      : undefined;
 
-    if (!this.satisfiesMinimumSet(item)) return 'incomplete';
+    if (outcome !== 'refresh' || !externalId) {
+      if (move) {
+        await this.locks.withLocks([productLock(modelId)], () => this.moveListing(move));
+      }
+      return outcome === 'refresh' ? 'no_offer' : outcome;
+    }
 
-    const model = record.model;
-    const externalId = this.pickExternalId(record, item);
-    if (!model || !externalId) return 'no_offer';
-
-    const refreshed = await this.locks.withLocks([productLock(model.id)], () =>
-      this.refresh({ source, recordId: record.id, modelId: model.id, externalId, item }),
-    );
+    const refreshed = await this.locks.withLocks([productLock(modelId)], async () => {
+      if (move) await this.moveListing(move);
+      return this.refresh({ source, recordId: record.id, modelId, externalId, item });
+    });
     return refreshed ? 'refreshed' : 'no_offer';
+  }
+
+  /**
+   * This source's record of the card: by (source, externalId) first, then by
+   * URL.
+   *
+   * The externalId is what a shop keeps when it renames a product and so its
+   * slug. Found by it, the record is this listing even under another URL, and
+   * `movedFrom` says so. Only an unambiguous match on a record that sits on a
+   * product counts: an id several records share (a group-level one) names no
+   * single listing, and an unattached record has no product lock to move it
+   * under. Both fall back to the URL, as does a card without an externalId.
+   */
+  private async findRecord(
+    sourceId: string,
+    item: ScrapedListProduct,
+    url: string,
+  ): Promise<{ record?: ProductSourceRecord; movedFrom?: string }> {
+    if (item.externalId) {
+      const byExternalId = await this.sourceRecordRepo.findUniqueBySourceAndExternalId(
+        sourceId,
+        item.externalId,
+      );
+      if (byExternalId?.model) {
+        const movedFrom =
+          byExternalId.url && byExternalId.url !== url ? byExternalId.url : undefined;
+        return { record: byExternalId, movedFrom };
+      }
+    }
+
+    const byUrl = await this.sourceRecordRepo.findBySourceAndUrl(sourceId, url);
+    return { record: byUrl ?? undefined };
+  }
+
+  /**
+   * Moves a listing to the URL its card now shows: the record's own URL, and
+   * that of its offer entries which pointed at the old page, so the offer
+   * links to the live one. Under the caller's product lock, on the record as
+   * it is now; nothing is written when it has moved meanwhile.
+   */
+  private async moveListing(move: { recordId: string; from: string; to: string }): Promise<void> {
+    // Without relations: saved with its loaded offers, a stale list would
+    // re-bind an offer another writer has pointed at another record since.
+    const record = await this.sourceRecordRepo.findById(move.recordId);
+    if (!record || record.url !== move.from) return;
+
+    if (record.scrapedProduct) {
+      const offers = (record.scrapedProduct.offers ?? []).map((entry) => {
+        // An entry without a native id derives its id from the URL: pinned
+        // first, so it stays the id its offer is stored under.
+        const pinned: ScrapedOffer =
+          entry.resolvedExternalId === undefined
+            ? { ...entry, resolvedExternalId: storedOfferExternalId(record, entry) ?? null }
+            : { ...entry };
+        if (entry.url && normalizeUrl(entry.url) === move.from) pinned.url = move.to;
+        return pinned;
+      });
+      record.scrapedProduct = { ...record.scrapedProduct, offers };
+    }
+    record.url = move.to;
+    await this.sourceRecordRepo.save(record);
+
+    this.logger.log('A listing moved to a new URL', {
+      recordId: record.id,
+      from: move.from,
+      to: move.to,
+    });
   }
 
   /**

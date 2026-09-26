@@ -174,7 +174,7 @@ const SOURCES: SeedSourceSpec[] = [
     // what lets the poller claim them.
     schedulingEnabled: false,
     processingEnabled: true,
-    frequency: '7 days',
+    frequency: '1 day',
     seller: {
       name: 'ebikeshop.hu',
       domains: ['ebikeshop.hu'],

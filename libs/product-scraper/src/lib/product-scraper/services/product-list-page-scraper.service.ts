@@ -1,7 +1,10 @@
 import { ScraperService } from '@fittkereso-backend/scraper';
-import { ProductImportTaskPublisherService } from '@fittkereso-backend/task';
 import { ScrapeUrlDeduplicationService } from './scrape-url-deduplication.service';
-import { ListProductRefreshService } from './list-product-refresh.service';
+import {
+  emptyOutcomeCounts,
+  ListProductRefreshService,
+} from './list-product-refresh.service';
+import { DetailTaskCapService } from './detail-task-cap.service';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   asScrapingConfig,
@@ -24,11 +27,11 @@ export class ProductListPageScraperService {
 
   constructor(
     private readonly scraperService: ScraperService,
-    private readonly importTaskPublisher: ProductImportTaskPublisherService,
     private readonly scrapeUrlDedup: ScrapeUrlDeduplicationService,
     private readonly listProductRefresh: ListProductRefreshService,
     private readonly productCollectionMetrics: ProductCollectionMetricsService,
     private readonly interpreter: ScrapeInterpreterService,
+    private readonly detailTaskCap: DetailTaskCapService,
   ) {}
 
   /**
@@ -71,19 +74,13 @@ export class ProductListPageScraperService {
         )
       : products;
 
-    // `maxItems` caps PER PAGE here — each list page is its own task, so there
-    // is no run-scoped counter to share. ScrapingImportService compensates by
-    // enumerating only the first page of each listing when the cap is set; see
-    // ScrapingSourceConfig.maxItems.
-    const items =
-      config.maxItems !== undefined
-        ? selected.slice(0, config.maxItems)
-        : selected;
-
-    const outcomes = { refreshed: 0, incomplete: 0, unknown: 0, no_offer: 0 };
+    // Every card is looked at, whatever `maxItems` says: a card refreshed in
+    // place costs no task. The cap applies only to the detail tasks queued
+    // below, counted across the whole run (DetailTaskCapService).
+    const outcomes = emptyOutcomeCounts();
     const needingDetail: ScrapedListProduct[] = [];
 
-    for (const item of items) {
+    for (const item of selected) {
       if (isEmpty(item?.url)) continue;
 
       try {
@@ -94,7 +91,8 @@ export class ProductListPageScraperService {
         outcomes[outcome] += 1;
 
         // Only 'refreshed' avoids the detail fetch. Everything else — a card
-        // too thin for the minimum set, an unseen listing, an ambiguous
+        // too thin for the minimum set, a listing due its periodic detail
+        // scrape, an unseen or ambiguously moved listing, an ambiguous
         // multi-offer record — falls back to the authoritative path.
         if (outcome !== 'refreshed') needingDetail.push(item);
       } catch (error) {
@@ -109,15 +107,13 @@ export class ProductListPageScraperService {
     }
 
     const detailTasks = await this.createDetailTasks(task, needingDetail);
+    const { queued, capped } = await this.detailTaskCap.queue({
+      listTask: task,
+      tasks: detailTasks,
+      maxItems: config.maxItems,
+    });
 
-    this.productCollectionMetrics.recordDetailTasksCreated(
-      sourceName,
-      detailTasks.length,
-    );
-
-    if (!isEmpty(detailTasks)) {
-      await this.importTaskPublisher.addTasks(detailTasks);
-    }
+    this.productCollectionMetrics.recordDetailTasksCreated(sourceName, queued);
 
     this.logger.debug('List page scrape complete', {
       taskId: task.id,
@@ -126,10 +122,10 @@ export class ProductListPageScraperService {
       categoryName,
       productsFound: products.length,
       afterFilter: selected.length,
-      processed: items.length,
       maxItems: config.maxItems ?? null,
       ...outcomes,
-      detailTasksCreated: detailTasks.length,
+      detailTasksCreated: queued,
+      detailTasksCapped: capped,
     });
   }
 
@@ -181,6 +177,9 @@ export class ProductListPageScraperService {
       task.source = parentTask.source;
       task.kind = ProductImportTaskKind.DetailPage;
       task.url = item.url;
+      // What the page must still show when the task runs (see
+      // ProductDetailsPageScraperService.assertCardsProduct).
+      task.externalId = item.externalId ?? null;
       // The list page's own: its detail pages are the same piece of work.
       task.priority = parentTask.priority;
 

@@ -135,6 +135,11 @@ export interface PrependPrefixOp extends OpBase {
   prefix: string; // supports {{var}} interpolation
 }
 
+export interface RoundOp extends OpBase {
+  op: 'round';
+  decimals?: number; // decimal places to keep; default 0
+}
+
 export interface StripPatternOp extends OpBase {
   op: 'stripPattern';
   value?: string; // vars key; defaults to current pipeline value
@@ -537,6 +542,7 @@ export type ScrapeOperation =
   | TrimEndOp
   | AppendSuffixOp
   | PrependPrefixOp
+  | RoundOp
   | StripPatternOp
   | StripPrefixOp
   | SplitAndTakeOp

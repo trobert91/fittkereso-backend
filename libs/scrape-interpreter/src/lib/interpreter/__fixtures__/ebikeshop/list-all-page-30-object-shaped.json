@@ -1,0 +1,244 @@
+{
+  "requestedUrl": "https://ebikeshop.hu/termekek?oldal=30",
+  "capturedAt": "2026-09-26",
+  "via": "Zyte, through the MCP tool fetch_website_html",
+  "note": "props.products trimmed from 31 to 4 rows; everything else in props dropped except what a list page reads.",
+  "dataPage": {
+    "component": "products/Search",
+    "url": "/termekek?oldal=30",
+    "props": {
+      "meta": {
+        "h1Title": null
+      },
+      "products": {
+        "0": {
+          "id": 1008,
+          "productCode": "E1871",
+          "productName": "Uebler lámpatartó kar, baloldali i21,i31",
+          "showPageUrl": "https://ebikeshop.hu/termek/uebler-lampatarto-kar-baloldali",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/uebler-lampatarto-kar-baloldali-pc8baaed-674-thumb_640.webp",
+            "fileName": "documents/file/uebler-lampatarto-kar-baloldali-pc8baaed-674.webp",
+            "altText": "Uebler lámpatartó kar, baloldali",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 166,
+            "title": "Uebler",
+            "url": "https://ebikeshop.hu/uebler",
+            "slug": "uebler",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [],
+          "vat": 27,
+          "prices": {
+            "price": 17989.9945,
+            "priceFormatted": "17 990 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 79,
+            "name": "Hordozó",
+            "slug": "hordozo",
+            "orderNum": 0,
+            "parentId": null
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        "1": {
+          "id": 177,
+          "productCode": "1270015067",
+          "productName": "Bosch akku kábel 310 mm PowerPack vázas akksihoz",
+          "showPageUrl": "https://ebikeshop.hu/termek/bosch-akku-kabel-310-mm-powerpack-vazas-akksihoz-177",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/bosch-akku-kabel-310-mm-powerpack-vazas-akksihoz-p63a024c-723-thumb_640.webp",
+            "fileName": "documents/file/bosch-akku-kabel-310-mm-powerpack-vazas-akksihoz-p63a024c-723.webp",
+            "altText": "Bosch akku kábel 310 mm PowerPack vázas akksihoz",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 165,
+            "title": "Bosch",
+            "url": "https://ebikeshop.hu/bosch",
+            "slug": "bosch",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [],
+          "vat": 27,
+          "prices": {
+            "price": 17989.9945,
+            "priceFormatted": "17 990 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 64,
+            "name": "Bosch alkatrészek",
+            "slug": "bosch-alkatreszek",
+            "orderNum": 5,
+            "parentId": 52
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        "2": {
+          "id": 6732,
+          "productCode": "AB82511",
+          "productName": "ABUS láncos lakat Catena 6806K/110, fekete",
+          "showPageUrl": "https://ebikeshop.hu/termek/abus-lancos-lakat-catena-6806k-110-fekete",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/abus-lancos-lakat-catena-6806k-110-fekete-p2fdaf45-4133-thumb_640.webp",
+            "fileName": "documents/file/abus-lancos-lakat-catena-6806k-110-fekete-p2fdaf45-4133.webp",
+            "altText": "ABUS láncos lakat Catena 6806K/110, fekete",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": null,
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 258,
+            "title": "ABUS",
+            "url": "https://ebikeshop.hu/abus",
+            "slug": "abus",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [],
+          "vat": 27,
+          "prices": {
+            "price": 17989.9945,
+            "priceFormatted": "17 990 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 23,
+            "name": "Bicikli zárak és lakatok",
+            "slug": "lakatok-es-zarak",
+            "orderNum": 28,
+            "parentId": 13
+          },
+          "preorderTypeTitle": "Készleten"
+        },
+        "15": {
+          "id": 18602,
+          "productCode": "13816",
+          "productName": "CUBE kitámasztó CUBESTAND PRO fekete",
+          "showPageUrl": "https://ebikeshop.hu/termek/cube-kitamaszto-cubestand-pro-fekete-18602",
+          "image": {
+            "url": "https://ebikeshop.hu/storage/documents/file/cube-kitamaszto-cubestand-pro-fekete-p3b798c2-18570-thumb_640.webp",
+            "fileName": "documents/file/cube-kitamaszto-cubestand-pro-fekete-p3b798c2-18570.webp",
+            "altText": "CUBE kitámasztó CUBESTAND PRO fekete",
+            "orderNum": 0
+          },
+          "isUsed": false,
+          "arrivalDate": "2026. szept. 26.",
+          "sale": false,
+          "salePercent": null,
+          "promotion": null,
+          "manufacturer": {
+            "id": 1432,
+            "title": "CUBE",
+            "url": "https://ebikeshop.hu/cube",
+            "slug": "cube",
+            "categorySlug": "gyarto"
+          },
+          "inCompareList": false,
+          "highlightedProperties": [],
+          "vat": 27,
+          "prices": {
+            "price": 17989.9945,
+            "priceFormatted": "17 990 Ft",
+            "priceSale": 0,
+            "priceSaleFormatted": "",
+            "lowestPrice": 0,
+            "lowestPriceFormatted": "",
+            "sale": false,
+            "salePercent": 0,
+            "vat": 27,
+            "lowestPriceDateInterval": 30,
+            "distinctVatProduct": false,
+            "currentSaleStartDateFormatted": null
+          },
+          "category": {
+            "id": 32,
+            "name": "Kitámasztók",
+            "slug": "kitamasztok",
+            "orderNum": 2,
+            "parentId": 13
+          },
+          "preorderTypeTitle": "Várható gyártás"
+        }
+      },
+      "total": 1330,
+      "currentPage": 30,
+      "lastPage": 42,
+      "perPage": 32,
+      "sortOrder": {
+        "orderParamName": "rendezes",
+        "pageParamName": "oldal",
+        "items": [
+          {
+            "title": "Olcsóbbak",
+            "urlParamName": "ar_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 0
+          },
+          {
+            "title": "Drágábbak",
+            "urlParamName": "ar_szerint_csokkeno",
+            "selected": true,
+            "isDefault": true,
+            "orderNumber": 1
+          },
+          {
+            "title": "Név szerint",
+            "urlParamName": "nev_szerint_novekvo",
+            "selected": false,
+            "isDefault": false,
+            "orderNumber": 2
+          }
+        ]
+      }
+    }
+  }
+}

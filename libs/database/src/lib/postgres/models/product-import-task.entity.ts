@@ -82,6 +82,17 @@ export class ProductImportTask extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   url: string;
 
+  /**
+   * The listing's externalId as its list card stated it, on a detail task
+   * queued from a card. The page fetched from `url` must state the same one:
+   * a shop that never 404s (ebikeshop) redirects a delisted product's URL to
+   * another product, and importing that page would file it under this card.
+   * Null where no card said (a card without one, a variant link, a manual task).
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.list] })
+  externalId?: string | null;
+
   @Index()
   @Column({
     type: 'enum',
