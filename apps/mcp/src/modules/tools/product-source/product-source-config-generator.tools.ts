@@ -3,6 +3,11 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { AiChatRequest, AiChatService } from '@fittkereso-backend/ai';
 import { ScraperService } from '@fittkereso-backend/scraper';
+import {
+  DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
+  PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceFetchMode,
+} from '@fittkereso-backend/database';
 
 const DRAFT_CONFIG_SCHEMA = {
   type: 'object',
@@ -57,16 +62,26 @@ export class ProductSourceConfigGeneratorTools {
         .describe(
           'Model identifier resolved via AiProviderRegistry (defaults to "gpt-5-mini" if omitted).',
         ),
+      fetchMode: z
+        .enum(PRODUCT_SOURCE_FETCH_MODES)
+        .optional()
+        .describe(
+          `Default "${DEFAULT_PRODUCT_SOURCE_FETCH_MODE}" (Zyte, paid). "direct" calls the shop itself — only for a shop that agreed to be read.`,
+        ),
     }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
   })
   async generateProductSourceConfigDraft(args: {
     url: string;
     model?: string;
+    fetchMode?: ProductSourceFetchMode;
   }): Promise<string> {
     let html: string;
     try {
-      html = await this.scraperService.getHtml(args.url);
+      html = await this.scraperService.getHtml(
+        args.url,
+        args.fetchMode ?? DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
+      );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return `Failed to fetch ${args.url}: ${message}`;

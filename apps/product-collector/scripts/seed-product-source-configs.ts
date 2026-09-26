@@ -32,6 +32,7 @@ import { AppModule } from '../src/app.module';
 import {
   ProductSource,
   ProductSourceConfig,
+  ProductSourceFetchMode,
   ProductSourceRepository,
   ProductSourceType,
   Seller,
@@ -72,6 +73,8 @@ interface SeedSourceSpec {
   identifiesProducts: boolean;
   /** Whether a complete run may remove the offers it did not see. Feed sources only. */
   hasAllProducts: boolean;
+  /** 'proxied' (Zyte, paid) unless the shop agreed to be read, or a document is over Zyte's 10 MB. */
+  fetchMode: ProductSourceFetchMode;
   frequency: string;
   seller: SeedSellerSpec;
   // Only applied when creating the row for the first time (existing rows
@@ -91,6 +94,8 @@ const SOURCES: SeedSourceSpec[] = [
     priority: 50,
     identifiesProducts: true,
     hasAllProducts: false,
+    // ebikeshop has not agreed to be read directly.
+    fetchMode: 'proxied',
     frequency: '1 day',
     seller: {
       name: 'ebikeshop.hu',
@@ -125,6 +130,8 @@ const SOURCES: SeedSourceSpec[] = [
     // The feed is what says what the shop sells, so an item missing from a
     // complete run is gone.
     hasAllProducts: true,
+    // The feed is 26 MB, and Zyte truncates anything over 10 MB.
+    fetchMode: 'direct',
     // Nightly: one native GET costs nothing, and the LLM post-process is
     // skipped for every product whose specs did not change.
     frequency: '1 day',
@@ -189,6 +196,7 @@ async function main(): Promise<void> {
         source.priority = spec.priority;
         source.identifiesProducts = spec.identifiesProducts;
         source.hasAllProducts = spec.hasAllProducts;
+        source.fetchMode = spec.fetchMode;
         source.schedulingEnabled = spec.schedulingEnabled ?? true;
         source.processingEnabled = true;
         source.frequency = spec.frequency as ms.StringValue;

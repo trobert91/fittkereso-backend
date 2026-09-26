@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import {
+  DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
   ProductSource,
   ProductSourceRepository,
   SellerRepository,
@@ -57,6 +58,7 @@ export class SellerProductSourceCreateService {
     source.priority = priority;
     source.identifiesProducts = identifiesProducts;
     source.hasAllProducts = hasAllProducts;
+    source.fetchMode = dto.fetchMode ?? DEFAULT_PRODUCT_SOURCE_FETCH_MODE;
     source.schedulingEnabled = false;
     source.processingEnabled = false;
 

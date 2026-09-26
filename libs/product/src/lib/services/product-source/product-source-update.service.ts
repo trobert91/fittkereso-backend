@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  isProductSourceFetchMode,
+  PRODUCT_SOURCE_FETCH_MODES,
   ProductSource,
   ProductSourceActor,
+  ProductSourceFetchMode,
   ProductSourceRepository,
   Seller,
   SellerRepository,
@@ -74,6 +77,7 @@ export class ProductSourceUpdateService {
       priority: source.priority,
       identifiesProducts: source.identifiesProducts,
       hasAllProducts: source.hasAllProducts,
+      fetchMode: source.fetchMode,
     };
 
     if (params.sellerId !== undefined) {
@@ -103,6 +107,10 @@ export class ProductSourceUpdateService {
 
     if (params.hasAllProducts !== undefined) {
       source.hasAllProducts = params.hasAllProducts;
+    }
+
+    if (params.fetchMode !== undefined) {
+      source.fetchMode = this.parseFetchMode(params.fetchMode);
     }
 
     if (params.maxConcurrent !== undefined) {
@@ -220,9 +228,12 @@ export class ProductSourceUpdateService {
    *
    * Only the ones worth a timeline entry: scheduling and processing decide
    * whether the source runs at all, the seller decides who every future
-   * offer belongs to, and the two flags decide whether the source creates
-   * products and whether its runs may remove offers. Renaming it or nudging an interval is visible in the row
-   * itself and not worth a row of its own.
+   * offer belongs to, the two flags decide whether the source creates
+   * products and whether its runs may remove offers, and the fetch mode
+   * decides whether we pay for every request or call the shop itself — which
+   * needs its consent, so who switched it and when is worth keeping. Renaming
+   * it or nudging an interval is visible in the row itself and not worth a
+   * row of its own.
    *
    * Never fails the update. The change is already committed by the time this
    * runs, and losing an audit row is a smaller problem than reporting a
@@ -237,6 +248,7 @@ export class ProductSourceUpdateService {
       processingEnabled: boolean;
       identifiesProducts: boolean;
       hasAllProducts: boolean;
+      fetchMode: ProductSourceFetchMode;
     },
     actor: ProductSourceActor,
   ): Promise<void> {
@@ -289,6 +301,15 @@ export class ProductSourceUpdateService {
         );
       }
 
+      if (params.fetchMode !== undefined && params.fetchMode !== previous.fetchMode) {
+        await this.versionService.recordAction(
+          source,
+          'fetch_mode_changed',
+          { from: previous.fetchMode, to: source.fetchMode },
+          actor,
+        );
+      }
+
       if (params.sellerId !== undefined && previous.seller?.id !== source.seller?.id) {
         await this.versionService.recordAction(
           source,
@@ -310,6 +331,19 @@ export class ProductSourceUpdateService {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  // Checked here as well as by the callers' validators: a value this column
+  // does not know would send every fetch of the source down the Zyte path
+  // (ScraperService treats anything but 'direct' as proxied) with no error.
+  private parseFetchMode(value: unknown): ProductSourceFetchMode {
+    if (!isProductSourceFetchMode(value)) {
+      throw new BadRequestException(
+        `Invalid fetchMode — expected one of ${PRODUCT_SOURCE_FETCH_MODES.join(', ')}`,
+      );
+    }
+
+    return value;
   }
 
   // Clearing has to resolve to null, not undefined: TypeORM's save() skips

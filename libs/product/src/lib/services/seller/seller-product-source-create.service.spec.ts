@@ -94,6 +94,26 @@ describe('SellerProductSourceCreateService', () => {
     expect(sourceRepo.save).not.toHaveBeenCalled();
   });
 
+  // Feeds included: a shop is only called directly because someone chose it.
+  it.each(['scraping', 'arukereso', 'googleshop'] as const)(
+    'fetches a new %s source through the scraping API unless told otherwise',
+    async (type) => {
+      const created = await service.createForSeller(SELLER.id, { name: 'first', type });
+
+      expect(created.fetchMode).toBe('proxied');
+    },
+  );
+
+  it('uses an explicit fetch mode as given', async () => {
+    const created = await service.createForSeller(SELLER.id, {
+      name: 'speedbike-arukereso',
+      type: 'arukereso',
+      fetchMode: 'direct',
+    });
+
+    expect(created.fetchMode).toBe('direct');
+  });
+
   it('refuses hasAllProducts on a scraping source', async () => {
     await expect(
       service.createForSeller(SELLER.id, { name: 'crawl', type: 'scraping', hasAllProducts: true }),

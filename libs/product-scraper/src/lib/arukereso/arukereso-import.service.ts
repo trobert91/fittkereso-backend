@@ -15,7 +15,7 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
 import { offerExternalIdOf } from '@fittkereso-backend/utils';
 import { CompleteSourceRemovalService } from '@fittkereso-backend/product';
-import { NativeScraperService } from '@fittkereso-backend/scraper';
+import { ScraperService } from '@fittkereso-backend/scraper';
 import {
   emptyImportRunSummary,
   ImportRunOptions,
@@ -80,7 +80,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
   private readonly logger = new CustomLogger(ArukeresoImportService.name);
 
   constructor(
-    private readonly nativeScraper: NativeScraperService,
+    private readonly scraperService: ScraperService,
     private readonly feedParser: ArukeresoFeedParserService,
     private readonly mapper: ArukeresoProductMapperService,
     private readonly triage: ArukeresoFeedTriageService,
@@ -118,8 +118,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
     let batch: FeedRow[] = [];
 
     try {
-      const { stream, contentType } = await this.nativeScraper.stream(
+      const { stream, contentType } = await this.scraperService.stream(
         config.feedUrl,
+        source.fetchMode,
       );
 
       const parsed = await this.feedParser.parseStream(

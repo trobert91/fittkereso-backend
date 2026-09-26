@@ -26,7 +26,7 @@ import {
   asArukeresoConfig,
   ProductSourceRepository,
 } from '@fittkereso-backend/database';
-import { NativeScraperService } from '@fittkereso-backend/scraper';
+import { ScraperService } from '@fittkereso-backend/scraper';
 import {
   ArukeresoFeedParserService,
   ArukeresoProductMapperService,
@@ -64,9 +64,10 @@ async function main(): Promise<void> {
     let withoutExternalId = 0;
     let specKeyTotal = 0;
 
+    // In the source's own fetch mode, as its run would fetch it.
     const { stream, contentType } = await app
-      .get(NativeScraperService)
-      .stream(config.feedUrl);
+      .get(ScraperService)
+      .stream(config.feedUrl, source.fetchMode);
 
     const started = Date.now();
     const summary = await app.get(ArukeresoFeedParserService).parseStream(

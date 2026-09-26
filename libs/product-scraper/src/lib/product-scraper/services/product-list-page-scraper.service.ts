@@ -51,7 +51,7 @@ export class ProductListPageScraperService {
     });
 
     const config = asScrapingConfig(task.source.config, sourceName);
-    const html = await this.scraperService.getHtml(task.url);
+    const html = await this.scraperService.getHtml(task.url, task.source.fetchMode);
     const $ = cheerio.load(html);
 
     const { categoryName, products } = await this.interpreter.runListPage(

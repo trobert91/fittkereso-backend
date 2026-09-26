@@ -135,7 +135,9 @@ export class ScrapingImportService implements ProductSourceImporter {
     const resolved: string[] = [];
     for (const startUrl of startUrls) {
       try {
-        const $ = cheerio.load(await this.scraperService.getHtml(startUrl));
+        const $ = cheerio.load(
+          await this.scraperService.getHtml(startUrl, source.fetchMode),
+        );
         const links =
           ((await this.interpreter.runPipeline(
             config.categoryLinks,
@@ -188,7 +190,9 @@ export class ScrapingImportService implements ProductSourceImporter {
       all.push(categoryUrl);
 
       try {
-        const $ = cheerio.load(await this.scraperService.getHtml(categoryUrl));
+        const $ = cheerio.load(
+          await this.scraperService.getHtml(categoryUrl, source.fetchMode),
+        );
         const raw = await this.interpreter.runPipeline(
           pagination.pageCount,
           this.fakeTask(source, categoryUrl),

@@ -19,6 +19,7 @@ const makeSource = (overrides: Partial<ProductSource>): ProductSource =>
     processingEnabled: true,
     identifiesProducts: true,
     hasAllProducts: false,
+    fetchMode: 'proxied',
     ...overrides,
   }) as ProductSource;
 
@@ -117,6 +118,36 @@ describe('ProductSourceUpdateService', () => {
 
     expect(sourceRepo.find).not.toHaveBeenCalled();
     expect(sourceRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'renamed' }));
+  });
+
+  describe('fetchMode', () => {
+    // A consent and cost decision: the timeline says who made it.
+    it('switches a source to direct and records it', async () => {
+      await service.updateProductSource(arukereso().id, { fetchMode: 'direct' });
+
+      expect(sourceRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ fetchMode: 'direct' }),
+      );
+      expect(versionService.recordAction).toHaveBeenCalledWith(
+        expect.anything(),
+        'fetch_mode_changed',
+        { from: 'proxied', to: 'direct' },
+        expect.anything(),
+      );
+    });
+
+    it('records nothing when the mode stays the same', async () => {
+      await service.updateProductSource(arukereso().id, { fetchMode: 'proxied' });
+
+      expect(versionService.recordAction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a mode it does not know', async () => {
+      await expect(
+        service.updateProductSource(arukereso().id, { fetchMode: 'native' as never }),
+      ).rejects.toThrow(/Invalid fetchMode/);
+      expect(sourceRepo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('detailRefreshInterval', () => {

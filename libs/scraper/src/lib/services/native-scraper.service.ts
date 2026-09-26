@@ -38,11 +38,10 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
 /**
  * Plain HTTP fetching — no anti-bot proxy, no per-request cost.
  *
- * Lives in libs/scraper beside the Zyte-backed ScraperService so this library
- * stays the only thing that reaches the network for content. The distinction is
- * deliberate and worth keeping visible: Zyte is the paid HTML fetcher for sites
- * that defend against scraping, and it has no business pulling a public feed
- * the shop publishes for exactly this purpose.
+ * The 'direct' half of ScraperService, which picks it or Zyte by the source's
+ * fetch mode; imports go through ScraperService rather than calling this, so
+ * the source's choice is always the one applied. Lives in libs/scraper so this
+ * library stays the only thing that reaches the network for content.
  */
 @Injectable()
 export class NativeScraperService {

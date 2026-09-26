@@ -9,10 +9,9 @@ const DAY = 24 * 60 * 60 * 1000;
 
 describe('ProductSourceImportSimulationService', () => {
   let service: ProductSourceImportSimulationService;
-  let nativeScraper: { stream: jest.Mock };
   let mapper: { classify: jest.Mock; map: jest.Mock; resolveTarget: jest.Mock };
   let interpreter: { runValuePipeline: jest.Mock; runListPage: jest.Mock };
-  let scraperService: { getHtml: jest.Mock };
+  let scraperService: { getHtml: jest.Mock; stream: jest.Mock };
   let scrapingImport: { planRun: jest.Mock };
   let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; findUniqueBySourceAndExternalId: jest.Mock };
   let specPostProcess: { extractIdentity: jest.Mock };
@@ -23,6 +22,7 @@ describe('ProductSourceImportSimulationService', () => {
     id: 'source-1',
     name: 'speedbike-arukereso',
     type: 'arukereso',
+    fetchMode: 'direct',
     config: {
       baseUrl: 'https://speedbike.hu',
       feedUrl: 'https://speedbike.hu/feed',
@@ -35,6 +35,7 @@ describe('ProductSourceImportSimulationService', () => {
     id: 'source-2',
     name: 'ebikeshop',
     type: 'scraping',
+    fetchMode: 'proxied',
     detailRefreshInterval: '60 days',
     config: {
       baseUrl: 'https://ebikeshop.hu',
@@ -57,14 +58,13 @@ describe('ProductSourceImportSimulationService', () => {
       .join('')}</Products>`;
 
   const givenFeed = (xml: string) =>
-    nativeScraper.stream.mockResolvedValue({
+    scraperService.stream.mockResolvedValue({
       statusCode: 200,
       contentType: 'application/xml',
       stream: Readable.from([xml]),
     });
 
   beforeEach(() => {
-    nativeScraper = { stream: jest.fn() };
     mapper = {
       classify: jest.fn().mockResolvedValue({ status: 'eligible', slug: 'ebikes' }),
       map: jest
@@ -81,7 +81,10 @@ describe('ProductSourceImportSimulationService', () => {
       ),
     };
     interpreter = { runValuePipeline: jest.fn(), runListPage: jest.fn() };
-    scraperService = { getHtml: jest.fn().mockResolvedValue('<html></html>') };
+    scraperService = {
+      getHtml: jest.fn().mockResolvedValue('<html></html>'),
+      stream: jest.fn(),
+    };
     scrapingImport = {
       planRun: jest
         .fn()
@@ -107,7 +110,6 @@ describe('ProductSourceImportSimulationService', () => {
 
     service = new ProductSourceImportSimulationService(
       scraperService as never,
-      nativeScraper as never,
       interpreter as never,
       scrapingImport as never,
       // The real decision: the simulation reports what a run would do, so a
@@ -417,12 +419,28 @@ describe('ProductSourceImportSimulationService', () => {
     });
 
     it('reports a feed that cannot be fetched as an error, not an empty run', async () => {
-      nativeScraper.stream.mockRejectedValue(new Error('HTTP 404'));
+      scraperService.stream.mockRejectedValue(new Error('HTTP 404'));
 
       const result = await service.simulate(feedSource);
 
       expect(result.errors).toEqual(['HTTP 404']);
       expect(result.feed).toBeUndefined();
+    });
+
+    it("fetches the feed in the source's mode unless told another", async () => {
+      givenFeed(feed(['a']));
+      const asStored = await service.simulate(feedSource);
+
+      expect(asStored.fetchMode).toBe('direct');
+      expect(scraperService.stream).toHaveBeenLastCalledWith('https://speedbike.hu/feed', 'direct');
+
+      givenFeed(feed(['a']));
+      const overridden = await service.simulate(feedSource, { fetchMode: 'proxied' });
+
+      expect(overridden.fetchMode).toBe('proxied');
+      expect(scraperService.stream).toHaveBeenLastCalledWith('https://speedbike.hu/feed', 'proxied');
+      // Only the simulation's copy: the source itself is not switched.
+      expect(feedSource.fetchMode).toBe('direct');
     });
   });
 
@@ -452,6 +470,30 @@ describe('ProductSourceImportSimulationService', () => {
       expect(result.scraping?.pageUrls).toEqual(['p1', 'p2']);
       expect(result.scraping?.listPageParsed).toBe('p1');
       expect(scrapingImport.planRun).toHaveBeenCalled();
+    });
+
+    // The check before switching a shop to direct: the page walk and the list
+    // page both have to come back from the shop itself.
+    it('walks and reads the list page in the overriding fetch mode', async () => {
+      interpreter.runListPage.mockResolvedValue({ products: [card()] });
+
+      const result = await service.simulate(scrapingSource, { fetchMode: 'direct' });
+
+      expect(result.fetchMode).toBe('direct');
+      expect(scrapingImport.planRun).toHaveBeenCalledWith(
+        expect.objectContaining({ fetchMode: 'direct' }),
+        expect.anything(),
+      );
+      expect(scraperService.getHtml).toHaveBeenCalledWith('p1', 'direct');
+    });
+
+    it("reads the list page in the source's own mode by default", async () => {
+      interpreter.runListPage.mockResolvedValue({ products: [card()] });
+
+      const result = await service.simulate(scrapingSource);
+
+      expect(result.fetchMode).toBe('proxied');
+      expect(scraperService.getHtml).toHaveBeenCalledWith('p1', 'proxied');
     });
 
     it('costs a detail fetch for a listing this source has never seen', async () => {

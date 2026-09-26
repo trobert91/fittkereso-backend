@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
+  DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
   isScrapingConfig,
+  PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceFetchMode,
   ProductSourceRepository,
   ScrapingSourceConfig,
 } from '@fittkereso-backend/database';
@@ -38,6 +41,12 @@ export class ProductSourceSimulateScrapeTools {
           .describe(
             "Use an existing ProductSource's already-saved config instead of passing one inline. Exactly one of config/productSourceId must be given.",
           ),
+        fetchMode: z
+          .enum(PRODUCT_SOURCE_FETCH_MODES)
+          .optional()
+          .describe(
+            "How to fetch the page: 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent). Defaults to the source's own fetchMode with productSourceId, 'proxied' with an inline config. Pass 'direct' to check a shop before switching it to direct.",
+          ),
       })
       .refine((args) => !!args.config !== !!args.productSourceId, {
         message: 'Provide exactly one of config or productSourceId',
@@ -48,8 +57,10 @@ export class ProductSourceSimulateScrapeTools {
     url: string;
     config?: Record<string, unknown>;
     productSourceId?: string;
+    fetchMode?: ProductSourceFetchMode;
   }): Promise<string> {
     let config: ScrapingSourceConfig;
+    let fetchMode = args.fetchMode ?? DEFAULT_PRODUCT_SOURCE_FETCH_MODE;
     if (args.productSourceId) {
       const source = await this.productSourceRepo.findOneOrFail({
         where: { id: args.productSourceId },
@@ -60,6 +71,7 @@ export class ProductSourceSimulateScrapeTools {
         return `Product source ${args.productSourceId} is not a scraping source with a detailPage config — nothing to simulate.`;
       }
       config = source.config;
+      fetchMode = args.fetchMode ?? source.fetchMode;
     } else {
       config = args.config as unknown as ScrapingSourceConfig;
       if (!config?.detailPage) {
@@ -68,7 +80,11 @@ export class ProductSourceSimulateScrapeTools {
     }
 
     try {
-      const result = await this.simulationService.simulateDetailPageScrape(args.url, config);
+      const result = await this.simulationService.simulateDetailPageScrape(
+        args.url,
+        config,
+        fetchMode,
+      );
       return this.formatResult(result);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -79,7 +95,7 @@ export class ProductSourceSimulateScrapeTools {
   private formatResult(result: ProductSourceSimulationResult): string {
     const L: string[] = [];
     L.push(`# Scrape Simulation: ${result.url}`);
-    L.push(`- **HTML fetched**: ${result.html.length} chars`);
+    L.push(`- **HTML fetched**: ${result.html.length} chars (${result.fetchMode})`);
     L.push('');
 
     if (result.errors.length) {

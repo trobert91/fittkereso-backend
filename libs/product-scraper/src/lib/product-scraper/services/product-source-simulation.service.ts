@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import {
   ProductCategory,
   ProductSource,
+  ProductSourceFetchMode,
   ScrapedProduct,
   ScrapingSourceConfig,
   ProductImportTask,
@@ -57,6 +58,7 @@ export interface SimulatedProductPreview {
 
 export interface ProductSourceSimulationResult {
   url: string;
+  fetchMode: ProductSourceFetchMode;
   html: {
     length: number;
   };
@@ -125,11 +127,12 @@ export class ProductSourceSimulationService {
   public async simulateDetailPageScrape(
     url: string,
     config: ScrapingSourceConfig,
+    fetchMode: ProductSourceFetchMode,
   ): Promise<ProductSourceSimulationResult> {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    const html = await this.scraperService.getHtml(url);
+    const html = await this.scraperService.getHtml(url, fetchMode);
     const $ = cheerio.load(html);
 
     const task = this.buildFakeTask(url, config);
@@ -137,6 +140,7 @@ export class ProductSourceSimulationService {
 
     const result: ProductSourceSimulationResult = {
       url,
+      fetchMode,
       html: { length: html.length },
       extraction: {
         rawSpecs: detail.rawSpecs,

@@ -70,7 +70,7 @@ export class ProductDetailsPageScraperService {
 
     try {
       const primaryUrl = normalizeUrl(task.url);
-      const html = await this.scraperService.getHtml(primaryUrl);
+      const html = await this.scraperService.getHtml(primaryUrl, task.source.fetchMode);
       const $ = cheerio.load(html);
 
       const extractionStart = Date.now();

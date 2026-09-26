@@ -1,6 +1,7 @@
 import {
   ProductSourceActor,
   ProductSourceConfig,
+  ProductSourceFetchMode,
   ProductSourceType,
 } from '@fittkereso-backend/database';
 
@@ -21,6 +22,8 @@ export interface ProductSourceUpdateParams {
   identifiesProducts?: boolean;
   /** Feed sources only. */
   hasAllProducts?: boolean;
+  /** Anything but a known mode is refused. */
+  fetchMode?: ProductSourceFetchMode;
   maxConcurrent?: number;
   requestsPerHour?: number;
   frequency?: string | null;

@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { ProductSourceRepository } from '@fittkereso-backend/database';
+import {
+  PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceFetchMode,
+  ProductSourceRepository,
+} from '@fittkereso-backend/database';
 import {
   ProductSourceImportSimulationResult,
   ProductSourceImportSimulationService,
@@ -41,6 +45,12 @@ export class ProductSourceSimulateImportTools {
         .array(z.string())
         .optional()
         .describe('Narrow the run to these category slugs, as a manual trigger would.'),
+      fetchMode: z
+        .enum(PRODUCT_SOURCE_FETCH_MODES)
+        .optional()
+        .describe(
+          "Fetch as if the source were in this mode — 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent) — for every fetch of the run, the page walk included. Defaults to the source's own fetchMode. The source itself is not changed: pass 'direct' to check a shop before switching it.",
+        ),
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false },
   })
@@ -49,6 +59,7 @@ export class ProductSourceSimulateImportTools {
     listUrl?: string;
     limit?: number;
     categorySlugs?: string[];
+    fetchMode?: ProductSourceFetchMode;
   }): Promise<string> {
     const source = await this.productSourceRepo.findOne({
       where: { id: args.productSourceId },
@@ -63,6 +74,7 @@ export class ProductSourceSimulateImportTools {
         listUrl: args.listUrl,
         limit: args.limit,
         categorySlugs: args.categorySlugs,
+        fetchMode: args.fetchMode,
       });
       return this.format(result);
     } catch (error: unknown) {
@@ -75,6 +87,7 @@ export class ProductSourceSimulateImportTools {
     const L: string[] = [];
     L.push(`# Import Simulation: ${result.sourceName} (type "${result.type}")`);
     L.push('_Nothing was queued, fetched into the database, or written._');
+    L.push(`- **fetched**: ${result.fetchMode}`);
     L.push('');
 
     if (result.errors.length) {

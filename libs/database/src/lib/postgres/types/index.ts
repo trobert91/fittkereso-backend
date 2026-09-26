@@ -3,6 +3,7 @@ export * from './product-source-config';
 export * from './product-source-actor';
 export * from './product-source-action';
 export * from './product-source-type';
+export * from './product-source-fetch-mode';
 export * from './scrape-operation';
 export * from './scrape-operation.schema';
 export * from './product-source-config.schema';

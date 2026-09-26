@@ -44,6 +44,8 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
   'identifies_products_changed',
   /** hasAllProducts changed: whether a complete run may remove unseen offers. Payload: { from, to }. */
   'has_all_products_changed',
+  /** fetchMode changed: through the paid scraping API or directly from the shop. Payload: { from, to }. */
+  'fetch_mode_changed',
   /**
    * An import run finished. Payload: ImportRunSummary plus type and
    * durationMs — { type, itemsSeen, listTasksEnqueued, detailTasksEnqueued,

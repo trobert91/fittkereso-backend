@@ -8,7 +8,9 @@ import {
   Min,
 } from 'class-validator';
 import {
+  PRODUCT_SOURCE_FETCH_MODES,
   PRODUCT_SOURCE_TYPES,
+  ProductSourceFetchMode,
   ProductSourceType,
 } from '@fittkereso-backend/database';
 
@@ -42,4 +44,9 @@ export class SellerProductSourceCreateDto {
   @IsOptional()
   @IsBoolean()
   hasAllProducts?: boolean;
+
+  /** Defaults to 'proxied' for every type: a shop is only called directly on purpose. */
+  @IsOptional()
+  @IsIn(PRODUCT_SOURCE_FETCH_MODES as readonly string[])
+  fetchMode?: ProductSourceFetchMode;
 }

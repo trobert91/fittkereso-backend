@@ -21,6 +21,7 @@ This is the root of everything. Each row is one importable source (today: `ebike
 - `config: ProductSourceConfig` (jsonb) — the entire declarative definition. Which shape it takes is decided by `type`, so it is a discriminated pair rather than one document with a mode flag.
 - `seller: Seller` — the storefront every offer from this source belongs to. Non-nullable; there is no per-offer seller in the pipeline.
 - `maxConcurrent`, `requestsPerHour`, `priority`, `schedulingEnabled`, `processingEnabled` — scheduling/throttling knobs. On a feed source they govern nothing: a feed run is one HTTP GET and enqueues no tasks.
+- `fetchMode` — how every page and feed of the source is fetched, for every type: `'proxied'` (the default, and what a new source gets) goes through the paid scraping API, Zyte today; `'direct'` calls the shop itself, for free. A shop goes direct only once it agrees to be read, or when a document is over Zyte's 10 MB limit — Zyte truncates a longer body without an error, so `ScraperService` refuses a proxied body of 10 MB or more rather than parse half a feed. speedbike's feeds are direct (its Árukereső feed is 26 MB); ebikeshop is proxied. A switch writes a `fetch_mode_changed` row on the source's timeline, and `simulate_product_source_import` / `simulate_product_source_scrape` take a `fetchMode` override to check a shop before switching it.
 - `frequency` / `nextRunAt` — how often this source runs, and when it is next due. Runs are **started overnight, 02:00–06:00 Europe/Budapest**; `nextRunAt` is always snapped into that window, with jitter so ten shops do not all start at 02:00.
 - `detailRefreshInterval` — how old a known listing's detail import may get (an `ms` string, default `'60 days'`, never null) before a run fetches its detail page again, even though its list card could refresh it in place: a card never shows a new GTIN, spec, description or store list. Each listing falls due somewhere in the interval's last quarter, by a hash of its URL, so a whole first import does not fall due on one night. Acts on scraping sources' list cards; a feed row is the whole listing and is re-imported whenever it changes.
 
@@ -161,7 +162,7 @@ These are the closest thing to living documentation for "what does this config a
 - `libs/product-scraper/src/lib/product-scraper/services/product-details-page-scraper.service.ts`
 
 These are the two services that actually get invoked per `ProductImportTask`. Both:
-1. Fetch HTML via `ScraperService.getHtml(task.url)` (unchanged — still backed by the Zyte API, see `libs/zyte`).
+1. Fetch HTML via `ScraperService.getHtml(task.url, task.source.fetchMode)` — through the Zyte API (`libs/zyte`) when the source is `proxied`, from the shop itself (`NativeScraperService`) when it is `direct`.
 2. `cheerio.load()` it.
 3. Call the interpreter (`runListPage` or `runDetailPage`) with `task.source.config`.
 4. Do something with the result.
@@ -285,7 +286,8 @@ cron (ProductSourceSyncScheduler, every 10 min between 02:00–05:59 Europe/Buda
 
   ── types 'arukereso' and 'googleshop' ───────────────────────────
   ArukeresoImportService
-    → one native GET, streamed through ArukeresoFeedParserService, every row
+    → one GET in the source's fetchMode (speedbike's are direct),
+      streamed through ArukeresoFeedParserService, every row
       mapped (deterministic, no LLM) and triaged against its listing's stored
       feedRowHash (ArukeresoFeedTriageService): an unchanged row only has its
       offer's lastSynced confirmed; a new or changed row becomes a feed_entry

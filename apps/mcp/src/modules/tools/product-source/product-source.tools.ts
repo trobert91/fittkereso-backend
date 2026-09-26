@@ -9,6 +9,9 @@ import {
   systemActor,
   PRODUCT_SOURCE_TYPES,
   ProductSourceType,
+  DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
+  PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceFetchMode,
 } from '@fittkereso-backend/database';
 import {
   ProductSourceUpdateParams,
@@ -199,7 +202,7 @@ export class ProductSourceTools {
       L.push(
         `- Scheduling: ${source.schedulingEnabled ? 'on' : 'off'} · Processing: ${source.processingEnabled ? 'on' : 'off'}`,
       );
-      L.push(`- Type: ${source.type}`);
+      L.push(`- Type: ${source.type} · Fetch mode: ${source.fetchMode}`);
       L.push(
         `- Priority: ${source.priority} · Identifies products: ${source.identifiesProducts ? 'yes' : 'no'} · Has all products: ${source.hasAllProducts ? 'yes' : 'no'}`,
       );
@@ -248,6 +251,12 @@ export class ProductSourceTools {
         .describe(
           "Default false. The source lists the shop's whole catalog for its enabled categories, so a complete run may remove the offers it did not see. Feed sources only.",
         ),
+      fetchMode: z
+        .enum(PRODUCT_SOURCE_FETCH_MODES)
+        .optional()
+        .describe(
+          `How every page and feed of the source is fetched. Default "${DEFAULT_PRODUCT_SOURCE_FETCH_MODE}": through Zyte, paid. "direct": from the shop itself, free — only for a shop that agreed to be read, or for a feed over 10 MB, which Zyte truncates.`,
+        ),
     }),
     annotations: { destructiveHint: false, idempotentHint: false },
   })
@@ -258,12 +267,13 @@ export class ProductSourceTools {
     priority?: number;
     identifiesProducts?: boolean;
     hasAllProducts?: boolean;
+    fetchMode?: ProductSourceFetchMode;
   }): Promise<string> {
     try {
       const { sellerId, ...dto } = args;
       const source = await this.createService.createForSeller(sellerId, dto);
 
-      return `Product source "${source.name}" created (${source.id}, type "${source.type}", priority ${source.priority}, identifies products: ${source.identifiesProducts}, has all products: ${source.hasAllProducts}) for seller ${sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
+      return `Product source "${source.name}" created (${source.id}, type "${source.type}", fetch mode "${source.fetchMode}", priority ${source.priority}, identifies products: ${source.identifiesProducts}, has all products: ${source.hasAllProducts}) for seller ${sellerId}. Scheduling and processing are both disabled — use update_product_source to configure and enable it.`;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return `Failed to create product source "${args.name}": ${message}`;
@@ -273,7 +283,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'update_product_source',
     description:
-      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority (unique per seller), identifiesProducts / hasAllProducts, throttling (maxConcurrent, requestsPerHour), the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear), and detailRefreshInterval (how old a known listing\'s detail import may get, default "60 days"). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
+      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority (unique per seller), identifiesProducts / hasAllProducts, fetchMode (Zyte or direct), throttling (maxConcurrent, requestsPerHour), the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear), and detailRefreshInterval (how old a known listing\'s detail import may get, default "60 days"). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to update'),
       name: z.string().min(1).optional(),
@@ -303,6 +313,12 @@ export class ProductSourceTools {
         .describe(
           'Whether the source lists the whole catalog, so a complete run may remove unseen offers. Feed sources only.',
         ),
+      fetchMode: z
+        .enum(PRODUCT_SOURCE_FETCH_MODES)
+        .optional()
+        .describe(
+          '"proxied": every page and feed goes through Zyte, paid. "direct": fetched from the shop itself, free — only for a shop that agreed to be read, or for a feed over 10 MB, which Zyte truncates. Check a switch first with simulate_product_source_import and its fetchMode override.',
+        ),
       maxConcurrent: z.number().int().min(1).optional(),
       requestsPerHour: z.number().int().min(1).optional(),
       frequency: z
@@ -328,6 +344,7 @@ export class ProductSourceTools {
     priority?: number;
     identifiesProducts?: boolean;
     hasAllProducts?: boolean;
+    fetchMode?: ProductSourceFetchMode;
     maxConcurrent?: number;
     requestsPerHour?: number;
     frequency?: string | null;
@@ -529,7 +546,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'fetch_website_html',
     description:
-      'Fetch the raw HTML of a real, publicly reachable URL via the Zyte extract API. Use this to inspect a seller\'s website before drafting or hand-writing a ProductSourceConfig scraping pipeline — e.g. fetch a product listing page or a product detail page and read the returned HTML to figure out selectors. Returns the HTML truncated to a safe length for the response; note the truncation if it happens.',
+      'Fetch the raw HTML of a real, publicly reachable URL — via the Zyte extract API by default, or directly from the shop. Use this to inspect a seller\'s website before drafting or hand-writing a ProductSourceConfig scraping pipeline — e.g. fetch a product listing page or a product detail page and read the returned HTML to figure out selectors. Returns the HTML truncated to a safe length for the response; note the truncation if it happens.',
     parameters: z.object({
       url: z.string().url().describe('Full URL to fetch, e.g. a category or product page'),
       maxLength: z
@@ -538,22 +555,30 @@ export class ProductSourceTools {
         .positive()
         .optional()
         .describe('Max characters of HTML to return, default 20000'),
+      fetchMode: z
+        .enum(PRODUCT_SOURCE_FETCH_MODES)
+        .optional()
+        .describe(
+          `Default "${DEFAULT_PRODUCT_SOURCE_FETCH_MODE}" (Zyte, paid). "direct" calls the shop itself — only for a shop that agreed to be read, e.g. to check that it answers us before switching its source to direct.`,
+        ),
     }),
     annotations: { readOnlyHint: true },
   })
   async fetchWebsiteHtml(args: {
     url: string;
     maxLength?: number;
+    fetchMode?: ProductSourceFetchMode;
   }): Promise<string> {
     const maxLength = args.maxLength ?? 20000;
+    const fetchMode = args.fetchMode ?? DEFAULT_PRODUCT_SOURCE_FETCH_MODE;
 
     try {
-      const html = await this.scraperService.getHtml(args.url);
+      const html = await this.scraperService.getHtml(args.url, fetchMode);
       const truncated = html.length > maxLength;
       const body = truncated ? html.slice(0, maxLength) : html;
 
       const L: string[] = [];
-      L.push(`# HTML for ${args.url}`);
+      L.push(`# HTML for ${args.url} (${fetchMode})`);
       L.push(`Length: ${html.length} chars${truncated ? ` (truncated to ${maxLength})` : ''}`);
       L.push('');
       L.push('```html');
@@ -580,6 +605,7 @@ export class ProductSourceTools {
     L.push(`- **Priority**: ${source.priority}`);
     L.push(`- **Identifies products**: ${source.identifiesProducts}`);
     L.push(`- **Has all products**: ${source.hasAllProducts}`);
+    L.push(`- **Fetch mode**: ${source.fetchMode}`);
     L.push(`- **Max concurrent**: ${source.maxConcurrent}`);
     L.push(`- **Requests per hour**: ${source.requestsPerHour}`);
     L.push(`- **Frequency**: ${source.frequency ?? '_not set_'}`);

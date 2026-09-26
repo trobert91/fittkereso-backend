@@ -381,6 +381,9 @@ async function createSources(app: App): Promise<{ a: ProductSource; g: ProductSo
       type,
       seller,
       priority,
+      // As speedbike's two feeds are, and what stubExternalCalls serves: a
+      // proxied source would reach Zyte instead of the stubbed feeds.
+      fetchMode: 'direct',
       schedulingEnabled: false,
       processingEnabled: true,
     });

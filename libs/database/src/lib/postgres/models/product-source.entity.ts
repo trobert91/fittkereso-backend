@@ -6,6 +6,10 @@ import { ProductImportTask } from './product-import-task.entity';
 import { Seller } from './seller.entity';
 import { ProductSourceConfig } from '../types/product-source-config';
 import { ProductSourceType } from '../types/product-source-type';
+import {
+  DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
+  ProductSourceFetchMode,
+} from '../types/product-source-fetch-mode';
 import { ProductSourceVersion } from './product-source-version.entity';
 import { ProductSourceAction } from './product-source-action.entity';
 import ms from 'ms';
@@ -118,6 +122,19 @@ export class ProductSource extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Column({ nullable: false, default: false })
   hasAllProducts: boolean;
+
+  /**
+   * Whether this source's pages and feeds go through the paid scraping API
+   * ('proxied', Zyte today) or are fetched from the shop by us ('direct').
+   * Every fetch an import makes follows it (ScraperService).
+   *
+   * 'proxied' unless someone chose otherwise: calling a shop directly needs
+   * its consent. A document over 10 MB must be 'direct' — the scraping API
+   * truncates it, and ScraperService refuses the truncated body.
+   */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Column({ type: 'text', nullable: false, default: DEFAULT_PRODUCT_SOURCE_FETCH_MODE })
+  fetchMode: ProductSourceFetchMode;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @Index()

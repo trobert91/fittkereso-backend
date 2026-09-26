@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsDateString,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -9,7 +10,11 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ProductSourceConfig } from '@fittkereso-backend/database';
+import {
+  PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceConfig,
+  ProductSourceFetchMode,
+} from '@fittkereso-backend/database';
 
 export class UpdateProductSourceDto {
   @IsOptional()
@@ -52,6 +57,12 @@ export class UpdateProductSourceDto {
   @IsOptional()
   @IsBoolean()
   hasAllProducts?: boolean;
+
+  // 'proxied' pays Zyte for every fetch; 'direct' calls the shop itself, which
+  // needs its consent. The switch is recorded on the source's timeline.
+  @IsOptional()
+  @IsIn(PRODUCT_SOURCE_FETCH_MODES as readonly string[])
+  fetchMode?: ProductSourceFetchMode;
 
   @IsOptional()
   @IsInt()

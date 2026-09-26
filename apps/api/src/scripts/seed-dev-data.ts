@@ -57,6 +57,7 @@ import {
   ProductSource,
   ProductSourceType,
   ProductSourceConfig,
+  ProductSourceFetchMode,
   ProductSourceRepository,
   Seller,
   SellerRepository,
@@ -137,6 +138,8 @@ interface SeedSourceSpec {
   identifiesProducts: boolean;
   /** Whether a complete run may remove the offers it did not see. Feed sources only. */
   hasAllProducts: boolean;
+  /** 'proxied' (Zyte, paid) unless the shop agreed to be read, or a document is over Zyte's 10 MB. */
+  fetchMode: ProductSourceFetchMode;
   schedulingEnabled: boolean;
   processingEnabled: boolean;
   frequency: string;
@@ -168,6 +171,8 @@ const SOURCES: SeedSourceSpec[] = [
     priority: 50,
     identifiesProducts: true,
     hasAllProducts: false,
+    // ebikeshop has not agreed to be read directly.
+    fetchMode: 'proxied',
     // Scheduling stays off in dev: a scheduled run would walk the shop's whole
     // catalogue on the next night tick. Runs are enqueued by hand instead (see
     // apps/product-collector/scripts/enqueue-ktm-catalog.ts). Processing is
@@ -198,6 +203,8 @@ const SOURCES: SeedSourceSpec[] = [
     // The feed is what says what the shop sells, so an item missing from a
     // complete run is gone.
     hasAllProducts: true,
+    // The feed is 26 MB, and Zyte truncates anything over 10 MB.
+    fetchMode: 'direct',
     schedulingEnabled: false,
     processingEnabled: true,
     frequency: '1 day',
@@ -355,6 +362,7 @@ async function seedSources(app: INestApplicationContext): Promise<void> {
       source.priority = spec.priority;
       source.identifiesProducts = spec.identifiesProducts;
       source.hasAllProducts = spec.hasAllProducts;
+      source.fetchMode = spec.fetchMode;
       source.schedulingEnabled = spec.schedulingEnabled;
       source.processingEnabled = spec.processingEnabled;
       source.frequency = spec.frequency as ms.StringValue;

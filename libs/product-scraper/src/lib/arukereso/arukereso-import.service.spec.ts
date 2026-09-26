@@ -24,7 +24,7 @@ const productOf = (id: string | number, price = 100) =>
 
 describe('ArukeresoImportService', () => {
   let service: ArukeresoImportService;
-  let nativeScraper: { stream: jest.Mock };
+  let scraperService: { stream: jest.Mock };
   let mapper: { map: jest.Mock };
   let sourceRecordRepo: {
     findFeedRowStates: jest.Mock;
@@ -55,6 +55,7 @@ describe('ArukeresoImportService', () => {
       id: 'source-1',
       name: 'speedbike-arukereso',
       type: 'arukereso',
+      fetchMode: 'direct',
       seller: { id: 'seller-1' },
       config: {
         baseUrl: 'https://speedbike.hu',
@@ -68,7 +69,7 @@ describe('ArukeresoImportService', () => {
 
   /** A feed of these row ids, each mapped to its own URL, product and offer. */
   const givenFeed = (ids: (string | number)[]) =>
-    nativeScraper.stream.mockResolvedValue({
+    scraperService.stream.mockResolvedValue({
       statusCode: 200,
       contentType: 'application/xml',
       stream: Readable.from([
@@ -124,7 +125,7 @@ describe('ArukeresoImportService', () => {
     taskRepo.saveAll.mock.calls.flatMap(([tasks]) => tasks);
 
   beforeEach(() => {
-    nativeScraper = { stream: jest.fn() };
+    scraperService = { stream: jest.fn() };
     mapper = {
       map: jest.fn().mockImplementation(async ({ item }) => {
         const id = item.fields['identifier'];
@@ -162,7 +163,7 @@ describe('ArukeresoImportService', () => {
     };
 
     service = new ArukeresoImportService(
-      nativeScraper as never,
+      scraperService as never,
       // The real parser and triage: this service's job is wiring them to the
       // task queue, and stubs would test the wiring against nothing.
       new ArukeresoFeedParserService(),
@@ -507,21 +508,32 @@ describe('ArukeresoImportService', () => {
   });
 
   // A 404 or a 500 page parsed as a feed yields zero items, which reads as
-  // "the shop sells nothing". NativeScraperService throws instead, and that
+  // "the shop sells nothing". The fetch throws instead, and that
   // must reach the caller rather than be reported as an empty success.
   it('fails the run when the feed cannot be fetched', async () => {
-    nativeScraper.stream.mockRejectedValue(new Error('HTTP 404'));
+    scraperService.stream.mockRejectedValue(new Error('HTTP 404'));
 
     await expect(service.import(source)).rejects.toThrow('HTTP 404');
     expect(metrics.fullSyncFailed).toHaveBeenCalled();
     expect(metrics.fullSyncCompleted).not.toHaveBeenCalled();
   });
 
+  it("fetches the feed in the source's fetch mode", async () => {
+    givenFeed([1]);
+
+    await service.import(source);
+    expect(scraperService.stream).toHaveBeenCalledWith('https://speedbike.hu/feed', 'direct');
+
+    givenFeed([1]);
+    await service.import({ ...source, fetchMode: 'proxied' } as ProductSource);
+    expect(scraperService.stream).toHaveBeenLastCalledWith('https://speedbike.hu/feed', 'proxied');
+  });
+
   it('refuses a source loaded without its seller, before fetching the feed', async () => {
     const withoutSeller = { ...source, seller: undefined } as unknown as ProductSource;
 
     await expect(service.import(withoutSeller)).rejects.toThrow('without its seller');
-    expect(nativeScraper.stream).not.toHaveBeenCalled();
+    expect(scraperService.stream).not.toHaveBeenCalled();
   });
 
   // Only a complete run knows an unseen offer is gone from the shop.

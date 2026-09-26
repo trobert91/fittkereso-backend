@@ -8,6 +8,7 @@ import {
   OfferAvailability,
   OfferRepository,
   ProductSource,
+  ProductSourceFetchMode,
   ProductSourceType,
   ScrapedListProduct,
   ScrapedProduct,
@@ -16,7 +17,7 @@ import {
   isFeedSourceType,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { NativeScraperService, ScraperService } from '@fittkereso-backend/scraper';
+import { ScraperService } from '@fittkereso-backend/scraper';
 import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
 import {
   GtinOutcome,
@@ -165,6 +166,8 @@ export interface SimulatedSpecRowCoverage {
 export interface ProductSourceImportSimulationResult {
   type: ProductSourceType;
   sourceName: string;
+  /** How this simulation fetched: the source's own mode, or the caller's override. */
+  fetchMode: ProductSourceFetchMode;
   scraping?: SimulatedScrapingImport;
   /** A feed source's run: `arukereso` or `googleshop`. */
   feed?: SimulatedArukeresoImport;
@@ -200,7 +203,6 @@ export class ProductSourceImportSimulationService {
 
   constructor(
     private readonly scraperService: ScraperService,
-    private readonly nativeScraper: NativeScraperService,
     private readonly interpreter: ScrapeInterpreterService,
     private readonly scrapingImport: ScrapingImportService,
     private readonly listRefresh: ListProductRefreshService,
@@ -211,13 +213,29 @@ export class ProductSourceImportSimulationService {
     private readonly offerRepo: OfferRepository,
   ) {}
 
+  /**
+   * `options.fetchMode` fetches as if the source were in that mode — the check
+   * before switching a shop to direct: does it answer, and does the config
+   * still read what comes back? Every fetch of the run follows it, the page
+   * walk included.
+   */
   public async simulate(
-    source: ProductSource,
-    options: { listUrl?: string; limit?: number; categorySlugs?: string[] } = {},
+    sourceAsStored: ProductSource,
+    options: {
+      listUrl?: string;
+      limit?: number;
+      categorySlugs?: string[];
+      fetchMode?: ProductSourceFetchMode;
+    } = {},
   ): Promise<ProductSourceImportSimulationResult> {
+    const source = options.fetchMode
+      ? ({ ...sourceAsStored, fetchMode: options.fetchMode } as ProductSource)
+      : sourceAsStored;
+
     const result: ProductSourceImportSimulationResult = {
       type: source.type,
       sourceName: source.name,
+      fetchMode: source.fetchMode,
       warnings: [],
       errors: [],
     };
@@ -279,7 +297,9 @@ export class ProductSourceImportSimulationService {
       };
     }
 
-    const $ = cheerio.load(await this.scraperService.getHtml(listPageParsed));
+    const $ = cheerio.load(
+      await this.scraperService.getHtml(listPageParsed, source.fetchMode),
+    );
     const page = await this.interpreter.runListPage(
       { id: 'simulate', url: listPageParsed, source } as ProductImportTask,
       $,
@@ -367,8 +387,9 @@ export class ProductSourceImportSimulationService {
     const config = asArukeresoConfig(source.config, source.name);
     const limit = options.limit ?? DEFAULT_PREVIEW_LIMIT;
 
-    const { stream, contentType } = await this.nativeScraper.stream(
+    const { stream, contentType } = await this.scraperService.stream(
       config.feedUrl,
+      source.fetchMode,
     );
 
     const skipReasons: Partial<Record<FeedSkipReason, number>> = {};
