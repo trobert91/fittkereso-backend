@@ -25,8 +25,9 @@ export interface ListingMatchFailedGate {
   /** The spec key, for spec gates. */
   spec?: string;
   severity: number;
-  queryValue: IdentityGateValue;
-  candidateValue: IdentityGateValue;
+  /** Null on the side a `specMissing` gate found without the spec. */
+  queryValue: IdentityGateValue | null;
+  candidateValue: IdentityGateValue | null;
 }
 
 /** One scored candidate, as the decision records it. */

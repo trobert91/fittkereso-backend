@@ -13,8 +13,11 @@ export const NEAR_MISS_SCORE = 70;
  * Points a failed gate takes off a candidate's score. A primary spec mismatch
  * on identical names lands exactly on NEAR_MISS_SCORE: it can reach the LLM or
  * a person, but never auto-attach.
+ *
+ * `specMissing` is not here: its points are per spec and per category
+ * (`matchingConfig.missingSpecPenalty`).
  */
-export const GATE_SEVERITY: Record<IdentityGate, number> = {
+export const GATE_SEVERITY: Record<Exclude<IdentityGate, 'specMissing'>, number> = {
   primarySpecMismatch: 30,
   modelNumberMismatch: 30,
   matcherSpecMismatch: 10,

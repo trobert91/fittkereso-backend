@@ -18,9 +18,12 @@ export interface GateInput {
 }
 
 /**
- * Every contradiction between a query and a candidate: primary specs, model
- * numbers, then matcher specs. A value missing on either side skips its gate,
- * and no gate rejects on its own — each only lowers the score (scoreOf).
+ * Every contradiction between a query and a candidate: primary specs, specs
+ * only one side states, model numbers, then matcher specs. A value missing on
+ * either side skips its mismatch gate — it costs something only for a spec
+ * the category's `matchingConfig.missingSpecPenalty` names, and only when the
+ * other side states it. No gate rejects on its own: each only lowers the score
+ * (scoreOf).
  *
  * Spec gates compare only the category's `primarySpecs` and `matcherSpecs`; a
  * key in both lists is primary. A category with neither has no spec gates.
@@ -33,6 +36,7 @@ export function applyGates(input: GateInput): FailedGate[] {
 
   return compact([
     ...primarySpecs.map((key) => specGate('primarySpecMismatch', key, input)),
+    ...missingSpecGates(input),
     modelNumberGate(input.queryKey, input.candidateKey),
     ...matcherSpecs.map((key) => specGate('matcherSpecMismatch', key, input)),
   ]);
@@ -74,8 +78,42 @@ function isPresent(value: ProductSpecs[string]): value is SpecValue {
   return !isNil(value) && value !== '' && value !== 0;
 }
 
+/**
+ * Fires when only one side states a spec the category's
+ * `matchingConfig.missingSpecPenalty` names, at that spec's penalty: a listing
+ * silent on its model year against last year's product. Neither side stating
+ * it costs nothing, so two silent listings of one bike still match each other.
+ *
+ * Only `applyGates` runs it. A product an identifier found is not in question
+ * by name, which is what this guards (see primarySpecMismatches).
+ */
+function missingSpecGates({
+  querySpecs,
+  candidateSpecs,
+  categoryConfig,
+}: GateInput): FailedGate[] {
+  const penalties = categoryConfig?.matchingConfig?.missingSpecPenalty ?? {};
+
+  return Object.entries(penalties).flatMap(([key, severity]) => {
+    const queryValue = querySpecs?.[key];
+    const candidateValue = candidateSpecs?.[key];
+    const queryStates = isPresent(queryValue);
+    if (severity <= 0 || queryStates === isPresent(candidateValue)) return [];
+
+    return [
+      {
+        gate: 'specMissing' as const,
+        spec: key,
+        severity,
+        queryValue: queryStates ? (queryValue as SpecValue) : null,
+        candidateValue: queryStates ? null : (candidateValue as SpecValue),
+      },
+    ];
+  });
+}
+
 function specGate(
-  gate: IdentityGate,
+  gate: Exclude<IdentityGate, 'specMissing'>,
   key: string,
   {
     querySpecs,

@@ -43,7 +43,7 @@ describe('case 1: different bikes from the same shop stay different products', (
       const right = listing(SPEEDBIKE, '772 di2 glorious lycan macina');
       const nameOnly = { ...asProduct(right), specs: undefined };
 
-      expect(gatesOf(left, { nameKey: right.nameKey })).toEqual([
+      expect(gatesOf({ nameKey: left.nameKey }, { nameKey: right.nameKey })).toEqual([
         expect.objectContaining({ gate: 'modelNumberMismatch' }),
       ]);
       expect(scoreOfPair(left, nameOnly)).toBeLessThan(NEAR_MISS_SCORE);
@@ -137,18 +137,21 @@ describe('case 1: different bikes from the same shop stay different products', (
       ['7973 kapoho macina', 59],
       ['8973 kapoho macina', 64],
     ])(
-      'still separates %s from the Elite row that has none, at %i',
-      (leftKey, score) => {
+      'still separates %s from the Elite row that has none, at %i on the name',
+      (leftKey, nameScore) => {
         const left = listing(SPEEDBIKE, leftKey);
         const specless = listingWithoutSpecs(SPEEDBIKE, 'elite kapoho macina');
 
-        // With every gate skipped these used to land at 74, inside the review
-        // band, purely on character overlap with "elite kapoho macina". The
-        // name score now reads the difference for what it is — a model number
-        // against a trim word, two tokens neither side shares — so the
-        // specless row no longer drags them anywhere.
-        expect(gatesOf(left, specless)).toEqual([]);
-        expect(scoreOfPair(left, asProduct(specless))).toBe(score);
+        // With every mismatch gate skipped these used to land at 74, inside
+        // the review band, purely on character overlap with "elite kapoho
+        // macina". The name score now reads the difference for what it is — a
+        // model number against a trim word, two tokens neither side shares —
+        // so the specless row no longer drags them anywhere. Its missing model
+        // year (missingSpecPenalty) takes 25 more.
+        expect(gatesOf(left, specless)).toEqual([
+          expect.objectContaining({ gate: 'specMissing', spec: 'modelYear', severity: 25 }),
+        ]);
+        expect(scoreOfPair(left, asProduct(specless))).toBe(nameScore - 25);
         expect(outcomeOf(left, asProduct(specless))).toBe('not_found');
       },
     );

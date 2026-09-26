@@ -270,11 +270,18 @@ export class CategoryTools {
     const matchingConfig = config?.matchingConfig;
     if (matchingConfig) {
       const tolerances = Object.keys(matchingConfig.specTolerances ?? {});
+      const missingPenalties = Object.entries(
+        matchingConfig.missingSpecPenalty ?? {},
+      ).map(([key, points]) => `${key} −${points}`);
       lines.push(
         `- **Matching Config**: Yes (${
           tolerances.length
             ? `spec tolerances: ${tolerances.join(', ')}`
             : 'no spec tolerances'
+        }; ${
+          missingPenalties.length
+            ? `missing-spec penalties: ${missingPenalties.join(', ')}`
+            : 'no missing-spec penalties'
         })`,
       );
     } else {

@@ -202,6 +202,7 @@ export class ProductIdentityTools {
   }
 
   private formatValue(value: FailedGate['queryValue']): string {
+    if (value === null) return 'missing';
     return isArray(value) ? value.join(' ') : String(value);
   }
 }

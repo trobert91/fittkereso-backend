@@ -64,18 +64,29 @@ describe('case 2: the same bike in both shops, named differently, merges', () =>
       expect(outcomeOf(fromSpeedbike, asProduct(fromEbikeshop))).toBe('attach');
     });
 
-    it('merges on the name alone when one shop published no specs', () => {
+    it('sends a listing with no specs to review, not attach, when the other states its year', () => {
       // speedbike lists the Kapoho Elite twice and fills the spec table in on
-      // only one of them. The empty one still merges: every gate skips, and
-      // the identical name carries the match by itself.
+      // only one of them. Every mismatch gate skips the empty one, but it
+      // states no model year against ebikeshop's 2023, and a name alone cannot
+      // tell this year's bike from last year's (missingSpecPenalty). So the
+      // identical name lands in review instead of attaching: the price of never
+      // silently merging two years.
       const speclessSpeedbike = listingWithoutSpecs(SPEEDBIKE, 'elite kapoho macina');
       const fromEbikeshop = listing(EBIKESHOP, 'elite kapoho macina');
 
       expect(speclessSpeedbike.specs).toBeUndefined();
       expect(fromEbikeshop.specs).toBeDefined();
-      expect(gatesOf(speclessSpeedbike, fromEbikeshop)).toEqual([]);
-      expect(scoreOfPair(speclessSpeedbike, asProduct(fromEbikeshop))).toBe(100);
-      expect(outcomeOf(speclessSpeedbike, asProduct(fromEbikeshop))).toBe('attach');
+      expect(gatesOf(speclessSpeedbike, fromEbikeshop)).toEqual([
+        {
+          gate: 'specMissing',
+          spec: 'modelYear',
+          severity: 25,
+          queryValue: null,
+          candidateValue: 2023,
+        },
+      ]);
+      expect(scoreOfPair(speclessSpeedbike, asProduct(fromEbikeshop))).toBe(75);
+      expect(outcomeOf(speclessSpeedbike, asProduct(fromEbikeshop))).toBe('ask_llm');
     });
   });
 

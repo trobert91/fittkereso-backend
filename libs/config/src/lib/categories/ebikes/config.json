@@ -289,6 +289,9 @@
       "motorPower": {
         "absolute": 0
       }
+    },
+    "missingSpecPenalty": {
+      "modelYear": 25
     }
   },
   "normalizationStrategy": "full-sorted",

@@ -3,11 +3,16 @@
  * them; they live here because entities can only depend on this lib.
  */
 
-/** A check that lowers a candidate's score when two products contradict each other. */
+/**
+ * A check that lowers a candidate's score when two products contradict each
+ * other — or, for `specMissing`, when only one of them states a spec the
+ * category's `matchingConfig.missingSpecPenalty` names.
+ */
 export type IdentityGate =
   | 'primarySpecMismatch'
   | 'modelNumberMismatch'
-  | 'matcherSpecMismatch';
+  | 'matcherSpecMismatch'
+  | 'specMissing';
 
 /** A spec value, or a name key's digit-bearing words for `modelNumberMismatch`. */
 export type IdentityGateValue = string | number | boolean | string[];
@@ -43,8 +48,9 @@ export interface DuplicatePairFailedGate {
   /** The spec key, for spec gates. */
   spec?: string;
   severity: number;
-  productAValue: IdentityGateValue;
-  productBValue: IdentityGateValue;
+  /** Null on the side a `specMissing` gate found without the spec. */
+  productAValue: IdentityGateValue | null;
+  productBValue: IdentityGateValue | null;
 }
 
 /** The columns a detection writes; `productAId` must sort below `productBId`. */

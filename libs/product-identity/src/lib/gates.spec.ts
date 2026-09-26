@@ -121,9 +121,79 @@ describe('applyGates', () => {
   });
 });
 
+describe('missing specs', () => {
+  const withYearPenalty: ProductCategoryConfig = {
+    ...ebikes,
+    matchingConfig: {
+      ...ebikes.matchingConfig,
+      missingSpecPenalty: { modelYear: 25 },
+    },
+  };
+  const gatesFor = (
+    querySpecs: ProductSpecs | undefined,
+    candidateSpecs: ProductSpecs | undefined,
+    categoryConfig = withYearPenalty,
+  ) =>
+    applyGates({ queryKey: KEY, candidateKey: KEY, querySpecs, candidateSpecs, categoryConfig });
+
+  it('charges the configured points when only one side states the spec, with null on the silent side', () => {
+    expect(gatesFor({ batteryCapacity: 625 }, { modelYear: 2025 })).toEqual([
+      { gate: 'specMissing', spec: 'modelYear', severity: 25, queryValue: null, candidateValue: 2025 },
+    ]);
+    expect(gatesFor({ modelYear: 2026 }, undefined)).toEqual([
+      { gate: 'specMissing', spec: 'modelYear', severity: 25, queryValue: 2026, candidateValue: null },
+    ]);
+  });
+
+  it('keeps identical names out of auto-attach, in review', () => {
+    const score = scoreOf(
+      baseScore(nameSimilarity(KEY, KEY)),
+      gatesFor({ batteryCapacity: 625 }, { modelYear: 2025 }),
+    );
+
+    expect(score).toBe(75);
+    expect(score).toBeLessThan(ACCEPT_SCORE);
+    expect(score).toBeGreaterThanOrEqual(NEAR_MISS_SCORE);
+  });
+
+  it('costs nothing when neither side states it, so two silent listings of one bike still match', () => {
+    expect(gatesFor({ batteryCapacity: 625 }, { batteryCapacity: 625 })).toEqual([]);
+  });
+
+  it('leaves a stated value on both sides to the mismatch gate', () => {
+    expect(gatesFor({ modelYear: 2026 }, { modelYear: 2026 })).toEqual([]);
+    expect(gatesFor({ modelYear: 2026 }, { modelYear: 2025 })).toEqual([
+      expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'modelYear' }),
+    ]);
+  });
+
+  it('reads an empty string or a zero as missing, like the mismatch gates', () => {
+    expect(gatesFor({ modelYear: 0 }, { modelYear: 2025 })).toEqual([
+      expect.objectContaining({ gate: 'specMissing', queryValue: null }),
+    ]);
+  });
+
+  it('charges nothing for a spec the category does not name', () => {
+    expect(gatesFor({}, { modelYear: 2025 }, ebikes)).toEqual([]);
+  });
+});
+
 // For a candidate an identifier found: the names are not in question, and a
 // size in one shop's title ("l/48") must not read as another model number.
 describe('primarySpecMismatches', () => {
+  it('never charges a missing spec: an identifier already vouched for the match', () => {
+    expect(
+      primarySpecMismatches({
+        querySpecs: {},
+        candidateSpecs: { modelYear: 2025 },
+        categoryConfig: {
+          ...ebikes,
+          matchingConfig: { missingSpecPenalty: { modelYear: 25 } },
+        },
+      }),
+    ).toEqual([]);
+  });
+
   it('reports only primary-spec contradictions', () => {
     expect(
       primarySpecMismatches({

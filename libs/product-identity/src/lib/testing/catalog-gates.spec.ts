@@ -50,8 +50,14 @@ describe('gates on the real KTM catalog', () => {
       matcherSpecMismatch: 10,
     };
 
+    const missingPenalties = EBIKES.matchingConfig?.missingSpecPenalty ?? {};
+
     for (const { query, candidate } of allScoredPairs()) {
       for (const gate of gatesBetween(query, candidate)) {
+        if (gate.gate === 'specMissing') {
+          expect(missingPenalties[gate.spec!]).toBe(gate.severity);
+          continue;
+        }
         expect(severities[gate.gate]).toBe(gate.severity);
         if (gate.gate === 'primarySpecMismatch') {
           expect(EBIKES.primarySpecs).toContain(gate.spec);
@@ -134,10 +140,11 @@ describe('gates on the real KTM catalog', () => {
       expect(gatesBetween(a, b).map((gate) => gate.spec)).not.toContain('torque');
     });
 
-    it('raises no spec gate at all when one side has no specs', () => {
+    it('raises no mismatch gate when one side has no specs, only the missing-year penalty', () => {
       // Every stored product now carries at least one spec, so this is built
       // from a query with none — what a listing whose spec table did not
-      // parse presents to matching.
+      // parse presents to matching. Nothing contradicts; the one thing it
+      // costs is the model year the category will not match without.
       for (const other of CATALOG) {
         const specGates = applyGates({
           queryKey: other.nameKey,
@@ -146,7 +153,19 @@ describe('gates on the real KTM catalog', () => {
           candidateSpecs: other.specs,
           categoryConfig: EBIKES,
         });
-        expect(specGates).toEqual([]);
+        expect(specGates).toEqual(
+          other.specs?.['modelYear']
+            ? [
+                {
+                  gate: 'specMissing',
+                  spec: 'modelYear',
+                  severity: 25,
+                  queryValue: null,
+                  candidateValue: other.specs['modelYear'],
+                },
+              ]
+            : [],
+        );
       }
     });
   });

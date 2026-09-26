@@ -7,6 +7,17 @@ export interface CategoryMatchingConfig {
    *  every other, so `modelYear` never contradicts anything. Listing a spec here
    *  is what makes it compare the way it reads. */
   specTolerances?: Record<string, SpecTolerance>;
+  /** Points a name match loses when only one side states the spec, keyed by
+   *  spec name — e.g. `{ modelYear: 25 }`. A spec gate otherwise skips a value
+   *  missing on either side, so a listing that never states its year would
+   *  attach by name alone to last year's product. Missing on both sides costs
+   *  nothing. Applies only to name and alias matches, never to a product an
+   *  identifier (GTIN, MPN, declared size) found.
+   *
+   *  More than 20 keeps identical names (100) from attaching on their own, so
+   *  they land in review. A name scoring below 70 + the penalty drops below
+   *  NEAR_MISS_SCORE instead, where no duplicate pair is opened. */
+  missingSpecPenalty?: Record<string, number>;
 }
 
 /** How far apart two numeric values may be and still count as the same.
