@@ -17,7 +17,6 @@ import {
   PRODUCT_SOURCE_TYPES,
   ProductSource,
   ProductSourceConfigValidatorService,
-  ProductSourceRecordRepository,
   ProductSourceRepository,
   ProductSourceVersion,
   UserRole,
@@ -44,10 +43,6 @@ import {
   ProductSourceHistoryQueryDto,
   ProductSourceVersionListDto,
 } from '../dtos/product-source-history.dto';
-import {
-  ProductSourceRecordListDto,
-  ProductSourceRecordQueryDto,
-} from '../dtos/product-source-record.dto';
 
 @Controller('admin-product-source')
 @MinRole(UserRole.admin)
@@ -59,7 +54,6 @@ export class AdminProductSourceController {
     private readonly updateService: ProductSourceUpdateService,
     private readonly configValidator: ProductSourceConfigValidatorService,
     private readonly versionService: ProductSourceVersionService,
-    private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
   @Post('search')
@@ -251,27 +245,6 @@ export class AdminProductSourceController {
     });
 
     return { items, total };
-  }
-
-  /**
-   * The source's listings, newest sighting first.  lists
-   * the ones waiting unattached: rows of a source that does not identify
-   * products, whose offer its seller's identifying source has not written.
-   */
-  @Get(':id/records')
-  @MinRole(UserRole.user)
-  @SerializeOptions({ strategy: 'exposeAll', groups: [SerializeGroup.list] })
-  async listRecords(
-    @Param('id') productSourceId: string,
-    @Query() query: ProductSourceRecordQueryDto,
-  ): Promise<ProductSourceRecordListDto> {
-    return this.sourceRecordRepo.searchRecords({
-      productSourceId,
-      attached: query.attached,
-      search: query.search,
-      skip: query.skip,
-      take: query.take,
-    });
   }
 
   @Post(':id/full-sync')

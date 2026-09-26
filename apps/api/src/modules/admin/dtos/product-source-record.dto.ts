@@ -1,28 +1,23 @@
 import { Expose, Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import type { ProductSourceRecordRow } from '@fittkereso-backend/database';
-import { SerializeGroup } from '@fittkereso-backend/utils';
-import { ProductSourceHistoryQueryDto } from './product-source-history.dto';
+import {
+  ProductSourceRecord,
+  type SpecDefinitionJsonSchema,
+} from '@fittkereso-backend/database';
+import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 
-/** A source's listings: attached or not, matching a text, paged. */
-export class ProductSourceRecordQueryDto extends ProductSourceHistoryQueryDto {
-  // A query string carries "true"/"false", not booleans.
-  @IsOptional()
-  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
-  @IsBoolean()
-  attached?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  search?: string;
-}
-
-/** Decorated like ProductSourceVersionListDto, for the same reason. */
-export class ProductSourceRecordListDto {
+/**
+ * One listing for the admin's details view: the record with its source,
+ * offers and product, as a product's records come on the product details
+ * route, and the spec schema its specs are labelled with.
+ *
+ * Decorated like ProductSourceVersionListDto, for the same reason.
+ */
+export class ProductSourceRecordDetailsDto {
   @Expose({ groups: [SerializeGroup.list] })
-  items: ProductSourceRecordRow[];
+  record: ProductSourceRecord;
 
+  /** Of the product's category, or while unattached of the listing's own. */
   @Expose({ groups: [SerializeGroup.list] })
-  total: number;
+  @Transform(transfromExposeAll())
+  schema: SpecDefinitionJsonSchema | null;
 }

@@ -5,6 +5,9 @@ import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { ProductSource } from '../models/product-source.entity';
+import type { ProductModel } from '../models/product-model.entity';
+import type { Seller } from '../models/seller.entity';
+import type { Offer } from '../models/offer.entity';
 import type { ScrapedOffer, ScrapedProduct } from '../../models/scraped-product';
 import { nameOf } from '@fittkereso-backend/utils';
 
@@ -17,13 +20,40 @@ export interface FeedRowState {
   modelId: string | null;
 }
 
-export interface ProductSourceRecordSearchParams {
+/** What a list of listings can be ordered by. */
+export const PRODUCT_SOURCE_RECORD_SORTS = [
+  'title',
+  'brand',
+  'productName',
+  'sourceName',
+  'externalId',
+  'price',
+  'seenAt',
+  'lastUpdated',
+  'createdAt',
+] as const;
+export type ProductSourceRecordSort = (typeof PRODUCT_SOURCE_RECORD_SORTS)[number];
+
+export interface ProductSourceRecordFilter {
   productSourceId?: string;
+  /** Any of these sources. */
+  productSourceIds?: string[];
   sellerId?: string;
   /** True: on a product. False: unattached. Omitted: either. */
   attached?: boolean;
+  /** True: specs valid. False: the listing failed spec validation. Omitted: either. */
+  valid?: boolean;
   /** Matched against the URL, the externalIds and the title, case-insensitively. */
   search?: string;
+  /** Matched against the name of the product the listing sits on. */
+  productName?: string;
+  /** Matched against the brand the listing states. */
+  brand?: string;
+  /** The category the listing was imported into, by id. */
+  categoryIds?: string[];
+  /** Default: newest sighting first. */
+  sort?: ProductSourceRecordSort;
+  order?: 'ASC' | 'DESC';
   skip?: number;
   take?: number;
 }
@@ -33,16 +63,32 @@ export interface ProductSourceRecordRow {
   id: string;
   sourceId: string;
   sourceName: string;
+  sourceType: string;
+  sellerId: string | null;
+  sellerName: string | null;
   url: string | null;
   externalId: string | null;
   /** The externalIds its offers are stored under. */
   offerExternalIds: string[];
   title: string | null;
+  brand: string | null;
+  categoryName: string | null;
+  /** How many offer entries (sizes, colours…) the listing states. */
+  offerCount: number;
+  /** The lowest price among its offer entries. */
   price: number | null;
+  /** That entry's old price, when it is discounted. */
+  priceWithoutDiscount: number | null;
+  currency: string | null;
+  /** Of the entry at that price. */
+  availability: string | null;
+  specValid: boolean;
   productId: string | null;
   productName: string | null;
   /** When its source last listed it (lastSeenAt, else lastUpdated). */
   seenAt: Date;
+  lastUpdated: Date;
+  createdAt: Date;
 }
 
 @Injectable()
@@ -166,6 +212,29 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .getMany();
   }
 
+  /**
+   * One listing with what the admin shows of it: its source and seller, the
+   * offers it supplies the price of, and the product it sits on with that
+   * product's category. The relations match a product's records on the
+   * product details route.
+   */
+  async findDetailsById(id: string): Promise<ProductSourceRecord | null> {
+    const source = nameOf<ProductSourceRecord>('source');
+    const offers = nameOf<ProductSourceRecord>('offers');
+    const model = nameOf<ProductSourceRecord>('model');
+    return this.repo.findOne({
+      where: { id },
+      relations: [
+        source,
+        `${source}.${nameOf<ProductSource>('seller')}`,
+        offers,
+        `${offers}.${nameOf<Offer>('seller')}`,
+        model,
+        `${model}.${nameOf<ProductModel>('productCategory')}`,
+      ],
+    });
+  }
+
   /** How many of this source's records wait unattached. */
   async countUnattached(sourceId: string): Promise<number> {
     return this.repo
@@ -189,20 +258,51 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .execute();
   }
 
-  /** Listings by source or seller, attached or not, newest sighting first. */
+  /**
+   * Listings by source or seller, attached or not, filtered by their title,
+   * brand, category, product and spec validity. Newest sighting first unless
+   * another sort is asked for.
+   */
   async searchRecords(
-    params: ProductSourceRecordSearchParams,
+    params: ProductSourceRecordFilter,
   ): Promise<{ items: ProductSourceRecordRow[]; total: number }> {
-    const scraped = `record."${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
-    const seenAt = `COALESCE(record."${nameOf<ProductSourceRecord>('lastSeenAt')}", record."${nameOf<ProductSourceRecord>('lastUpdated')}")`;
-    const offerExternalIds = `jsonb_path_query_array(${scraped}, '$.offers[*].resolvedExternalId')`;
+    const record = (column: keyof ProductSourceRecord) => `record."${nameOf<ProductSourceRecord>(column)}"`;
+    const scraped = record('scrapedProduct');
+    const displayName: keyof ScrapedProduct = 'displayName';
+    const brand: keyof ScrapedProduct = 'brand';
+    const category: keyof ScrapedProduct = 'category';
+    const offers: keyof ScrapedProduct = 'offers';
+    const price: keyof ScrapedOffer = 'price';
+    const seenAt = `COALESCE(${record('lastSeenAt')}, ${record('lastUpdated')})`;
+    const offerExternalIds = `jsonb_path_query_array(${scraped}, '$.${offers}[*].resolvedExternalId')`;
+    const entries = `jsonb_array_elements(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`;
+    // The entry a listing is priced by: its cheapest size or colour.
+    const cheapest = `(SELECT entry FROM ${entries} AS entry ORDER BY (entry ->> '${price}')::numeric ASC NULLS LAST LIMIT 1)`;
+    const cheapestField = (field: keyof ScrapedOffer) => `${cheapest} ->> '${field}'`;
+    const productName = `model."${nameOf<ProductModel>('displayName')}"`;
+
+    const sortExpressions: Record<ProductSourceRecordSort, string> = {
+      title: `LOWER(${scraped} ->> '${displayName}')`,
+      brand: `LOWER(${scraped} ->> '${brand}')`,
+      productName: `LOWER(${productName})`,
+      sourceName: `LOWER(source.${nameOf<ProductSource>('name')})`,
+      externalId: record('externalId'),
+      price: `(${cheapestField('price')})::numeric`,
+      seenAt,
+      lastUpdated: record('lastUpdated'),
+      createdAt: record('createdAt'),
+    };
 
     const query = this.repo
       .createQueryBuilder('record')
       .innerJoin(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
+      .leftJoin(`source.${nameOf<ProductSource>('seller')}`, 'seller')
       .leftJoin(`record.${nameOf<ProductSourceRecord>('model')}`, 'model');
     if (params.productSourceId) {
       query.andWhere('source.id = :sourceId', { sourceId: params.productSourceId });
+    }
+    if (params.productSourceIds?.length) {
+      query.andWhere('source.id IN (:...sourceIds)', { sourceIds: params.productSourceIds });
     }
     if (params.sellerId) {
       query.andWhere(`source."${nameOf<ProductSource>('seller')}Id" = :sellerId`, {
@@ -214,40 +314,77 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         `record."${nameOf<ProductSourceRecord>('model')}Id" IS ${params.attached ? 'NOT NULL' : 'NULL'}`,
       );
     }
+    if (params.valid !== undefined) {
+      // A row written before validation existed holds null, and counts as valid.
+      query.andWhere(`${record('specValid')} ${params.valid ? 'IS NOT FALSE' : 'IS FALSE'}`);
+    }
     if (params.search) {
       query.andWhere(
         new Brackets((where) =>
           where
             .where(`record.${nameOf<ProductSourceRecord>('url')} ILIKE :search`)
-            .orWhere(`record."${nameOf<ProductSourceRecord>('externalId')}" ILIKE :search`)
-            .orWhere(`${scraped} ->> 'displayName' ILIKE :search`)
+            .orWhere(`${record('externalId')} ILIKE :search`)
+            .orWhere(`${scraped} ->> '${displayName}' ILIKE :search`)
             .orWhere(`${offerExternalIds}::text ILIKE :search`),
         ),
         { search: `%${params.search}%` },
       );
     }
+    if (params.productName) {
+      query.andWhere(`${productName} ILIKE :productName`, {
+        productName: `%${params.productName}%`,
+      });
+    }
+    if (params.brand) {
+      query.andWhere(`${scraped} ->> '${brand}' ILIKE :brand`, { brand: `%${params.brand}%` });
+    }
+    if (params.categoryIds?.length) {
+      query.andWhere(`${scraped} -> '${category}' ->> 'id' IN (:...categoryIds)`, {
+        categoryIds: params.categoryIds,
+      });
+    }
 
     const total = await query.getCount();
-    const rows: (Omit<ProductSourceRecordRow, 'offerExternalIds' | 'price'> & {
+    const rows: (Omit<
+      ProductSourceRecordRow,
+      'offerExternalIds' | 'price' | 'priceWithoutDiscount' | 'specValid'
+    > & {
       offerExternalIds: (string | null)[] | null;
       price: string | null;
+      priceWithoutDiscount: string | null;
+      specValid: boolean | null;
     })[] = await query
       .select('record.id', 'id')
       .addSelect('source.id', 'sourceId')
       .addSelect(`source.${nameOf<ProductSource>('name')}`, 'sourceName')
+      .addSelect(`source.${nameOf<ProductSource>('type')}`, 'sourceType')
+      .addSelect('seller.id', 'sellerId')
+      .addSelect(`seller.${nameOf<Seller>('name')}`, 'sellerName')
       .addSelect(`record.${nameOf<ProductSourceRecord>('url')}`, 'url')
-      .addSelect(`record."${nameOf<ProductSourceRecord>('externalId')}"`, 'externalId')
+      .addSelect(record('externalId'), 'externalId')
       .addSelect(offerExternalIds, 'offerExternalIds')
-      .addSelect(`${scraped} ->> 'displayName'`, 'title')
-      .addSelect(`${scraped} -> 'offers' -> 0 ->> 'price'`, 'price')
+      .addSelect(`${scraped} ->> '${displayName}'`, 'title')
+      .addSelect(`${scraped} ->> '${brand}'`, 'brand')
+      .addSelect(`${scraped} -> '${category}' ->> 'name'`, 'categoryName')
+      .addSelect(`jsonb_array_length(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`, 'offerCount')
+      .addSelect(cheapestField('price'), 'price')
+      .addSelect(cheapestField('priceWithoutDiscount'), 'priceWithoutDiscount')
+      .addSelect(cheapestField('currency'), 'currency')
+      .addSelect(cheapestField('availability'), 'availability')
+      .addSelect(record('specValid'), 'specValid')
       .addSelect('model.id', 'productId')
-      .addSelect('model."displayName"', 'productName')
+      .addSelect(productName, 'productName')
       .addSelect(seenAt, 'seenAt')
-      .orderBy('"seenAt"', 'DESC')
+      .addSelect(record('lastUpdated'), 'lastUpdated')
+      .addSelect(record('createdAt'), 'createdAt')
+      .orderBy(sortExpressions[params.sort ?? 'seenAt'], params.order ?? 'DESC', 'NULLS LAST')
       .addOrderBy('record.id', 'ASC')
       .offset(params.skip ?? 0)
       .limit(params.take ?? 50)
       .getRawMany();
+
+    const toNumber = (value: string | null | undefined) =>
+      value === null || value === undefined ? null : Number(value);
 
     return {
       total,
@@ -256,7 +393,10 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         offerExternalIds: (row.offerExternalIds ?? []).filter(
           (id): id is string => typeof id === 'string',
         ),
-        price: row.price === null ? null : Number(row.price),
+        offerCount: Number(row.offerCount ?? 0),
+        price: toNumber(row.price),
+        priceWithoutDiscount: toNumber(row.priceWithoutDiscount),
+        specValid: row.specValid !== false,
       })),
     };
   }

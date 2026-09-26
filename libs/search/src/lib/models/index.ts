@@ -16,6 +16,9 @@ export * from './product-source-search-result';
 export * from './product-import-task-search-params';
 export * from './product-import-task-search-result';
 
+export * from './product-source-record-search-params';
+export * from './product-source-record-search-result';
+
 
 
 export * from './seller-search-params';

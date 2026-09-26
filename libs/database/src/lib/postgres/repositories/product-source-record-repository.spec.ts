@@ -149,4 +149,81 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     expect(where).toContain('source."sellerId" = :sellerId');
     expect(where).toContain('record."modelId" IS NOT NULL');
   });
+
+  it('filters by several sources, validity, product name, brand and category', async () => {
+    const builder = makeQueryBuilder({});
+
+    await repositoryWith(builder).searchRecords({
+      productSourceIds: ['source-1', 'source-2'],
+      valid: false,
+      productName: 'macina',
+      brand: 'ktm',
+      categoryIds: ['category-1'],
+    });
+
+    const where = clauses(builder);
+    expect(where).toContain('source.id IN (:...sourceIds)');
+    expect(where).toContain('record."specValid" IS FALSE');
+    expect(where).toContain('model."displayName" ILIKE :productName');
+    expect(where).toContain(`record."scrapedProduct" ->> 'brand' ILIKE :brand`);
+    expect(where).toContain(`record."scrapedProduct" -> 'category' ->> 'id' IN (:...categoryIds)`);
+    expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), {
+      sourceIds: ['source-1', 'source-2'],
+    });
+    expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), { productName: '%macina%' });
+    expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), { brand: '%ktm%' });
+  });
+
+  it('counts a row written before validation existed as valid', async () => {
+    const builder = makeQueryBuilder({});
+
+    await repositoryWith(builder).searchRecords({ valid: true });
+
+    expect(clauses(builder)).toContain('record."specValid" IS NOT FALSE');
+  });
+
+  it('puts the newest sighting first by default, and sorts text case-insensitively', async () => {
+    const byDefault = makeQueryBuilder({});
+    await repositoryWith(byDefault).searchRecords({});
+    expect(byDefault['orderBy']).toHaveBeenCalledWith(
+      'COALESCE(record."lastSeenAt", record."lastUpdated")',
+      'DESC',
+      'NULLS LAST',
+    );
+
+    const byProduct = makeQueryBuilder({});
+    await repositoryWith(byProduct).searchRecords({ sort: 'productName', order: 'ASC' });
+    expect(byProduct['orderBy']).toHaveBeenCalledWith('LOWER(model."displayName")', 'ASC', 'NULLS LAST');
+    expect(byProduct['addOrderBy']).toHaveBeenCalledWith('record.id', 'ASC');
+  });
+
+  it('prices a listing by its cheapest entry, and reads a null validity as valid', async () => {
+    const builder = makeQueryBuilder({
+      getRawMany: [
+        {
+          id: 'record-1',
+          offerExternalIds: null,
+          offerCount: 3,
+          price: '899990',
+          priceWithoutDiscount: '999990',
+          specValid: null,
+        },
+      ],
+    });
+
+    const { items } = await repositoryWith(builder).searchRecords({ sort: 'price' });
+
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        offerExternalIds: [],
+        offerCount: 3,
+        price: 899990,
+        priceWithoutDiscount: 999990,
+        specValid: true,
+      }),
+    );
+    expect(String(builder['orderBy'].mock.calls[0][0])).toContain(
+      `ORDER BY (entry ->> 'price')::numeric ASC NULLS LAST LIMIT 1`,
+    );
+  });
 });
