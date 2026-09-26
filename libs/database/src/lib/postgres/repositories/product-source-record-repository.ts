@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
+import { isPlainObject } from 'lodash';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { ProductSourceRecord } from '../models/product-source-record.entity';
@@ -9,6 +10,7 @@ import type { ProductModel } from '../models/product-model.entity';
 import type { Seller } from '../models/seller.entity';
 import type { Offer } from '../models/offer.entity';
 import type { ScrapedOffer, ScrapedProduct } from '../../models/scraped-product';
+import type { ProductSpecs } from '../../models/product-spec';
 import { nameOf } from '@fittkereso-backend/utils';
 
 /** What a feed run knows about one of its listings before deciding on a row. */
@@ -71,8 +73,13 @@ export interface ProductSourceRecordRow {
   /** The externalIds its offers are stored under. */
   offerExternalIds: string[];
   title: string | null;
+  /** The title exactly as the shop showed it; null on a record stored before it was kept. */
+  originalName: string | null;
   brand: string | null;
   categoryName: string | null;
+  categorySlug: string | null;
+  /** Each offer entry's offer-level specs (size, colour…), for the entries that carry any. */
+  offerEntrySpecs: ProductSpecs[];
   /** How many offer entries (sizes, colours…) the listing states. */
   offerCount: number;
   /** The lowest price among its offer entries. */
@@ -85,6 +92,8 @@ export interface ProductSourceRecordRow {
   specValid: boolean;
   productId: string | null;
   productName: string | null;
+  /** The product's price: its cheapest active offer, across every seller. */
+  productPrice: number | null;
   /** When its source last listed it (lastSeenAt, else lastUpdated). */
   seenAt: Date;
   lastUpdated: Date;
@@ -289,11 +298,15 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     const record = (column: keyof ProductSourceRecord) => `record."${nameOf<ProductSourceRecord>(column)}"`;
     const scraped = record('scrapedProduct');
     const displayName: keyof ScrapedProduct = 'displayName';
+    const originalName: keyof ScrapedProduct = 'originalName';
     const brand: keyof ScrapedProduct = 'brand';
     const category: keyof ScrapedProduct = 'category';
     const offers: keyof ScrapedProduct = 'offers';
     const price: keyof ScrapedOffer = 'price';
+    const offerSpecs: keyof ScrapedOffer = 'specs';
     const seenAt = `COALESCE(${record('lastSeenAt')}, ${record('lastUpdated')})`;
+    // What the list shows as the listing's title.
+    const shownTitle = `COALESCE(${scraped} ->> '${originalName}', ${scraped} ->> '${displayName}')`;
     const offerExternalIds = `jsonb_path_query_array(${scraped}, '$.${offers}[*].resolvedExternalId')`;
     const entries = `jsonb_array_elements(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`;
     // The entry a listing is priced by: its cheapest size or colour.
@@ -302,7 +315,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     const productName = `model."${nameOf<ProductModel>('displayName')}"`;
 
     const sortExpressions: Record<ProductSourceRecordSort, string> = {
-      title: `LOWER(${scraped} ->> '${displayName}')`,
+      title: `LOWER(${shownTitle})`,
       brand: `LOWER(${scraped} ->> '${brand}')`,
       productName: `LOWER(${productName})`,
       sourceName: `LOWER(source.${nameOf<ProductSource>('name')})`,
@@ -345,6 +358,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
             .where(`record.${nameOf<ProductSourceRecord>('url')} ILIKE :search`)
             .orWhere(`${record('externalId')} ILIKE :search`)
             .orWhere(`${scraped} ->> '${displayName}' ILIKE :search`)
+            .orWhere(`${scraped} ->> '${originalName}' ILIKE :search`)
             .orWhere(`${offerExternalIds}::text ILIKE :search`),
         ),
         { search: `%${params.search}%` },
@@ -367,11 +381,18 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     const total = await query.getCount();
     const rows: (Omit<
       ProductSourceRecordRow,
-      'offerExternalIds' | 'price' | 'priceWithoutDiscount' | 'specValid'
+      | 'offerExternalIds'
+      | 'offerEntrySpecs'
+      | 'price'
+      | 'priceWithoutDiscount'
+      | 'productPrice'
+      | 'specValid'
     > & {
       offerExternalIds: (string | null)[] | null;
+      offerEntrySpecs: unknown[] | null;
       price: string | null;
       priceWithoutDiscount: string | null;
+      productPrice: string | null;
       specValid: boolean | null;
     })[] = await query
       .select('record.id', 'id')
@@ -384,8 +405,14 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .addSelect(record('externalId'), 'externalId')
       .addSelect(offerExternalIds, 'offerExternalIds')
       .addSelect(`${scraped} ->> '${displayName}'`, 'title')
+      .addSelect(`${scraped} ->> '${originalName}'`, 'originalName')
       .addSelect(`${scraped} ->> '${brand}'`, 'brand')
       .addSelect(`${scraped} -> '${category}' ->> 'name'`, 'categoryName')
+      .addSelect(`${scraped} -> '${category}' ->> 'slug'`, 'categorySlug')
+      .addSelect(
+        `jsonb_path_query_array(${scraped}, '$.${offers}[*].${offerSpecs}')`,
+        'offerEntrySpecs',
+      )
       .addSelect(`jsonb_array_length(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`, 'offerCount')
       .addSelect(cheapestField('price'), 'price')
       .addSelect(cheapestField('priceWithoutDiscount'), 'priceWithoutDiscount')
@@ -394,6 +421,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .addSelect(record('specValid'), 'specValid')
       .addSelect('model.id', 'productId')
       .addSelect(productName, 'productName')
+      .addSelect(`model."${nameOf<ProductModel>('price')}"`, 'productPrice')
       .addSelect(seenAt, 'seenAt')
       .addSelect(record('lastUpdated'), 'lastUpdated')
       .addSelect(record('createdAt'), 'createdAt')
@@ -413,9 +441,11 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         offerExternalIds: (row.offerExternalIds ?? []).filter(
           (id): id is string => typeof id === 'string',
         ),
+        offerEntrySpecs: (row.offerEntrySpecs ?? []).filter(isPlainObject) as ProductSpecs[],
         offerCount: Number(row.offerCount ?? 0),
         price: toNumber(row.price),
         priceWithoutDiscount: toNumber(row.priceWithoutDiscount),
+        productPrice: toNumber(row.productPrice),
         specValid: row.specValid !== false,
       })),
     };

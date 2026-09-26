@@ -231,6 +231,16 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     expect(byProduct['addOrderBy']).toHaveBeenCalledWith('record.id', 'ASC');
   });
 
+  it("sorts by the shop's original title, falling back to the cleaned one", async () => {
+    const builder = makeQueryBuilder({});
+    await repositoryWith(builder).searchRecords({ sort: 'title', order: 'ASC' });
+    expect(builder['orderBy']).toHaveBeenCalledWith(
+      `LOWER(COALESCE(record."scrapedProduct" ->> 'originalName', record."scrapedProduct" ->> 'displayName'))`,
+      'ASC',
+      'NULLS LAST',
+    );
+  });
+
   it('prices a listing by its cheapest entry, and reads a null validity as valid', async () => {
     const builder = makeQueryBuilder({
       getRawMany: [
@@ -240,8 +250,11 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
           offerCount: 3,
           price: '899990',
           priceWithoutDiscount: '999990',
+          productPrice: '849990.00',
+          offerEntrySpecs: [{ frameSize: 'M' }, null],
           specValid: null,
         },
+        { id: 'record-2', productPrice: null, offerEntrySpecs: null },
       ],
     });
 
@@ -253,9 +266,14 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
         offerCount: 3,
         price: 899990,
         priceWithoutDiscount: 999990,
+        productPrice: 849990,
+        offerEntrySpecs: [{ frameSize: 'M' }],
         specValid: true,
       }),
     );
+    expect(items[1].productPrice).toBeNull();
+    expect(items[1].offerEntrySpecs).toEqual([]);
+    expect(builder['addSelect']).toHaveBeenCalledWith('model."price"', 'productPrice');
     expect(String(builder['orderBy'].mock.calls[0][0])).toContain(
       `ORDER BY (entry ->> 'price')::numeric ASC NULLS LAST LIMIT 1`,
     );

@@ -1,14 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { ProductSourceRecordRepository } from '@fittkereso-backend/database';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductSourceRecordSearchParams } from '../models/product-source-record-search-params';
 import { ProductSourceRecordSearchResult } from '../models/product-source-record-search-result';
+import { summarizeOfferSpecs } from './listing-offer-specs';
 
 const DEFAULT_PAGE_SIZE = 50;
 
 /** Every source's listings, as pages. The query itself is the repository's searchRecords. */
 @Injectable()
 export class ProductSourceRecordSearchService {
-  constructor(private readonly sourceRecordRepo: ProductSourceRecordRepository) {}
+  constructor(
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly categoryConfigService: CategoryConfigService,
+  ) {}
 
   public async search(
     params: ProductSourceRecordSearchParams,
@@ -37,7 +42,14 @@ export class ProductSourceRecordSearchService {
     result.pageSize = pageSize;
     result.totalItems = total;
     result.totalPages = Math.ceil(total / pageSize);
-    result.items = items;
+    // Labelled by the listing's own category: its specs were mapped against it.
+    result.items = items.map(({ offerEntrySpecs, ...row }) => ({
+      ...row,
+      offerSpecs: summarizeOfferSpecs(
+        offerEntrySpecs,
+        this.categoryConfigService.getJsonSchema(row.categorySlug),
+      ),
+    }));
     result.sort = sort;
     result.order = order;
     return result;

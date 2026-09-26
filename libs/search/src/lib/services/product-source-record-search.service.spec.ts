@@ -1,11 +1,29 @@
-import type { ProductSourceRecordRepository } from '@fittkereso-backend/database';
+import type {
+  ProductSourceRecordRepository,
+  SpecDefinitionJsonSchema,
+} from '@fittkereso-backend/database';
+import type { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductSourceRecordSearchService } from './product-source-record-search.service';
+
+const EBIKE_SCHEMA = {
+  title: 'E-bike',
+  type: 'object',
+  properties: {
+    frameSize: { type: 'string', title: 'Frame size' },
+    wheelSize: { type: 'number', title: 'Wheel size', meta: { unit: 'inch' } },
+    color: { type: 'string', title: 'Color' },
+  },
+} satisfies SpecDefinitionJsonSchema;
 
 function serviceWith(result: { items: unknown[]; total: number }) {
   const searchRecords = jest.fn().mockResolvedValue(result);
-  const service = new ProductSourceRecordSearchService({
-    searchRecords,
-  } as unknown as ProductSourceRecordRepository);
+  const getJsonSchema = jest.fn((slug?: string | null) =>
+    slug === 'ebikes' ? EBIKE_SCHEMA : undefined,
+  );
+  const service = new ProductSourceRecordSearchService(
+    { searchRecords } as unknown as ProductSourceRecordRepository,
+    { getJsonSchema } as unknown as CategoryConfigService,
+  );
   return { service, searchRecords };
 }
 
@@ -42,7 +60,10 @@ describe('ProductSourceRecordSearchService', () => {
   });
 
   it('answers with the page, the totals and the sort it used', async () => {
-    const { service } = serviceWith({ items: [{ id: 'record-1' }], total: 51 });
+    const { service } = serviceWith({
+      items: [{ id: 'record-1', offerEntrySpecs: [] }],
+      total: 51,
+    });
 
     const result = await service.search({});
 
@@ -52,10 +73,52 @@ describe('ProductSourceRecordSearchService', () => {
         pageSize: 50,
         totalItems: 51,
         totalPages: 2,
-        items: [{ id: 'record-1' }],
+        items: [{ id: 'record-1', offerSpecs: [] }],
         sort: 'seenAt',
         order: 'DESC',
       }),
     );
+  });
+
+  it("sums up each listing's offer entry specs, labelled and ordered by its category's schema", async () => {
+    const { service } = serviceWith({
+      items: [
+        {
+          id: 'record-1',
+          categorySlug: 'ebikes',
+          offerEntrySpecs: [
+            { color: 'Black', frameSize: 'M', wheelSize: 29, batteryBrand: 'Bosch' },
+            { color: 'Black', frameSize: 'L', wheelSize: 29, notes: '' },
+          ],
+        },
+      ],
+      total: 1,
+    });
+
+    const { items } = await service.search({});
+
+    expect(items?.[0]).toEqual({
+      id: 'record-1',
+      categorySlug: 'ebikes',
+      offerSpecs: [
+        { key: 'frameSize', label: 'Frame size', unit: undefined, values: ['M', 'L'] },
+        { key: 'wheelSize', label: 'Wheel size', unit: 'inch', values: [29] },
+        { key: 'color', label: 'Color', unit: undefined, values: ['Black'] },
+        { key: 'batteryBrand', label: 'batteryBrand', unit: undefined, values: ['Bosch'] },
+      ],
+    });
+  });
+
+  it('keeps the keys as labels when the category has no schema', async () => {
+    const { service } = serviceWith({
+      items: [{ id: 'record-1', categorySlug: null, offerEntrySpecs: [{ size: 'S' }] }],
+      total: 1,
+    });
+
+    const { items } = await service.search({});
+
+    expect(items?.[0].offerSpecs).toEqual([
+      { key: 'size', label: 'size', unit: undefined, values: ['S'] },
+    ]);
   });
 });
