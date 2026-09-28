@@ -566,7 +566,7 @@ describe('ProductMergeService.mergeSources', () => {
       expect(sourceRepo.find).not.toHaveBeenCalled();
     });
 
-    // Its titles are raw, and a record without `nameCleaned` reads as cleaned.
+    // It never names a product, not even by its title.
     it('leaves a source that does not identify products out of the name merge', async () => {
       const model = { sources: [google, arukereso, otherShop], productCategory: category } as any;
 

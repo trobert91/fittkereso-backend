@@ -165,8 +165,8 @@ export class ProductMergeService {
       : undefined;
 
     // A source that does not identify products only contributes to offers
-    // and specs: its titles are raw (it runs no identity extraction), and the
-    // name merge would read a record without `nameCleaned` as cleaned.
+    // and specs, never to a product's names — not even its title, where the
+    // identifying sources' records carry no model to name the product with.
     await this.nameMergeService.mergeNames(
       model,
       getLatestSourcePerSource(

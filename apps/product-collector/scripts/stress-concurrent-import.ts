@@ -371,7 +371,7 @@ async function checkConcurrentReimports(
   for (let round = 1; round <= 5; round++) {
     const marked = pair.map((listing, index) => {
       const scrapedProduct = structuredClone(listing.scrapedProduct);
-      scrapedProduct.displayName = `${scrapedProduct.displayName} [${index === 0 ? 'A' : 'B'}${round}]`;
+      scrapedProduct.originalName = `${scrapedProduct.originalName} [${index === 0 ? 'A' : 'B'}${round}]`;
       return { listing, scrapedProduct };
     });
     await Promise.all(
@@ -379,15 +379,15 @@ async function checkConcurrentReimports(
         updater.createOrUpdateProduct({ source: listing.source, url: listing.url }, scrapedProduct),
       ),
     );
-    const stored: { url: string; displayName: string }[] = await db.query(
-      `SELECT url, "scrapedProduct"->>'displayName' AS "displayName"
+    const stored: { url: string; originalName: string }[] = await db.query(
+      `SELECT url, "scrapedProduct"->>'originalName' AS "originalName"
          FROM product_source_record WHERE url = ANY($1)`,
       [pair.map((listing) => listing.url)],
     );
     for (const { listing, scrapedProduct } of marked) {
       const row = stored.find((candidate) => candidate.url === listing.url);
-      if (row?.displayName !== scrapedProduct.displayName) {
-        problems.push(`round ${round}: ${listing.sourceName} holds "${row?.displayName}"`);
+      if (row?.originalName !== scrapedProduct.originalName) {
+        problems.push(`round ${round}: ${listing.sourceName} holds "${row?.originalName}"`);
       }
     }
   }

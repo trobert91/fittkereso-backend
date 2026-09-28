@@ -418,4 +418,26 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
     expect(record).toBe(existing);
     expect(record.feedRowHash).toBe('hash-2');
   });
+
+  // A contributing source's record keeps no key; one stored before that goes.
+  it('clears a stored match key on null, and keeps it when none is passed', () => {
+    const existing = { id: 'record-google', model: null, normalizedSourceName: '- e+ talon' } as any;
+
+    service.upsertUnattached({
+      existing,
+      source: google,
+      scrapedProduct: listing,
+      sourceUrl: 'https://speedbike.hu/haibike',
+    });
+    expect(existing.normalizedSourceName).toBe('- e+ talon');
+
+    service.upsertUnattached({
+      existing,
+      source: google,
+      scrapedProduct: listing,
+      sourceUrl: 'https://speedbike.hu/haibike',
+      normalizedSourceName: null,
+    });
+    expect(existing.normalizedSourceName).toBeNull();
+  });
 });

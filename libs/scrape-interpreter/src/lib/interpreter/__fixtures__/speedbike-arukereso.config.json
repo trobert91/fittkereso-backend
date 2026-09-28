@@ -547,6 +547,7 @@
     }
   },
   "postProcess": {
-    "enabled": true
+    "identity": true,
+    "specs": true
   }
 }

@@ -105,7 +105,7 @@ describe('ProductSourceImportSimulationService', () => {
     specPostProcess = {
       extractIdentity: jest
         .fn()
-        .mockImplementation(async ({ scrapedProduct }) => ({ ...scrapedProduct, nameCleaned: true })),
+        .mockImplementation(async ({ scrapedProduct }) => ({ ...scrapedProduct, model: 'Named' })),
     };
 
     service = new ProductSourceImportSimulationService(
@@ -150,7 +150,7 @@ describe('ProductSourceImportSimulationService', () => {
       expect(specPostProcess.extractIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ context: expect.objectContaining({ force: true }) }),
       );
-      expect(result.feed?.products[0]).toMatchObject({ nameCleaned: true });
+      expect(result.feed?.products[0]).toMatchObject({ model: 'Named' });
     });
 
     it('reports what a run would queue and what it would only refresh', async () => {
@@ -205,9 +205,10 @@ describe('ProductSourceImportSimulationService', () => {
 
       expect(result.feed?.matchingOffers).toBe(2);
       expect(offerRepo.findSyncStates).toHaveBeenCalledWith('seller-1', ['sku-1', 'sku-2', 'sku-3']);
-      // It runs no identity extraction, so its previews cost nothing either,
-      // and what the extraction would read is no concern of its.
-      expect(specPostProcess.extractIdentity).not.toHaveBeenCalled();
+      // Its previews go through the extraction as its import would: the
+      // source's postProcess.identity decides whether that calls the LLM. The
+      // spec rows it would read are no concern of a contributing source.
+      expect(specPostProcess.extractIdentity).toHaveBeenCalledTimes(3);
       expect(result.warnings.join(' ')).not.toMatch(/identityExtraction\.specRows/);
     });
 

@@ -35,7 +35,7 @@ export class ProductSourceRecordUpdaterService {
     scrapedProduct?: Partial<ScrapedProduct>;
     externalId?: string;
     sourceUrl?: string;
-    normalizedSourceName?: string;
+    normalizedSourceName?: string | null;
     /** A feed row's hash, stored so the next feed run can tell it unchanged. */
     feedRowHash?: string;
   }): Promise<ProductSourceRecord | undefined> {
@@ -174,7 +174,7 @@ export class ProductSourceRecordUpdaterService {
     scrapedProduct: ScrapedProduct;
     externalId?: string;
     sourceUrl: string;
-    normalizedSourceName?: string;
+    normalizedSourceName?: string | null;
     feedRowHash?: string;
   }): ProductSourceRecord {
     const record = params.existing ?? new ProductSourceRecord();
@@ -203,7 +203,7 @@ export class ProductSourceRecordUpdaterService {
       scrapedProduct?: Partial<ScrapedProduct>;
       externalId?: string;
       sourceUrl?: string;
-      normalizedSourceName?: string;
+      normalizedSourceName?: string | null;
       feedRowHash?: string;
       processedSpecs: NonNullable<ScrapedProduct['specs']>;
       validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
@@ -260,6 +260,8 @@ export class ProductSourceRecordUpdaterService {
     source.specErrors = validation.isValid ? {} : validation.errors;
     source.lastUpdated = new Date();
     this.markSeen(source);
+    // Null clears it (a source that does not identify products keeps none);
+    // undefined leaves it as stored.
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
     if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;

@@ -86,10 +86,16 @@ export class ProductNormalizerService {
    * (size, color, ...) already having been stripped out of `model` upstream
    * by ProductSourcePostProcessService — this strategy does no semantic
    * stripping of its own, only the minimum transform needed for the result
-   * to be a stable, collision-resistant DB key.
+   * to be a stable, collision-resistant DB key. A word with no letter or digit
+   * (the " - " in "Talon E+ - M méretben") says nothing and is dropped;
+   * words mixing punctuation in, like "e+" or "m/43", stay whole.
    */
   private normalizeFull(input: string): string {
-    return input.toLowerCase().replace(/\s+/g, ' ').trim();
+    return input
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((word) => /[\p{L}\p{N}]/u.test(word))
+      .join(' ');
   }
 
   /**

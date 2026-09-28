@@ -16,12 +16,14 @@ import {
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
 import { EntityManager } from 'typeorm';
 import { compact, isEmpty, uniq } from 'lodash';
 import { ProductMergeService } from './product-merge.service';
 import { ProductModelFactoryService } from '../product-model-factory.service';
 import { ProductEmbeddingService } from '../product-embedding.service';
+import { ProductNormalizerService } from '../product-normalizer.service';
 
 export interface SplitIntoNewProductParams {
   /** The listings to carve out. All must currently belong to the same product. */
@@ -53,6 +55,8 @@ export class ProductSplitService {
     private readonly modelFactory: ProductModelFactoryService,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly locks: AdvisoryLockService,
+    private readonly productNormalizer: ProductNormalizerService,
+    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async splitIntoNewProduct(
@@ -163,10 +167,13 @@ export class ProductSplitService {
     records: ProductSourceRecord[],
   ): Promise<ProductModel> {
     // The newest record describes the listing best — later scrapes supersede
-    // earlier ones for identity purposes, same ordering mergeSources uses.
-    const newest = [...records].sort(
+    // earlier ones for identity purposes, same ordering mergeSources uses. A
+    // record the identity extraction named still beats a newer one it did
+    // not: a shop's title is only the fallback, as in the name merge.
+    const byNewest = [...records].sort(
       (a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime(),
-    )[0];
+    );
+    const newest = byNewest.find((record) => !!record.scrapedProduct?.model) ?? byNewest[0];
     const scraped = newest.scrapedProduct;
     const categoryId = scraped?.category?.id ?? newest.model?.productCategory?.id;
 
@@ -177,22 +184,34 @@ export class ProductSplitService {
     }
 
     // A manual/admin-entered record carries only specs, so fall back through
-    // the record's own identity fields before the product it is leaving.
+    // the record's own names and title before the product it is leaving.
     const displayName =
-      scraped?.displayName ?? newest.normalizedSourceName ?? newest.model?.displayName;
+      scraped?.displayName ?? scraped?.originalName ?? newest.model?.displayName;
     if (!displayName) {
       throw new BadRequestException(
         'Cannot split: source record has no name to build a product from',
       );
     }
+    const model = scraped?.model ?? scraped?.originalName ?? newest.model?.model ?? displayName;
+    const brandName = scraped?.brand ?? newest.model?.brand?.name;
+    const categorySlug = scraped?.category?.slug ?? newest.model?.productCategory?.slug;
 
     return this.modelFactory.createShell({
-      brandName: scraped?.brand ?? newest.model?.brand?.name,
+      brandName,
       displayName,
-      model: scraped?.model ?? newest.model?.model ?? displayName,
+      model,
       categoryId,
       categoryName: scraped?.category?.name,
-      normalizedName: newest.normalizedSourceName ?? displayName,
+      // Built from the names just picked, not read off the record: a record
+      // of a source that does not identify products stores no key.
+      normalizedName: this.productNormalizer.normalizeProduct({
+        brand: brandName ?? '',
+        model,
+        displayName,
+        strategy:
+          this.categoryConfigService.getConfig(categorySlug)?.normalizationStrategy ??
+          'full-sorted',
+      }),
     });
   }
 

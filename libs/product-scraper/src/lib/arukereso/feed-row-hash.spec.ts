@@ -51,9 +51,10 @@ describe('feedRowHash', () => {
     expect(feedRowHash('u', none)).not.toBe(feedRowHash('u', silent));
   });
 
-  // Bumped for the null/absent distinction: every row imports once more.
-  it('is on version 2', () => {
-    expect(FEED_HASH_VERSION).toBe(2);
+  // Bumped when a mapped row stopped carrying model/displayName: every row
+  // imports once more.
+  it('is on version 3', () => {
+    expect(FEED_HASH_VERSION).toBe(3);
   });
 });
 

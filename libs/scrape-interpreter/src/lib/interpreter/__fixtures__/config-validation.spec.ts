@@ -152,9 +152,9 @@ describe('hand-authored source configs', () => {
     ]);
   });
 
-  it('speedbike config enables LLM post-processing', () => {
+  it('speedbike config enables both LLM calls', () => {
     const config = speedbikeConfig as unknown as ScrapingSourceConfig;
-    expect(config.detailPage.postProcess?.enabled).toBe(true);
+    expect(config.detailPage.postProcess).toEqual({ identity: true, specs: true });
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -335,8 +335,8 @@ describe('hand-authored source configs', () => {
     });
 
     // It identifies nothing and carries no specs: no LLM call has anything to do.
-    it('turns the LLM post-processing off', () => {
-      expect(config.postProcess).toEqual({ enabled: false });
+    it('turns both LLM calls off', () => {
+      expect(config.postProcess).toEqual({ identity: false, specs: false });
     });
   });
 });

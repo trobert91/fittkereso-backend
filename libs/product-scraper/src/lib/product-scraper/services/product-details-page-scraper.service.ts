@@ -107,7 +107,7 @@ export class ProductDetailsPageScraperService {
           url: task.url,
           sourceName,
           brand: scrapedProduct.brand,
-          model: scrapedProduct.model,
+          title: scrapedProduct.originalName,
           categorySlug: scrapedProduct.category.slug,
           offersFound: scrapedProduct.offers?.length ?? 0,
         });
@@ -376,8 +376,8 @@ export class ProductDetailsPageScraperService {
     return {
       scrapedProduct: {
         brand: detail.brand,
-        model: detail.model,
-        displayName: `${detail.brand} ${detail.model}`.trim(),
+        // The page title is not a model name: the identity extraction reads
+        // one off it, and until then the listing has only its title.
         originalName: detail.model,
         category,
         specs: productLevelDeterministicSpecs,

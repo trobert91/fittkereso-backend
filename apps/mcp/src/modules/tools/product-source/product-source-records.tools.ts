@@ -87,7 +87,7 @@ export class ProductSourceRecordsTools {
           row.sourceName,
           row.url ?? '—',
           externalIdsOf(row),
-          row.title ?? '—',
+          row.originalName ?? row.title ?? '—',
           row.price ?? '—',
           row.productId ? `${row.productName ?? ''} (${row.productId})` : '— (unattached)',
           new Date(row.seenAt).toISOString(),

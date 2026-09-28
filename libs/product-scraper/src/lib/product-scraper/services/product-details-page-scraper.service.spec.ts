@@ -87,18 +87,18 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     return (service as any).extractProduct(task, {} as any);
   }
 
-  it('hands over the raw title as the model, for the identity extraction to clean', async () => {
+  // A page title is not a model name: only the identity extraction sets one.
+  it('hands over only the raw title, for the identity extraction to name', async () => {
     const result = await callExtractProduct(buildTask());
 
     expect(result.scrapedProduct).toMatchObject({
       brand: 'KTM',
-      model: detail.model,
       originalName: detail.model,
-      displayName: `KTM ${detail.model}`,
       rawSpecs: detail.rawSpecs,
       externalId: 'sku-1',
     });
-    expect(result.scrapedProduct.nameCleaned).toBeUndefined();
+    expect(result.scrapedProduct).not.toHaveProperty('model');
+    expect(result.scrapedProduct).not.toHaveProperty('displayName');
   });
 
   it('carries the deterministic specs, split by the category\'s offer-level keys, and both hashes', async () => {

@@ -710,7 +710,8 @@
       "contextTemplate": "Technical specification values from a speedbike.hu electric bicycle product listing. Preserve units, model numbers, and technical jargon."
     },
     "postProcess": {
-      "enabled": true
+      "identity": true,
+      "specs": true
     }
   }
 }

@@ -8,6 +8,8 @@ import { ProductSplitService } from './product-split.service';
 import type { ProductMergeService } from './product-merge.service';
 import type { ProductModelFactoryService } from '../product-model-factory.service';
 import type { ProductEmbeddingService } from '../product-embedding.service';
+import { ProductNormalizerService } from '../product-normalizer.service';
+import type { CategoryConfigService } from '@fittkereso-backend/config';
 
 function makeQueryBuilder() {
   const builder: any = {
@@ -88,6 +90,10 @@ describe('ProductSplitService', () => {
       modelFactory as unknown as ProductModelFactoryService,
       { createProductEmbedding: jest.fn() } as unknown as ProductEmbeddingService,
       locks as never,
+      new ProductNormalizerService(),
+      {
+        getConfig: jest.fn().mockReturnValue({ normalizationStrategy: 'full-sorted' }),
+      } as unknown as CategoryConfigService,
     );
   });
 
@@ -193,6 +199,73 @@ describe('ProductSplitService', () => {
 
     expect(modelFactory.createShell).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'New Name', displayName: 'New Name' }),
+    );
+  });
+
+  // A Google record joined later is newer, but only the Árukereső one was
+  // named by the identity extraction.
+  it('names the new product from an identified record over a newer title-only one, and builds its key', async () => {
+    sourceRecordRepo.find.mockResolvedValue([
+      makeRecord({
+        id: 'record-arukereso',
+        lastUpdated: new Date('2026-09-25'),
+        normalizedSourceName: 'e+ talon',
+        scrapedProduct: {
+          brand: 'GIANT',
+          model: 'Talon E+',
+          displayName: 'GIANT Talon E+',
+          originalName: 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben',
+          category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
+        } as any,
+      }),
+      makeRecord({
+        id: 'record-google',
+        lastUpdated: new Date('2026-09-26'),
+        normalizedSourceName: null,
+        scrapedProduct: {
+          brand: 'GIANT',
+          originalName: 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben',
+          flags: ['identity_off'],
+          category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
+        } as any,
+      }),
+    ]);
+
+    await service.splitIntoNewProduct({
+      sourceRecordIds: ['record-arukereso', 'record-google'],
+      reason: 'test',
+    });
+
+    expect(modelFactory.createShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'Talon E+',
+        displayName: 'GIANT Talon E+',
+        normalizedName: 'e+ talon',
+      }),
+    );
+  });
+
+  it('falls back to the title when no record was identified', async () => {
+    sourceRecordRepo.find.mockResolvedValue([
+      makeRecord({
+        normalizedSourceName: null,
+        scrapedProduct: {
+          brand: 'GIANT',
+          originalName: 'GIANT Talon E+ - M méretben',
+          flags: ['identity_failed'],
+          category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
+        } as any,
+      }),
+    ]);
+
+    await service.splitIntoNewProduct({ sourceRecordIds: ['record-1'], reason: 'test' });
+
+    expect(modelFactory.createShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'GIANT Talon E+ - M méretben',
+        displayName: 'GIANT Talon E+ - M méretben',
+        normalizedName: 'e+ m méretben talon',
+      }),
     );
   });
 

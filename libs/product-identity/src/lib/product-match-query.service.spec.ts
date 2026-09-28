@@ -69,6 +69,20 @@ describe('ProductMatchQueryService', () => {
     expect(query.nameKey).toBe('140 hpc hybrid stereo');
   });
 
+  // The identity extraction was off or failed: no model, no display name.
+  it('keys a listing the extraction did not name on its title', () => {
+    const query = service.ofListing(
+      listingOf({
+        model: undefined,
+        displayName: undefined,
+        originalName: 'Cube Stereo Hybrid 140 HPC - M méretben',
+      }),
+      cube,
+    );
+
+    expect(query.nameKey).toBe('140 hpc hybrid m méretben stereo');
+  });
+
   it('scopes a listing by brand and category, and a stored product also by its own id', () => {
     const scope = {
       brandId: 'brand-cube',

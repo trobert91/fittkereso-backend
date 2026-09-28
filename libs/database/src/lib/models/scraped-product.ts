@@ -19,16 +19,27 @@ import { OfferAvailability } from '../postgres/types/offer-availability';
 export interface ScrapedProduct {
   category: { id: string; slug: string; name: string };
   brand: string;
-  model: string;
-  displayName: string;
   /**
-   * The raw, unfiltered title/model text exactly as scraped, before
-   * ProductSourcePostProcessService (or the post-process-disabled path)
-   * strips brand/marketing/size/color boilerplate into the clean `model`
-   * above. Some sources (e.g. speedbike.hu) only expose the full marketing
-   * title, so this is the only place the original listing name survives.
+   * The model name the identity extraction read off the title, without the
+   * brand, size, colour or marketing words. Set only when that call returned
+   * one (now, or on an earlier import whose result was reused); otherwise
+   * absent, and `flags` says why. A reader that needs some name either way
+   * takes listingNames().
    */
-  originalName?: string;
+  model?: string;
+  /** `${brand} ${model}`, set exactly when `model` is. */
+  displayName?: string;
+  /**
+   * The title exactly as the shop publishes it. Every importer sets it; the
+   * identity extraction reads it, and it stays as scraped.
+   */
+  originalName: string;
+  /**
+   * What happened to this listing on its import that its fields alone don't
+   * show — why it has no `model`, say. Rebuilt on every import: the importers
+   * set none, the updater's steps add theirs.
+   */
+  flags?: ScrapedProductFlag[];
   aliases?: string[];
   specs?: ProductSpecs;
   /**
@@ -100,13 +111,6 @@ export interface ScrapedProduct {
    */
   siblingExternalIds?: string[];
   /**
-   * Whether `model` came back from the LLM identity extraction, rather than
-   * being the raw title because the call was skipped or failed. A raw title
-   * carries sizes, colours and marketing words, so ProductNameMergeService
-   * lets it vote on a product's name only when no cleaned name exists.
-   */
-  nameCleaned?: boolean;
-  /**
    * Hash of exactly what the identity extraction was given — the raw title,
    * the brand, the deterministic identity values and the selected spec rows.
    * A re-import whose hash (and both spec hashes) match the stored record's
@@ -119,6 +123,30 @@ export interface ScrapedProduct {
   identityInputHash?: string;
   images?: ProductSourceImage[];
   offers?: ScrapedOffer[];
+}
+
+/**
+ * The flags a listing can carry (ScrapedProduct.flags):
+ * - `identity_off`: its source's `postProcess.identity` is off, so no identity
+ *   extraction ran and it has no `model`.
+ * - `identity_failed`: the extraction ran but returned no model (an LLM error,
+ *   a truncated or empty answer). The next import calls it again.
+ */
+export const SCRAPED_PRODUCT_FLAGS = ['identity_off', 'identity_failed'] as const;
+export type ScrapedProductFlag = (typeof SCRAPED_PRODUCT_FLAGS)[number];
+
+/**
+ * The names to use where some name is needed whether or not the listing was
+ * identified — a match key, a new product's shell, brand resolution's
+ * fallback text: the identified ones, else the shop's title.
+ */
+export function listingNames(
+  scrapedProduct: Pick<ScrapedProduct, 'model' | 'displayName' | 'originalName'>,
+): { model: string; displayName: string } {
+  return {
+    model: scrapedProduct.model ?? scrapedProduct.originalName,
+    displayName: scrapedProduct.displayName ?? scrapedProduct.originalName,
+  };
 }
 
 // A single scraped image URL with its position in the source listing's

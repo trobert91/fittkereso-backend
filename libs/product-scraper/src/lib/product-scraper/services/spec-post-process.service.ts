@@ -9,6 +9,7 @@ import {
   ProductSpecs,
   ScrapedOffer,
   ScrapedProduct,
+  ScrapedProductFlag,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import {
@@ -24,7 +25,7 @@ import {
 } from '@fittkereso-backend/metrics';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { filterDefinedSpecs } from '@fittkereso-backend/utils';
-import { omit, pick, uniq } from 'lodash';
+import { isEmpty, omit, pick, uniq } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 
 /**
@@ -99,7 +100,9 @@ export class SpecPostProcessService {
    * listing its source has already contributed.
    *
    * Never throws for an LLM failure: the listing continues on its
-   * deterministic data, with `nameCleaned: false`.
+   * deterministic data with no `model`, flagged `identity_failed`, and the
+   * next import asks again. With the source's `identity` off it is flagged
+   * `identity_off` and nothing is called.
    */
   public async extractIdentity(params: {
     context: ProductImportContext;
@@ -116,7 +119,7 @@ export class SpecPostProcessService {
     const config = postProcessConfigOf(context.source.config);
     const specRows = context.source.config?.identityExtraction?.specRows;
     const deterministic = scrapedProduct.extractedSpecs ?? {};
-    const rawTitle = scrapedProduct.originalName ?? scrapedProduct.model;
+    const rawTitle = scrapedProduct.originalName;
     const rows = selectIdentitySpecRows(scrapedProduct.rawSpecs, specRows);
     const description = config?.includeDescriptionInOfferIdentity
       ? scrapedProduct.description
@@ -128,9 +131,11 @@ export class SpecPostProcessService {
     };
     const identityInputHash = hashOf({ ...data, rows, description });
 
+    // Only a result that named the listing is worth keeping: one that did
+    // not (the call failed, or was off) is asked again.
     const stored = ownRecord?.scrapedProduct;
     if (
-      stored &&
+      stored?.model &&
       !context.force &&
       ownRecord?.offerSpecsHash === scrapedProduct.offerSpecsHash &&
       ownRecord?.productSpecsHash === scrapedProduct.productSpecsHash &&
@@ -145,7 +150,8 @@ export class SpecPostProcessService {
     }
 
     let identity: IdentityContribution | undefined;
-    if (config?.enabled === false) {
+    const enabled = config?.identity !== false;
+    if (!enabled) {
       this.productMetrics.identityExtraction(context.source.name, 'disabled');
     } else {
       this.logger.debug('Running identity extraction', {
@@ -180,11 +186,15 @@ export class SpecPostProcessService {
     return {
       ...scrapedProduct,
       brand: merged.brand,
+      // Only a name the call returned: without one the listing keeps its
+      // title alone, and its flags say why.
       model: merged.model,
-      displayName: `${merged.brand} ${merged.model}`.trim(),
-      originalName: rawTitle,
+      displayName: merged.model ? `${merged.brand} ${merged.model}` : undefined,
       specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
-      nameCleaned: merged.nameCleaned,
+      flags: withIdentityFlag(
+        scrapedProduct.flags,
+        merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
+      ),
       identityInputHash,
       offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
     };
@@ -213,7 +223,7 @@ export class SpecPostProcessService {
     if (!schema) return scrapedProduct;
 
     const config = postProcessConfigOf(context.source.config);
-    if (config?.enabled === false) {
+    if (config?.specs === false) {
       this.productMetrics.specUnification(context.source.name, trigger, 'disabled');
       return scrapedProduct;
     }
@@ -227,7 +237,7 @@ export class SpecPostProcessService {
     const unified = await this.postProcess.processModelSpecs({
       data: {
         brand: scrapedProduct.brand,
-        model: scrapedProduct.originalName ?? scrapedProduct.model,
+        model: scrapedProduct.originalName,
         specs: filterDefinedSpecs(
           pick(scrapedProduct.extractedSpecs ?? {}, scopes.unificationKeys),
         ),
@@ -289,11 +299,10 @@ export class SpecPostProcessService {
     return {
       ...scrapedProduct,
       brand: stored.brand ?? scrapedProduct.brand,
-      model: stored.model ?? scrapedProduct.model,
-      displayName: stored.displayName ?? scrapedProduct.displayName,
-      originalName: scrapedProduct.originalName ?? scrapedProduct.model,
+      model: stored.model,
+      displayName: stored.displayName,
       specs: stored.specs ?? scrapedProduct.specs,
-      nameCleaned: stored.nameCleaned,
+      flags: withIdentityFlag(scrapedProduct.flags, undefined),
       identityInputHash,
       offers: withOfferLevelSpecs(scrapedProduct.offers, (offer, index) =>
         pick(storedSpecsFor(offer, index), scopes.offerLevelKeys),
@@ -332,6 +341,17 @@ function withOfferLevelSpecs(
     ...offer,
     specs: offer.specs ?? pageSpecs(offer, index),
   }));
+}
+
+const IDENTITY_FLAGS: readonly ScrapedProductFlag[] = ['identity_off', 'identity_failed'];
+
+/** The listing's flags with the identity extraction's own replaced by `flag`. */
+function withIdentityFlag(
+  flags: ScrapedProductFlag[] | undefined,
+  flag: ScrapedProductFlag | undefined,
+): ScrapedProductFlag[] | undefined {
+  const next = [...(flags ?? []).filter((each) => !IDENTITY_FLAGS.includes(each)), ...(flag ? [flag] : [])];
+  return isEmpty(next) ? undefined : next;
 }
 
 function hashOf(value: unknown): string {

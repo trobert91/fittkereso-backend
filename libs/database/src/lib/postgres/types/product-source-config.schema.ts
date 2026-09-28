@@ -203,11 +203,17 @@ const identityExtractionSchema: JsonSchemaFragment = {
 const postProcessConfigSchema: JsonSchemaFragment = {
   type: 'object',
   description:
-    'Per-source switch for the LLM post-processing pass that runs after deterministic extraction. On by default — a source with no block at all still runs it.',
+    'Per-source switches for the two LLM calls that run after deterministic extraction. Both are on by default — a source with no block at all runs both.',
   properties: {
-    enabled: {
+    identity: {
       type: 'boolean',
-      description: 'Set false to opt this source out, e.g. where inference adds nothing.',
+      description:
+        'The per-listing identity extraction: the model name, and the identity and listing-level specs (size, colour) read off the title. Off, a listing keeps only its title and matching uses it. On a source that does not identify products it decides nothing; it only names the listing and fills listing-level specs the seller\'s higher sources lack.',
+    },
+    specs: {
+      type: 'boolean',
+      description:
+        'Full spec unification, once per product per source: every non-identity field, from the whole spec table. Set false for a source with no spec table (a Google Shopping feed), where it would read only the title.',
     },
     model: { type: 'string', description: 'Model identifier to use.' },
     thinking: {

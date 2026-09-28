@@ -501,14 +501,13 @@ export class ProductSourceImportSimulationService {
         if (products.length < limit) {
           if (mapped.status === 'mapped') {
             // The mapping itself is free; the preview then runs the identity
-            // extraction a first import would, which is the part that costs.
-            // `force` rules out reusing a stored result.
-            const extracted = contributes
-              ? mapped.scrapedProduct
-              : await this.specPostProcess.extractIdentity({
-                  context: { source, url: mapped.url, force: true },
-                  scrapedProduct: mapped.scrapedProduct,
-                });
+            // extraction a first import would, which is the part that costs —
+            // unless the source's `postProcess.identity` is off, contributing
+            // or not. `force` rules out reusing a stored result.
+            const extracted = await this.specPostProcess.extractIdentity({
+              context: { source, url: mapped.url, force: true },
+              scrapedProduct: mapped.scrapedProduct,
+            });
             products.push(extracted);
             const offer = extracted.offers?.[0];
             productIdentifiers.push(

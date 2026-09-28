@@ -100,6 +100,7 @@ function makeScrapedProduct(
     brand: 'Logitech',
     displayName: 'Logitech MX Keys',
     model: 'MX Keys',
+    originalName: 'Logitech MX Keys Wireless UK',
     category: makeCategory(),
     specs: { layout: 'UK' },
     images: [],
@@ -719,7 +720,6 @@ describe('ProductScrapeUpdaterService', () => {
       model: 'Macina Scarp SX',
       displayName: 'KTM Macina Scarp SX',
       specs: { modelYear: 2026 },
-      nameCleaned: true,
     });
 
     const savedAs = (id: string) =>
@@ -799,7 +799,7 @@ describe('ProductScrapeUpdaterService', () => {
         specs: { modelYear: 2026 },
       }));
       expect(mockListingMatch.match).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'Macina Scarp SX', nameCleaned: true }),
+        expect.objectContaining({ model: 'Macina Scarp SX' }),
         expect.anything(),
       );
       expect(mockBrandResolution.resolve).toHaveBeenCalledWith(
@@ -1487,19 +1487,25 @@ describe('ProductScrapeUpdaterService', () => {
       identifiesProducts: false,
       seller: { id: 'seller-speedbike', name: 'speedbike.hu' },
     };
+    // What its importer hands over: the title, and no name.
     const contribute = (overrides?: Partial<ScrapedProduct>) =>
       service.createOrUpdateProduct(
         { source: googleSource as never, url: PAGE, feedRowHash: 'hash-1' },
         makeScrapedProduct({
-          displayName: 'HAIBIKE SDURO raw title',
+          model: undefined,
+          displayName: undefined,
+          originalName: 'HAIBIKE SDURO raw title',
           offers: [{ price: 1499990, priceWithoutDiscount: 2269000, externalId: 'HAIBIKE-1' }] as never,
           ...overrides,
         }),
       );
     const offerOn = (modelId: string) => ({ id: 'offer-1', externalId: 'HAIBIKE-1', model: { id: modelId } });
 
-    it('joins the offer its seller has, with no identity work and no product fields', async () => {
+    it('joins the offer its seller has, with no identity decision, no product fields and no match key', async () => {
       const model = makeExistingModel();
+      // Stored while it waited for the offer.
+      const own = { id: 'record-google', url: PAGE, model: null };
+      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValue(own as never);
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
         ...offerOn('model-1'),
         model,
@@ -1509,8 +1515,12 @@ describe('ProductScrapeUpdaterService', () => {
       const result = await contribute();
 
       expect(result).toBe(model);
+      // The extraction runs (its source's config decides whether it calls),
+      // with the listing's own record so an unchanged one reuses its result.
+      expect(mockSpecPostProcess.extractIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ ownRecord: own }),
+      );
       for (const identityStep of [
-        mockSpecPostProcess.extractIdentity,
         mockBrandResolution.resolve,
         mockKeyLookup.lookup,
         mockListingMatch.match,
@@ -1523,7 +1533,12 @@ describe('ProductScrapeUpdaterService', () => {
       // The product's names are its identifying sources'.
       expect(model.displayName).toBe('Logitech MX Keys');
       expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
-        expect.objectContaining({ model, source: googleSource, feedRowHash: 'hash-1' }),
+        expect.objectContaining({
+          model,
+          source: googleSource,
+          feedRowHash: 'hash-1',
+          normalizedSourceName: null,
+        }),
       );
       expect(mockMergeService.mergeSources).toHaveBeenCalledWith(model);
       expect(mockOfferComposer.compose).toHaveBeenCalledWith({
@@ -1537,6 +1552,42 @@ describe('ProductScrapeUpdaterService', () => {
       expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
         'speedbike-googleshop',
         'contributed',
+      );
+    });
+
+    // Google states a colour the identifying source's listing lacks: its record
+    // carries it on the offer entry, and the composer fills the offer's gap.
+    it('writes the listing-level specs it extracted onto its offer entry before composing', async () => {
+      const model = makeExistingModel();
+      mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
+        ...offerOn('model-1'),
+        model,
+      } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
+      mockSpecPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) => ({
+        ...scrapedProduct,
+        offers: scrapedProduct.offers?.map((offer) => ({
+          ...offer,
+          specs: { frameSizeLabel: 'M', color: 'Asphalt Green' },
+        })),
+      }));
+
+      await contribute();
+
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scrapedProduct: expect.objectContaining({
+            offers: [
+              expect.objectContaining({
+                resolvedExternalId: 'HAIBIKE-1',
+                specs: { frameSizeLabel: 'M', color: 'Asphalt Green' },
+              }),
+            ],
+          }),
+        }),
+      );
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ model, externalIds: ['HAIBIKE-1'] }),
       );
     });
 
@@ -1629,6 +1680,8 @@ describe('ProductScrapeUpdaterService', () => {
       };
       oldProduct.sources = [own] as never;
       mockSourceRecordRepo.findBySourceAndUrl
+        // The extraction's own record, then the detach check's: on the old product.
+        .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
         .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
         .mockResolvedValue({ ...own, model: null } as never);
 

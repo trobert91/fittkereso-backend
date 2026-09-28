@@ -9,8 +9,10 @@ import type { ArukeresoFeedItem } from './arukereso-feed-item';
  *
  * 2: an offer says "none" with null for a mapped field and leaves an unmapped
  * one out (see ScrapedOffer).
+ * 3: a mapped row carries only its title (`originalName`); `model` and
+ * `displayName` come from the identity extraction alone.
  */
-export const FEED_HASH_VERSION = 2;
+export const FEED_HASH_VERSION = 3;
 
 /**
  * One feed row as the importer sees it: the MAPPED product at its canonical

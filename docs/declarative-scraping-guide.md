@@ -65,6 +65,13 @@ interface ScrapingSourceConfig {
     specMapping: Record<string, SourceSpecConfig>; // keyed by category slug
     offers?: { offerList: ScrapeOperation[]; itemMode: 'cheerio' | 'json'; itemPipeline: ScrapeOperation[] /* terminates in assembleOffer */ };
     translation?: { enabled: boolean; sourceLanguage: string; targetLanguage: string; contextTemplate: string };
+    // The two LLM calls, switched separately; both on by default.
+    // identity: the per-listing identity extraction — the model name, and the
+    //   identity and listing-level specs (size, colour) read off the title.
+    //   Off, the listing has no model/displayName, only its title
+    //   (`originalName`, flagged `identity_off`), and matching uses the title.
+    // specs: full spec unification, once per product per source.
+    postProcess?: { identity?: boolean; specs?: boolean; /* model, thinking, effort, maxTokens, includeDescriptionIn… */ };
   };
 }
 ```
@@ -85,7 +92,7 @@ interface ArukeresoSourceConfig {
   category: { labelFrom?: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
   mapping: Record<ArukeresoMappingTarget, FieldMapping | FieldMapping[]>;  // FieldMapping = { field?: string; pipeline?: ScrapeOperation[] }
   specMapping?: Record<string, SourceSpecConfig>;  // same shape as detailPage.specMapping
-  postProcess?: ProductSourcePostProcessConfig;    // the same block, read by the same service
+  postProcess?: ProductSourcePostProcessConfig;    // the same block ({ identity, specs, … }), read by the same service
 }
 ```
 
@@ -105,7 +112,7 @@ Small on purpose: `field` does the addressing and the op pipeline does the trans
 - `__fixtures__/ebikeshop.config.json` — scraping, JSON-hydration/Inertia `data-page` markup.
 - `__fixtures__/speedbike.config.json` — scraping, classic `<table>` spec extraction. Kept as a style template; speedbike itself is feed-only, so this config has no source row.
 - `__fixtures__/speedbike-arukereso.config.json` — the feed config, reusing that file's 58 spec mappings unchanged, because a feed's `attribute_name` labels are the same labels the shop's own spec table uses.
-- `__fixtures__/speedbike-googleshop.config.json` — speedbike's Google Shopping feed: the fallback price, the old price, and post-processing off. Its `id` equals the Árukereső `identifier`, which is how its rows join that source's offers.
+- `__fixtures__/speedbike-googleshop.config.json` — speedbike's Google Shopping feed: the fallback price, the old price, and both LLM calls off (`postProcess: { identity: false, specs: false }`). Its `id` equals the Árukereső `identifier`, which is how its rows join that source's offers.
 
 ---
 
@@ -263,7 +270,8 @@ A shop may have several sources: speedbike has its Árukereső feed and its Goog
   - `list_product_source_records` (`attached: false` for the waiting ones);
   - the unattached count in `get_product_source_import_status`, and the Listings box on the admin source page;
   - `simulate_product_source_import`, which for a contributing source counts the rows matching an existing offer, and for any feed the rows carrying an old price.
-- **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess` off, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number.
+- **A contributing source's names:** it never names a product, and its record stores no match key (`normalizedSourceName` null), since nothing matches on it. With `postProcess.identity` on, its listings still get the identity extraction: that names the record and reads its listing-level specs (size, colour), which fill the offer's keys the seller's higher sources lack. With it off, a record has only its title (`originalName`), flagged `identity_off`.
+- **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess: { identity: false, specs: false }`, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number. Its titles are the same as Árukereső's and it has no spec table, so an extraction there would add nothing but the colour a few descriptions state (Giant/Liv), which also needs `includeDescriptionInOfferIdentity`.
 - **Checked by** `apps/product-collector/scripts/verify-multi-source.ts` on `fittkereso_e2e`: A then G, G then A and both at once end in the same state, plus the removal and admin-description scenarios.
 
 ---

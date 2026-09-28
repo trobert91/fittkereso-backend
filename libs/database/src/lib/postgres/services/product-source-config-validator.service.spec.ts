@@ -298,6 +298,22 @@ describe('ProductSourceConfigValidatorService', () => {
       expect(validator.problems('googleshop', MINIMAL_CONFIG)).not.toBeNull();
     });
 
+    // The two LLM calls are switched separately; the old single switch is gone.
+    it('takes separate identity and spec switches for the LLM calls, and no longer `enabled`', () => {
+      const withPostProcess = (postProcess: Record<string, unknown>) => ({
+        ...feedConfig(),
+        postProcess,
+      });
+
+      expect(
+        validator.problems('googleshop', withPostProcess({ identity: false, specs: false })),
+      ).toBeNull();
+      expect(validator.problems('arukereso', withPostProcess({ identity: true }))).toBeNull();
+      expect(validator.problems('googleshop', withPostProcess({ enabled: false }))).toEqual([
+        expect.objectContaining({ path: expect.stringContaining('postProcess') }),
+      ]);
+    });
+
     it('accepts a list of fallbacks for a target', () => {
       const config = feedConfig({
         price: [

@@ -84,6 +84,7 @@ async function bootstrap() {
   console.log('Backfilling ProductSourceRecord.normalizedSourceName...');
   const sources = await sourceRepo.find({
     relations: [
+      nameOf<ProductSourceRecord>('source'),
       nameOf<ProductSourceRecord>('model'),
       `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('brand')}`,
       `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('productCategory')}`,
@@ -97,9 +98,17 @@ async function bootstrap() {
     const batch = sources.slice(i, i + BATCH_SIZE);
     const toSave: ProductSourceRecord[] = [];
     for (const source of batch) {
+      // Nothing matches on a contributing source's records: they keep no key.
+      if (source.source?.identifiesProducts === false) {
+        sourcesSkipped++;
+        continue;
+      }
       const brandName = source.model?.brand?.name ?? '';
+      // An unidentified listing is keyed on its title, as the scraper keys it.
       const displayName =
-        source.scrapedProduct?.displayName ?? source.model?.displayName;
+        source.scrapedProduct?.displayName ??
+        source.scrapedProduct?.originalName ??
+        source.model?.displayName;
       if (!displayName) {
         sourcesSkipped++;
         continue;

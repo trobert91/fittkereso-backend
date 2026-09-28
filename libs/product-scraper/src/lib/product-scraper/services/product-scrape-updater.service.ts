@@ -4,6 +4,7 @@ import {
   AdvisoryLockKey,
   AdvisoryLockService,
   brandLock,
+  listingNames,
   offerKeyLock,
   productLock,
   Offer,
@@ -111,7 +112,8 @@ interface ListingWrite {
    * the product, with each offer carrying the externalId it is stored under.
    */
   listing: ScrapedProduct;
-  normalizedSourceName: string;
+  /** Null for a source that does not identify products: nothing matches on its listings. */
+  normalizedSourceName: string | null;
   identifiers: OfferIdentifiers[];
   /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
   externalIds: (string | undefined)[];
@@ -176,7 +178,7 @@ export class ProductScrapeUpdaterService {
       this.logger.warn('Skipping scrape — no category identified', {
         taskId: context.task?.id,
         url: context.url,
-        displayName: scrapedProduct.displayName,
+        title: scrapedProduct.originalName,
       });
       return undefined;
     }
@@ -270,30 +272,35 @@ export class ProductScrapeUpdaterService {
 
   // One canonical name for this scrape, stored on the new ProductSourceRecord
   // row and used as a new product's first normalizedName (mergeSources then
-  // rebuilds it from the resolved brand).
+  // rebuilds it from the resolved brand). From the title when the listing was
+  // not identified, as name matching does.
   private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
     const strategy =
       this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
         ?.normalizationStrategy ?? 'full-sorted';
     return this.productNormalizer.normalizeProduct({
       brand: scrapedProduct.brand,
-      model: scrapedProduct.model,
-      displayName: scrapedProduct.displayName,
+      ...listingNames(scrapedProduct),
       strategy,
     });
   }
 
   /**
    * A listing of a source that does not identify products — a shop's Google
-   * feed beside its Árukereső feed, say. No identity work at all: no history
-   * paths, identifiers, extraction or name matching. It joins the offer its
-   * seller already has under one of its externalIds, on that offer's
-   * product; with none, it is stored unattached, and the identifying listing
-   * that writes the offer attaches it (attachWaitingRecords).
+   * feed beside its Árukereső feed, say. No identity decision: no history
+   * paths, identifiers or name matching. It joins the offer its seller
+   * already has under one of its externalIds, on that offer's product; with
+   * none, it is stored unattached, and the identifying listing that writes
+   * the offer attaches it (attachWaitingRecords).
+   *
+   * The identity extraction still runs when the source's `postProcess.identity`
+   * is on: it names the listing and reads its listing-level specs (size,
+   * colour), which fill the offer's keys the seller's higher sources lack.
    *
    * It never creates a product or an offer, and never touches a product's
    * names, category, image or aliases: it contributes offer fields and specs,
-   * by its source's priority.
+   * by its source's priority. Its record stores no match key, since nothing
+   * matches on it.
    */
   private async contributeListing(
     context: ProductImportContext,
@@ -308,11 +315,19 @@ export class ProductScrapeUpdaterService {
         { taskId: context.task?.id, url: context.url, source: context.source.name },
       );
     }
+    // Its own record, so an unchanged listing reuses the stored extraction.
+    const extracted = await this.specPostProcess.extractIdentity({
+      context,
+      scrapedProduct,
+      ownRecord:
+        (await this.sourceRecordRepo.findBySourceAndUrl(context.source.id, normalizeUrl(context.url))) ??
+        undefined,
+    });
     const write: ListingWrite = {
       context,
-      extracted: scrapedProduct,
-      listing: this.withStoredOffers(scrapedProduct, externalIds),
-      normalizedSourceName: this.buildNormalizedSourceName(scrapedProduct),
+      extracted,
+      listing: this.withStoredOffers(extracted, externalIds),
+      normalizedSourceName: null,
       identifiers: [],
       externalIds,
     };
@@ -336,7 +351,7 @@ export class ProductScrapeUpdaterService {
       // time this source contributes to the product.
       const listing = await this.unifyForNewSource(
         context,
-        scrapedProduct,
+        extracted,
         { model: offer.model, isExistingMatch: true, keyMatches: [], keyGates: {} },
         true,
       );
@@ -608,7 +623,7 @@ export class ProductScrapeUpdaterService {
   ): Promise<{ identity: ResolvedIdentity; brandResolved: boolean }> {
     const brand = await this.brandResolution.resolve(
       scrapedProduct.brand,
-      scrapedProduct.displayName,
+      listingNames(scrapedProduct).displayName,
     );
     const brandId = brand?.entity?.id;
     const brandResolved = !!brandId;
@@ -955,11 +970,7 @@ export class ProductScrapeUpdaterService {
     const { context } = write;
     // Before any lock: the shell costs an embedding call, thrown away when
     // the re-check attaches.
-    const shell = await this.newProductModel(
-      context,
-      write.listing,
-      write.normalizedSourceName,
-    );
+    const shell = await this.newProductModel(context, write.listing);
 
     const written = await this.locks.withLocks(
       [brandLock(shell.brand.id)],
@@ -1701,16 +1712,18 @@ export class ProductScrapeUpdaterService {
   private async newProductModel(
     context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
-    normalizedSourceName: string,
   ): Promise<ProductModel> {
+    // A listing the extraction did not name starts its product off its title;
+    // the name merge replaces it once a source names the product.
+    const names = listingNames(scrapedProduct);
     try {
       return await this.modelFactory.createShell({
         brandName: scrapedProduct.brand,
-        displayName: scrapedProduct.displayName,
-        model: scrapedProduct.model,
+        displayName: names.displayName,
+        model: names.model,
         categoryId: scrapedProduct.category.id,
         categoryName: scrapedProduct.category.name,
-        normalizedName: normalizedSourceName,
+        normalizedName: this.buildNormalizedSourceName(scrapedProduct),
       });
     } catch (error: unknown) {
       if (error instanceof Error && error.message === BRAND_NOT_IDENTIFIED) {
@@ -1719,7 +1732,7 @@ export class ProductScrapeUpdaterService {
           {
             taskId: context.task?.id,
             url: context.url,
-            displayName: scrapedProduct.displayName,
+            displayName: names.displayName,
           },
         );
       }

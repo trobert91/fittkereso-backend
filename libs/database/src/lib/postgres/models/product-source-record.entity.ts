@@ -160,12 +160,13 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * Normalized identity key derived from scrapedProduct.{brand,model,
    * displayName} at scrape time (see ProductScrapeUpdaterService.
    * buildNormalizedSourceName). Also feeds ProductModel.normalizedName on
-   * new products.
+   * new products. Null on the records of a source that does not identify
+   * products: nothing matches on them.
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  normalizedSourceName?: string;
+  normalizedSourceName?: string | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @OneToMany(() => Offer, (offer) => offer.sourceRecord)

@@ -11,6 +11,7 @@ const SCRAPED = {
   brand: 'KTM',
   model: 'Macina Kapoho Master',
   displayName: 'KTM Macina Kapoho Master 2024',
+  originalName: 'KTM Macina Kapoho Master 2024 M/43',
   category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },
   specs: { modelYear: 2024 },
 } as ScrapedProduct;
@@ -66,6 +67,20 @@ describe('ListingMatchService', () => {
       decision: { outcome: 'created', candidates: [] },
     });
     expect(finder.findCandidates).not.toHaveBeenCalled();
+  });
+
+  // The identity extraction was off or failed: the listing goes by its title.
+  it('resolves the brand of a listing with no model from its title', async () => {
+    const titleOnly = {
+      brand: SCRAPED.brand,
+      originalName: SCRAPED.originalName,
+      category: SCRAPED.category,
+    } as ScrapedProduct;
+
+    await service.match(titleOnly);
+
+    expect(brandResolution.resolve).toHaveBeenCalledWith('KTM', SCRAPED.originalName);
+    expect(queryService.ofListing).toHaveBeenCalledWith(titleOnly, BRAND);
   });
 
   it('attaches to a single candidate above the accept score without asking the LLM', async () => {

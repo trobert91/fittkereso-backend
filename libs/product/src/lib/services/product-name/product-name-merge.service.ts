@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ProductAlias, ProductAliasSource, ProductModel, ProductSource, ProductSourceRecord } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { orderBy } from 'lodash';
+import { isEmpty, orderBy } from 'lodash';
 import { BrandResolutionService } from '../brand/brand-resolution.service';
 import { ProductNormalizerService } from '../product-normalizer.service';
 import { EntityManager } from 'typeorm';
@@ -52,22 +52,16 @@ export class ProductNameMergeService {
       latestPerSource,
       (r) => r.scrapedProduct?.brand,
     );
-    // A name the identity extraction did not clean (it failed, or is off for
-    // that source) is the raw title — sizes, colours, marketing words. It only
-    // names the product when no source has a cleaned one. Records from before
-    // the flag existed carry none, and were cleaned by the old pass.
-    const cleaned = latestPerSource.filter(
-      (r) => r.scrapedProduct?.nameCleaned !== false,
-    );
-    const nameSources = cleaned.length > 0 ? cleaned : latestPerSource;
-    const modelWinner = this.resolveField(
-      nameSources,
-      (r) => r.scrapedProduct?.model,
-    );
-    const displayNameWinner = this.resolveField(
-      nameSources,
-      (r) => r.scrapedProduct?.displayName,
-    );
+    // A record has a `model` only when the identity extraction named it. When
+    // none has (the call failed, or is off for those sources), the shops'
+    // titles name the product — sizes, colours, marketing words and all.
+    const identified = latestPerSource.filter((r) => !!r.scrapedProduct?.model);
+    const modelWinner = isEmpty(identified)
+      ? this.resolveField(latestPerSource, (r) => r.scrapedProduct?.originalName)
+      : this.resolveField(identified, (r) => r.scrapedProduct?.model);
+    const displayNameWinner = isEmpty(identified)
+      ? this.resolveField(latestPerSource, (r) => r.scrapedProduct?.originalName)
+      : this.resolveField(identified, (r) => r.scrapedProduct?.displayName);
 
     if (brandWinner !== undefined) {
       const resolved = await this.brandResolution.resolve(

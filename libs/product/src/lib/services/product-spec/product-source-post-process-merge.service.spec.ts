@@ -77,13 +77,13 @@ describe('ProductSourcePostProcessMergeService', () => {
     expect(result.specs['smartConnectivity']).toEqual(['App']);
   });
 
-  it('degrades to an exact deterministic pass-through when both contributions are undefined, returning a fresh specs object', () => {
+  // The deterministic model is the raw title, never a model name.
+  it('degrades to the deterministic brand and specs, with no model, when both contributions are undefined, returning a fresh specs object', () => {
     const result = service.merge(deterministic, undefined, undefined);
 
     expect(result).toEqual({
       brand: 'KTM',
-      model: deterministic.model,
-      nameCleaned: false,
+      model: undefined,
       specs: { weight: 17, batteryCapacity: 400 },
     });
     expect(result.specs).not.toBe(deterministic.specs);
@@ -96,27 +96,25 @@ describe('ProductSourcePostProcessMergeService', () => {
 
     expect(result.specs).toEqual(deterministic.specs);
     expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
-    expect(result.nameCleaned).toBe(true);
   });
 
-  it('falls model through to deterministic when identity.model is absent but modelSpecs.specs is set', () => {
+  it('gives no model when identity.model is absent, even with modelSpecs.specs set', () => {
     const modelSpecs: ModelSpecContribution = { specs: { weight: 17.9 } };
 
     const result = service.merge(deterministic, undefined, modelSpecs);
 
-    expect(result.model).toBe(deterministic.model);
+    expect(result.model).toBeUndefined();
     expect(result.specs['weight']).toBe(17.9);
   });
 
-  it('overrides brand alone (only identity carries it), leaving specs/model to fall through', () => {
+  it('overrides brand alone (only identity carries it), leaving specs to fall through and no model', () => {
     const identity: IdentityContribution = { brand: 'KTM AG' };
 
     const result = service.merge(deterministic, identity, undefined);
 
     expect(result.brand).toBe('KTM AG');
-    expect(result.model).toBe(deterministic.model);
-    // The name is still the raw title: nothing cleaned it.
-    expect(result.nameCleaned).toBe(false);
+    // Nothing named it: the raw title is not a model name.
+    expect(result.model).toBeUndefined();
     expect(result.specs).toEqual(deterministic.specs);
   });
 

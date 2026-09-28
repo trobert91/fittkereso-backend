@@ -171,7 +171,7 @@ function listingOf(
   queryService: ProductMatchQueryService,
 ): FixtureListing | undefined {
   const scraped = record.scrapedProduct;
-  if (!scraped?.model && !scraped?.displayName) return undefined;
+  if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) return undefined;
 
   const { productCategory } = product;
   const category = scraped.category ?? {

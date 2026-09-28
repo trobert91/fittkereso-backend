@@ -43,11 +43,9 @@ describe('SpecPostProcessService', () => {
     { name: 'Fékbetét', values: ['Shimano J05A'] },
   ];
 
-  /** What an importer hands the updater: deterministic data only. */
+  /** What an importer hands the updater: deterministic data only, and no name but the title. */
   const listing = (overrides: Partial<ScrapedProduct> = {}): ScrapedProduct => ({
     brand: 'KTM',
-    model: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
-    displayName: "KTM KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
     originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
     category: { id: 'cat-1', slug: 'ebikes', name: 'E-bikes' },
     specs: { weight: 24 },
@@ -163,10 +161,10 @@ describe('SpecPostProcessService', () => {
         model: 'Macina Scarp SX Prestige Di2',
         displayName: 'KTM Macina Scarp SX Prestige Di2',
         originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
-        nameCleaned: true,
         specs: { modelYear: 2026, batteryCapacity: 750, weight: 24, forkTravel: 150 },
         offers: [{ price: 1, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
       });
+      expect(result.flags).toBeUndefined();
       expect(result.specs).not.toHaveProperty('frameSize');
       expect(result.identityInputHash).toEqual(expect.any(String));
     });
@@ -200,7 +198,7 @@ describe('SpecPostProcessService', () => {
       );
     });
 
-    it('continues on the deterministic data when the LLM fails, with the name marked uncleaned', async () => {
+    it('continues on the deterministic data when the LLM fails, with no name and the failure flagged', async () => {
       postProcess.extractIdentity.mockResolvedValueOnce(undefined);
 
       const result = await service.extractIdentity({
@@ -208,21 +206,48 @@ describe('SpecPostProcessService', () => {
         scrapedProduct: listing(),
       });
 
-      expect(result.model).toBe("KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE");
-      expect(result.nameCleaned).toBe(false);
+      expect(result.model).toBeUndefined();
+      expect(result.displayName).toBeUndefined();
+      expect(result.originalName).toBe("KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE");
+      expect(result.flags).toEqual(['identity_failed']);
       expect(result.specs).toEqual({ weight: 24, forkTravel: 150 });
       expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'failed');
     });
 
-    it('makes no call for a source that turned post-processing off', async () => {
+    // A brand alone names nothing.
+    it('flags a call that corrected only the brand as failed', async () => {
+      postProcess.extractIdentity.mockResolvedValueOnce({ brand: 'KTM AG' });
+
       const result = await service.extractIdentity({
-        context: context({ postProcess: { enabled: false } }),
+        context: context(),
+        scrapedProduct: listing(),
+      });
+
+      expect(result).toMatchObject({ brand: 'KTM AG', flags: ['identity_failed'] });
+      expect(result.model).toBeUndefined();
+    });
+
+    it('makes no call for a source that turned the identity extraction off, and flags it', async () => {
+      const result = await service.extractIdentity({
+        context: context({ postProcess: { identity: false } }),
         scrapedProduct: listing(),
       });
 
       expect(postProcess.extractIdentity).not.toHaveBeenCalled();
-      expect(result.nameCleaned).toBe(false);
+      expect(result.model).toBeUndefined();
+      expect(result.displayName).toBeUndefined();
+      expect(result.flags).toEqual(['identity_off']);
       expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'disabled');
+    });
+
+    it('still extracts with unification off', async () => {
+      const result = await service.extractIdentity({
+        context: context({ postProcess: { specs: false } }),
+        scrapedProduct: listing(),
+      });
+
+      expect(postProcess.extractIdentity).toHaveBeenCalled();
+      expect(result.model).toBe('Macina Scarp SX Prestige Di2');
     });
 
     describe('on a re-import', () => {
@@ -258,11 +283,51 @@ describe('SpecPostProcessService', () => {
         expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'reused');
         expect(result).toMatchObject({
           model: 'Macina Scarp SX Prestige Di2',
-          nameCleaned: true,
+          displayName: 'KTM Macina Scarp SX Prestige Di2',
           specs: expect.objectContaining({ modelYear: 2026, tubeless: true }),
           // Today's price, the stored listing-level specs.
           offers: [{ price: 2, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
         });
+        expect(result.flags).toBeUndefined();
+      });
+
+      // A stored failure is nothing to keep: the next import asks again.
+      it('extracts again when the stored record has no model', async () => {
+        postProcess.extractIdentity.mockResolvedValueOnce(undefined);
+        const ownRecord = await storedRecord();
+        expect(ownRecord.scrapedProduct?.flags).toEqual(['identity_failed']);
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing(),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+        expect(result.model).toBe('Macina Scarp SX Prestige Di2');
+        expect(result.flags).toBeUndefined();
+      });
+
+      // Turned on later, the extraction names a listing stored while it was off.
+      it('names a listing stored while the extraction was off once it is on', async () => {
+        const first = await service.extractIdentity({
+          context: context({ postProcess: { identity: false } }),
+          scrapedProduct: listing(),
+        });
+        const ownRecord = {
+          offerSpecsHash: 'offer-hash',
+          productSpecsHash: 'product-hash',
+          scrapedProduct: first,
+        } as unknown as ProductSourceRecord;
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing(),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+        expect(result.model).toBe('Macina Scarp SX Prestige Di2');
       });
 
       // speedbike's deterministic mapping fills one field, so both spec
@@ -390,9 +455,9 @@ describe('SpecPostProcessService', () => {
       );
     });
 
-    it('makes no call for a source that turned post-processing off', async () => {
+    it('makes no call for a source that turned unification off', async () => {
       await service.unify({
-        context: context({ postProcess: { enabled: false } }),
+        context: context({ postProcess: { specs: false } }),
         scrapedProduct: listing(),
         trigger: 'created',
       });
@@ -403,6 +468,16 @@ describe('SpecPostProcessService', () => {
         'created',
         'disabled',
       );
+    });
+
+    it('still unifies with the identity extraction off', async () => {
+      await service.unify({
+        context: context({ postProcess: { identity: false } }),
+        scrapedProduct: listing(),
+        trigger: 'created',
+      });
+
+      expect(postProcess.processModelSpecs).toHaveBeenCalled();
     });
   });
 });

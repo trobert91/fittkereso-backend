@@ -17,15 +17,17 @@ describe('ProductNameMergeService.mergeNames', () => {
       brand?: string;
       model?: string;
       displayName?: string;
+      originalName?: string;
       aliases?: string[];
-      nameCleaned?: boolean;
     },
     opts: { lastUpdated?: string; priority?: number } = {},
   ): ProductSourceRecord {
     return {
       id,
       source: { id, priority: opts.priority ?? 0 } as any,
-      scrapedProduct: { ...fields },
+      // A listing the identity extraction named carries a model beside its
+      // display name; only the title is left when it did not.
+      scrapedProduct: { model: fields.displayName, ...fields },
       lastUpdated: new Date(opts.lastUpdated ?? '2026-01-01T00:00:00Z'),
     } as unknown as ProductSourceRecord;
   }
@@ -129,24 +131,24 @@ describe('ProductNameMergeService.mergeNames', () => {
     expect(model.displayName).toBe('Trek Marlin Seven');
   });
 
-  // A listing whose identity extraction failed keeps its raw title, sizes and
-  // colours included — it must not outvote or out-date a cleaned name.
-  it('ignores a raw, uncleaned name whenever a cleaned one exists', async () => {
+  // A listing whose identity extraction failed keeps only its raw title,
+  // sizes and colours included — it must not outvote or out-date a name.
+  it('ignores the titles of unnamed listings whenever a named one exists', async () => {
     const model = makeModel();
     const sources = [
       makeSource(
-        'cleaned',
+        'named',
         { model: 'Macina Scarp SX Exonic XX', displayName: 'KTM Macina Scarp SX Exonic XX' },
         { lastUpdated: '2026-01-01T00:00:00Z' },
       ),
       makeSource(
-        'raw-1',
-        { model: 'MACINA SCARP SX EXONICX 48cm narancs', displayName: 'KTM MACINA SCARP SX EXONICX 48cm narancs', nameCleaned: false },
+        'title-1',
+        { originalName: 'KTM MACINA SCARP SX EXONICX 48cm narancs' },
         { lastUpdated: '2026-02-01T00:00:00Z' },
       ),
       makeSource(
-        'raw-2',
-        { model: 'MACINA SCARP SX EXONICX 48cm narancs', displayName: 'KTM MACINA SCARP SX EXONICX 48cm narancs', nameCleaned: false },
+        'title-2',
+        { originalName: 'KTM MACINA SCARP SX EXONICX 48cm narancs' },
         { lastUpdated: '2026-02-01T00:00:00Z' },
       ),
     ];
@@ -157,14 +159,13 @@ describe('ProductNameMergeService.mergeNames', () => {
     expect(model.displayName).toBe('KTM Macina Scarp SX Exonic XX');
   });
 
-  it('still names the product from a raw title when no source has a cleaned one', async () => {
+  it('names the product from the titles when no listing was named', async () => {
     const model = makeModel();
-    const sources = [
-      makeSource('raw', { displayName: 'KTM MACINA SCARP 48cm', nameCleaned: false }),
-    ];
+    const sources = [makeSource('title', { originalName: 'KTM MACINA SCARP 48cm' })];
 
     await service.mergeNames(model, sources, categorySlug);
 
+    expect(model.model).toBe('KTM MACINA SCARP 48cm');
     expect(model.displayName).toBe('KTM MACINA SCARP 48cm');
   });
 

@@ -67,7 +67,22 @@ export interface ProductSourceTranslationConfig {
  * inference at all, where the extra cost is pure waste.
  */
 export interface ProductSourcePostProcessConfig {
-  enabled?: boolean;
+  /**
+   * Whether each listing gets the identity extraction: its model name, and
+   * the identity and listing-level specs (size, colour) read off its title.
+   * On by default. Off, a listing has no `model`/`displayName`, only its
+   * title, and matching uses the title. On a source that does not identify
+   * products it still decides nothing: it only names the listing and fills
+   * the offer's listing-level specs the seller's higher sources lack.
+   */
+  identity?: boolean;
+  /**
+   * Whether full spec unification runs (once per product per source): every
+   * schema field outside the identity set, from the listing's whole spec
+   * table. On by default. Off suits a source with no spec table, a Google
+   * Shopping feed say, where it would read only the title.
+   */
+  specs?: boolean;
   model?: string;
   /**
    * Reasoning toggle. Leave unset to use the service default (reasoning on at

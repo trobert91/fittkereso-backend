@@ -4,6 +4,7 @@ import type {
   ProductModel,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
+import { listingNames } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
 import type { ProductMatchQuery } from './types';
@@ -20,7 +21,10 @@ export class ProductMatchQueryService {
     private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
-  /** A scraped listing, with the brand already resolved from it. */
+  /**
+   * A scraped listing, with the brand already resolved from it. One the
+   * identity extraction did not name is keyed on its title.
+   */
   public ofListing(
     scrapedProduct: ScrapedProduct,
     brand: Brand,
@@ -33,8 +37,7 @@ export class ProductMatchQueryService {
       categorySlug: category.slug,
       nameKey: this.nameKeyOf({
         brandName: brand.name,
-        model: scrapedProduct.model,
-        displayName: scrapedProduct.displayName,
+        ...listingNames(scrapedProduct),
         categorySlug: category.slug,
       }),
       specs: scrapedProduct.specs,

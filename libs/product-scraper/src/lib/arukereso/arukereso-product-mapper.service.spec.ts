@@ -531,17 +531,18 @@ describe('ArukeresoProductMapperService', () => {
   // before, which only identity resolution knows — so the mapper never makes
   // one, and hands the updater everything the decision needs.
   describe('deterministic data only', () => {
-    it('keeps the raw title as the model, for the identity extraction to clean', async () => {
+    // A title is not a model name: only the identity extraction sets one.
+    it('keeps only the raw title, for the identity extraction to name', async () => {
       const result = await call();
 
       expect(result.status).toBe('mapped');
       if (result.status !== 'mapped') return;
-      expect(result.scrapedProduct).toMatchObject({
-        model: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
-        originalName: 'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
-        displayName: 'KTM KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
-      });
-      expect(result.scrapedProduct.nameCleaned).toBeUndefined();
+      expect(result.scrapedProduct.originalName).toBe(
+        'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
+      );
+      expect(result.scrapedProduct).not.toHaveProperty('model');
+      expect(result.scrapedProduct).not.toHaveProperty('displayName');
+      expect(result.scrapedProduct).not.toHaveProperty('flags');
     });
 
     it('carries the split deterministic specs and both hashes', async () => {

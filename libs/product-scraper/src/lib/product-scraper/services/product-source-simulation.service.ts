@@ -4,7 +4,9 @@ import {
   ProductCategory,
   ProductSource,
   ProductSourceFetchMode,
+  listingNames,
   ScrapedProduct,
+  ScrapedProductFlag,
   ScrapingSourceConfig,
   ProductImportTask,
   SourceSpecConfig,
@@ -44,9 +46,11 @@ export interface SimulatedBrandResolution {
 
 export interface SimulatedProductPreview {
   brand: string;
-  model: string;
-  displayName: string;
+  /** Absent when the identity extraction gave no name (see `flags`). */
+  model?: string;
+  displayName?: string;
   originalName?: string;
+  flags?: ScrapedProductFlag[];
   categorySlug: string;
   categoryName: string;
   aliases?: string[];
@@ -250,8 +254,6 @@ export class ProductSourceSimulationService {
     // the updater.
     const listing: ScrapedProduct = {
       brand: detail.brand,
-      model: detail.model,
-      displayName: `${detail.brand} ${detail.model}`.trim(),
       originalName: detail.model,
       category: { id: category.id, slug: category.slug, name: category.name },
       specs: split.productLevelDeterministicSpecs,
@@ -277,9 +279,9 @@ export class ProductSourceSimulationService {
       context,
       scrapedProduct: listing,
     });
-    if (config.detailPage.postProcess?.enabled !== false && !identified.nameCleaned) {
+    if (identified.flags?.includes('identity_failed')) {
       warnings.push(
-        'The identity extraction ran but contributed nothing usable (LLM call failed, hit the token ceiling, or returned nothing confident) — the real pipeline would continue on the deterministic specs and the raw title.',
+        'The identity extraction ran but returned no model name (LLM call failed, hit the token ceiling, or returned nothing confident) — the real pipeline would continue on the deterministic specs, match on the raw title, and ask again on the next import.',
       );
     }
     const unified = await this.specPostProcess.unify({
@@ -303,7 +305,7 @@ export class ProductSourceSimulationService {
 
     const brandMatch = await this.brandResolution.resolve(
       identified.brand,
-      identified.displayName,
+      listingNames(identified).displayName,
     );
     result.brandResolution = {
       queriedName: identified.brand,
@@ -322,6 +324,7 @@ export class ProductSourceSimulationService {
       model: identified.model,
       displayName: identified.displayName,
       originalName: detail.model,
+      flags: identified.flags,
       categorySlug: category.slug,
       categoryName: category.name,
       aliases: detail.aliases,

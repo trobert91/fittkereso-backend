@@ -127,6 +127,16 @@ describe('ProductNormalizerService', () => {
       expect(runFull('LG', '34GN850P-B')).toBe('34gn850p-b');
     });
 
+    // A shop title's separators say nothing; "e+" and "m/43" are names.
+    it('drops words with no letter or digit, and keeps words mixing punctuation in', () => {
+      expect(runFull('GIANT', 'GIANT Talon E+ férfi MTB - M méretben')).toBe(
+        'talon e+ férfi mtb m méretben',
+      );
+      expect(runFull('KTM', 'MACINA TEAM 892 M/43 ( GREY+BLACK ) / 2023')).toBe(
+        'macina team 892 m/43 grey+black 2023',
+      );
+    });
+
     it('produces distinct keys for different trims of the same model line', () => {
       const prestige = runFull('KTM', 'MACINA SCARP SX PRESTIGE Di2');
       const master = runFull('KTM', 'MACINA SCARP SX MASTER Di2');
@@ -174,6 +184,12 @@ describe('ProductNormalizerService', () => {
       const crossFirst = runFullSorted('KTM', 'Cross Macina 720');
       const macinaFirst = runFullSorted('KTM', 'Macina Cross 720');
       expect(crossFirst).toBe(macinaFirst);
+    });
+
+    it('sorts no lone separator to the front of a title key', () => {
+      expect(
+        runFullSorted('GIANT', 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben'),
+      ).toBe('e+ elektromos férfi kerékpár m mtb méretben talon');
     });
 
     it('does not fall back to the digit-heuristic word-dropping behavior', () => {

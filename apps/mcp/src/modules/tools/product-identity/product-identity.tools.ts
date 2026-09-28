@@ -108,8 +108,9 @@ export class ProductIdentityTools {
     if (!product?.brand || !product.productCategory) {
       return `Source record ${sourceRecordId} has no product with a brand and category.`;
     }
-    if (!scraped?.model && !scraped?.displayName) {
-      return `Source record ${sourceRecordId} has no scraped name to match on.`;
+    // An unidentified listing is keyed on its title, as the scraper keys it.
+    if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) {
+      return `Source record ${sourceRecordId} has no scraped name or title to match on.`;
     }
 
     const { productCategory } = product;

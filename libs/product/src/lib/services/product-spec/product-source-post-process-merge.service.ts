@@ -9,13 +9,13 @@ import type {
 
 export interface MergedProductData {
   brand: string;
-  model: string;
-  specs: ProductSpecs;
   /**
-   * Whether `model` came from the identity extraction rather than being the
-   * raw title passed through — see ScrapedProduct.nameCleaned.
+   * The identity extraction's model name; undefined when it gave none. The
+   * deterministic `model` is the raw title, which is never a model name — see
+   * ScrapedProduct.model.
    */
-  nameCleaned: boolean;
+  model?: string;
+  specs: ProductSpecs;
 }
 
 /**
@@ -44,8 +44,7 @@ export class ProductSourcePostProcessMergeService {
       // identity.brand/model are pre-sanitized (trimmed, blank -> undefined)
       // by ProductSourcePostProcessService before this is called.
       brand: identity?.brand || deterministic.brand,
-      model: identity?.model || deterministic.model,
-      nameCleaned: !!identity?.model,
+      model: identity?.model,
       // defaults() fills only keys still `undefined` in the target, so LLM
       // specs (applied first) are never overwritten by deterministic — this
       // is a shallow, whole-value-wins merge: array-type spec values are

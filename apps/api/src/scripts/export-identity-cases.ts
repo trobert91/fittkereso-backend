@@ -198,8 +198,9 @@ async function listingCase(
   productRepo: ProductModelRepository,
 ): Promise<RawCase | undefined> {
   const scraped = record.scrapedProduct;
-  // Manual rows carry specs only, and a listing with no name can't be matched.
-  if (!scraped?.model && !scraped?.displayName) return undefined;
+  // Manual rows carry specs only, and a listing with no name or title can't be
+  // matched. One the extraction did not name is keyed on its title.
+  if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) return undefined;
 
   const { productCategory } = product;
   const category = scraped.category ?? {

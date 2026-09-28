@@ -147,8 +147,6 @@ export class ArukeresoProductMapperService {
       url,
       scrapedProduct: {
         brand,
-        model: rawName,
-        displayName: `${brand} ${rawName}`.trim(),
         originalName: rawName,
         category: { id: category.id, slug: category.slug, name: category.name },
         specs: productLevelDeterministicSpecs,
