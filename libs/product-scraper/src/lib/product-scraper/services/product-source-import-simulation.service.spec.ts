@@ -13,7 +13,7 @@ describe('ProductSourceImportSimulationService', () => {
   let interpreter: { runValuePipeline: jest.Mock; runListPage: jest.Mock };
   let scraperService: { getHtml: jest.Mock; stream: jest.Mock };
   let scrapingImport: { planRun: jest.Mock };
-  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; findUniqueBySourceAndExternalId: jest.Mock };
+  let sourceRecordRepo: { findBySourceAndUrl: jest.Mock; findBySourceAndExternalId: jest.Mock };
   let specPostProcess: { extractIdentity: jest.Mock };
   let feedTriage: { triage: jest.Mock };
   let offerRepo: { findSyncStates: jest.Mock };
@@ -92,7 +92,7 @@ describe('ProductSourceImportSimulationService', () => {
     };
     sourceRecordRepo = {
       findBySourceAndUrl: jest.fn().mockResolvedValue(null),
-      findUniqueBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
     };
     offerRepo = { findSyncStates: jest.fn().mockResolvedValue([]) };
     // Every row new unless a test says otherwise.
@@ -116,6 +116,7 @@ describe('ProductSourceImportSimulationService', () => {
       // stub here would check the wrong thing. It only reads.
       new ListProductRefreshService(
         sourceRecordRepo as never,
+        {} as never,
         {} as never,
         {} as never,
         {} as never,
@@ -264,10 +265,10 @@ describe('ProductSourceImportSimulationService', () => {
       expect(result.feed?.skipReasons).toEqual({ category_not_enabled: 2 });
     });
 
-    // The check this simulator exists for. Offer is @Unique([seller, externalId]),
-    // so a repeated id does not error at import — it silently collapses those
-    // offers onto one row, keeping only the last. speedbike's feed repeats `sku`
-    // across size variants for exactly this reason.
+    // The check this simulator exists for. A listing is unique per (source,
+    // externalId) and its offer per (seller, externalId), so a run imports only
+    // the first row of a repeated id. speedbike's feed repeats `sku` across size
+    // variants for exactly this reason.
     it('fails the simulation when the chosen externalId is not unique', async () => {
       givenFeed(feed(['dup', 'dup', 'unique']));
 
@@ -277,7 +278,7 @@ describe('ProductSourceImportSimulationService', () => {
       expect(result.feed?.duplicateExternalIds).toEqual([
         { externalId: 'dup', count: 2 },
       ]);
-      expect(result.errors.join(' ')).toMatch(/WOULD COLLAPSE onto one row/);
+      expect(result.errors.join(' ')).toMatch(/imports only the first row of each/);
     });
 
     describe('identifiers, counted over the whole feed', () => {
@@ -567,7 +568,7 @@ describe('ProductSourceImportSimulationService', () => {
     });
 
     it('says when a listing found by its externalId moves to the card’s URL', async () => {
-      sourceRecordRepo.findUniqueBySourceAndExternalId.mockResolvedValue(
+      sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(
         knownRecord({ url: 'https://ebikeshop.hu/p/old-name' }),
       );
       interpreter.runListPage.mockResolvedValue({ products: [card({ externalId: 'CODE-1' })] });

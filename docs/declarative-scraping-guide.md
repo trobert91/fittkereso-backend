@@ -14,7 +14,7 @@ This guide is a reading order. Each section names the file(s) to open, what they
 
 **File:** `libs/database/src/lib/postgres/models/product-source.entity.ts`
 
-This is the root of everything. Each row is one importable source (today: `ebikeshop` scraping pages, `speedbike-arukereso` importing a feed). **One webshop may have several sources** — `ProductSourceRecord` is unique on `(source, url)` and every URL-keyed lookup is source-scoped, so each source keeps its own records; the offers converge through `Offer`'s `(seller, externalId)` unique constraint. Key fields:
+This is the root of everything. Each row is one importable source (today: `ebikeshop` scraping pages, `speedbike-arukereso` importing a feed). **One webshop may have several sources** — `ProductSourceRecord` is unique on `(source, externalId)` and every lookup is source-scoped, so each source keeps its own records; the offers converge through `Offer`'s `(seller, externalId)` unique constraint. A record is keyed by its listing's id (§8a), not its URL: when a shop renames a product's URL, the next import moves the record to it. Key fields:
 
 - `name` — the source's identity, and the label on every log line and metric.
 - `type` — `'scraping'`, `'arukereso'` or `'googleshop'`. **Fixed at creation**: the config format is bound to it, the scraping and feed shapes share no keys (the two feed types share one), and `ProductSourceUpdateService` refuses an update that changes it. It selects both the config schema and the importer.
@@ -110,7 +110,7 @@ Small on purpose: `field` does the addressing and the op pipeline does the trans
 
 **See the real thing:**
 - `__fixtures__/ebikeshop.config.json` — scraping, JSON-hydration/Inertia `data-page` markup.
-- `__fixtures__/speedbike.config.json` — scraping, classic `<table>` spec extraction. Kept as a style template; speedbike itself is feed-only, so this config has no source row.
+- `__fixtures__/speedbike.config.json` — scraping, classic `<table>` spec extraction. Kept as a style template; speedbike itself is feed-only, so this config has no source row. Before it is revived, check its `detailPage.externalId`: it reads the first `"sku"` in `ShopRenter.product`, and speedbike repeats its `sku` across a product's sizes, while a listing's id must name one page (§8a).
 - `__fixtures__/speedbike-arukereso.config.json` — the feed config, reusing that file's 58 spec mappings unchanged, because a feed's `attribute_name` labels are the same labels the shop's own spec table uses.
 - `__fixtures__/speedbike-googleshop.config.json` — speedbike's Google Shopping feed: the fallback price, the old price, and both LLM calls off (`postProcess: { identity: false, specs: false }`). Its `id` equals the Árukereső `identifier`, which is how its rows join that source's offers.
 
@@ -221,6 +221,26 @@ Both feed `offer_identity_conflict_total{source,kind}`.
 
 Both `ebikeshop.config.json` and `speedbike.config.json` populate `detailPage.offers` today, so this runs on every scrape for those sources — a single-seller storefront config populates `offers.listItems`/`price` (and, for ebikeshop, `priceWithoutDiscount`) directly from its own listing/price markup. Seller is never scraped per offer — every offer belongs to its `ProductSource.seller`.
 
+### 8a. The listing's id: the key of its record
+
+A listing is one detail page, or one feed row. Its `ProductSourceRecord` is found and written by `(source, externalId)`, where the id is `listingExternalIdOf` (`libs/utils`): the listing's source-native id (`detailPage.externalId`, or a feed's `mapping.externalId`), trimmed, else the slug of its URL. Every import, feed triage, list card and identity lookup (Path 3) uses it, so a URL the shop renamed finds the same record, which moves to the new URL (`ProductSourceRecordUpdaterService.moveUrl`, logged as `Listing URL changed`, counted in `source_record_url_changed_total{source}`). A source without ids is keyed by its URL slug, so a rename there still leaves the old record behind.
+
+The id must **name exactly one listing** within its source:
+
+- A size group's shared id (ShopRenter's `parent.sku`, say) is not a listing id. It belongs in `siblingIds`.
+- A feed whose id repeats across rows at different URLs is refused, not renamed: a run imports the first row of each id, skips the rest and reports them as `duplicateExternalIds`. `simulate_product_source_import` lists repeated ids as an error.
+- The same listing moving back and forth between two URLs in `source_record_url_changed_total` means a config emitting one id for two pages.
+
+**A page listing several sizes at one URL** is one listing, keyed by its own page id; each size is an offer with its own id. When the page shows no per-size id, compute one in the offer pipeline with the `literal` op, which fills in `{{vars}}`: `{{externalId}}-{{size}}`, or `{{externalId}}-{{color}}-{{size}}`. The rules:
+
+- read the size from the page (its size selector), never from the AI;
+- normalize the size token, so `M`, `m` and ` M ` give one id;
+- include every variant axis that differs between the page's offers;
+- prefer a real per-size sku when the page has one;
+- when the seller also has a feed, match the feed's id format (speedbike's is `1104300-XL`), so both sources compose the same offers.
+
+For example, page `1260042` with sizes S, M and L: one record under `1260042`, and offers `1260042-S`, `1260042-M`, `1260042-L`.
+
 ---
 
 ## 9. What stayed exactly as it was
@@ -316,8 +336,8 @@ ProductImportTaskManagerService (every tick, 30s by default)
                                     matched to its record by (source,
                                     externalId) first, then by URL; a listing
                                     found under another URL moves to the
-                                    card's, unless another record of the
-                                    source holds it (`moved`, a detail task).
+                                    card's (an unattached one when its
+                                    detail page is imported).
                                 → detail tasks go through DetailTaskCapService:
                                   with maxItems set, the run queues no more once
                                   it has queued that many, counted across all its

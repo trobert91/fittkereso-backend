@@ -1,4 +1,21 @@
-import { offerExternalIdOf, storedOfferExternalId } from './offer-external-id';
+import { listingExternalIdOf, offerExternalIdOf, storedOfferExternalId } from './offer-external-id';
+
+describe('listingExternalIdOf', () => {
+  it('takes a source-native id, trimmed', () => {
+    expect(listingExternalIdOf({ externalId: ' 1260042108 ' }, 'https://shop.hu/a')).toBe('1260042108');
+  });
+
+  // A page's JSON can carry its id as a number.
+  it('stringifies a numeric id', () => {
+    expect(listingExternalIdOf({ externalId: 1260042 }, 'https://shop.hu/a')).toBe('1260042');
+  });
+
+  it("falls back to the slug of the page's URL, else the URL", () => {
+    expect(listingExternalIdOf({}, 'https://shop.hu/kerekpar/ktm-macina/')).toBe('kerekpar/ktm-macina');
+    expect(listingExternalIdOf({ externalId: '  ' }, 'https://shop.hu/kerekpar/ktm')).toBe('kerekpar/ktm');
+    expect(listingExternalIdOf({ externalId: null }, 'https://shop.hu/12345')).toBe('https://shop.hu/12345');
+  });
+});
 
 describe('offerExternalIdOf', () => {
   it('takes a source-native id, trimmed', () => {

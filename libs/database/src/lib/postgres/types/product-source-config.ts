@@ -173,12 +173,14 @@ export interface ProductSourceDetailPageConfig {
   model: ScrapeOperation[];
   aliases?: ScrapeOperation[];
   releaseYear?: ScrapeOperation[];
-  // Source-native listing identifier (SKU/model code/slug), stable across URL
-  // changes. Extracted once here (not only inside offers.itemPipeline) so
-  // ProductSourceRecord.externalId can be populated independent of whether the
-  // source's config populates `offers` at all. May be a group-level id shared
-  // across variant siblings (e.g. ShopRenter's parent.sku) when the source
-  // exposes one — see offerLinks below.
+  /**
+   * The page's source-native id (SKU, product code), stable across URL
+   * changes: the key of the listing's ProductSourceRecord, which a renamed
+   * URL keeps. It must name exactly this page within the source. A size
+   * group's shared id (ShopRenter's parent.sku, say) belongs in `siblingIds`.
+   * Without it, the record is keyed by the URL slug, and a rename leaves the
+   * old record behind.
+   */
   externalId?: ScrapeOperation[];
   /**
    * The ids of this product's other sizes, as the shop itself declares them —
@@ -321,7 +323,11 @@ export interface ProductSourceFilterConfig {
  * adding it here and teaching the importer to read it, in that order.
  */
 export const ARUKERESO_MAPPING_TARGETS = [
-  /** Source-native id (sku, identifier). Falls back to the URL slug when absent. */
+  /**
+   * Source-native id (sku, identifier), unique per row: the key of the row's
+   * listing record and its offer. Falls back to the URL slug when absent. A
+   * later row repeating it under another URL is skipped.
+   */
   'externalId',
   'brand',
   /**
@@ -330,7 +336,7 @@ export const ARUKERESO_MAPPING_TARGETS = [
    * title, so the raw value is rarely a usable model name on its own.
    */
   'name',
-  /** The product page URL — ProductSourceRecord identity and the offer's link. */
+  /** The product page URL — the offer's link. A changed URL moves the listing's record. */
   'url',
   'price',
   'priceWithoutDiscount',

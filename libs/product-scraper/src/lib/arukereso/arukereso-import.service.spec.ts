@@ -19,6 +19,7 @@ const urlOf = (id: string | number) => `https://speedbike.hu/p/${id}`;
 const productOf = (id: string | number, price = 100) =>
   ({
     displayName: `Bike ${id}`,
+    externalId: `sku-${id}`,
     offers: [{ externalId: `sku-${id}`, price, currency: 'HUF' }],
   }) as never;
 
@@ -95,12 +96,12 @@ describe('ArukeresoImportService', () => {
       offerOn?: string;
     }[],
   ) => {
-    sourceRecordRepo.findFeedRowStates.mockImplementation(async (_sourceId, urls: string[]) =>
+    sourceRecordRepo.findFeedRowStates.mockImplementation(async (_sourceId, listingIds: string[]) =>
       new Map(
         rows
-          .filter((row) => urls.includes(urlOf(row.id)))
+          .filter((row) => listingIds.includes(`sku-${row.id}`))
           .map((row) => [
-            urlOf(row.id),
+            `sku-${row.id}`,
             {
               feedRowHash: feedRowHash(urlOf(row.id), productOf(row.id, row.price)),
               seenAt: row.seenAt ?? new Date(),
@@ -221,7 +222,7 @@ describe('ArukeresoImportService', () => {
     expect(summary.feedTasksEnqueued).toBe(1);
     expect(offerRepo.stampSynced).toHaveBeenCalledWith(['offer-1']);
     // The source still lists it, so its values keep counting for the offer.
-    expect(sourceRecordRepo.stampSeen).toHaveBeenCalledWith('source-1', [urlOf(1)]);
+    expect(sourceRecordRepo.stampSeen).toHaveBeenCalledWith('source-1', ['sku-1']);
     expect(queuedTasks().map((task) => task.url)).toEqual([urlOf(2)]);
     expect(mergeService.recomputePrice).not.toHaveBeenCalled();
     expect(offerComposer.compose).not.toHaveBeenCalled();
@@ -293,7 +294,7 @@ describe('ArukeresoImportService', () => {
 
       expect(summary.feedTasksEnqueued).toBe(0);
       expect(summary.offersUpdated).toBe(0);
-      expect(sourceRecordRepo.stampSeen).toHaveBeenCalledWith('source-1', [urlOf(1)]);
+      expect(sourceRecordRepo.stampSeen).toHaveBeenCalledWith('source-1', ['sku-1']);
       expect(offerRepo.stampSynced).toHaveBeenCalledWith([]);
     });
 
@@ -448,6 +449,42 @@ describe('ArukeresoImportService', () => {
     expect(queuedTasks()[0].payloadHash).toBe(feedRowHash(urlOf(1), productOf(1, 200)));
   });
 
+  // A listing is found by its id: a row renamed in the feed re-imports once
+  // (its hash covers the URL), and that import moves the record.
+  it('finds a listing by its id when its URL changed, and imports it again', async () => {
+    givenFeed([1]);
+    givenImported([{ id: 1 }]);
+    mapper.map.mockResolvedValue({
+      status: 'mapped',
+      url: `${urlOf(1)}-2026`,
+      scrapedProduct: productOf(1),
+    });
+
+    const summary = await service.import(source);
+
+    expect(sourceRecordRepo.findFeedRowStates).toHaveBeenCalledWith('source-1', ['sku-1']);
+    expect(summary.feedTasksEnqueued).toBe(1);
+    expect(queuedTasks()[0].url).toBe(`${urlOf(1)}-2026`);
+    expect(sourceRecordRepo.stampSeen).not.toHaveBeenCalled();
+  });
+
+  // Two rows under one id are a config emitting a shared id, never a rename:
+  // the record must not flip between their URLs.
+  it('imports the first row of an id repeated under another URL, and counts the rest', async () => {
+    givenFeed([1, 2]);
+    mapper.map.mockImplementation(async ({ item }) => ({
+      status: 'mapped',
+      url: urlOf(item.fields['identifier']),
+      scrapedProduct: productOf('1104300-XL'),
+    }));
+
+    const summary = await service.import(source);
+
+    expect(summary.duplicateExternalIds).toBe(1);
+    expect(summary.duplicateUrls).toBe(0);
+    expect(queuedTasks().map((task) => task.url)).toEqual([urlOf(1)]);
+  });
+
   it('triages in batches, a few lookups each', async () => {
     const ids = Array.from({ length: FEED_FLUSH_SIZE * 2 + 50 }, (_, i) => i);
     givenFeed(ids);
@@ -497,7 +534,7 @@ describe('ArukeresoImportService', () => {
     let call = 0;
     mapper.map.mockImplementation(async ({ item }) =>
       (call += 1) % 2 === 0
-        ? { status: 'mapped', url: urlOf(item.fields['identifier']), scrapedProduct: productOf(1) }
+        ? { status: 'mapped', url: urlOf(item.fields['identifier']), scrapedProduct: productOf(item.fields['identifier']) }
         : Promise.reject(new Error('one bad row')),
     );
 
@@ -670,7 +707,7 @@ describe('ArukeresoImportService', () => {
       let seen = 0;
       mapper.map.mockImplementation(async ({ item }) =>
         (seen += 1) % 5 === 0
-          ? { status: 'mapped', url: urlOf(item.fields['identifier']), scrapedProduct: productOf(1) }
+          ? { status: 'mapped', url: urlOf(item.fields['identifier']), scrapedProduct: productOf(item.fields['identifier']) }
           : { status: 'skipped', reason: 'filtered_out' },
       );
 

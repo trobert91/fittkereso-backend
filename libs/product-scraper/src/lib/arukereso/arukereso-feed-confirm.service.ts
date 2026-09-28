@@ -59,7 +59,7 @@ export class ArukeresoFeedConfirmService {
     await this.offerRepo.stampSynced(withOffer.map((entry) => entry.offerId));
     await this.sourceRecordRepo.stampSeen(
       source.id,
-      unchanged.map((entry) => entry.row.url),
+      unchanged.map((entry) => entry.row.listingId),
     );
 
     const revived = withOffer.filter(

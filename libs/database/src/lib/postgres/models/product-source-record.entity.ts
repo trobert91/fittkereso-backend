@@ -10,12 +10,15 @@ import { Offer } from './offer.entity';
 @Entity()
 @Index(['model', 'source'])
 @Index(['source', 'productSpecsHash'])
-// A list card is matched to its record by (source, externalId) before its URL
-// (ListProductRefreshService), and identity's Path 3 asks the same pair.
-@Index(['source', 'externalId'])
-// One record per (source, url). Manual/admin rows carry source: null and no
-// url; Postgres treats NULLs as distinct, so they are unconstrained here.
-@Unique(['source', 'url'])
+// Page dispatch and a list card without a usable id look a record up by
+// (source, url). Not unique: a URL change moves a record, and two listings
+// may share a page.
+@Index(['source', 'url'])
+// One record per (source, externalId): every import finds and writes its
+// listing's record by it, and identity's Path 3 asks the same pair. Manual/
+// admin rows carry source: null and no externalId; Postgres treats NULLs as
+// distinct, so they are unconstrained here.
+@Unique(['source', 'externalId'])
 export class ProductSourceRecord extends BasePostgresEntity {
   /** The product this listing currently sits on. Exposed to `adminList` because
    *  the resolution review queue's whole job is showing where a listing ended
@@ -41,20 +44,17 @@ export class ProductSourceRecord extends BasePostgresEntity {
   source?: ProductSource | null;
 
   /**
-   * This listing's URL, normalized (see normalizeUrl).
+   * This listing's URL, normalized (see normalizeUrl): where it is fetched
+   * from, and where its offer links. Not its identity: a shop renaming the
+   * product changes it, and the next import moves the record to the new URL
+   * (ProductSourceRecordUpdaterService.moveUrl). `externalId` is the key.
    *
-   * Unique PER SOURCE, not globally — one webshop may be covered by several
-   * ProductSources (a page scraper and an Árukereső feed, say), and both
-   * legitimately hold a record for the same product page, each with its own
-   * provenance in `scrapedProduct` and its own spec hashes. A global unique
-   * made the second source unable to store anything it had already seen.
+   * Several sources can hold a record of one product page (a page scraper
+   * and an Árukereső feed, say), so a URL lookup must be source-scoped
+   * (findBySourceAndUrl).
    *
-   * Consequence for callers: every URL lookup here must be source-scoped
-   * (findBySourceAndUrl). A bare url match can return another source's row, and
-   * writing through it silently overwrites that source's data.
-   *
-   * The plain index is deliberate and separate: the composite unique below
-   * leads with sourceId, so it cannot serve a url-only predicate.
+   * The plain index serves a url-only predicate, which the composite one
+   * above, leading with sourceId, cannot.
    */
   @Index()
   @Column({ type: 'varchar', nullable: true })
@@ -123,11 +123,15 @@ export class ProductSourceRecord extends BasePostgresEntity {
   feedRowHash?: string | null;
 
   /**
-   * Source-native listing identifier (SKU/model code/slug), stable across URL
-   * changes. Used to recognize an already-known listing independent of
-   * `url` matching byte-for-byte.
+   * The listing's key within its source (listingExternalIdOf): its
+   * source-native id (SKU, product code, feed identifier), or the slug of its
+   * URL when the source has none. Names exactly one listing, so it is unique
+   * per source; a size group's shared id belongs in the listing's
+   * siblingExternalIds. Stable across URL changes, which is why records are
+   * found by it rather than by `url`.
+   *
+   * Null only on the admin's record.
    */
-  @Index()
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.adminDetails] })
   externalId?: string;

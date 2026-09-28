@@ -195,7 +195,7 @@ describe('ProductScrapeUpdaterService', () => {
       findBySourceAndExternalIdWithModelRelations: jest
         .fn()
         .mockResolvedValue(null),
-      findBySourceAndUrl: jest.fn().mockResolvedValue(null),
+      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
       findUnattachedBySellerAndExternalIds: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockImplementation(async (record) => record),
     } as unknown as jest.Mocked<ProductSourceRecordRepository>;
@@ -728,13 +728,19 @@ describe('ProductScrapeUpdaterService', () => {
     // The listing's own history decides whether the stored extraction can be
     // reused, so it has to be known before the extraction runs.
     it('hands the extraction this listing\'s own record once its history found it', async () => {
+      // Stored under the URL the shop has since renamed.
       const ownRecord = {
-        url: 'https://example.com/product',
+        url: 'https://example.com/product-old',
+        externalId: 'MXK-1',
         source: { id: 'source-arukereso' },
       };
       const known = makeExistingModel();
       known.sources = [
-        { url: 'https://example.com/other', source: { id: 'source-arukereso' } } as never,
+        {
+          url: 'https://example.com/product',
+          externalId: 'MXK-2',
+          source: { id: 'source-arukereso' },
+        } as never,
         ownRecord as never,
       ];
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValueOnce({
@@ -744,7 +750,7 @@ describe('ProductScrapeUpdaterService', () => {
 
       await service.createOrUpdateProduct(
         contextFromTask(makeTask()),
-        makeScrapedProduct({ offers: [{ price: 1, externalId: 'sku-1' }] }),
+        makeScrapedProduct({ externalId: 'MXK-1', offers: [{ price: 1, externalId: 'sku-1' }] }),
       );
 
       expect(mockSpecPostProcess.extractIdentity).toHaveBeenCalledWith(
@@ -869,10 +875,14 @@ describe('ProductScrapeUpdaterService', () => {
     it('unifies a listing its source already contributed when the resync is forced', async () => {
       const product = makeExistingModel();
       product.sources = [
-        { url: 'https://example.com/product', source: { id: 'source-arukereso' } } as never,
+        {
+          url: 'https://example.com/product',
+          externalId: 'product',
+          source: { id: 'source-arukereso' },
+        } as never,
       ];
-      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({
-        model: { id: product.id },
+      mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
+        model: product,
       } as never);
       mockProductRepo.findOneOrFail.mockResolvedValueOnce(product);
       mockProductRepo.save.mockResolvedValue(product);
@@ -917,28 +927,62 @@ describe('ProductScrapeUpdaterService', () => {
     });
   });
 
-  // A source without source-native ids still has a history: its own page.
-  it('recognises a listing by its page URL when no id resolves it', async () => {
-    const known = makeExistingModel();
-    mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValueOnce({ model: { id: known.id } } as never);
-    mockProductRepo.findOneOrFail.mockResolvedValueOnce(known);
-    mockProductRepo.save.mockResolvedValue(known);
+  describe("the listing's own record (Path 3)", () => {
+    // The shop renamed the page (speedbike added "-2026"), keeping its id.
+    it('finds a listing by its id under a new URL, and writes the same record', async () => {
+      const known = makeExistingModel();
+      mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
+        model: known,
+      } as never);
+      mockProductRepo.save.mockResolvedValue(known);
 
-    const result = await service.createOrUpdateProduct(
-      contextFromTask(makeTask()),
-      makeScrapedProduct(),
-    );
+      const result = await service.createOrUpdateProduct(
+        contextFromTask({ ...makeTask(), url: 'https://example.com/product-2026' } as ProductImportTask),
+        makeScrapedProduct({ externalId: ' 1260042108 ' }),
+      );
 
-    expect(result?.id).toBe(known.id);
-    expect(mockSourceRecordRepo.findBySourceAndUrl).toHaveBeenCalledWith(
-      'source-arukereso',
-      'https://example.com/product',
-    );
-    expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
-      'arukereso',
-      'source_url_hit',
-    );
-    expect(mockListingMatch.match).not.toHaveBeenCalled();
+      expect(result?.id).toBe(known.id);
+      expect(mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations).toHaveBeenCalledWith(
+        'source-arukereso',
+        '1260042108',
+        expect.any(Array),
+      );
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalId: '1260042108',
+          sourceUrl: 'https://example.com/product-2026',
+        }),
+      );
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'external_id_hit',
+      );
+      expect(mockListingMatch.match).not.toHaveBeenCalled();
+    });
+
+    // A source without source-native ids still has a history: its own page.
+    it('keys a listing without an id by its URL slug', async () => {
+      const known = makeExistingModel();
+      mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
+        model: known,
+      } as never);
+      mockProductRepo.save.mockResolvedValue(known);
+
+      const result = await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct(),
+      );
+
+      expect(result?.id).toBe(known.id);
+      expect(mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations).toHaveBeenCalledWith(
+        'source-arukereso',
+        'product',
+        expect.any(Array),
+      );
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ externalId: 'product' }),
+      );
+    });
   });
 
   describe('duplicate detection after the scrape', () => {
@@ -1329,8 +1373,11 @@ describe('ProductScrapeUpdaterService', () => {
     const PAGE = 'https://ebikeshop.hu/termek/53cm-variant';
     const seller = { id: 'seller-ebikeshop', name: 'ebikeshop.hu' };
 
-    /** A re-import of this page, pinned to model-1, whose record listed `before`. */
-    const reimport = async (before: string[], now: string[]) => {
+    /**
+     * A re-import of this page, pinned to model-1, whose record listed `before`
+     * and was stored under `storedUrl`.
+     */
+    const reimport = async (before: string[], now: string[], storedUrl = PAGE) => {
       const task = {
         ...makeTask(),
         url: PAGE,
@@ -1340,7 +1387,8 @@ describe('ProductScrapeUpdaterService', () => {
       const existingModel = makeExistingModel();
       const ownRecord = {
         id: 'record-53cm',
-        url: PAGE,
+        url: storedUrl,
+        externalId: 'EB-53',
         source: task.source,
         scrapedProduct: {
           offers: before.map((id) => ({ price: 1, externalId: id, resolvedExternalId: id })),
@@ -1350,6 +1398,7 @@ describe('ProductScrapeUpdaterService', () => {
       const siblingRecord = {
         id: 'record-48cm',
         url: 'https://ebikeshop.hu/termek/48cm-variant',
+        externalId: 'EB-48',
         source: task.source,
         scrapedProduct: {
           offers: [{ price: 1, externalId: 'sku-48cm', resolvedExternalId: 'sku-48cm' }],
@@ -1362,11 +1411,23 @@ describe('ProductScrapeUpdaterService', () => {
       await service.createOrUpdateProduct(
         contextFromTask(task),
         makeScrapedProduct({
+          externalId: 'EB-53',
           offers: now.map((id) => ({ price: 3359000, url: PAGE, externalId: id })),
         }),
       );
       return existingModel;
     };
+
+    // Found by its id, the record still knows the offers it had.
+    it('deals with the offers a renamed page stopped showing', async () => {
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValueOnce([
+        { id: 'offer-53cm-stale', externalId: 'sku-53cm-old', model: { id: 'model-1' } },
+      ] as never);
+
+      await reimport(['sku-53cm-old'], ['sku-53cm-new'], 'https://ebikeshop.hu/termek/53cm-old-name');
+
+      expect(mockOfferRepo.deleteByIds).toHaveBeenCalledWith(['offer-53cm-stale']);
+    });
 
     // Regression: a scrape of one variant URL (e.g. ebikeshop's 53cm frame-size
     // page) must never delete a sibling variant's offer (e.g. the 48cm page's
@@ -1488,13 +1549,14 @@ describe('ProductScrapeUpdaterService', () => {
       seller: { id: 'seller-speedbike', name: 'speedbike.hu' },
     };
     // What its importer hands over: the title, and no name.
-    const contribute = (overrides?: Partial<ScrapedProduct>) =>
+    const contribute = (overrides?: Partial<ScrapedProduct>, url = PAGE) =>
       service.createOrUpdateProduct(
-        { source: googleSource as never, url: PAGE, feedRowHash: 'hash-1' },
+        { source: googleSource as never, url, feedRowHash: 'hash-1' },
         makeScrapedProduct({
           model: undefined,
           displayName: undefined,
           originalName: 'HAIBIKE SDURO raw title',
+          externalId: 'HAIBIKE-1',
           offers: [{ price: 1499990, priceWithoutDiscount: 2269000, externalId: 'HAIBIKE-1' }] as never,
           ...overrides,
         }),
@@ -1504,8 +1566,8 @@ describe('ProductScrapeUpdaterService', () => {
     it('joins the offer its seller has, with no identity decision, no product fields and no match key', async () => {
       const model = makeExistingModel();
       // Stored while it waited for the offer.
-      const own = { id: 'record-google', url: PAGE, model: null };
-      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValue(own as never);
+      const own = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', model: null };
+      mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(own as never);
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
         ...offerOn('model-1'),
         model,
@@ -1519,6 +1581,10 @@ describe('ProductScrapeUpdaterService', () => {
       // with the listing's own record so an unchanged one reuses its result.
       expect(mockSpecPostProcess.extractIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ ownRecord: own }),
+      );
+      expect(mockSourceRecordRepo.findBySourceAndExternalId).toHaveBeenCalledWith(
+        'source-google',
+        'HAIBIKE-1',
       );
       for (const identityStep of [
         mockBrandResolution.resolve,
@@ -1536,6 +1602,7 @@ describe('ProductScrapeUpdaterService', () => {
         expect.objectContaining({
           model,
           source: googleSource,
+          externalId: 'HAIBIKE-1',
           feedRowHash: 'hash-1',
           normalizedSourceName: null,
         }),
@@ -1608,13 +1675,19 @@ describe('ProductScrapeUpdaterService', () => {
 
     it('brings its waiting record onto the product instead of writing a second one', async () => {
       const model = makeExistingModel();
-      const waiting = { id: 'record-google', url: PAGE, model: null, offers: [{ id: 'x' }] };
+      const waiting = {
+        id: 'record-google',
+        url: PAGE,
+        externalId: 'HAIBIKE-1',
+        model: null,
+        offers: [{ id: 'x' }],
+      };
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
         ...offerOn('model-1'),
         model,
       } as never);
       mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([offerOn('model-1')] as never);
-      mockSourceRecordRepo.findBySourceAndUrl.mockResolvedValue(waiting as never);
+      mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(waiting as never);
 
       await contribute();
 
@@ -1637,6 +1710,7 @@ describe('ProductScrapeUpdaterService', () => {
         expect.objectContaining({
           existing: null,
           source: googleSource,
+          externalId: 'HAIBIKE-1',
           sourceUrl: PAGE,
           feedRowHash: 'hash-1',
         }),
@@ -1648,6 +1722,22 @@ describe('ProductScrapeUpdaterService', () => {
       expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
         'speedbike-googleshop',
         'unattached',
+      );
+    });
+
+    // The shop renamed the page while the listing waited: the same record, moved.
+    it('keeps the record of a waiting listing whose URL changed', async () => {
+      const waiting = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', model: null };
+      mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(waiting as never);
+
+      await contribute(undefined, `${PAGE}-2026`);
+
+      expect(mockSourceRecordUpdater.upsertUnattached).toHaveBeenCalledWith(
+        expect.objectContaining({
+          existing: waiting,
+          externalId: 'HAIBIKE-1',
+          sourceUrl: `${PAGE}-2026`,
+        }),
       );
     });
 
@@ -1675,11 +1765,12 @@ describe('ProductScrapeUpdaterService', () => {
       const own = {
         id: 'record-google',
         url: PAGE,
+        externalId: 'HAIBIKE-1',
         source: googleSource,
         scrapedProduct: { offers: [{ price: 1, resolvedExternalId: 'HAIBIKE-1' }] },
       };
       oldProduct.sources = [own] as never;
-      mockSourceRecordRepo.findBySourceAndUrl
+      mockSourceRecordRepo.findBySourceAndExternalId
         // The extraction's own record, then the detach check's: on the old product.
         .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
         .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)

@@ -46,6 +46,7 @@ export interface DetailPageResult {
   model: string | undefined;
   aliases?: string[];
   releaseYear?: number;
+  /** detailPage.externalId as text, trimmed — absent when not configured or blank. */
   externalId?: string;
   /** detailPage.siblingIds, trimmed and deduped — absent when not configured or empty. */
   siblingIds?: string[];
@@ -250,11 +251,10 @@ export class ScrapeInterpreterService {
         )) as number | undefined)
       : undefined;
 
+    // Text, trimmed: a page's JSON can carry its id as a number, and the id
+    // is the key of the listing's record.
     const externalId = config.detailPage.externalId
-      ? ((await this.runner.run(
-          config.detailPage.externalId,
-          ctx,
-        )) as string | undefined)
+      ? this.toId(await this.runner.run(config.detailPage.externalId, ctx))
       : undefined;
     ctx.vars['externalId'] = externalId;
 
@@ -331,6 +331,11 @@ export class ScrapeInterpreterService {
   // A pipeline may end on a single id or a list, with numbers where the JSON
   // had them. Blank entries are dropped rather than kept as ids that match
   // nothing, and a list that comes out empty is reported as absent.
+  private toId(value: unknown): string | undefined {
+    if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+    return String(value).trim() || undefined;
+  }
+
   private toIdList(value: unknown): string[] | undefined {
     const ids = (Array.isArray(value) ? value : [value])
       .filter((id) => typeof id === 'string' || typeof id === 'number')

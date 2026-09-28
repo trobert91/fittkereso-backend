@@ -49,8 +49,9 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
   /**
    * An import run finished. Payload: ImportRunSummary plus type and
    * durationMs — { type, itemsSeen, listTasksEnqueued, detailTasksEnqueued,
-   * feedTasksEnqueued, tasksReplaced, offersUpdated, duplicateUrls, skipped,
-   * failed, unattachedRecords, offersRemoved, removalSkipped, durationMs } —
+   * feedTasksEnqueued, tasksReplaced, offersUpdated, duplicateUrls,
+   * duplicateExternalIds, skipped, failed, unattachedRecords, offersRemoved,
+   * removalSkipped, durationMs } —
    * unattachedRecords on feed runs only; offersRemoved and removalSkipped only
    * for a source that lists the whole catalog (hasAllProducts), where
    * removalSkipped says why a run removed nothing it did not see: capped,

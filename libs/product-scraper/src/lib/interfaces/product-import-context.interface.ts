@@ -11,7 +11,11 @@ import { ProductModel, ProductSource, ProductImportTask } from '@fittkereso-back
 export interface ProductImportContext {
   source: ProductSource;
 
-  /** The product's own URL — ProductSourceRecord identity. */
+  /**
+   * The listing's URL: where it was fetched from, and the URL its record
+   * stores. Not the record's key — that is the listing's externalId, else
+   * this URL's slug (listingExternalIdOf), so a renamed URL moves the record.
+   */
   url: string;
 
   /**

@@ -3,17 +3,22 @@ import {
   ProductModel,
   ProductSource,
   ProductSourceRecord,
+  ScrapedOffer,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { CategoryConfigService } from '@fittkereso-backend/config';
-import { filterDefinedSpecs, normalizeUrl } from '@fittkereso-backend/utils';
+import {
+  filterDefinedSpecs,
+  normalizeUrl,
+  storedOfferExternalId,
+} from '@fittkereso-backend/utils';
 import { ProductSpecValidatorService } from './product-spec-validator.service';
 import { ProductMetricsService } from '@fittkereso-backend/metrics';
 
 /**
- * Upserts the one ProductSourceRecord for a (model, url) pair — mutation
- * only, no cross-source merge logic. Callers must follow up with
+ * Upserts the one ProductSourceRecord of a (source, externalId) listing —
+ * mutation only, no cross-source merge logic. Callers must follow up with
  * ProductMergeService.mergeSources(model) to recompute ProductModel's
  * specs/identity fields from all of its sources; this service never
  * touches ProductModel itself, so the upsert is safe to call repeatedly
@@ -33,6 +38,7 @@ export class ProductSourceRecordUpdaterService {
     model: ProductModel;
     source: ProductSource | null;
     scrapedProduct?: Partial<ScrapedProduct>;
+    /** The listing's key (listingExternalIdOf). Required with a source; the admin's record has none. */
     externalId?: string;
     sourceUrl?: string;
     normalizedSourceName?: string | null;
@@ -41,34 +47,38 @@ export class ProductSourceRecordUpdaterService {
   }): Promise<ProductSourceRecord | undefined> {
     const { model, source: newSource, scrapedProduct } = params;
     // Trimmed/trailing-slash-stripped once here so every ProductSourceRecord.url
-    // stored is already normalized — callers matching against model.sources
-    // (e.g. ProductScrapeUpdaterService.storedExternalIdsOf, finding the record
-    // this call is about to overwrite) rely on this.
+    // stored is already normalized.
     const sourceUrl = params.sourceUrl ? normalizeUrl(params.sourceUrl) : undefined;
     // Label used only for metrics/logging — admin-entered specs have no
     // ProductSource (source: null), everything else is scraped.
     const sourceLabel = newSource?.name ?? 'manual';
+    if (newSource && !params.externalId) {
+      throw new Error(
+        `A listing of ${newSource.name} was written without the externalId its record is keyed by`,
+      );
+    }
 
     // Ensure sources loaded
     model.sources = model.sources ?? [];
 
-    // Find THIS source's existing entry by URL, or create a new one.
+    // Find THIS source's existing entry by the listing's key, or create a new
+    // one. The admin's record has neither a key nor a URL.
     //
     // The source filter is load-bearing, not defensive. `model.sources` is
     // loaded across every source (see ProductScrapeUpdaterService.
-    // getProductRelations), and ProductSourceRecord.url is unique only per
-    // source — so once two sources cover one webshop, a url-only match returns
-    // the OTHER source's row. Everything below then overwrites its
-    // scrapedProduct, both spec hashes, externalId and specValid, while
-    // `source.source` is assigned on create only (further down), so the row
-    // stays attributed to the source whose data was just destroyed. The specs
-    // are then merged under the wrong source's priority, and this source never
-    // gets a record of its own.
-    const belongsToThisSource = (s: ProductSourceRecord) =>
-      s.source?.id === newSource?.id;
-    let source = sourceUrl
-      ? model.sources.find((s) => belongsToThisSource(s) && s.url === sourceUrl)
-      : model.sources.find((s) => belongsToThisSource(s) && !s.url);
+    // getProductRelations), and two sources of one webshop can carry the same
+    // id — so an id-only match can return the OTHER source's row. Everything
+    // below then overwrites its scrapedProduct, both spec hashes and
+    // specValid, while `source.source` is assigned on create only (further
+    // down), so the row stays attributed to the source whose data was just
+    // destroyed.
+    let source = newSource
+      ? model.sources.find(
+          (s) => s.source?.id === newSource.id && s.externalId === params.externalId,
+        )
+      : model.sources.find((s) => !s.source && !s.url);
+    // Found under another URL: the shop renamed the listing.
+    if (source && sourceUrl) this.moveUrl(source, sourceUrl, sourceLabel);
 
     // `scrapedProduct.specs` is absent (whether `scrapedProduct` itself is
     // undefined, e.g. a manual edit with no re-scrape, or defined without
@@ -166,7 +176,7 @@ export class ProductSourceRecordUpdaterService {
    * A listing of a source that does not identify products, whose offer its
    * seller does not have yet: written as any listing is, with no product, so
    * it attaches as it is once that offer exists. `existing` is this source's
-   * record of the URL. The caller saves it.
+   * record of the listing, found by its externalId. The caller saves it.
    */
   public upsertUnattached(params: {
     existing: ProductSourceRecord | null;
@@ -178,6 +188,7 @@ export class ProductSourceRecordUpdaterService {
     feedRowHash?: string;
   }): ProductSourceRecord {
     const record = params.existing ?? new ProductSourceRecord();
+    if (params.existing) this.moveUrl(record, params.sourceUrl, params.source.name);
     record.model = null;
     record.source = params.source;
 
@@ -194,6 +205,45 @@ export class ProductSourceRecordUpdaterService {
       validation,
     });
     return record;
+  }
+
+  /**
+   * Moves a listing's record to the URL the shop now shows it under: its own
+   * URL, and that of its offer entries which pointed at the old page, so the
+   * offer links to the live one. Each entry's offer id is pinned first: an
+   * entry stored before resolvedExternalId existed derives it from the
+   * record's URL, and must keep the id its offer is stored under.
+   *
+   * Nothing happens when the URL is the same. The caller saves the record.
+   */
+  public moveUrl(record: ProductSourceRecord, url: string, sourceName: string): void {
+    const from = record.url;
+    const to = normalizeUrl(url);
+    if (!from || from === to) return;
+
+    if (record.scrapedProduct?.offers) {
+      record.scrapedProduct = {
+        ...record.scrapedProduct,
+        offers: record.scrapedProduct.offers.map((entry) => {
+          const moved: ScrapedOffer =
+            entry.resolvedExternalId === undefined
+              ? { ...entry, resolvedExternalId: storedOfferExternalId(record, entry) ?? null }
+              : { ...entry };
+          if (entry.url && normalizeUrl(entry.url) === from) moved.url = to;
+          return moved;
+        }),
+      };
+    }
+    record.url = to;
+
+    this.productMetrics.sourceRecordUrlChanged(sourceName);
+    this.logger.log('Listing URL changed', {
+      recordId: record.id,
+      source: sourceName,
+      externalId: record.externalId,
+      from,
+      to,
+    });
   }
 
   /** Everything a listing's record keeps of one import of it. */

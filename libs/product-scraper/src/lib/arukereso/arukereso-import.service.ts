@@ -13,7 +13,6 @@ import {
 import { TaskConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductCollectionMetricsService } from '@fittkereso-backend/metrics';
-import { offerExternalIdOf } from '@fittkereso-backend/utils';
 import { CompleteSourceRemovalService } from '@fittkereso-backend/product';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import {
@@ -30,9 +29,13 @@ import {
   FeedSkipReason,
   MappedFeedItem,
 } from './arukereso-product-mapper.service';
-import { ArukeresoFeedTriageService, FeedRow } from './arukereso-feed-triage.service';
+import {
+  ArukeresoFeedTriageService,
+  FeedRow,
+  toFeedRow,
+} from './arukereso-feed-triage.service';
 import { ArukeresoFeedConfirmService } from './arukereso-feed-confirm.service';
-import { FeedEntryPayload, feedRowHash } from './feed-row-hash';
+import { FeedEntryPayload } from './feed-row-hash';
 
 /**
  * How many consecutive per-item failures end the run.
@@ -108,6 +111,10 @@ export class ArukeresoImportService implements ProductSourceImporter {
     const requestedSlugs = options?.categorySlugs;
     const skips: Partial<Record<FeedSkipReason, number>> = {};
     const seenUrls = new Set<string>();
+    // The URL of each listing id's first row. A second row with the same id
+    // under another URL is a config emitting one id for several listings,
+    // never a rename: it is skipped, so the record does not flip between them.
+    const listingUrls = new Map<string, string>();
     // Every eligible row's offer key: what a complete run weighs the seller's
     // offers against.
     const seenExternalIds = new Set<string>();
@@ -154,13 +161,20 @@ export class ArukeresoImportService implements ProductSourceImporter {
             return;
           }
 
+          const row = toFeedRow(mapped, item);
+          const firstUrl = listingUrls.get(row.listingId);
+          if (firstUrl !== undefined && firstUrl !== row.url) {
+            summary.duplicateExternalIds += 1;
+            return;
+          }
+          listingUrls.set(row.listingId, row.url);
+
           eligible += 1;
           if (seenUrls.has(mapped.url)) {
             summary.duplicateUrls += 1;
           } else {
             seenUrls.add(mapped.url);
           }
-          const row = this.toRow(mapped, item);
           if (row.externalId) seenExternalIds.add(row.externalId);
           batch.push(row);
 
@@ -207,6 +221,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
         tasksReplaced: summary.tasksReplaced,
         offersUpdated: summary.offersUpdated,
         duplicateUrls: summary.duplicateUrls,
+        duplicateExternalIds: summary.duplicateExternalIds,
         unattachedRecords: summary.unattachedRecords,
         offersRemoved: summary.offersRemoved,
         removalSkipped: summary.removalSkipped,
@@ -219,6 +234,12 @@ export class ArukeresoImportService implements ProductSourceImporter {
         this.logger.warn(
           'Feed rows share a URL — only the last row of each is imported. Is the URL mapping per variant?',
           { source: source.name, duplicateUrls: summary.duplicateUrls },
+        );
+      }
+      if (summary.duplicateExternalIds > 0) {
+        this.logger.warn(
+          'Feed rows share an externalId under different URLs — only the first row of each is imported. Is the externalId mapping per variant?',
+          { source: source.name, duplicateExternalIds: summary.duplicateExternalIds },
         );
       }
 
@@ -306,20 +327,6 @@ export class ArukeresoImportService implements ProductSourceImporter {
       });
       return undefined;
     }
-  }
-
-  private toRow(
-    mapped: Extract<MappedFeedItem, { status: 'mapped' }>,
-    item: ArukeresoFeedItem,
-  ): FeedRow {
-    const offer = mapped.scrapedProduct.offers?.[0];
-    return {
-      url: mapped.url,
-      item,
-      scrapedProduct: mapped.scrapedProduct,
-      rowHash: feedRowHash(mapped.url, mapped.scrapedProduct),
-      externalId: offer ? offerExternalIdOf(offer, mapped.url).value : undefined,
-    };
   }
 
   /** One batch: confirm the unchanged rows' offers, queue the rest. */

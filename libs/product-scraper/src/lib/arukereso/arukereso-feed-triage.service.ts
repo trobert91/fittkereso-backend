@@ -6,18 +6,42 @@ import {
   ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import type { ScrapedProduct } from '@fittkereso-backend/product';
+import { listingExternalIdOf, offerExternalIdOf } from '@fittkereso-backend/utils';
 import type { ArukeresoFeedItem } from './arukereso-feed-item';
+import { feedRowHash } from './feed-row-hash';
 
 /** One mapped feed row, ready to triage. */
 export interface FeedRow {
-  /** Canonical product URL: the listing's identity within its source. */
+  /** Canonical product URL: where the listing's offer links, and its task's key. */
   url: string;
+  /**
+   * The key of the listing's record (listingExternalIdOf): the row's
+   * externalId, else its URL slug. What its record is found by, so a row
+   * whose URL changed still finds it.
+   */
+  listingId: string;
   item: ArukeresoFeedItem;
   scrapedProduct: ScrapedProduct;
   /** feedRowHash of the mapped row. */
   rowHash: string;
   /** The externalId its offer is stored under (offerExternalIdOf). */
   externalId?: string;
+}
+
+/** A mapped feed row's keys and hash, the same for a run and its simulation. */
+export function toFeedRow(
+  mapped: { url: string; scrapedProduct: ScrapedProduct },
+  item: ArukeresoFeedItem,
+): FeedRow {
+  const offer = mapped.scrapedProduct.offers?.[0];
+  return {
+    url: mapped.url,
+    listingId: listingExternalIdOf(mapped.scrapedProduct, mapped.url),
+    item,
+    scrapedProduct: mapped.scrapedProduct,
+    rowHash: feedRowHash(mapped.url, mapped.scrapedProduct),
+    externalId: offer ? offerExternalIdOf(offer, mapped.url).value : undefined,
+  };
 }
 
 /**
@@ -47,7 +71,9 @@ export interface FeedTriage {
  * import simulator reports it.
  *
  * A row is unchanged when its listing's stored feedRowHash equals the row's,
- * AND the listing's offer still exists. The second half matters: a listing
+ * AND the listing's offer still exists. The listing is found by its key, and
+ * the hash covers the URL: a row whose URL changed is imported again, which
+ * moves the record to it. The second half matters: a listing
  * whose offer was swept, or whose import failed after the record was written,
  * has nothing to refresh and must be imported again.
  *
@@ -67,10 +93,10 @@ export class ArukeresoFeedTriageService {
   async triage(source: ProductSource, rows: FeedRow[]): Promise<FeedTriage> {
     const states = await this.sourceRecordRepo.findFeedRowStates(
       source.id,
-      rows.map((row) => row.url),
+      rows.map((row) => row.listingId),
     );
     const isSameRow = (row: FeedRow) =>
-      !!row.externalId && states.get(row.url)?.feedRowHash === row.rowHash;
+      !!row.externalId && states.get(row.listingId)?.feedRowHash === row.rowHash;
     const offers = await this.offerRepo.findSyncStates(
       source.seller.id,
       rows.filter(isSameRow).map((row) => row.externalId as string),
@@ -80,7 +106,7 @@ export class ArukeresoFeedTriageService {
     const unchanged: UnchangedFeedRow[] = [];
     const toImport: FeedRow[] = [];
     for (const row of rows) {
-      const state = states.get(row.url);
+      const state = states.get(row.listingId);
       if (!state || !isSameRow(row)) {
         toImport.push(row);
         continue;

@@ -26,7 +26,6 @@ import {
 } from '@fittkereso-backend/utils';
 import { compact, countBy } from 'lodash';
 import { selectIdentitySpecRows } from '@fittkereso-backend/product';
-import { offerExternalIdOf } from '@fittkereso-backend/utils';
 import { ScrapingImportService } from './scraping-import.service';
 import {
   ListItemDecision,
@@ -46,8 +45,8 @@ import {
 import {
   ArukeresoFeedTriageService,
   FeedRow,
+  toFeedRow,
 } from '../../arukereso/arukereso-feed-triage.service';
-import { feedRowHash } from '../../arukereso/feed-row-hash';
 
 /** What a run would do with one list card, and why. */
 export interface SimulatedListItemDecision {
@@ -350,14 +349,13 @@ export class ProductSourceImportSimulationService {
 
     const reasons: Record<ListItemDecision['outcome'], string> = {
       unknown: 'not seen by this source before — only a detail page has its specs, brand and model',
-      moved: `known by its externalId under ${movedFrom}, but another record of this source holds this URL — a detail fetch sorts it out`,
       incomplete: `known listing, but the card is missing ${missingFields.join(', ')}`,
       stale: `known listing whose detail page was due again on ${dueOn} (detailRefreshInterval: ${source.detailRefreshInterval})`,
       no_offer: 'known listing with no offer to refresh yet',
       refresh: `refreshed in place from the card — no detail fetch spent; detail page due again on ${dueOn}`,
     };
     let reason = reasons[outcome];
-    if (movedFrom && outcome !== 'moved') {
+    if (movedFrom) {
       reason += `; the listing moves here from ${movedFrom}`;
     }
 
@@ -403,8 +401,10 @@ export class ProductSourceImportSimulationService {
       config.identityExtraction?.specRows,
     );
     // What a run would do with each eligible row, triaged in batches as the
-    // run does (last row wins for a repeated URL).
+    // run does (last row wins for a repeated URL, the first for a repeated
+    // listing id under another URL).
     const seenUrls = new Set<string>();
+    const listingUrls = new Map<string, string>();
     let batch: FeedRow[] = [];
     let wouldQueue = 0;
     let wouldRefresh = 0;
@@ -482,20 +482,19 @@ export class ProductSourceImportSimulationService {
           return;
         }
         if (mapped.status === 'mapped') {
-          if (seenUrls.has(mapped.url)) duplicateUrls += 1;
-          seenUrls.add(mapped.url);
-          const offer = mapped.scrapedProduct.offers?.[0];
-          if (offer?.priceWithoutDiscount && offer.priceWithoutDiscount > offer.price) {
-            rowsWithOldPrice += 1;
+          const row = toFeedRow(mapped, item);
+          const firstUrl = listingUrls.get(row.listingId);
+          if (firstUrl === undefined || firstUrl === row.url) {
+            listingUrls.set(row.listingId, row.url);
+            if (seenUrls.has(mapped.url)) duplicateUrls += 1;
+            seenUrls.add(mapped.url);
+            const offer = mapped.scrapedProduct.offers?.[0];
+            if (offer?.priceWithoutDiscount && offer.priceWithoutDiscount > offer.price) {
+              rowsWithOldPrice += 1;
+            }
+            batch.push(row);
+            if (batch.length >= TRIAGE_BATCH) await triageBatch();
           }
-          batch.push({
-            url: mapped.url,
-            item,
-            scrapedProduct: mapped.scrapedProduct,
-            rowHash: feedRowHash(mapped.url, mapped.scrapedProduct),
-            externalId: offer ? offerExternalIdOf(offer, mapped.url).value : undefined,
-          });
-          if (batch.length >= TRIAGE_BATCH) await triageBatch();
         }
 
         if (products.length < limit) {
@@ -545,16 +544,16 @@ export class ProductSourceImportSimulationService {
       .filter(([, count]) => count > 1)
       .map(([externalId, count]) => ({ externalId, count }));
 
-    // The check worth failing loudly on. Offer is @Unique([seller, externalId]),
-    // so a repeated id does not error — it silently collapses those offers onto
-    // one row, keeping only the last imported. speedbike's feed repeats `sku`
-    // across size variants for exactly this reason, which is why its config
-    // keys on `identifier`.
+    // The check worth failing loudly on. A listing's record is unique per
+    // (source, externalId), and its offer per (seller, externalId): a run
+    // imports only the first row of a repeated id, and the rest never arrive.
+    // speedbike's feed repeats `sku` across size variants for exactly this
+    // reason, which is why its config keys on `identifier`.
     if (duplicateExternalIds.length > 0) {
       result.errors.push(
         `${duplicateExternalIds.length} externalId values repeat across eligible items. ` +
-          `Offer is unique per (seller, externalId), so those offers WOULD COLLAPSE onto one row each, ` +
-          `keeping only the last imported. Map externalId to a field that is unique per variant.`,
+          `A listing is unique per (source, externalId), so a run imports only the first row of each ` +
+          `and skips the rest. Map externalId to a field that is unique per variant.`,
       );
     }
     if (wouldImport === 0) {

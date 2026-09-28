@@ -15,6 +15,7 @@ import {
   OFFER_COMPOSER_MODEL_RELATIONS,
   OfferComposerService,
   ProductMergeService,
+  ProductSourceRecordUpdaterService,
 } from '@fittkereso-backend/product';
 import { normalizeUrl, storedOfferExternalId } from '@fittkereso-backend/utils';
 import { isEmpty } from 'lodash';
@@ -43,12 +44,6 @@ export type ListItemOutcome =
   | 'stale'
   /** Not seen before; only a detail page has its specs, brand and model. */
   | 'unknown'
-  /**
-   * Known by its externalId under another URL, while another record of this
-   * source already holds the card's URL: a detail scrape sorts that out, where
-   * moving the listing would be a guess.
-   */
-  | 'moved'
   /** Known listing with no offer row to refresh yet. */
   | 'no_offer';
 
@@ -57,7 +52,6 @@ export const LIST_ITEM_OUTCOMES: readonly ListItemOutcome[] = [
   'incomplete',
   'stale',
   'unknown',
-  'moved',
   'no_offer',
 ];
 
@@ -120,6 +114,7 @@ export class ListProductRefreshService {
     private readonly offerComposer: OfferComposerService,
     private readonly locks: AdvisoryLockService,
     private readonly dynamicConfig: DynamicConfigService,
+    private readonly sourceRecordUpdater: ProductSourceRecordUpdaterService,
   ) {}
 
   get requiredFields(): string[] {
@@ -160,10 +155,6 @@ export class ListProductRefreshService {
     if (!record) return { outcome: 'unknown', missingFields };
 
     const known = { record, movedFrom, missingFields };
-    if (movedFrom && (await this.sourceRecordRepo.findBySourceAndUrl(source.id, url))) {
-      return { ...known, outcome: 'moved' };
-    }
-
     if (missingFields.length > 0) return { ...known, outcome: 'incomplete' };
 
     // Checked before the in-place refresh, which never writes lastUpdated:
@@ -198,12 +189,14 @@ export class ListProductRefreshService {
   ): Promise<ListItemOutcome> {
     const { outcome, record, movedFrom, externalId } = await this.decide(source, item);
     const modelId = record?.model?.id;
-    if (outcome === 'unknown' || outcome === 'moved' || !record || !modelId) {
+    // An unattached record has no product lock to move it under: the detail
+    // import moves it.
+    if (outcome === 'unknown' || !record || !modelId) {
       return outcome === 'refresh' ? 'no_offer' : outcome;
     }
 
     const move = movedFrom
-      ? { recordId: record.id, from: movedFrom, to: normalizeUrl(item.url) }
+      ? { source, recordId: record.id, from: movedFrom, to: normalizeUrl(item.url) }
       : undefined;
 
     if (outcome !== 'refresh' || !externalId) {
@@ -224,24 +217,24 @@ export class ListProductRefreshService {
    * This source's record of the card: by (source, externalId) first, then by
    * URL.
    *
-   * The externalId is what a shop keeps when it renames a product and so its
-   * slug. Found by it, the record is this listing even under another URL, and
-   * `movedFrom` says so. Only an unambiguous match on a record that sits on a
-   * product counts: an id several records share (a group-level one) names no
-   * single listing, and an unattached record has no product lock to move it
-   * under. Both fall back to the URL, as does a card without an externalId.
+   * The externalId is the record's key, and what a shop keeps when it renames
+   * a product and so its slug. Found by it, the record is this listing even
+   * under another URL, and `movedFrom` says so. A card without an id, or with
+   * one from another id space than its detail page's (an offer's sku, say),
+   * falls back to the URL.
    */
   private async findRecord(
     sourceId: string,
     item: ScrapedListProduct,
     url: string,
   ): Promise<{ record?: ProductSourceRecord; movedFrom?: string }> {
-    if (item.externalId) {
-      const byExternalId = await this.sourceRecordRepo.findUniqueBySourceAndExternalId(
+    const externalId = item.externalId?.trim();
+    if (externalId) {
+      const byExternalId = await this.sourceRecordRepo.findBySourceAndExternalId(
         sourceId,
-        item.externalId,
+        externalId,
       );
-      if (byExternalId?.model) {
+      if (byExternalId) {
         const movedFrom =
           byExternalId.url && byExternalId.url !== url ? byExternalId.url : undefined;
         return { record: byExternalId, movedFrom };
@@ -253,38 +246,23 @@ export class ListProductRefreshService {
   }
 
   /**
-   * Moves a listing to the URL its card now shows: the record's own URL, and
-   * that of its offer entries which pointed at the old page, so the offer
-   * links to the live one. Under the caller's product lock, on the record as
-   * it is now; nothing is written when it has moved meanwhile.
+   * Moves a listing to the URL its card now shows (moveUrl). Under the
+   * caller's product lock, on the record as it is now; nothing is written
+   * when it has moved meanwhile.
    */
-  private async moveListing(move: { recordId: string; from: string; to: string }): Promise<void> {
+  private async moveListing(move: {
+    source: ProductSource;
+    recordId: string;
+    from: string;
+    to: string;
+  }): Promise<void> {
     // Without relations: saved with its loaded offers, a stale list would
     // re-bind an offer another writer has pointed at another record since.
     const record = await this.sourceRecordRepo.findById(move.recordId);
     if (!record || record.url !== move.from) return;
 
-    if (record.scrapedProduct) {
-      const offers = (record.scrapedProduct.offers ?? []).map((entry) => {
-        // An entry without a native id derives its id from the URL: pinned
-        // first, so it stays the id its offer is stored under.
-        const pinned: ScrapedOffer =
-          entry.resolvedExternalId === undefined
-            ? { ...entry, resolvedExternalId: storedOfferExternalId(record, entry) ?? null }
-            : { ...entry };
-        if (entry.url && normalizeUrl(entry.url) === move.from) pinned.url = move.to;
-        return pinned;
-      });
-      record.scrapedProduct = { ...record.scrapedProduct, offers };
-    }
-    record.url = move.to;
+    this.sourceRecordUpdater.moveUrl(record, move.to, move.source.name);
     await this.sourceRecordRepo.save(record);
-
-    this.logger.log('A listing moved to a new URL', {
-      recordId: record.id,
-      from: move.from,
-      to: move.to,
-    });
   }
 
   /**

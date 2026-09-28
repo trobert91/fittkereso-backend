@@ -1,4 +1,5 @@
 import { OfferAvailability, type ScrapedOffer } from '@fittkereso-backend/database';
+import { ProductSourceRecordUpdaterService } from '@fittkereso-backend/product';
 import {
   DEFAULT_LIST_REFRESH_REQUIRED_FIELDS,
   ListProductRefreshService,
@@ -27,10 +28,11 @@ describe('ListProductRefreshService', () => {
   let service: ListProductRefreshService;
   let sourceRecordRepo: {
     findBySourceAndUrl: jest.Mock;
-    findUniqueBySourceAndExternalId: jest.Mock;
+    findBySourceAndExternalId: jest.Mock;
     findById: jest.Mock;
     save: jest.Mock;
   };
+  let productMetrics: { sourceRecordUrlChanged: jest.Mock };
   let productRepo: { findOne: jest.Mock; save: jest.Mock };
   let mergeService: { recomputePrice: jest.Mock };
   let offerComposer: { compose: jest.Mock };
@@ -62,7 +64,7 @@ describe('ListProductRefreshService', () => {
     sourceRecordRepo = {
       findBySourceAndUrl: jest.fn(),
       // Unmatched by externalId unless a test says so: looked up by URL.
-      findUniqueBySourceAndExternalId: jest.fn().mockResolvedValue(null),
+      findBySourceAndExternalId: jest.fn().mockResolvedValue(null),
       findById: jest.fn(),
       save: jest.fn(),
     };
@@ -73,6 +75,7 @@ describe('ListProductRefreshService', () => {
     };
     locks = { withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()) };
     dynamicConfig = {};
+    productMetrics = { sourceRecordUrlChanged: jest.fn() };
 
     service = new ListProductRefreshService(
       sourceRecordRepo as never,
@@ -81,6 +84,8 @@ describe('ListProductRefreshService', () => {
       offerComposer as never,
       locks as never,
       dynamicConfig as never,
+      // The real move: pinning and rewriting the entries is what is tested.
+      new ProductSourceRecordUpdaterService({} as never, productMetrics as never, {} as never),
     );
   });
 
@@ -365,7 +370,7 @@ describe('ListProductRefreshService', () => {
     /** This source's record of SKU-1, still under its old URL. */
     const givenMovedRecord = (offers: ScrapedOffer[], overrides: Record<string, unknown> = {}) => {
       const record = givenRecord(offers, { url: OLD_URL, externalId: 'SKU-1', ...overrides });
-      sourceRecordRepo.findUniqueBySourceAndExternalId.mockResolvedValue(record);
+      sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(record);
       // Nothing else of this source holds the new URL.
       sourceRecordRepo.findBySourceAndUrl.mockResolvedValue(null);
       return record;
@@ -379,10 +384,11 @@ describe('ListProductRefreshService', () => {
 
       await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('refreshed');
 
-      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
+      expect(sourceRecordRepo.findBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
       expect(record.url).toBe(NEW_URL);
       const entries = record.scrapedProduct.offers as ScrapedOffer[];
       expect(entries.map((offer) => offer.url)).toEqual([NEW_URL, 'https://ebikeshop.hu/termek/other']);
+      expect(productMetrics.sourceRecordUrlChanged).toHaveBeenCalledWith('speedbike');
       expect(entries[0].price).toBe(1_339_990);
       // One lock for the move and the refresh together.
       expect(locks.withLocks).toHaveBeenCalledTimes(1);
@@ -417,17 +423,17 @@ describe('ListProductRefreshService', () => {
       });
     });
 
-    it('does not guess when another record of the source holds the new URL', async () => {
+    // A URL is no key: two listings may share one, so nothing collides.
+    it('moves it even when another record of the source is at the new URL', async () => {
       const record = givenMovedRecord([
         { price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1', url: OLD_URL },
       ]);
       sourceRecordRepo.findBySourceAndUrl.mockResolvedValue({ id: 'record-2', url: NEW_URL });
 
-      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('moved');
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('refreshed');
 
-      expect(record.url).toBe(OLD_URL);
-      expect(sourceRecordRepo.save).not.toHaveBeenCalled();
-      expect(locks.withLocks).not.toHaveBeenCalled();
+      expect(record.url).toBe(NEW_URL);
+      expect(sourceRecordRepo.findBySourceAndUrl).not.toHaveBeenCalled();
     });
 
     it('writes nothing when the record moved meanwhile', async () => {
@@ -442,27 +448,28 @@ describe('ListProductRefreshService', () => {
       expect(sourceRecordRepo.save).not.toHaveBeenCalled();
     });
 
-    // The repository answers null for an id several records share (a
-    // group-level id), and the card is then looked up by its URL.
-    it('falls back to the URL when no single record carries the externalId', async () => {
+    // A card's id can be from another id space than its page's (an offer's
+    // sku, say): no record carries it, and the card is looked up by its URL.
+    it('falls back to the URL when no record carries the externalId', async () => {
       givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }]);
 
       await expect(service.tryRefresh(SOURCE, completeItem() as never)).resolves.toBe('refreshed');
 
-      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
+      expect(sourceRecordRepo.findBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'SKU-1');
       expect(sourceRecordRepo.findBySourceAndUrl).toHaveBeenCalledWith(
         'source-1',
         'https://speedbike.hu/termek/macina',
       );
     });
 
-    // No product lock to move it under; it keeps its URL, as before.
-    it('falls back to the URL for an unattached record', async () => {
-      givenMovedRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
+    // No product lock to move it under: its detail import moves it.
+    it('leaves an unattached record to its detail import', async () => {
+      const record = givenMovedRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
         model: null,
       });
 
-      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('unknown');
+      await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('no_offer');
+      expect(record.url).toBe(OLD_URL);
       expect(sourceRecordRepo.save).not.toHaveBeenCalled();
     });
 
@@ -471,7 +478,7 @@ describe('ListProductRefreshService', () => {
 
       await service.tryRefresh(SOURCE, { ...completeItem(), externalId: undefined } as never);
 
-      expect(sourceRecordRepo.findUniqueBySourceAndExternalId).not.toHaveBeenCalled();
+      expect(sourceRecordRepo.findBySourceAndExternalId).not.toHaveBeenCalled();
     });
   });
 });

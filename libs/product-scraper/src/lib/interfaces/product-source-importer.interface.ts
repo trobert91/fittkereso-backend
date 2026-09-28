@@ -42,6 +42,11 @@ export interface ImportRunSummary {
   offersUpdated: number;
   /** Feed rows sharing a URL with an earlier row: the last one wins. Feed only. */
   duplicateUrls: number;
+  /**
+   * Feed rows carrying the externalId of an earlier row under another URL:
+   * skipped, since a listing is unique per (source, externalId). Feed only.
+   */
+  duplicateExternalIds: number;
   /** Items deliberately not imported (category gate, missing identity). */
   skipped: number;
   /** Items that errored. A few is normal; a lot means the config has rotted. */
@@ -72,6 +77,7 @@ export const emptyImportRunSummary = (): ImportRunSummary => ({
   tasksReplaced: 0,
   offersUpdated: 0,
   duplicateUrls: 0,
+  duplicateExternalIds: 0,
   skipped: 0,
   failed: 0,
 });

@@ -409,7 +409,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
         aliases: pipelineRef('Pipeline producing alternative names for this product.'),
         releaseYear: pipelineRef('Pipeline producing the model year.'),
         externalId: pipelineRef(
-          'Pipeline producing the source-native listing id (SKU, model code, slug) — stable across URL changes. May be a group-level id shared by variant siblings.',
+          "Pipeline producing the page's source-native id (SKU, product code) — stable across URL changes, and the key of the listing's record, so it must name exactly this page within the source. A size group's shared id belongs in siblingIds. Without it, the record is keyed by the URL slug, and a URL change leaves the old record behind.",
         ),
         siblingIds: pipelineRef(
           "Optional. Pipeline producing the ids of this product's other sizes, as the shop itself declares them (e.g. a frame-size variation list), in the same id space as externalId. May include this page's own id. Identity resolution looks them up within this source only, so every size the shop groups lands on one product. Configure it only from a list the shop declares — groupings inferred from shared images or article-number prefixes put different bikes together.",

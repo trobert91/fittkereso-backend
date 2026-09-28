@@ -26,6 +26,25 @@ export function offerExternalIdOf(
 }
 
 /**
+ * The key of a listing's ProductSourceRecord within its source: its
+ * source-native id when it has one, otherwise the slug of its page URL (the
+ * URL itself where the path has no slug). Always set, so every record of a
+ * source is found by it, and a URL change moves the record instead of adding
+ * one.
+ *
+ * The native id must name exactly one listing (a detail page, or a feed row).
+ * A size group's shared id belongs in siblingExternalIds.
+ */
+export function listingExternalIdOf(
+  scraped: { externalId?: string | number | null },
+  pageUrl: string,
+): string {
+  const native = scraped.externalId == null ? '' : String(scraped.externalId).trim();
+  const url = normalizeUrl(pageUrl);
+  return native || slugFromUrl(url) || url;
+}
+
+/**
  * The externalId a stored offer entry (ProductSourceRecord.scrapedProduct.offers)
  * joins its offer by: the one it was stored under, or none when its id
  * collided on its page. Entries stored before `resolvedExternalId` existed

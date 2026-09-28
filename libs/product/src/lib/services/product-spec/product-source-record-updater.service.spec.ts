@@ -7,6 +7,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
   let validatorService: { validateSpecs: jest.Mock };
   let productMetrics: {
     productSourceSpecValidationFailed: jest.Mock;
+    sourceRecordUrlChanged: jest.Mock;
   };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
 
@@ -26,6 +27,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     };
     productMetrics = {
       productSourceSpecValidationFailed: jest.fn(),
+      sourceRecordUrlChanged: jest.fn(),
     };
     categoryConfigService = {
       getJsonSchema: jest.fn().mockReturnValue(undefined),
@@ -43,6 +45,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,
       url: 'https://speedbike.hu/product-1',
+      externalId: 'product-1',
       scrapedProduct: { specs: { weight: 22 } },
       offerSpecsHash: 'abc123',
       productSpecsHash: 'def456',
@@ -54,6 +57,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: undefined,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -70,6 +74,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: { specs: { weight: 22 } } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
     const manual = await service.upsertSourceRecord({
@@ -105,6 +110,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     const model = makeModel({
       source,
       url: 'https://speedbike.hu/product-1',
+      externalId: 'product-1',
       scrapedProduct: { specs: { weight: 22 }, description: 'régi' },
     });
 
@@ -112,6 +118,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: { specs: { weight: 22 } } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -152,6 +159,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         model,
         source,
         scrapedProduct: { specs: { weight: 22 } } as any,
+        externalId: 'product-1',
         sourceUrl: 'https://speedbike.hu/product-1',
         feedRowHash,
       });
@@ -167,6 +175,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,
       url: 'https://speedbike.hu/product-1',
+      externalId: 'product-1',
       scrapedProduct: { specs: { weight: 22 } },
       productSpecsHash: hashSpecs({ weight: 22 }),
       lastUpdated: new Date('2026-01-01'),
@@ -182,6 +191,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         productLevelDeterministicSpecs: { weight: 23 },
         productSpecsHash: hashSpecs({ weight: 23 }),
       } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -200,6 +210,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         productLevelDeterministicSpecs: { weight: 22 },
         productSpecsHash: 'caller-computed-hash',
       } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -213,6 +224,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: { specs: { weight: 22 } } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -226,6 +238,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: undefined,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -244,6 +257,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,
       url: 'https://speedbike.hu/product-1',
+      externalId: 'product-1',
       scrapedProduct: { specs: { weight: 22 } },
       offerSpecsHash: 'abc123',
       productSpecsHash: 'def456',
@@ -259,6 +273,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         model: 'Macina Scarp',
         displayName: 'KTM Macina Scarp',
       } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -267,24 +282,24 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(existingSource.lastUpdated).toEqual(new Date('2026-01-01')); // untouched
   });
 
-  it('never writes through another source\'s record for the same URL', async () => {
-    // One webshop can be covered by several ProductSources (a page scraper and
-    // an Árukereső feed), and ProductSourceRecord.url is unique only per
-    // source — so `model.sources`, which is loaded across ALL sources, can hold
-    // two rows with this same URL.
+  it('never writes through another source\'s record of the same listing', async () => {
+    // One webshop can be covered by several ProductSources (an Árukereső feed
+    // and a Google feed), both keyed by the shop's own id — so `model.sources`,
+    // which is loaded across ALL sources, can hold two rows with this same
+    // externalId and URL.
     //
-    // Matching on url alone picked whichever came first. Source B then
-    // overwrote source A's scrapedProduct, hashes and externalId, while the row
-    // stayed attributed to A (source.source is assigned on create only). A's
-    // data was silently replaced by B's under A's merge priority, and B never
-    // got a record of its own. This is the regression guard for that.
+    // Matching without the source picked whichever came first. Source B then
+    // overwrote source A's scrapedProduct and hashes, while the row stayed
+    // attributed to A (source.source is assigned on create only). A's data was
+    // silently replaced by B's under A's merge priority, and B never got a
+    // record of its own. This is the regression guard for that.
     const otherSourcesRecord: Partial<ProductSourceRecord> = {
       source: { id: 'source-2', name: 'speedbike-arukereso' } as any,
       url: 'https://speedbike.hu/product-1',
+      externalId: 'product-1',
       scrapedProduct: { specs: { weight: 99 } },
       offerSpecsHash: 'other-offer-hash',
       productSpecsHash: 'other-product-hash',
-      externalId: 'other-external-id',
       lastUpdated: new Date('2026-01-01'),
     };
     const model = makeModel(otherSourcesRecord);
@@ -296,7 +311,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         model: 'Macina Scarp',
         specs: { weight: 23 },
       } as any,
-      externalId: 'my-external-id',
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -310,8 +325,94 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(otherSourcesRecord.scrapedProduct?.specs).toEqual({ weight: 99 });
     expect(otherSourcesRecord.offerSpecsHash).toBe('other-offer-hash');
     expect(otherSourcesRecord.productSpecsHash).toBe('other-product-hash');
-    expect(otherSourcesRecord.externalId).toBe('other-external-id');
+    expect(otherSourcesRecord.url).toBe('https://speedbike.hu/product-1');
     expect(otherSourcesRecord.lastUpdated).toEqual(new Date('2026-01-01'));
+  });
+
+  describe('a listing the shop renamed', () => {
+    const OLD_URL = 'https://speedbike.hu/ktm-macina-burnt-orange-matt-szinben';
+    const NEW_URL = 'https://speedbike.hu/ktm-macina-burnt-orange-matt-szinben-2026';
+
+    function renamedModel(): { model: ProductModel; record: Partial<ProductSourceRecord> } {
+      const record: Partial<ProductSourceRecord> = {
+        id: 'record-1',
+        source,
+        url: OLD_URL,
+        externalId: '1260042108',
+        scrapedProduct: {
+          specs: { weight: 22 },
+          offers: [
+            // Stored before resolvedExternalId existed: its id derives from the URL.
+            { price: 1, url: OLD_URL } as any,
+            { price: 2, url: 'https://speedbike.hu/other', resolvedExternalId: 'SKU-2' } as any,
+          ],
+        },
+        lastUpdated: new Date('2026-01-01'),
+      };
+      return { model: makeModel(record), record };
+    }
+
+    it('moves the record to the new URL instead of adding a second one', async () => {
+      const { model, record } = renamedModel();
+
+      const result = await service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        externalId: '1260042108',
+        sourceUrl: `${NEW_URL}/`,
+      });
+
+      expect(result).toBe(record);
+      expect(model.sources).toHaveLength(1);
+      expect(record.url).toBe(NEW_URL);
+      expect(productMetrics.sourceRecordUrlChanged).toHaveBeenCalledWith('speedbike');
+    });
+
+    // The stored entries, when the import writes no new ones (an unchanged page).
+    it('pins each stored entry to the id its offer is under, and points it at the new page', async () => {
+      const { model, record } = renamedModel();
+
+      await service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { brand: 'KTM' } as any,
+        externalId: '1260042108',
+        sourceUrl: NEW_URL,
+      });
+
+      expect(record.url).toBe(NEW_URL);
+      expect(record.scrapedProduct?.offers).toEqual([
+        { price: 1, url: NEW_URL, resolvedExternalId: 'ktm-macina-burnt-orange-matt-szinben' },
+        { price: 2, url: 'https://speedbike.hu/other', resolvedExternalId: 'SKU-2' },
+      ]);
+    });
+
+    it('counts nothing when the URL is the same', async () => {
+      const { model } = renamedModel();
+
+      await service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        externalId: '1260042108',
+        sourceUrl: OLD_URL,
+      });
+
+      expect(productMetrics.sourceRecordUrlChanged).not.toHaveBeenCalled();
+    });
+  });
+
+  // Without it, the record could not be found again, and each import would add one.
+  it("refuses a source's listing without its externalId", async () => {
+    await expect(
+      service.upsertSourceRecord({
+        model: makeModel(),
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        sourceUrl: 'https://speedbike.hu/product-1',
+      }),
+    ).rejects.toThrow('without the externalId');
   });
 
   it('sets both hashes to undefined when scrapedProduct has no offerLevelDeterministicSpecs/productLevelDeterministicSpecs', async () => {
@@ -321,6 +422,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       model,
       source,
       scrapedProduct: { model: 'Macina Scarp', specs: { weight: 22 } } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -340,6 +442,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
         offerLevelDeterministicSpecs: { frameSize: 43, color: undefined },
         productLevelDeterministicSpecs: { weight: 22, torque: '' },
       } as any,
+      externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
     });
 
@@ -352,6 +455,7 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   let service: ProductSourceRecordUpdaterService;
   let validatorService: { validateSpecs: jest.Mock };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
+  let productMetrics: { productSourceSpecValidationFailed: jest.Mock; sourceRecordUrlChanged: jest.Mock };
 
   const google = { id: 'source-google', name: 'speedbike-googleshop' } as any;
   const listing = {
@@ -369,9 +473,13 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
       getJsonSchema: jest.fn().mockReturnValue({ type: 'object' }),
       getConfig: jest.fn().mockReturnValue(undefined),
     };
+    productMetrics = {
+      productSourceSpecValidationFailed: jest.fn(),
+      sourceRecordUrlChanged: jest.fn(),
+    };
     service = new ProductSourceRecordUpdaterService(
       validatorService as any,
-      { productSourceSpecValidationFailed: jest.fn() } as any,
+      productMetrics as any,
       categoryConfigService as any,
     );
   });
@@ -404,19 +512,47 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
     expect(categoryConfigService.getJsonSchema).toHaveBeenCalledWith('ebikes');
   });
 
-  it('updates the record it already has for the URL', () => {
-    const existing = { id: 'record-google', model: null, feedRowHash: 'old' } as any;
+  it('updates the record it already has for the listing', () => {
+    const existing = {
+      id: 'record-google',
+      model: null,
+      url: 'https://speedbike.hu/haibike',
+      feedRowHash: 'old',
+    } as any;
 
     const record = service.upsertUnattached({
       existing,
       source: google,
       scrapedProduct: listing,
+      externalId: 'HAIBIKE-1',
       sourceUrl: 'https://speedbike.hu/haibike',
       feedRowHash: 'hash-2',
     });
 
     expect(record).toBe(existing);
     expect(record.feedRowHash).toBe('hash-2');
+    expect(productMetrics.sourceRecordUrlChanged).not.toHaveBeenCalled();
+  });
+
+  it('moves the record it already has when the shop renamed the listing', () => {
+    const existing = {
+      id: 'record-google',
+      model: null,
+      url: 'https://speedbike.hu/haibike',
+      externalId: 'HAIBIKE-1',
+    } as any;
+
+    const record = service.upsertUnattached({
+      existing,
+      source: google,
+      scrapedProduct: listing,
+      externalId: 'HAIBIKE-1',
+      sourceUrl: 'https://speedbike.hu/haibike-2026',
+    });
+
+    expect(record).toBe(existing);
+    expect(record.url).toBe('https://speedbike.hu/haibike-2026');
+    expect(productMetrics.sourceRecordUrlChanged).toHaveBeenCalledWith('speedbike-googleshop');
   });
 
   // A contributing source's record keeps no key; one stored before that goes.

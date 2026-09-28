@@ -19,21 +19,20 @@ import {
   PRODUCT_SPEC_VALIDATION_FAILED,
   PRODUCT_UPDATED,
   SCRAPE_RESOLUTION_OUTCOME_TOTAL,
+  SOURCE_RECORD_URL_CHANGED_TOTAL,
   SPEC_UNIFICATION_TOTAL,
 } from '../metric-names';
 
 export type ScrapeResolutionOutcome =
   | 'skipped_no_category'
-  /** Path 3: group-level (ProductSourceRecord.externalId) match — only
-   *  reached when Path 2 (below) found no variant-level match. */
+  /** Path 3: this source's record of the listing (ProductSourceRecord.externalId)
+   *  — only reached when Path 2 (below) found no variant-level match. */
   | 'external_id_hit'
   /** Path 2: variant-level (Offer.externalId) match — one of this scrape's
    *  own offers' externalIds matched an existing Offer for this seller.
    *  Tried before the group-level match since it's available whenever a
    *  source identifies its listings at all. */
   | 'offer_external_id_hit'
-  /** Path 3b: this source already has a record for the listing's page URL. */
-  | 'source_url_hit'
   /** A size this source declared as a sibling is already on a product, and
    *  the listing passed the sanity check against it. */
   | 'sibling_hit'
@@ -79,7 +78,6 @@ export type IdentityResolvedVia =
   | 'pinned'
   | 'offer_external_id'
   | 'external_id'
-  | 'source_url'
   | 'sibling'
   | 'gtin'
   | 'mpn';
@@ -119,6 +117,7 @@ export class ProductMetricsService {
   private readonly identityExtractionCounter: client.Counter<string>;
   private readonly identitySpecRowsHistogram: client.Histogram<string>;
   private readonly specUnificationCounter: client.Counter<string>;
+  private readonly sourceRecordUrlChangedCounter: client.Counter<string>;
 
   constructor(private readonly prometheusService: PrometheusService) {
     this.newProductCounter = new client.Counter({
@@ -230,6 +229,12 @@ export class ProductMetricsService {
       labelNames: ['source', 'trigger', 'result'],
       registers: [this.prometheusService.register],
     });
+    this.sourceRecordUrlChangedCounter = new client.Counter({
+      name: SOURCE_RECORD_URL_CHANGED_TOTAL,
+      help: 'Listings whose record moved to a new URL under the same externalId, by source',
+      labelNames: ['source'],
+      registers: [this.prometheusService.register],
+    });
   }
 
   newProductCreated(source: string): void {
@@ -321,5 +326,9 @@ export class ProductMetricsService {
     result: 'ok' | 'failed' | 'disabled',
   ): void {
     this.specUnificationCounter.inc({ source, trigger, result });
+  }
+
+  sourceRecordUrlChanged(source: string): void {
+    this.sourceRecordUrlChangedCounter.inc({ source });
   }
 }

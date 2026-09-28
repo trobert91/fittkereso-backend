@@ -37,8 +37,8 @@ import {
   nameOf,
   normalize,
   inspectGtin,
+  listingExternalIdOf,
   normalizeMpn,
-  normalizeUrl,
   offerExternalIdOf,
   storedOfferExternalId,
 } from '@fittkereso-backend/utils';
@@ -96,15 +96,17 @@ interface OfferIdentifiers {
 /** A listing found through its own history: a pin, its offer, or its record. */
 interface HistoryHit {
   model: ProductModel;
-  via: Extract<
-    IdentityResolvedVia,
-    'pinned' | 'offer_external_id' | 'external_id' | 'source_url'
-  >;
+  via: Extract<IdentityResolvedVia, 'pinned' | 'offer_external_id' | 'external_id'>;
 }
 
 /** Everything the locked write of one listing needs. */
 interface ListingWrite {
   context: ProductImportContext;
+  /**
+   * The listing's key (listingExternalIdOf): its record is found and written
+   * by (source, listingId), whatever URL the listing has now.
+   */
+  listingId: string;
   /** What the identity extraction produced: the input of every identity decision. */
   extracted: ScrapedProduct;
   /**
@@ -183,10 +185,13 @@ export class ProductScrapeUpdaterService {
       return undefined;
     }
 
+    // The key of the listing's record, stable when the shop renames its URL.
+    const listingId = listingExternalIdOf(scrapedProduct, context.url);
+
     // A source that does not identify products never decides which product a
     // listing is: it joins its seller's offer, or waits for one.
     if (context.source.identifiesProducts === false) {
-      return this.contributeListing(context, scrapedProduct);
+      return this.contributeListing(context, scrapedProduct, listingId);
     }
 
     try {
@@ -212,13 +217,14 @@ export class ProductScrapeUpdaterService {
       // the LLM — the path every unchanged listing of a re-import takes.
       const history = await this.resolveFromHistory(
         context,
+        listingId,
         scrapedProduct,
         seller,
       );
       const extracted = await this.specPostProcess.extractIdentity({
         context,
         scrapedProduct,
-        ownRecord: this.ownRecordOf(context, scrapedProduct, history?.model),
+        ownRecord: this.ownRecordOf(context, listingId, history?.model),
       });
 
       // The decision reads what the extraction produced: the sanity check
@@ -240,6 +246,7 @@ export class ProductScrapeUpdaterService {
       // writes, under the lock of the product it writes to.
       const write: ListingWrite = {
         context,
+        listingId,
         extracted,
         listing: this.withStoredOffers(listing, externalIds),
         normalizedSourceName: this.buildNormalizedSourceName(listing),
@@ -305,6 +312,7 @@ export class ProductScrapeUpdaterService {
   private async contributeListing(
     context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
+    listingId: string,
   ): Promise<ProductModel | undefined> {
     const seller = context.source.seller;
     const externalIds = this.resolveOfferExternalIds(context, scrapedProduct.offers ?? []);
@@ -320,11 +328,12 @@ export class ProductScrapeUpdaterService {
       context,
       scrapedProduct,
       ownRecord:
-        (await this.sourceRecordRepo.findBySourceAndUrl(context.source.id, normalizeUrl(context.url))) ??
+        (await this.sourceRecordRepo.findBySourceAndExternalId(context.source.id, listingId)) ??
         undefined,
     });
     const write: ListingWrite = {
       context,
+      listingId,
       extracted,
       listing: this.withStoredOffers(extracted, externalIds),
       normalizedSourceName: null,
@@ -340,7 +349,7 @@ export class ProductScrapeUpdaterService {
         keys,
         this.getProductRelations(),
       );
-      await this.detachOwnRecordElsewhere(context, offer?.model?.id);
+      await this.detachOwnRecordElsewhere(write, offer?.model?.id);
 
       if (!offer?.model) {
         if (await this.storeUnattached(write, keys)) return undefined;
@@ -390,13 +399,13 @@ export class ProductScrapeUpdaterService {
         where: { id: productId },
         relations: this.getProductRelations(),
       });
-      await this.adoptOwnRecord(context, model);
-      const previousExternalIds = this.storedExternalIdsOf(context, model);
+      await this.adoptOwnRecord(write, model);
+      const previousExternalIds = this.storedExternalIdsOf(write, model);
 
       await this.sourceRecordUpdater.upsertSourceRecord({
         model,
         scrapedProduct: listing,
-        externalId: listing.externalId,
+        externalId: write.listingId,
         source: context.source,
         sourceUrl: context.url,
         normalizedSourceName,
@@ -448,9 +457,9 @@ export class ProductScrapeUpdaterService {
           [],
         );
         if (offer?.model) return false;
-        const existing = await this.sourceRecordRepo.findBySourceAndUrl(
+        const existing = await this.sourceRecordRepo.findBySourceAndExternalId(
           context.source.id,
-          normalizeUrl(context.url),
+          write.listingId,
         );
         if (existing?.model) return false;
         if (existing) {
@@ -463,7 +472,7 @@ export class ProductScrapeUpdaterService {
           existing,
           source: context.source,
           scrapedProduct: listing,
-          externalId: listing.externalId,
+          externalId: write.listingId,
           sourceUrl: context.url,
           normalizedSourceName: write.normalizedSourceName,
           feedRowHash: context.feedRowHash,
@@ -482,18 +491,19 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
-   * This source's record of the page, when it sits on another product than the
-   * one it now joins, or on any product while it joins none (its offer was
+   * This source's record of the listing, when it sits on another product than
+   * the one it now joins, or on any product while it joins none (its offer was
    * removed without detaching it): taken off that product, whose offers and
    * specs are then composed without it.
    */
   private async detachOwnRecordElsewhere(
-    context: ProductImportContext,
+    write: ListingWrite,
     targetProductId: string | undefined,
   ): Promise<void> {
-    const own = await this.sourceRecordRepo.findBySourceAndUrl(
+    const { context } = write;
+    const own = await this.sourceRecordRepo.findBySourceAndExternalId(
       context.source.id,
-      normalizeUrl(context.url),
+      write.listingId,
     );
     const productId = own?.model?.id;
     if (!own || !productId || productId === targetProductId) return;
@@ -529,25 +539,25 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
-   * This source's record of the page, when it waits unattached: brought onto
-   * the product, so the write updates it instead of inserting a second record
-   * of one (source, url).
+   * This source's record of the listing, when it waits unattached: brought
+   * onto the product, so the write updates it instead of inserting a second
+   * record of one (source, externalId).
    */
   private async adoptOwnRecord(
-    context: ProductImportContext,
+    write: ListingWrite,
     model: ProductModel,
   ): Promise<void> {
-    const url = normalizeUrl(context.url);
+    const { context, listingId } = write;
     const onProduct = (model.sources ?? []).some(
-      (record) => record.source?.id === context.source.id && record.url === url,
+      (record) => record.source?.id === context.source.id && record.externalId === listingId,
     );
     if (onProduct) return;
 
-    const own = await this.sourceRecordRepo.findBySourceAndUrl(context.source.id, url);
+    const own = await this.sourceRecordRepo.findBySourceAndExternalId(context.source.id, listingId);
     if (!own) return;
     if (own.model) {
       throw new Error(
-        `Listing ${url} of ${context.source.name} moved to product ${own.model.id} meanwhile; the task retries it`,
+        `Listing ${listingId} of ${context.source.name} moved to product ${own.model.id} meanwhile; the task retries it`,
       );
     }
     own.offers = undefined;
@@ -757,23 +767,16 @@ export class ProductScrapeUpdaterService {
 
   /**
    * This listing's own record, when its history resolved it: the one this
-   * scrape will overwrite, found by URL as the record updater does, else by
-   * externalId. Read off the product's already-loaded sources — no query.
+   * scrape will overwrite, found by its key as the record updater does. Read
+   * off the product's already-loaded sources — no query.
    */
   private ownRecordOf(
     context: ProductImportContext,
-    scrapedProduct: ScrapedProduct,
+    listingId: string,
     model: ProductModel | undefined,
   ): ProductSourceRecord | undefined {
-    const records = (model?.sources ?? []).filter(
-      (record) => record.source?.id === context.source.id,
-    );
-    const url = normalizeUrl(context.url);
-    return (
-      records.find((record) => record.url === url) ??
-      (scrapedProduct.externalId
-        ? records.find((record) => record.externalId === scrapedProduct.externalId)
-        : undefined)
+    return (model?.sources ?? []).find(
+      (record) => record.source?.id === context.source.id && record.externalId === listingId,
     );
   }
 
@@ -809,11 +812,12 @@ export class ProductScrapeUpdaterService {
   /**
    * This exact listing, seen before: its task was pinned to a product (Path 1),
    * one of its offers is already stored for this seller (Path 2), or this source
-   * already has its record, by externalId (Path 3) or by page URL (Path 3b).
-   * All are the listing's own history, so none needs checking against anything.
+   * already has its record (Path 3). All are the listing's own history, so none
+   * needs checking against anything.
    */
   private async resolveFromHistory(
     context: ProductImportContext,
+    listingId: string,
     scrapedProduct: ScrapedProduct,
     seller: Seller,
   ): Promise<HistoryHit | undefined> {
@@ -832,10 +836,9 @@ export class ProductScrapeUpdaterService {
     // scrape) and take the first that matches an existing Offer for this
     // seller. Whichever variant URL we land on, and regardless of which
     // sibling's sku happens to already be in the DB, this resolves straight
-    // back to the product we already created. Tried before Path 3's
-    // group-level lookup because it's available whenever a source
-    // identifies its listings at all (an offer's own sku), whereas the
-    // group-level id is optional and only some sources populate it.
+    // back to the product we already created. Tried before Path 3 because
+    // it also finds a listing new to this source whose offer another source
+    // of the seller already wrote.
     const candidateExternalIds = compact(
       (scrapedProduct.offers ?? []).map((o) => o.externalId),
     );
@@ -855,45 +858,23 @@ export class ProductScrapeUpdaterService {
       }
     }
 
-    // Path 3: this exact (source, externalId) listing was already scraped
-    // and linked to a product — reuse that link directly. externalId is a
-    // group-level id (e.g. ShopRenter's parent.sku), stable across URL,
-    // variant, and display-name changes. Only reached when Path 2 found no
-    // offer-level match (either no offer externalId matched, or this scrape
-    // carries none at all).
-    if (scrapedProduct.externalId) {
-      const existingSource =
-        await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
-          context.source.id,
-          scrapedProduct.externalId,
-          this.getProductRelations(),
-        );
-      if (existingSource?.model) {
-        this.productMetricsService.scrapeResolutionOutcome(
-          context.source.name,
-          'external_id_hit',
-        );
-        return { model: existingSource.model, via: 'external_id' };
-      }
-    }
-
-    // Path 3b: this source already has a record for this very page. The only
-    // history a source without source-native ids has, and what lets its
-    // unchanged listings skip the extraction on a re-import.
-    const byUrl = await this.sourceRecordRepo.findBySourceAndUrl(
-      context.source.id,
-      normalizeUrl(context.url),
-    );
-    if (byUrl?.model) {
-      const model = await this.productRepo.findOneOrFail({
-        where: { id: byUrl.model.id },
-        relations: this.getProductRelations(),
-      });
+    // Path 3: this source already has the listing's record, on a product —
+    // reuse that link directly. Found by the listing's key (its native id, or
+    // its URL slug for a source without ids), so a renamed URL still finds it.
+    // Only reached when Path 2 found no offer-level match (either no offer
+    // externalId matched, or this scrape carries none at all).
+    const existingSource =
+      await this.sourceRecordRepo.findBySourceAndExternalIdWithModelRelations(
+        context.source.id,
+        listingId,
+        this.getProductRelations(),
+      );
+    if (existingSource?.model) {
       this.productMetricsService.scrapeResolutionOutcome(
         context.source.name,
-        'source_url_hit',
+        'external_id_hit',
       );
-      return { model, via: 'source_url' };
+      return { model: existingSource.model, via: 'external_id' };
     }
 
     return undefined;
@@ -1039,6 +1020,7 @@ export class ProductScrapeUpdaterService {
     const { context, extracted, identifiers } = write;
     const history = await this.resolveFromHistory(
       context,
+      write.listingId,
       extracted,
       context.source.seller,
     );
@@ -1131,7 +1113,7 @@ export class ProductScrapeUpdaterService {
     previousExternalIds: string[];
   }> {
     const { context, listing, normalizedSourceName } = write;
-    const previousExternalIds = this.storedExternalIdsOf(context, model);
+    const previousExternalIds = this.storedExternalIdsOf(write, model);
 
     this.applyScrapedProductDetails(model, listing);
     // Before the listing's own record: when its source used to contribute
@@ -1141,7 +1123,7 @@ export class ProductScrapeUpdaterService {
     const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
       model,
       scrapedProduct: listing,
-      externalId: listing.externalId,
+      externalId: write.listingId,
       source: context.source,
       sourceUrl: context.url,
       normalizedSourceName,
@@ -1208,16 +1190,15 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
-   * The externalIds this source's record of this page carries now — found the
-   * way the record updater finds the record it overwrites.
+   * The offer externalIds this source's record of the listing carries now —
+   * found by its key, as the record updater finds the record it overwrites,
+   * so a listing whose URL changed still finds the offers it had.
    */
-  private storedExternalIdsOf(
-    context: ProductImportContext,
-    model: ProductModel,
-  ): string[] {
-    const url = normalizeUrl(context.url);
+  private storedExternalIdsOf(write: ListingWrite, model: ProductModel): string[] {
     const record = (model.sources ?? []).find(
-      (candidate) => candidate.source?.id === context.source.id && candidate.url === url,
+      (candidate) =>
+        candidate.source?.id === write.context.source.id &&
+        candidate.externalId === write.listingId,
     );
     return record ? this.storedKeysOf(record) : [];
   }

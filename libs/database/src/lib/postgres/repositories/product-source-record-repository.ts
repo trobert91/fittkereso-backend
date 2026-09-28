@@ -119,14 +119,29 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Find this source's record for a URL.
+   * This source's record of a listing, by its key (listingExternalIdOf), with
+   * its product and offers. The key is unique per source, and survives the
+   * shop renaming the listing's URL.
    *
    * Source-scoped deliberately, and there is no unscoped variant: several
-   * ProductSources can cover one webshop (a page scraper plus an Árukereső
-   * feed), so `url` alone identifies a product page, not a record. A bare url
-   * match would hand one source another source's row — and writing through it
-   * overwrites that source's specs, hashes and externalId while the row stays
-   * attributed to its original owner.
+   * ProductSources can cover one webshop, and a bare match would hand one
+   * source another source's row.
+   */
+  async findBySourceAndExternalId(
+    sourceId: string,
+    externalId: string,
+  ): Promise<ProductSourceRecord | null> {
+    return this.repo.findOne({
+      where: { source: { id: sourceId }, externalId },
+      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
+    });
+  }
+
+  /**
+   * A record of this source at this URL, with the same relations as
+   * findBySourceAndExternalId. For what only knows a URL: dispatching a page,
+   * and a list card without a usable id. URLs are not unique, so where two
+   * listings share a page this is one of them.
    *
    * `url` is expected normalized (see normalizeUrl); the column is written
    * that way by ProductSourceRecordUpdaterService.
@@ -138,45 +153,26 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     return this.repo.findOne({
       where: { source: { id: sourceId }, url },
       relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
+      order: { updatedAt: 'DESC' },
     });
   }
 
   /**
-   * This source's record carrying this externalId, with the same relations
-   * as findBySourceAndUrl — or null when none does, or when several do.
-   *
-   * Several do where a source stores a group-level id shared by its sizes
-   * (ShopRenter's parent.sku, say): that id does not name one listing, and
-   * the caller falls back to the URL.
-   */
-  async findUniqueBySourceAndExternalId(
-    sourceId: string,
-    externalId: string,
-  ): Promise<ProductSourceRecord | null> {
-    const records = await this.repo.find({
-      where: { source: { id: sourceId }, externalId },
-      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
-      take: 2,
-    });
-    return records.length === 1 ? records[0] : null;
-  }
-
-  /**
-   * Each of these URLs' feed row hash, last sighting and product, for one
-   * source: a feed run's whole question about a row is whether its listing
-   * already holds that hash, whether it had stopped counting as current, and
-   * (for a contributing source) whether it waits unattached.
+   * Each of these listings' feed row hash, last sighting and product, for one
+   * source, by listing key: a feed run's whole question about a row is whether
+   * its listing already holds that hash, whether it had stopped counting as
+   * current, and (for a contributing source) whether it waits unattached.
    */
   async findFeedRowStates(
     sourceId: string,
-    urls: string[],
+    externalIds: string[],
   ): Promise<Map<string, FeedRowState>> {
-    if (urls.length === 0) return new Map();
+    if (externalIds.length === 0) return new Map();
     const records = await this.repo
       .createQueryBuilder('record')
       .select([
         `record.${nameOf<ProductSourceRecord>('id')}`,
-        `record.${nameOf<ProductSourceRecord>('url')}`,
+        `record.${nameOf<ProductSourceRecord>('externalId')}`,
         `record.${nameOf<ProductSourceRecord>('feedRowHash')}`,
         `record.${nameOf<ProductSourceRecord>('lastSeenAt')}`,
         `record.${nameOf<ProductSourceRecord>('lastUpdated')}`,
@@ -186,11 +182,13 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .where(`record."${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, {
         sourceId,
       })
-      .andWhere(`record.${nameOf<ProductSourceRecord>('url')} IN (:...urls)`, { urls })
+      .andWhere(`record."${nameOf<ProductSourceRecord>('externalId')}" IN (:...externalIds)`, {
+        externalIds,
+      })
       .getMany();
     return new Map(
       records.map((record) => [
-        record.url as string,
+        record.externalId as string,
         {
           feedRowHash: record.feedRowHash ?? null,
           seenAt: record.lastSeenAt ?? record.lastUpdated,
@@ -201,17 +199,19 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * These listings of one source were seen again, unchanged: they still count
-   * as current for OfferComposerService.
+   * These listings of one source, by key, were seen again, unchanged: they
+   * still count as current for OfferComposerService.
    */
-  async stampSeen(sourceId: string, urls: string[]): Promise<void> {
-    if (urls.length === 0) return;
+  async stampSeen(sourceId: string, externalIds: string[]): Promise<void> {
+    if (externalIds.length === 0) return;
     await this.repo
       .createQueryBuilder()
       .update(ProductSourceRecord)
       .set({ lastSeenAt: () => 'NOW()' })
       .where(`"${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, { sourceId })
-      .andWhere(`${nameOf<ProductSourceRecord>('url')} IN (:...urls)`, { urls })
+      .andWhere(`"${nameOf<ProductSourceRecord>('externalId')}" IN (:...externalIds)`, {
+        externalIds,
+      })
       .execute();
   }
 
@@ -494,10 +494,10 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Identity lookup by (source, externalId) — the source-native SKU/model
-   * code/slug, stable across URL changes — with `model` loaded via the given
-   * relations so the result can be used directly as a resolved ProductModel
-   * (see ProductScrapeUpdaterService Path 3).
+   * Identity lookup by (source, externalId) — the listing's key, stable
+   * across URL changes — with `model` loaded via the given relations so the
+   * result can be used directly as a resolved ProductModel (see
+   * ProductScrapeUpdaterService Path 3).
    */
   async findBySourceAndExternalIdWithModelRelations(
     sourceId: string,

@@ -167,6 +167,13 @@ export const DETAIL_EXTRACTION_DURATION_SECONDS =
 export const PRODUCT_SOURCE_SPEC_VALIDATION_FAILED_TOTAL =
   'product_source_spec_validation_failed_total';
 
+/**
+ * A listing found by its (source, externalId) under another URL: the shop
+ * renamed it, and its record moved. The same listing moving back and forth
+ * means the source emits one id for several listings.
+ */
+export const SOURCE_RECORD_URL_CHANGED_TOTAL = 'source_record_url_changed_total';
+
 // Image copy metrics
 export const PRODUCT_IMAGE_COPY_TOTAL = 'product_image_copy_total';
 
