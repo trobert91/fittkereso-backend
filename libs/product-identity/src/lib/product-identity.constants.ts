@@ -14,7 +14,9 @@ export const NEAR_MISS_SCORE = 70;
  * on identical names lands exactly on NEAR_MISS_SCORE: it can reach the LLM or
  * a person, but never auto-attach.
  *
- * `specMissing` is not here: its points are per spec and per category
+ * The two spec tiers are defaults: a category can price one spec's mismatch
+ * itself (`matchingConfig.specMismatchPenalty`). `specMissing` is not here: its
+ * points are always per spec and per category
  * (`matchingConfig.missingSpecPenalty`).
  */
 export const GATE_SEVERITY: Record<Exclude<IdentityGate, 'specMissing'>, number> = {

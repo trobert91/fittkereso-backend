@@ -292,6 +292,9 @@
     },
     "missingSpecPenalty": {
       "modelYear": 25
+    },
+    "specMismatchPenalty": {
+      "modelYear": 50
     }
   },
   "normalizationStrategy": "full-sorted",

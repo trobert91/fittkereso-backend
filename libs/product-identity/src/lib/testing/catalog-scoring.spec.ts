@@ -67,40 +67,46 @@ describe('scoring the real KTM catalog', () => {
   });
 
   describe('the same name, different bike', () => {
-    // One primary spec costs 30, landing an otherwise identical pair exactly on
-    // NEAR_MISS_SCORE: reachable by the LLM and by a person, never auto-attached.
+    // A year apart is two products: the ebikes config gives modelYear its own
+    // penalty of 50 (matchingConfig.specMismatchPenalty) instead of the primary
+    // tier's 30, so an otherwise identical pair lands below NEAR_MISS_SCORE —
+    // no pair, no LLM, no person. At 30 these three sat at exactly 70.
     it.each([
       ['chacana lfc macina'],
       ['elite macina prowler'],
       ['810 di2 macina style'],
-    ])('caps %s at exactly 70 for a model year apart', (nameKey) => {
+    ])('drops %s to 50 for a model year apart', (nameKey) => {
       const [a, b] = pairByKey(nameKey);
 
-      expect(scoreBetween(a, b)).toBe(NEAR_MISS_SCORE);
-      expect(scoreBetween(a, b)).toBeLessThan(ACCEPT_SCORE);
+      expect(scoreBetween(a, b)).toBe(50);
+      expect(scoreBetween(a, b)).toBeLessThan(NEAR_MISS_SCORE);
       expect(candidateOf(a, b).failedGates).toEqual([
-        expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'modelYear' }),
+        expect.objectContaining({
+          gate: 'primarySpecMismatch',
+          spec: 'modelYear',
+          severity: 50,
+        }),
       ]);
     });
 
     it('stacks a matcher spec on top of the model year', () => {
-      // 2025 vs 2026 and a 10-speed against a 12-speed: 100 − 30 − 10.
+      // 2025 vs 2026 and a 10-speed against a 12-speed: 100 − 50 − 10.
       const [a, b] = pairByKey('892 abs lfc macina team');
 
       expect(candidateOf(a, b).failedGates.map((gate) => gate.spec).sort()).toEqual([
         'gearCount',
         'modelYear',
       ]);
-      expect(scoreBetween(a, b)).toBe(60);
+      expect(scoreBetween(a, b)).toBe(40);
       expect(scoreBetween(a, b)).toBeLessThan(NEAR_MISS_SCORE);
     });
 
-    it('drops to 40 when two primary specs disagree', () => {
+    it('drops to 20 when two primary specs disagree', () => {
       // The same city bike a year apart, and the shops disagree on whether it
-      // is a City or a Trekking bike: 100 − 30 − 30.
+      // is a City or a Trekking bike: 100 − 50 − 30.
       const [a, b] = pairByKey('810 belt city macina');
 
-      expect(scoreBetween(a, b)).toBe(40);
+      expect(scoreBetween(a, b)).toBe(20);
       expect(candidateOf(a, b).failedGates.map((gate) => gate.spec).sort()).toEqual([
         'modelYear',
         'usageType',
@@ -146,11 +152,13 @@ describe('scoring the real KTM catalog', () => {
       // Was 10 before baseScore became a blend: the review band is where a
       // name difference the character measures could not classify used to
       // land, and six of those ten resolved to one side of it or the other.
+      // Then 4, until a model year apart got its own penalty and the three
+      // year siblings left the band.
       expect(
         pairs.filter(
           (pair) => pair.score >= NEAR_MISS_SCORE && pair.score < ACCEPT_SCORE,
         ),
-      ).toHaveLength(4);
+      ).toHaveLength(1);
     });
 
     /**

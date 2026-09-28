@@ -75,23 +75,23 @@ describe('duplicate detection on the real KTM catalog', () => {
     for (const row of rows) expect(row.similarityScore).toBe(100);
   });
 
-  it('still pairs a model-year sibling, so a person gets to decide', () => {
+  // A year apart is two products, so the model year's own penalty (50,
+  // matchingConfig.specMismatchPenalty) keeps even identical names out of the
+  // queue. At the primary tier's 30 this pair sat at exactly 70, for a person.
+  it('writes no pair for a model-year sibling', () => {
     const [a, b] = pairByKey('chacana lfc macina');
 
-    expect(scoreBetween(a, b)).toBe(NEAR_MISS_SCORE);
-    expect(detectPairsFor(a)).toContainEqual(
-      expect.objectContaining({
-        similarityScore: NEAR_MISS_SCORE,
-        failedGates: [
-          expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'modelYear' }),
-        ],
-      }),
-    );
+    expect(scoreBetween(a, b)).toBe(50);
+    const partners = detectPairsFor(a).flatMap((pair) => [
+      pair.productAId,
+      pair.productBId,
+    ]);
+    expect(partners).not.toContain(b.id);
   });
 
   it.each([
-    ['810 belt city macina', 40],
-    ['892 abs lfc macina team', 60],
+    ['810 belt city macina', 20],
+    ['892 abs lfc macina team', 40],
   ])('writes nothing for %s, which the score rejects at %i', (nameKey, expected) => {
     const [a, b] = pairByKey(nameKey);
 
@@ -152,10 +152,11 @@ describe('duplicate detection on the real KTM catalog', () => {
   it('keeps the pair count sane — detection is not a cross join', () => {
     const paired = allScoredPairs().filter((pair) => pair.score >= NEAR_MISS_SCORE);
 
-    // 334 pairs are recalled; 9 are worth a person's attention. It was 19
+    // 334 pairs are recalled; 6 are worth a person's attention. It was 19
     // until frameType became a primary spec and pushed four frame-shape pairs
     // below the bar, then 15 until baseScore became a blend and the trim-word
-    // pairs it used to leave in the band dropped out of it.
-    expect(paired).toHaveLength(9);
+    // pairs it used to leave in the band dropped out of it, then 9 until a
+    // model year apart got its own penalty and the three year siblings left.
+    expect(paired).toHaveLength(6);
   });
 });

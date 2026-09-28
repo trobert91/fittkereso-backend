@@ -88,12 +88,11 @@ describe('case 4: different bikes from different shops stay different products',
         .filter((pair) => pair.score >= NEAR_MISS_SCORE && !pair.sameBike)
         .map((pair) => [pair.speedbike.nameKey, pair.ebikeshop.nameKey, pair.score]);
 
-      // One, and it is a real question rather than a mistake: speedbike's 2022
-      // Chacana against ebikeshop's 2023, identical names a model year apart.
-      // The Master/Prestige pair used to sit here too and no longer does.
-      expect(reviewed).toEqual([
-        ['chacana lfc macina', 'chacana lfc macina', 70],
-      ]);
+      // None. The last was speedbike's 2022 Chacana against ebikeshop's 2023,
+      // identical names a model year apart, at 70 — until the year got its own
+      // penalty of 50 (matchingConfig.specMismatchPenalty) and a year apart
+      // stopped being a question. The Master/Prestige pair sat here before it.
+      expect(reviewed).toEqual([]);
     });
   });
 
@@ -138,12 +137,12 @@ describe('case 4: different bikes from different shops stay different products',
     });
   });
 
-  it('sends the overwhelming majority of cross-shop pairs to creation', () => {
+  it('sends every cross-shop pair of different bikes to creation', () => {
     const pairs = crossShopPairs().filter((pair) => !pair.sameBike);
     const created = pairs.filter((pair) => pair.score < NEAR_MISS_SCORE);
 
     expect(pairs.length).toBeGreaterThan(20);
-    expect(pairs.length - created.length).toBe(1);
+    expect(created).toHaveLength(pairs.length);
   });
 
   it('attaches nothing across the two shops but the four bikes they share', () => {

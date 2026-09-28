@@ -273,6 +273,9 @@ export class CategoryTools {
       const missingPenalties = Object.entries(
         matchingConfig.missingSpecPenalty ?? {},
       ).map(([key, points]) => `${key} −${points}`);
+      const mismatchPenalties = Object.entries(
+        matchingConfig.specMismatchPenalty ?? {},
+      ).map(([key, points]) => `${key} −${points}`);
       lines.push(
         `- **Matching Config**: Yes (${
           tolerances.length
@@ -282,6 +285,10 @@ export class CategoryTools {
           missingPenalties.length
             ? `missing-spec penalties: ${missingPenalties.join(', ')}`
             : 'no missing-spec penalties'
+        }; ${
+          mismatchPenalties.length
+            ? `mismatch penalties: ${mismatchPenalties.join(', ')}`
+            : 'default mismatch penalties'
         })`,
       );
     } else {

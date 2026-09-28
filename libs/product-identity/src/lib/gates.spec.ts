@@ -178,6 +178,106 @@ describe('missing specs', () => {
   });
 });
 
+describe('per-spec mismatch penalties', () => {
+  const withPenalties = (
+    specMismatchPenalty: Record<string, number>,
+  ): ProductCategoryConfig => ({
+    ...ebikes,
+    matchingConfig: { ...ebikes.matchingConfig, specMismatchPenalty },
+  });
+  const gatesFor = (
+    querySpecs: ProductSpecs,
+    candidateSpecs: ProductSpecs,
+    categoryConfig: ProductCategoryConfig,
+  ) =>
+    applyGates({ queryKey: KEY, candidateKey: KEY, querySpecs, candidateSpecs, categoryConfig });
+
+  it('charges a primary spec its own points', () => {
+    expect(
+      gatesFor({ modelYear: 2026 }, { modelYear: 2025 }, withPenalties({ modelYear: 50 })),
+    ).toEqual([
+      {
+        gate: 'primarySpecMismatch',
+        spec: 'modelYear',
+        severity: 50,
+        queryValue: 2026,
+        candidateValue: 2025,
+      },
+    ]);
+  });
+
+  // The point of the override: a year apart is two products, so identical
+  // names don't even reach review.
+  it('takes identical names a year apart below NEAR_MISS_SCORE', () => {
+    const score = scoreOf(
+      baseScore(nameSimilarity(KEY, KEY)),
+      gatesFor({ modelYear: 2026 }, { modelYear: 2025 }, withPenalties({ modelYear: 50 })),
+    );
+
+    expect(score).toBe(50);
+    expect(score).toBeLessThan(NEAR_MISS_SCORE);
+  });
+
+  it('charges a matcher spec its own points', () => {
+    expect(
+      gatesFor({ motorPower: 250 }, { motorPower: 600 }, withPenalties({ motorPower: 25 })),
+    ).toEqual([
+      expect.objectContaining({ gate: 'matcherSpecMismatch', spec: 'motorPower', severity: 25 }),
+    ]);
+  });
+
+  it('keeps the default for every spec it does not name', () => {
+    expect(
+      gatesFor(
+        { modelYear: 2026, batteryCapacity: 750, motorPower: 250 },
+        { modelYear: 2025, batteryCapacity: 800, motorPower: 600 },
+        withPenalties({ modelYear: 50 }),
+      ).map(({ spec, severity }) => [spec, severity]),
+    ).toEqual([
+      ['modelYear', 50],
+      ['batteryCapacity', 30],
+      ['motorPower', 10],
+    ]);
+  });
+
+  it('still needs a value on both sides', () => {
+    expect(gatesFor({}, { modelYear: 2025 }, withPenalties({ modelYear: 50 }))).toEqual([]);
+  });
+
+  it('turns the gate off at 0', () => {
+    const off = withPenalties({ modelYear: 0 });
+
+    expect(gatesFor({ modelYear: 2026 }, { modelYear: 2025 }, off)).toEqual([]);
+    expect(
+      primarySpecMismatches({
+        querySpecs: { modelYear: 2026 },
+        candidateSpecs: { modelYear: 2025 },
+        categoryConfig: off,
+      }),
+    ).toEqual([]);
+  });
+
+  it('adds no gate for a spec in neither list', () => {
+    expect(
+      gatesFor({ gearCount: 11 }, { gearCount: 12 }, withPenalties({ gearCount: 50 })),
+    ).toEqual([]);
+  });
+
+  // An identifier's pair still scores 100 and goes to review; the reviewer
+  // sees the spec's own points.
+  it('reports the same points on a product an identifier found', () => {
+    expect(
+      primarySpecMismatches({
+        querySpecs: { modelYear: 2026 },
+        candidateSpecs: { modelYear: 2025 },
+        categoryConfig: withPenalties({ modelYear: 50 }),
+      }),
+    ).toEqual([
+      expect.objectContaining({ gate: 'primarySpecMismatch', spec: 'modelYear', severity: 50 }),
+    ]);
+  });
+});
+
 // For a candidate an identifier found: the names are not in question, and a
 // size in one shop's title ("l/48") must not read as another model number.
 describe('primarySpecMismatches', () => {

@@ -41,6 +41,9 @@ describe('gates on the real KTM catalog', () => {
     expect(EBIKES.matchingConfig?.specTolerances?.['modelYear']).toEqual({
       absolute: 0,
     });
+    // A year apart is two products: more than the primary tier's 30, so even
+    // identical names land below NEAR_MISS_SCORE and never reach review.
+    expect(EBIKES.matchingConfig?.specMismatchPenalty).toEqual({ modelYear: 50 });
   });
 
   it('only ever reports gates the category configured, at their set severity', () => {
@@ -51,6 +54,7 @@ describe('gates on the real KTM catalog', () => {
     };
 
     const missingPenalties = EBIKES.matchingConfig?.missingSpecPenalty ?? {};
+    const mismatchPenalties = EBIKES.matchingConfig?.specMismatchPenalty ?? {};
 
     for (const { query, candidate } of allScoredPairs()) {
       for (const gate of gatesBetween(query, candidate)) {
@@ -58,7 +62,9 @@ describe('gates on the real KTM catalog', () => {
           expect(missingPenalties[gate.spec!]).toBe(gate.severity);
           continue;
         }
-        expect(severities[gate.gate]).toBe(gate.severity);
+        expect(
+          (gate.spec && mismatchPenalties[gate.spec]) ?? severities[gate.gate],
+        ).toBe(gate.severity);
         if (gate.gate === 'primarySpecMismatch') {
           expect(EBIKES.primarySpecs).toContain(gate.spec);
         }
@@ -83,14 +89,14 @@ describe('gates on the real KTM catalog', () => {
   });
 
   describe('primary specs', () => {
-    it('reports a model year difference with both years', () => {
+    it('reports a model year difference with both years, at the year’s own penalty', () => {
       const [a, b] = pairByKey('chacana lfc macina');
 
       expect(gatesBetween(a, b)).toEqual([
         {
           gate: 'primarySpecMismatch',
           spec: 'modelYear',
-          severity: 30,
+          severity: 50,
           queryValue: a.specs?.['modelYear'],
           candidateValue: b.specs?.['modelYear'],
         },
@@ -104,11 +110,15 @@ describe('gates on the real KTM catalog', () => {
       const [a, b] = pairByKey('810 belt city macina');
       const gates = gatesBetween(a, b);
 
-      expect(gates.map((gate) => gate.spec).sort()).toEqual([
-        'modelYear',
-        'usageType',
+      // The year at its own penalty, the usage type at the primary tier's.
+      expect(
+        gates
+          .map((gate) => [gate.spec, gate.severity])
+          .sort(([x], [y]) => String(x).localeCompare(String(y))),
+      ).toEqual([
+        ['modelYear', 50],
+        ['usageType', 30],
       ]);
-      expect(gates.every((gate) => gate.severity === 30)).toBe(true);
     });
   });
 

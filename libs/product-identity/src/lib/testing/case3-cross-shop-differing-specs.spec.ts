@@ -1,5 +1,5 @@
 import type { ProductSpecs } from '@fittkereso-backend/database';
-import { ACCEPT_SCORE, NEAR_MISS_SCORE } from '../product-identity.constants';
+import { NEAR_MISS_SCORE } from '../product-identity.constants';
 import {
   CatalogListing,
   EBIKESHOP,
@@ -159,7 +159,7 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
       [SPEEDBIKE, '773 lycan macina', SPEEDBIKE, '773 l lycan macina'],
       [EBIKESHOP, '810 belt city macina', EBIKESHOP, '810 belt city he macina'],
     ])(
-      '%s %s never attaches to %s %s a model year apart',
+      '%s %s never even reaches review against %s %s a model year apart',
       (leftShop, leftKey, rightShop, rightKey) => {
         const left = listing(leftShop, leftKey);
         const right = otherShopWith(
@@ -168,15 +168,17 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
           'modelYear',
         );
 
+        // The model year's own penalty (matchingConfig.specMismatchPenalty),
+        // not the primary tier's 30: a year apart is two products.
         expect(gatesOf(left, right)).toEqual([
           expect.objectContaining({
             gate: 'primarySpecMismatch',
             spec: 'modelYear',
-            severity: 30,
+            severity: 50,
           }),
         ]);
-        expect(scoreOfPair(left, right)).toBeLessThan(ACCEPT_SCORE);
-        expect(outcomeOf(left, right)).not.toBe('attach');
+        expect(scoreOfPair(left, right)).toBeLessThan(NEAR_MISS_SCORE);
+        expect(outcomeOf(left, right)).toBe('not_found');
       },
     );
 
@@ -196,11 +198,12 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
   });
 
   describe('the disagreement the catalog already contains', () => {
-    it('holds the two model years of the Chacana at exactly the near-miss line', () => {
+    it('keeps the two model years of the Chacana apart without asking anyone', () => {
       // Both shops sell a "chacana lfc macina" and key it identically, but
       // speedbike also carries the 2022 bike while ebikeshop carries the 2023.
-      // The one primary gate takes a perfect name match to 70: reachable by
-      // the LLM and by a person, never attached on its own.
+      // The year's own penalty takes a perfect name match to 50, below the
+      // near-miss line: the listing creates its own product and no pair asks a
+      // person. At the primary tier's 30 it sat at exactly 70, in review.
       const older = listingOfProduct(
         SPEEDBIKE,
         productOf('chacana lfc macina', 2022).id,
@@ -220,8 +223,8 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
           candidateValue: 2023,
         }),
       ]);
-      expect(scoreOfPair(older, asProduct(newer))).toBe(NEAR_MISS_SCORE);
-      expect(outcomeOf(older, asProduct(newer))).toBe('ask_llm');
+      expect(scoreOfPair(older, asProduct(newer))).toBe(50);
+      expect(outcomeOf(older, asProduct(newer))).toBe('not_found');
     });
 
     it('agrees on every spec for the bikes the shops genuinely share', () => {

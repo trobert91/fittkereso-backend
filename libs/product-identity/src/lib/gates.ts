@@ -26,7 +26,9 @@ export interface GateInput {
  * (scoreOf).
  *
  * Spec gates compare only the category's `primarySpecs` and `matcherSpecs`; a
- * key in both lists is primary. A category with neither has no spec gates.
+ * key in both lists is primary. A category with neither has no spec gates. A
+ * spec gate costs its GATE_SEVERITY unless the category's
+ * `matchingConfig.specMismatchPenalty` sets that spec's own points.
  */
 export function applyGates(input: GateInput): FailedGate[] {
   const primarySpecs = uniq(input.categoryConfig?.primarySpecs ?? []);
@@ -112,8 +114,13 @@ function missingSpecGates({
   });
 }
 
+type SpecMismatchGate = Extract<
+  IdentityGate,
+  'primarySpecMismatch' | 'matcherSpecMismatch'
+>;
+
 function specGate(
-  gate: Exclude<IdentityGate, 'specMissing'>,
+  gate: SpecMismatchGate,
   key: string,
   {
     querySpecs,
@@ -121,6 +128,9 @@ function specGate(
     categoryConfig,
   }: Omit<GateInput, 'queryKey' | 'candidateKey'>,
 ): FailedGate | undefined {
+  const severity = mismatchSeverity(gate, key, categoryConfig);
+  if (severity <= 0) return undefined;
+
   const queryValue = querySpecs?.[key];
   const candidateValue = candidateSpecs?.[key];
   if (!isPresent(queryValue) || !isPresent(candidateValue)) return undefined;
@@ -136,10 +146,26 @@ function specGate(
   return {
     gate,
     spec: key,
-    severity: GATE_SEVERITY[gate],
+    severity,
     queryValue,
     candidateValue,
   };
+}
+
+/**
+ * The spec's own points from the category's `matchingConfig.specMismatchPenalty`
+ * — a model year apart is proof enough of two products, where a weight apart
+ * is not — or the gate's default.
+ */
+function mismatchSeverity(
+  gate: SpecMismatchGate,
+  key: string,
+  categoryConfig: ProductCategoryConfig | undefined,
+): number {
+  return (
+    categoryConfig?.matchingConfig?.specMismatchPenalty?.[key] ??
+    GATE_SEVERITY[gate]
+  );
 }
 
 /**

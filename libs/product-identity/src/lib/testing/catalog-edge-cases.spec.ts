@@ -168,17 +168,16 @@ describe('what a scraped listing would do against this catalog', () => {
     }
   });
 
-  it('sends a model-year sibling to the LLM instead of attaching it', () => {
+  // A year apart is two products (matchingConfig.specMismatchPenalty gives the
+  // year 50), so identical names a year apart are nothing to ask about.
+  it('creates a new product for a model-year sibling, without asking the LLM', () => {
     const product = oneByKey('chacana lfc macina');
-    const decision = decideListingMatch(candidatesFor(product));
+    const candidates = candidatesFor(product);
 
-    expect(decision.kind).toBe('ask_llm');
-    if (decision.kind === 'ask_llm') {
-      expect(decision.candidates[0].score).toBe(NEAR_MISS_SCORE);
-      expect(
-        decision.candidates.every((candidate) => candidate.score >= NEAR_MISS_SCORE),
-      ).toBe(true);
-    }
+    expect(candidates[0].nameSimilarity).toEqual({ trigram: 1, levenshtein: 1, alignment: 1 });
+    expect(candidates[0].score).toBe(50);
+    expect(candidates.every((candidate) => candidate.score < NEAR_MISS_SCORE)).toBe(true);
+    expect(decideListingMatch(candidates).kind).toBe('not_found');
   });
 
   it('asks the LLM rather than guessing when two products tie at the top', () => {

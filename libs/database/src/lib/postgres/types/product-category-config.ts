@@ -18,6 +18,19 @@ export interface CategoryMatchingConfig {
    *  they land in review. A name scoring below 70 + the penalty drops below
    *  NEAR_MISS_SCORE instead, where no duplicate pair is opened. */
   missingSpecPenalty?: Record<string, number>;
+  /** Points a mismatch on one spec costs, keyed by spec name — e.g.
+   *  `{ modelYear: 50 }`. Overrides the gate's default (GATE_SEVERITY: 30 for
+   *  a `primarySpecs` spec, 10 for a `matcherSpecs` one); a key in neither
+   *  list has no gate and does nothing. As for every mismatch gate, both sides
+   *  must state the spec.
+   *
+   *  Above 30, identical names already fall below NEAR_MISS_SCORE: no
+   *  duplicate pair is opened, and a listing becomes a new product without
+   *  review — for a spec whose contradiction is proof enough on its own. A
+   *  product a shared identifier (GTIN, MPN, declared size) found still
+   *  reaches review, since that pair scores 100 whatever it contradicts.
+   *  0 turns the gate off, as in `missingSpecPenalty`. */
+  specMismatchPenalty?: Record<string, number>;
 }
 
 /** How far apart two numeric values may be and still count as the same.
