@@ -13,7 +13,9 @@ import {
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import {
+  getYearSpecKeys,
   IdentityContribution,
+  normalizeYearSpecs,
   ProductSourcePostProcessMergeService,
   ProductSourcePostProcessService,
   selectIdentitySpecRows,
@@ -103,6 +105,9 @@ export class SpecPostProcessService {
    * deterministic data with no `model`, flagged `identity_failed`, and the
    * next import asks again. With the source's `identity` off it is flagged
    * `identity_off` and nothing is called.
+   *
+   * Its result is what identity matching compares, so every year in it is
+   * normalised (withNormalizedYears) whichever piece it came from.
    */
   public async extractIdentity(params: {
     context: ProductImportContext;
@@ -142,7 +147,10 @@ export class SpecPostProcessService {
       stored.identityInputHash === identityInputHash
     ) {
       this.productMetrics.identityExtraction(context.source.name, 'reused');
-      return this.reuse(scrapedProduct, stored, identityInputHash, scopes);
+      return withNormalizedYears(
+        this.reuse(scrapedProduct, stored, identityInputHash, scopes),
+        schema,
+      );
     }
 
     if (specRows?.length) {
@@ -183,21 +191,24 @@ export class SpecPostProcessService {
     const carried = pick(stored?.specs, scopes.unificationKeys);
     const offerLevel = pick(merged.specs, scopes.offerLevelKeys);
 
-    return {
-      ...scrapedProduct,
-      brand: merged.brand,
-      // Only a name the call returned: without one the listing keeps its
-      // title alone, and its flags say why.
-      model: merged.model,
-      displayName: merged.model ? `${merged.brand} ${merged.model}` : undefined,
-      specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
-      flags: withIdentityFlag(
-        scrapedProduct.flags,
-        merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
-      ),
-      identityInputHash,
-      offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
-    };
+    return withNormalizedYears(
+      {
+        ...scrapedProduct,
+        brand: merged.brand,
+        // Only a name the call returned: without one the listing keeps its
+        // title alone, and its flags say why.
+        model: merged.model,
+        displayName: merged.model ? `${merged.brand} ${merged.model}` : undefined,
+        specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
+        flags: withIdentityFlag(
+          scrapedProduct.flags,
+          merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
+        ),
+        identityInputHash,
+        offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
+      },
+      schema,
+    );
   }
 
   /**
@@ -268,13 +279,16 @@ export class SpecPostProcessService {
     );
     if (!unified?.specs) return scrapedProduct;
 
-    return {
-      ...scrapedProduct,
-      specs: {
-        ...scrapedProduct.specs,
-        ...omit(unified.specs, scopes.identityKeys),
+    return withNormalizedYears(
+      {
+        ...scrapedProduct,
+        specs: {
+          ...scrapedProduct.specs,
+          ...omit(unified.specs, scopes.identityKeys),
+        },
       },
-    };
+      schema,
+    );
   }
 
   /**
@@ -326,6 +340,31 @@ function llmOptionsOf(config: ProductSourcePostProcessConfig | undefined) {
     thinking: config?.thinking,
     effort: config?.effort,
     maxTokens: config?.maxTokens,
+  };
+}
+
+/**
+ * The listing with every year field in the one form `normalizeYear` gives it,
+ * on the page's specs and on each offer's. The spec normaliser sees each piece
+ * alone; what is merged here also holds pieces it never sees — an importer's
+ * `releaseYear`, values carried over from a stored record, an offer's own page
+ * specs — and this object is what identity matching compares and the source
+ * record stores.
+ */
+function withNormalizedYears(
+  product: ScrapedProduct,
+  schema: SpecDefinitionJsonSchema,
+): ScrapedProduct {
+  if (isEmpty(getYearSpecKeys(schema))) return product;
+
+  return {
+    ...product,
+    specs: product.specs && normalizeYearSpecs(product.specs, schema),
+    offers: product.offers?.map((offer) =>
+      offer.specs
+        ? { ...offer, specs: normalizeYearSpecs(offer.specs, schema) }
+        : offer,
+    ),
   };
 }
 

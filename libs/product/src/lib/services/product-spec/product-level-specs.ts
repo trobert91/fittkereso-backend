@@ -3,7 +3,8 @@ import {
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
-import { isEmpty, omit, pick } from 'lodash';
+import { normalizeYear } from '@fittkereso-backend/utils';
+import { isEmpty, isNil, omit, pick } from 'lodash';
 
 // Offer-level spec keys (e.g. frameSize, color) describe a purchasable
 // variant/listing attribute, not the product model's identity — they're
@@ -48,6 +49,36 @@ export function getVerbatimSpecKeys(
     const property = schema.properties[key];
     return property?.type === 'string' && !property.enum?.length;
   });
+}
+
+/** The schema's year fields: numbers holding a calendar year (`meta.format: 'year'`). */
+export function getYearSpecKeys(schema: SpecDefinitionJsonSchema): string[] {
+  return Object.keys(schema.properties).filter(
+    (key) => schema.properties[key].meta?.format === 'year',
+  );
+}
+
+/**
+ * The specs with every year field in the one form `normalizeYear` gives it,
+ * so a listing and a stored product compare the same number however their
+ * sources wrote it. A value that is not one year is dropped — the same "can't
+ * confirm, so omit" rule the spec normaliser applies to an enum value that
+ * isn't on the list. Every other key is returned as it was.
+ */
+export function normalizeYearSpecs(
+  specs: ProductSpecs,
+  schema: SpecDefinitionJsonSchema,
+): ProductSpecs {
+  const yearKeys = getYearSpecKeys(schema).filter((key) => !isNil(specs[key]));
+  if (isEmpty(yearKeys)) return specs;
+
+  const result = { ...specs };
+  for (const key of yearKeys) {
+    const year = normalizeYear(specs[key]);
+    if (year === undefined) delete result[key];
+    else result[key] = year;
+  }
+  return result;
 }
 
 function getOfferLevelKeys(

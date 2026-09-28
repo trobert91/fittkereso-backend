@@ -23,7 +23,7 @@ import {
   SpecTranslationSelectorService,
   getVerbatimSpecKeys,
 } from '@fittkereso-backend/product';
-import { splitDeterministicSpecs } from './deterministic-specs';
+import { foldReleaseYear, splitDeterministicSpecs } from './deterministic-specs';
 import { toScrapedOffers } from './scraped-offers';
 import { DetailPageResult } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
@@ -348,14 +348,7 @@ export class ProductDetailsPageScraperService {
           untranslatedKeys,
         })
       : {};
-    // detailPage.releaseYear is a dedicated deterministic scrape-op some
-    // sources use when the release/model year isn't part of the labeled spec
-    // table — folded into the same modelYear key the label-based mapping
-    // would otherwise populate, so downstream code has exactly one place to
-    // look regardless of which extraction path produced it.
-    if (deterministicSpecs['modelYear'] === undefined && detail.releaseYear !== undefined) {
-      deterministicSpecs['modelYear'] = detail.releaseYear;
-    }
+    foldReleaseYear(deterministicSpecs, detail.releaseYear);
     // Split and hashed by the shared helper, which every importer uses — see
     // splitDeterministicSpecs for why the filtering and the hashing have to
     // happen in exactly one place. The two hashes are passed through on

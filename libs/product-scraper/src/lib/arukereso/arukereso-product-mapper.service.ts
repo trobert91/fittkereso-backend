@@ -18,7 +18,10 @@ import {
   feedField,
   normalizeFieldName,
 } from './arukereso-feed-item';
-import { splitDeterministicSpecs } from '../product-scraper/services/deterministic-specs';
+import {
+  foldReleaseYear,
+  splitDeterministicSpecs,
+} from '../product-scraper/services/deterministic-specs';
 import { matchesFilter } from '../product-scraper/services/source-item-filter';
 
 /**
@@ -126,12 +129,10 @@ export class ArukeresoProductMapperService {
         })
       : {};
 
-    const releaseYear = this.asNumber(
+    foldReleaseYear(
+      deterministicSpecs,
       await this.resolveTarget(config, item, 'releaseYear'),
     );
-    if (deterministicSpecs['modelYear'] === undefined && releaseYear !== undefined) {
-      deterministicSpecs['modelYear'] = releaseYear;
-    }
 
     const {
       offerLevelDeterministicSpecs,

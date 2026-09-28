@@ -24,7 +24,8 @@
           "2026"
         ],
         "min": 2015,
-        "max": 2030
+        "max": 2030,
+        "format": "year"
       },
       "type": "number",
       "title": "Model year",

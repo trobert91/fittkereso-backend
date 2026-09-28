@@ -1,6 +1,26 @@
 import { ProductSpecs } from '@fittkereso-backend/database';
-import { filterDefinedSpecs, hashSpecs } from '@fittkereso-backend/utils';
+import {
+  filterDefinedSpecs,
+  hashSpecs,
+  normalizeYear,
+} from '@fittkereso-backend/utils';
 import { omit, pick } from 'lodash';
+
+/**
+ * Folds a source's dedicated `releaseYear` value into `modelYear` when the
+ * label-based mapping left it empty, so downstream code has one place to look
+ * whichever extraction produced the year. Some sources state the year outside
+ * their spec table and read it with the `releaseYear` target instead.
+ *
+ * The value arrives after the spec normaliser has run, and a pipeline without
+ * `cast: number` hands over a string, so it is converted here: a year that
+ * isn't one is not folded in at all.
+ */
+export function foldReleaseYear(specs: ProductSpecs, releaseYear: unknown): void {
+  if (specs['modelYear'] !== undefined) return;
+  const year = normalizeYear(releaseYear);
+  if (year !== undefined) specs['modelYear'] = year;
+}
 
 /**
  * The deterministic spec mapping, split into its two halves and hashed.

@@ -29,7 +29,10 @@ import { ProductSpecSortService } from '../product-spec/product-spec-sort.servic
 import { ProductSpecValidatorService } from '../product-spec/product-spec-validator.service';
 import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
 import { groupRecordsBySeller } from '../product-spec/group-records-by-seller';
-import { getProductLevelSpecs } from '../product-spec/product-level-specs';
+import {
+  getProductLevelSpecs,
+  normalizeYearSpecs,
+} from '../product-spec/product-level-specs';
 import { ProductNameMergeService } from '../product-name/product-name-merge.service';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductEmbeddingService } from '../product-embedding.service';
@@ -147,14 +150,20 @@ export class ProductMergeService {
       model.specs,
       categorySlug,
     );
+    const jsonSchema = categorySlug
+      ? this.categoryConfigService.getJsonSchema(categorySlug)
+      : undefined;
+    // These specs are what every later listing's years are compared against,
+    // and a manual record or one stored before years were normalised never
+    // went through an import's normalisation.
+    if (jsonSchema) {
+      model.specs = normalizeYearSpecs(model.specs, jsonSchema);
+    }
     model.orderedSpecs = await this.specSortService.sortSpecs(
       categorySlug,
       model.specs,
     );
 
-    const jsonSchema = categorySlug
-      ? this.categoryConfigService.getJsonSchema(categorySlug)
-      : undefined;
     const finalValidation = this.validatorService.validateSpecs(
       jsonSchema,
       model.specs,

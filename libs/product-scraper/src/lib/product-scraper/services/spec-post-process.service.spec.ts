@@ -480,4 +480,97 @@ describe('SpecPostProcessService', () => {
       expect(postProcess.processModelSpecs).toHaveBeenCalled();
     });
   });
+
+  // What these return is what identity matching compares and the source
+  // record stores, so a year arrives in one form whichever piece it came from
+  // — including pieces the spec normaliser never sees.
+  describe('years', () => {
+    const yearSchema: SpecDefinitionJsonSchema = {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        modelYear: { type: 'number', title: 'Model year', meta: { format: 'year' } },
+      },
+    };
+
+    beforeEach(() => {
+      categoryConfigService.getJsonSchema.mockReturnValue(yearSchema);
+      postProcess.extractIdentity.mockResolvedValue({
+        model: 'Macina Scarp SX Prestige Di2',
+        specs: { batteryCapacity: 750 },
+      });
+    });
+
+    it('normalises a deterministic year the LLM did not replace', async () => {
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing({ extractedSpecs: { weight: 24, modelYear: "'26" } }),
+      });
+
+      expect(result.specs).toMatchObject({ modelYear: 2026, batteryCapacity: 750 });
+    });
+
+    it('normalises the year with the identity extraction off', async () => {
+      const result = await service.extractIdentity({
+        context: context({ postProcess: { identity: false } }),
+        scrapedProduct: listing({ extractedSpecs: { modelYear: '26' } }),
+      });
+
+      expect(result.specs).toMatchObject({ modelYear: 2026 });
+    });
+
+    // Another category may keep a year on the offer.
+    it('normalises a year in an offer\'s own specs', async () => {
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing({
+          offers: [{ price: 1, externalId: 'sku-43', specs: { frameSize: 43, modelYear: "'26" } }],
+        }),
+      });
+
+      expect(result.offers?.[0].specs).toEqual({ frameSize: 43, modelYear: 2026 });
+    });
+
+    it('normalises a year reused from the stored record', async () => {
+      const first = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing(),
+      });
+      postProcess.extractIdentity.mockClear();
+      const ownRecord = {
+        offerSpecsHash: 'offer-hash',
+        productSpecsHash: 'product-hash',
+        // Stored before years were normalised.
+        scrapedProduct: { ...first, specs: { ...first.specs, modelYear: '2026.' } },
+      } as unknown as ProductSourceRecord;
+
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing(),
+        ownRecord,
+      });
+
+      expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+      expect(result.specs).toMatchObject({ modelYear: 2026 });
+    });
+
+    it('normalises the year on the unified listing', async () => {
+      const result = await service.unify({
+        context: context(),
+        scrapedProduct: listing({ specs: { weight: 24, modelYear: "'26" } }),
+        trigger: 'created',
+      });
+
+      expect(result.specs).toEqual({ weight: 24, modelYear: 2026, tubeless: true });
+    });
+
+    it('drops a year that is not one year', async () => {
+      const result = await service.extractIdentity({
+        context: context(),
+        scrapedProduct: listing({ extractedSpecs: { weight: 24, modelYear: '2025/2026' } }),
+      });
+
+      expect(result.specs).not.toHaveProperty('modelYear');
+    });
+  });
 });

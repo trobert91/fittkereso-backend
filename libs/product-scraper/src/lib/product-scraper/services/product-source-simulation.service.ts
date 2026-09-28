@@ -29,7 +29,7 @@ import {
 } from '@fittkereso-backend/scrape-interpreter';
 import { isEqual, omitBy, pick } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
-import { splitDeterministicSpecs } from './deterministic-specs';
+import { foldReleaseYear, splitDeterministicSpecs } from './deterministic-specs';
 import { SpecPostProcessService } from './spec-post-process.service';
 import { toScrapedOffers } from './scraped-offers';
 import {
@@ -242,12 +242,9 @@ export class ProductSourceSimulationService {
           untranslatedKeys,
         })
       : {};
-    // Mirrors ProductDetailsPageScraperService: detailPage.releaseYear is a
-    // dedicated deterministic scrape-op, folded into modelYear so this
-    // preview matches what the real pipeline would persist to specs.
-    if (deterministicSpecs['modelYear'] === undefined && detail.releaseYear !== undefined) {
-      deterministicSpecs['modelYear'] = detail.releaseYear;
-    }
+    // As ProductDetailsPageScraperService does, so this preview matches what
+    // the real pipeline would persist to specs.
+    foldReleaseYear(deterministicSpecs, detail.releaseYear);
 
     const split = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
     // The same deterministic listing ProductDetailsPageScraperService hands

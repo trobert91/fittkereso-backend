@@ -521,6 +521,34 @@ describe('ProductMergeService.mergeSources', () => {
     expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [fresh], 'ebikes');
   });
 
+  // A manual record, or one stored before years were normalised, never went
+  // through an import's normalisation — and the product's specs are what every
+  // later listing's year is compared against.
+  it('stores every year field as a 4-digit year, before sorting and validating', async () => {
+    specMergeService.mergeSpecs.mockResolvedValue({ modelYear: "'26", weight: 22 });
+    categoryConfigService.getJsonSchema.mockReturnValue({
+      type: 'object',
+      title: 'E-bike',
+      properties: {
+        modelYear: { type: 'number', title: 'Model year', meta: { format: 'year' } },
+        weight: { type: 'number', title: 'Weight' },
+      },
+    });
+    const model = {
+      sources: [{ id: 'src-a', source: { id: 'source-1' } }],
+      productCategory: category,
+    } as any;
+
+    await service.mergeSources(model);
+
+    expect(model.specs).toEqual({ modelYear: 2026, weight: 22 });
+    expect(specSortService.sortSpecs).toHaveBeenCalledWith('ebikes', model.specs);
+    expect(validatorService.validateSpecs).toHaveBeenCalledWith(
+      expect.anything(),
+      model.specs,
+    );
+  });
+
   describe('several sources of one seller', () => {
     const speedbike = { id: 'seller-speedbike' };
     const ebikeshop = { id: 'seller-ebikeshop' };

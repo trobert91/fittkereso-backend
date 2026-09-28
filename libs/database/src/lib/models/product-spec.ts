@@ -45,6 +45,14 @@ export interface SpecDefinitionMeta {
    */
   min?: number;
   max?: number;
+  /**
+   * `year`: a number field holding a calendar year (a model year). Every
+   * writer converts it with `normalizeYear` (libs/utils), so `'26`, `"2026"`
+   * and `2026` are all stored and compared as `2026`, whichever source wrote
+   * them. Lives in `meta` rather than as a JSON-Schema `format`, which Ajv
+   * would reject as unknown.
+   */
+  format?: 'year';
 }
 
 export interface SpecDefinitionProperty {

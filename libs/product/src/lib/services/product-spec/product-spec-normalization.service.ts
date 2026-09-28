@@ -3,6 +3,7 @@ import {
   ProductSpecs,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
+import { normalizeYear } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class ProductSpecNormalizationService {
@@ -24,7 +25,11 @@ export class ProductSpecNormalizationService {
 
       switch (prop.type) {
         case 'number':
-          result[key] = this.toNumber(rawValue);
+          // A year's first number is not the year: `'26` would be 26.
+          result[key] =
+            prop.meta?.format === 'year'
+              ? normalizeYear(rawValue)
+              : this.toNumber(rawValue);
           break;
 
         case 'boolean':
