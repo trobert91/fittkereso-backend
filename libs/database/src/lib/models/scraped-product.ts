@@ -1,5 +1,6 @@
 import { ProductSpecs, ScrapedProductSpec } from './product-spec';
 import { OfferAvailability } from '../postgres/types/offer-availability';
+import { OfferCondition } from '../postgres/types/offer-condition';
 
 /**
  * The complete result of scraping one product listing from one source,
@@ -176,6 +177,13 @@ export interface ScrapedOffer {
   priceWithoutDiscount?: number | null;
   currency?: string | null;
   availability?: OfferAvailability | null;
+  /**
+   * New, used or refurbished. Null when the source maps it and this item's
+   * value is empty or not one of the three, which reads as new: a shop marks
+   * the exceptions, as Google Shopping's spec has it. Absent when the source
+   * does not map it.
+   */
+  condition?: OfferCondition | null;
   url?: string | null;
   externalId?: string;
   /**

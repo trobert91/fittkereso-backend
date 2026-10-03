@@ -4,7 +4,7 @@ import { ArukeresoProductMapperService } from './arukereso-product-mapper.servic
 import { ArukeresoFeedItem } from './arukereso-feed-item';
 import { ArukeresoFeedParserService } from './arukereso-feed-parser.service';
 import type { ArukeresoSourceConfig, ScrapedProduct } from '@fittkereso-backend/database';
-import { OfferAvailability } from '@fittkereso-backend/database';
+import { OfferAvailability, OfferCondition } from '@fittkereso-backend/database';
 import {
   ProductValueMapperService,
   ScrapeInterpreterModule,
@@ -527,6 +527,53 @@ describe('ArukeresoProductMapperService', () => {
     });
   });
 
+  describe('condition', () => {
+    const withCondition = config({
+      mapping: { ...config().mapping, condition: { field: 'condition' } },
+    });
+    const conditionOf = async (cfg: ArukeresoSourceConfig, feedItem: ArukeresoFeedItem) => {
+      const result = await call(cfg, feedItem);
+      if (result.status !== 'mapped') throw new Error(`skipped: ${result.reason}`);
+      return result.scrapedProduct.offers?.[0].condition;
+    };
+
+    it.each([
+      ['used', OfferCondition.used],
+      ['refurbished', OfferCondition.refurbished],
+      // Google's own spelling on speedbike's feed.
+      ['New', OfferCondition.new],
+      [' USED ', OfferCondition.used],
+    ])('reads %p as %p', async (value, expected) => {
+      expect(await conditionOf(withCondition, item({ condition: value }))).toBe(expected);
+    });
+
+    // Null is the source saying "none", which the offer reads as new — and
+    // which, unlike silence, a lower source's "used" cannot override.
+    it('gives null when mapped and the row has none', async () => {
+      expect(await conditionOf(withCondition, item({ condition: '' }))).toBeNull();
+    });
+
+    it('gives null for a label the config did not translate', async () => {
+      expect(await conditionOf(withCondition, item({ condition: 'Használt' }))).toBeNull();
+    });
+
+    it('leaves it absent when not mapped', async () => {
+      expect(await conditionOf(config(), item({ condition: 'used' }))).toBeUndefined();
+    });
+
+    it('takes a constant for a shop that sells only used bikes', async () => {
+      const usedOnly = config({
+        mapping: {
+          ...config().mapping,
+          condition: { pipeline: [{ op: 'literal', value: 'used' }] },
+        },
+      });
+      interpreter.runValuePipeline.mockResolvedValueOnce('used');
+
+      expect(await conditionOf(usedOnly, item())).toBe(OfferCondition.used);
+    });
+  });
+
   // Whether a listing needs an LLM call depends on whether it was seen
   // before, which only identity resolution knows — so the mapper never makes
   // one, and hands the updater everything the decision needs.
@@ -588,6 +635,8 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
     ),
   ) as ArukeresoSourceConfig;
   const products = new Map<string, ScrapedProduct>();
+  const items: ArukeresoFeedItem[] = [];
+  let mapper: ArukeresoProductMapperService;
 
   beforeAll(async () => {
     const registry = new ScrapeOpRegistryService();
@@ -596,7 +645,7 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
     const runtime = {
       getCategoryBySlug: jest.fn().mockResolvedValue({ id: 'cat-1', slug: 'ebikes', name: 'Ebikes' }),
     };
-    const mapper = new ArukeresoProductMapperService(
+    mapper = new ArukeresoProductMapperService(
       new ScrapeInterpreterService(runner, runtime as never),
       runtime as never,
       {
@@ -606,7 +655,6 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
       { extractSpecs: () => ({}) } as never,
     );
 
-    const items: ArukeresoFeedItem[] = [];
     await new ArukeresoFeedParserService().parseString(
       fs.readFileSync(path.join(__dirname, '__fixtures__/speedbike-google-shopping-sample.tsv'), 'utf8'),
       (feedItem) => void items.push(feedItem),
@@ -648,5 +696,26 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
   it('keeps the description, and has none where the row has none', () => {
     expect(products.get('121210')?.description).toContain('24" / 20"');
     expect(products.get('2103714104')?.description).toBeUndefined();
+  });
+
+  it('leaves the condition to other sources while it is not mapped', () => {
+    expect(offerOf('121210')?.condition).toBeUndefined();
+  });
+
+  it("reads Google's condition column as it stands once mapped", async () => {
+    const withCondition = {
+      ...googleConfig,
+      mapping: { ...googleConfig.mapping, condition: { field: 'condition' } },
+    };
+
+    const conditions = await Promise.all(
+      items.map(async (feedItem) => {
+        const mapped = await mapper.map({ config: withCondition, item: feedItem });
+        return mapped.status === 'mapped' ? mapped.scrapedProduct.offers?.[0].condition : undefined;
+      }),
+    );
+
+    // Every row of the sample says "New".
+    expect(conditions).toEqual(Array(6).fill(OfferCondition.new));
   });
 });

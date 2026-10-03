@@ -405,12 +405,6 @@
             }
           },
           {
-            "key": "condition",
-            "labels": [
-              "Állapot"
-            ]
-          },
-          {
             "key": "batteryPosition",
             "labels": [
               "Akku elhelyezkedése"
@@ -644,6 +638,33 @@
                 "SoldOut": "out_of_stock"
               },
               "default": "unknown"
+            }
+          ],
+          "condition": [
+            {
+              "op": "parseJsonAttr",
+              "selector": "#app",
+              "attr": "data-page",
+              "path": "props.product.properties"
+            },
+            {
+              "op": "filterJsonArray",
+              "path": "categoryTitle",
+              "equals": "Állapot"
+            },
+            {
+              "op": "jsonPath",
+              "path": "0.value",
+              "cast": "string"
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "Új": "new",
+                "Újszerű": "used",
+                "Használt": "used",
+                "Felújított": "refurbished"
+              }
             }
           ],
           "url": [

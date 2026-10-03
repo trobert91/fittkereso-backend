@@ -197,6 +197,24 @@ describe('ProductSourceConfigValidatorService', () => {
     });
   });
 
+  it('takes a condition sub-pipeline on assembleOffer', () => {
+    const config = configWith((c) => {
+      c.detailPage.offers = {
+        offerList: [{ op: 'selectAll', selector: '.offer' }],
+        itemMode: 'cheerio',
+        itemPipeline: [
+          {
+            op: 'assembleOffer',
+            price: [{ op: 'trim' }],
+            condition: [{ op: 'literal', value: 'used' }],
+          },
+        ],
+      };
+    });
+
+    expect(validator.problems('scraping', config)).toBeNull();
+  });
+
   it('requires an assembleOffer somewhere in an offer item pipeline', () => {
     const message = messageFor(
       configWith((c) => {
@@ -324,6 +342,18 @@ describe('ProductSourceConfigValidatorService', () => {
 
       expect(validator.problems('googleshop', config)).toBeNull();
       expect(validator.problems('arukereso', config)).toBeNull();
+    });
+
+    it('takes a condition mapping, from a column or as a constant', () => {
+      expect(
+        validator.problems('googleshop', feedConfig({ condition: { field: 'condition' } })),
+      ).toBeNull();
+      expect(
+        validator.problems(
+          'arukereso',
+          feedConfig({ condition: { pipeline: [{ op: 'literal', value: 'used' }] } }),
+        ),
+      ).toBeNull();
     });
 
     it('rejects an empty fallback list, and a bad entry inside one', () => {

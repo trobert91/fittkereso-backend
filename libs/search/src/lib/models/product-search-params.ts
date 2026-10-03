@@ -6,8 +6,10 @@ import {
   Min,
   IsIn,
   IsBoolean,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { OfferCondition } from '@fittkereso-backend/database';
 
 export class ProductSearchParams {
   @IsOptional()
@@ -69,6 +71,12 @@ export class ProductSearchParams {
   @IsOptional()
   @IsString()
   mpn?: string;
+
+  /** The products with a current offer in any of these conditions. */
+  @IsOptional()
+  @IsArray()
+  @IsEnum(OfferCondition, { each: true })
+  conditions?: OfferCondition[];
 
   @IsOptional()
   @IsNumber()

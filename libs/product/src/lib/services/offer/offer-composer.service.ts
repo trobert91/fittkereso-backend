@@ -63,6 +63,7 @@ interface ComposedFields {
   priceWithoutDiscount: number | null;
   currency: string;
   availability: OfferAvailability | null;
+  condition: OfferCondition;
   url: string | null;
   gtin: string | null;
   mpn: string | null;
@@ -211,6 +212,8 @@ export class OfferComposerService {
       priceWithoutDiscount: oldPrice !== null && oldPrice > price ? oldPrice : null,
       currency: first('currency')?.entry.currency ?? DEFAULT_CURRENCY,
       availability: first('availability')?.entry.availability ?? null,
+      // A shop marks the used and refurbished items; silence and "none" are new.
+      condition: first('condition')?.entry.condition ?? OfferCondition.new,
       url: url ? normalizeUrl(url) : null,
       gtin: inspectGtin(first('gtin')?.entry.gtin).gtin ?? null,
       mpn: normalizeMpn(first('mpn')?.entry.mpn) ?? null,
@@ -291,7 +294,6 @@ export class OfferComposerService {
     offer.model = model;
     offer.seller = seller;
     offer.externalId = externalId;
-    offer.condition = OfferCondition.new;
     return offer;
   }
 
@@ -304,6 +306,7 @@ export class OfferComposerService {
     offer.priceWithoutDiscount = fields.priceWithoutDiscount;
     offer.currency = fields.currency;
     offer.availability = fields.availability;
+    offer.condition = fields.condition;
     offer.url = fields.url;
     offer.gtin = fields.gtin;
     offer.mpn = fields.mpn;

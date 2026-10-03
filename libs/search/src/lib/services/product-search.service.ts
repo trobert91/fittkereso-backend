@@ -111,7 +111,11 @@ export class ProductSearchService {
       const gtin = normalizeGtin(params.gtin);
       query = gtin
         ? query.andWhere(
-            this.anyOffer(query, 'gtinOffer', 'gtin', '= :gtin'),
+            this.anyOffer(query, {
+              alias: 'gtinOffer',
+              column: 'gtin',
+              condition: '= :gtin',
+            }),
             { gtin },
           )
         : query.andWhere('1 = 0');
@@ -121,15 +125,31 @@ export class ProductSearchService {
       const mpn = normalizeMpn(params.mpn);
       query = mpn
         ? query.andWhere(
-            this.anyOffer(
-              query,
-              'mpnOffer',
-              'mpn',
-              `LIKE :mpnPrefix ESCAPE '\\'`,
-            ),
+            this.anyOffer(query, {
+              alias: 'mpnOffer',
+              column: 'mpn',
+              condition: `LIKE :mpnPrefix ESCAPE '\\'`,
+            }),
             { mpnPrefix: `${escapeLike(mpn)}%` },
           )
         : query.andWhere('1 = 0');
+    }
+
+    // Unlike an identifier lookup, current offers only: a product whose one
+    // used offer went stale is not for sale used.
+    if (!isEmpty(params.conditions)) {
+      query = query.andWhere(
+        this.anyOffer(query, {
+          alias: 'conditionOffer',
+          column: 'condition',
+          condition: 'IN (:...conditions)',
+          currentOnly: true,
+        }),
+        {
+          conditions: params.conditions,
+          offerFreshnessCutoff: this.offerFreshness.visibleCutoff(),
+        },
+      );
     }
 
     if (!isEmpty(params.specFilters)) {
@@ -192,25 +212,34 @@ export class ProductSearchService {
   }
 
   /**
-   * `EXISTS` an offer of this product — any shop's, stale or not — whose
-   * column meets the condition. A subquery rather than a join, so a product
+   * `EXISTS` an offer of this product — any shop's — whose column meets the
+   * condition: stale or not, unless `currentOnly`, whose caller binds
+   * `:offerFreshnessCutoff`. A subquery rather than a join, so a product
    * whose three sizes all match is still one row: getManyAndCount with
    * skip/take counts and pages products, not offers.
    */
   private anyOffer(
     query: SelectQueryBuilder<ProductModel>,
-    alias: string,
-    column: keyof Offer,
-    condition: string,
+    offer: {
+      alias: string;
+      column: keyof Offer;
+      condition: string;
+      currentOnly?: boolean;
+    },
   ): string {
-    const offers = query
+    const { alias, column, condition, currentOnly } = offer;
+    let offers = query
       .subQuery()
       .select('1')
       .from(Offer, alias)
       .where(`${alias}.${nameOf<Offer>('model')} = product.${nameOf<ProductModel>('id')}`)
-      .andWhere(`${alias}.${nameOf<Offer>(column)} ${condition}`)
-      .getQuery();
-    return `EXISTS ${offers}`;
+      .andWhere(`${alias}.${nameOf<Offer>(column)} ${condition}`);
+    if (currentOnly) {
+      offers = offers.andWhere(
+        `${alias}.${nameOf<Offer>('lastSynced')} >= :offerFreshnessCutoff`,
+      );
+    }
+    return `EXISTS ${offers.getQuery()}`;
   }
 
   // A spec key is offer-level if ANY known category flags it as such —

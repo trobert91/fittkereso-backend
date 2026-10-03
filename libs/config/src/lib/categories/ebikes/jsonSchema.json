@@ -94,18 +94,6 @@
       "title": "Color",
       "translation": "Szín"
     },
-    "condition": {
-      "meta": {},
-      "enum": [
-        "Új",
-        "Újszerű",
-        "Használt",
-        "Felújított"
-      ],
-      "type": "string",
-      "title": "Condition",
-      "translation": "Állapot"
-    },
     "mileage": {
       "meta": {
         "unit": "km",

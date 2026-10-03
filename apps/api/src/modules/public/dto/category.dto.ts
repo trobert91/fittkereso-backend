@@ -63,5 +63,9 @@ export class FilterConfigDto {
   @Expose({ groups: [SerializeGroup.details] })
   @Type(() => FilterOptionDto)
   brands?: FilterOptionDto[];
+  /** Products per offer condition, among their current offers. */
+  @Expose({ groups: [SerializeGroup.details] })
+  @Type(() => FilterOptionDto)
+  conditions?: FilterOptionDto[];
   @Expose({ groups: [SerializeGroup.details] }) totalProducts?: number;
 }

@@ -97,23 +97,49 @@ describe('OfferComposerService', () => {
       expect(offer.seller).toBe(SELLER);
     });
 
-    it('updates an existing offer in place without clobbering a non-default condition', async () => {
+    it('updates an existing offer in place, its condition included', async () => {
       const existing = Object.assign(new Offer(), {
         id: 'offer-1',
         externalId: 'HAIBIKE-451641xx-2021',
-        condition: OfferCondition.refurbished,
+        condition: OfferCondition.new,
         price: 150000,
         lastSynced: new Date('2026-09-01T00:00:00Z'),
         model: { id: 'model-1' },
       });
       offerRepo.findBySellerAndExternalIds.mockResolvedValue([existing]);
 
-      const offer = await composedOffer(record({ id: 'arukereso', offers: [entry()] }));
+      const offer = await composedOffer(
+        record({ id: 'arukereso', offers: [entry({ condition: OfferCondition.refurbished })] }),
+      );
 
       expect(offer).toBe(existing);
       expect(offer.condition).toBe(OfferCondition.refurbished);
       expect(offer.price).toBe(1499990);
       expect(offer.lastSynced).toEqual(NOW);
+    });
+
+    it('takes a reported condition', async () => {
+      const offer = await composedOffer(
+        record({ id: 'arukereso', offers: [entry({ condition: OfferCondition.used })] }),
+      );
+
+      expect(offer.condition).toBe(OfferCondition.used);
+    });
+
+    it('reads a mapped but empty condition as new, and sets an offer back to new when its source does', async () => {
+      const existing = Object.assign(new Offer(), {
+        id: 'offer-1',
+        externalId: 'HAIBIKE-451641xx-2021',
+        condition: OfferCondition.used,
+        model: { id: 'model-1' },
+      });
+      offerRepo.findBySellerAndExternalIds.mockResolvedValue([existing]);
+
+      const offer = await composedOffer(
+        record({ id: 'arukereso', offers: [entry({ condition: null })] }),
+      );
+
+      expect(offer.condition).toBe(OfferCondition.new);
     });
 
     it('defaults the currency, and leaves availability null when no source reports one', async () => {
@@ -226,6 +252,24 @@ describe('OfferComposerService', () => {
       );
 
       expect(offer.priceWithoutDiscount).toBeNull();
+    });
+
+    it('takes the condition from a lower source when the higher one does not map it', async () => {
+      const offer = await composedOffer(
+        record({ id: 'arukereso', priority: 60, offers: [entry()] }),
+        record({ id: 'google', priority: 40, offers: [entry({ condition: OfferCondition.used })] }),
+      );
+
+      expect(offer.condition).toBe(OfferCondition.used);
+    });
+
+    it('lets a higher source\'s empty condition (new) win over a lower source\'s used', async () => {
+      const offer = await composedOffer(
+        record({ id: 'arukereso', priority: 60, offers: [entry({ condition: null })] }),
+        record({ id: 'google', priority: 40, offers: [entry({ condition: OfferCondition.used })] }),
+      );
+
+      expect(offer.condition).toBe(OfferCondition.new);
     });
 
     it('ignores a source that no longer lists the item', async () => {

@@ -130,8 +130,12 @@ export class EntityTools {
               entry.priceWithoutDiscount === undefined
                 ? 'old price not mapped'
                 : `old price ${entry.priceWithoutDiscount ?? 'none'}`;
+            const condition =
+              entry.condition === undefined
+                ? 'condition not mapped'
+                : `condition ${entry.condition ?? 'none (new)'}`;
             L.push(
-              `  - key=${entry.resolvedExternalId ?? entry.externalId ?? '(none)'} · ${entry.price ?? '(no price)'} · ${oldPrice} · ${entry.availability ?? '(not reported)'}`,
+              `  - key=${entry.resolvedExternalId ?? entry.externalId ?? '(none)'} · ${entry.price ?? '(no price)'} · ${oldPrice} · ${entry.availability ?? '(not reported)'} · ${condition}`,
             );
           }
         }

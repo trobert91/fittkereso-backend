@@ -9,7 +9,7 @@ import {
   CategorySearchParams,
   BrandSearchParams,
 } from '@fittkereso-backend/search';
-import { ProductCategoryRepository } from '@fittkereso-backend/database';
+import { OfferCondition, ProductCategoryRepository } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
@@ -45,6 +45,12 @@ export class SearchTools {
         .describe(
           'Products with an offer whose manufacturer article number starts with this (case, spaces and hyphens ignored; at least 5 characters).',
         ),
+      conditions: z
+        .array(z.nativeEnum(OfferCondition))
+        .optional()
+        .describe(
+          'Products with a current offer (synced within the freshness window) in any of these conditions, e.g. ["used", "refurbished"].',
+        ),
       pageSize: z
         .number()
         .optional()
@@ -58,6 +64,7 @@ export class SearchTools {
     categoryId?: string;
     gtin?: string;
     mpn?: string;
+    conditions?: OfferCondition[];
     pageSize?: number;
   }): Promise<string> {
     const params = new ProductSearchParams();
@@ -66,6 +73,7 @@ export class SearchTools {
     params.categoryIds = args.categoryId ? [args.categoryId] : undefined;
     params.gtin = args.gtin;
     params.mpn = args.mpn;
+    params.conditions = args.conditions;
     params.pageSize = Math.min(args.pageSize ?? 20, 50);
     params.page = 1;
 

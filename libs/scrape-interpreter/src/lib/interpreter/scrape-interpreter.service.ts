@@ -30,6 +30,7 @@ export interface RawOfferRecord {
   priceWithoutDiscount?: number | null;
   currency?: string | null;
   availability?: string | null;
+  condition?: string | null;
   url?: string | null;
   externalId?: string;
   gtin?: string | null;

@@ -786,6 +786,9 @@ const OP_PARAMS: Record<
       priceWithoutDiscount: pipeline('Sub-pipeline producing the pre-discount price.'),
       currency: pipeline('Sub-pipeline producing the currency code.'),
       availability: pipeline('Sub-pipeline producing the availability.'),
+      condition: pipeline(
+        'Sub-pipeline producing the condition: "new", "used" or "refurbished" (case ignored). Translate the shop\'s own labels with mapValue; empty or any other value reads as new. Omit when the shop sells only new items; a used-only shop sets a literal.',
+      ),
       url: pipeline('Sub-pipeline producing the offer URL.'),
       externalId: pipeline('Sub-pipeline producing the source-native offer id.'),
       gtin: pipeline(

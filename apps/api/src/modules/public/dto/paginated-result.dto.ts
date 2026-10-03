@@ -24,4 +24,8 @@ export class PaginatedProductResult extends PaginatedResultBase {
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
   @Type(() => FilterOptionDto)
   brands?: FilterOptionDto[];
+  /** Products per offer condition, among their current offers. */
+  @Expose({ groups: [SerializeGroup.list, SerializeGroup.details] })
+  @Type(() => FilterOptionDto)
+  conditions?: FilterOptionDto[];
 }

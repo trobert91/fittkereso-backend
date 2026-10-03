@@ -6,6 +6,7 @@ import {
   asArukeresoConfig,
   asScrapingConfig,
   OfferAvailability,
+  OfferCondition,
   OfferRepository,
   ProductSource,
   ProductSourceFetchMode,
@@ -109,6 +110,11 @@ export interface SimulatedArukeresoImport {
    * put on the offers as a discount, when no higher-priority source says one.
    */
   rowsWithOldPrice: number;
+  /**
+   * Mapped rows per condition; `none` is an empty or unrecognised value, which
+   * is stored as new. Undefined when the config does not map `condition`.
+   */
+  conditions?: Partial<Record<OfferCondition | 'none', number>>;
   /** Eligible rows sharing a URL with an earlier row: only the last is imported. */
   duplicateUrls: number;
   wouldSkip: number;
@@ -413,6 +419,7 @@ export class ProductSourceImportSimulationService {
     const contributes = source.identifiesProducts === false;
     let matchingOffers = 0;
     let rowsWithOldPrice = 0;
+    const conditions: Partial<Record<OfferCondition | 'none', number>> = {};
     const triageBatch = async () => {
       const unique = [...new Map(batch.map((row) => [row.url, row])).values()];
       batch = [];
@@ -491,6 +498,10 @@ export class ProductSourceImportSimulationService {
             const offer = mapped.scrapedProduct.offers?.[0];
             if (offer?.priceWithoutDiscount && offer.priceWithoutDiscount > offer.price) {
               rowsWithOldPrice += 1;
+            }
+            if (offer && offer.condition !== undefined) {
+              const condition = offer.condition ?? 'none';
+              conditions[condition] = (conditions[condition] ?? 0) + 1;
             }
             batch.push(row);
             if (batch.length >= TRIAGE_BATCH) await triageBatch();
@@ -599,6 +610,7 @@ export class ProductSourceImportSimulationService {
       wouldRefresh,
       matchingOffers: contributes ? matchingOffers : undefined,
       rowsWithOldPrice,
+      conditions: this.mapper.isMapped(config, 'condition') ? conditions : undefined,
       duplicateUrls,
       wouldSkip: Object.values(skipReasons).reduce((a, b) => a + b, 0),
       skipReasons,

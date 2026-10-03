@@ -79,10 +79,6 @@
       "filterType": "multiselect"
     },
     {
-      "key": "condition",
-      "filterType": "multiselect"
-    },
-    {
       "key": "motorBrand",
       "filterType": "multiselect"
     },

@@ -476,6 +476,9 @@ export interface AssembleOfferOp extends OpBase {
   priceWithoutDiscount?: ScrapeOperation[];
   currency?: ScrapeOperation[];
   availability?: ScrapeOperation[];
+  // `new`, `used` or `refurbished` (see parseOfferCondition); empty or any
+  // other value reads as new. A used-only shop sets a `literal`.
+  condition?: ScrapeOperation[];
   url?: ScrapeOperation[];
   externalId?: ScrapeOperation[];
   // The offer's barcode and the manufacturer's article number, as published.

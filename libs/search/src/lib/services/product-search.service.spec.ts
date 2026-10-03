@@ -1,3 +1,4 @@
+import { OfferCondition } from '@fittkereso-backend/database';
 import { ProductSearchService } from './product-search.service';
 
 /** A query builder that records what the service asks of it. */
@@ -119,6 +120,34 @@ describe('ProductSearchService', () => {
       await service.searchProducts({ mpn: '126' });
 
       expect(recorded.wheres).toEqual([{ sql: '1 = 0', params: undefined }]);
+    });
+  });
+
+  describe('by offer condition', () => {
+    // Unlike an identifier lookup, a stale used offer is no evidence the
+    // product is for sale used now.
+    it('matches a current offer in any of the conditions', async () => {
+      await service.searchProducts({
+        conditions: [OfferCondition.used, OfferCondition.refurbished],
+      });
+
+      expect(recorded.wheres).toEqual([
+        {
+          sql: expect.stringMatching(
+            /^EXISTS \(SELECT 1 FROM offer conditionOffer AND conditionOffer\.model = product\.id AND conditionOffer\.condition IN \(:\.\.\.conditions\) AND conditionOffer\.lastSynced >= :offerFreshnessCutoff\)$/,
+          ),
+          params: {
+            conditions: [OfferCondition.used, OfferCondition.refurbished],
+            offerFreshnessCutoff: new Date('2026-09-23T06:30:00Z'),
+          },
+        },
+      ]);
+    });
+
+    it('ignores an empty list', async () => {
+      await service.searchProducts({ conditions: [] });
+
+      expect(recorded.wheres).toEqual([]);
     });
   });
 

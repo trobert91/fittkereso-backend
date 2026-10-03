@@ -128,6 +128,8 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
         currency: 'HUF',
         // Manufacturer stock: JSON-LD PreOrder.
         availability: 'preorder',
+        // The page's "Állapot: Új" row.
+        condition: 'new',
         url: capture.requestedUrl,
         externalId: '1260040108',
         gtin: '9008594503199',
@@ -198,11 +200,11 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
 
       // Váztípus "Összteleszkópos" is neither a frame type nor a gender, and
       // is dropped; the LLM sees the row. Gyártó is the brand, Modellév the
-      // release year, Emelt teherbírás a yes/no no key fits.
+      // release year, Emelt teherbírás a yes/no no key fits, and Állapot is
+      // the offer's condition, not a spec.
       expect(mappedSpecs(result.rawSpecs)).toEqual({
         frameSize: 48,
         usageType: 'MTB',
-        condition: 'Új',
         batteryPosition: 'Vázba integrált',
         wheelSize: 29,
         drivetrain: 'Lánc',

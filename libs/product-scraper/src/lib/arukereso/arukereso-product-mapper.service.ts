@@ -4,6 +4,8 @@ import {
   ArukeresoMappingTarget,
   ArukeresoSourceConfig,
   OfferAvailability,
+  OfferCondition,
+  parseOfferCondition,
   ScrapedProduct,
   ScrapedProductSpec,
   SpecDefinitionJsonSchema,
@@ -358,6 +360,7 @@ export class ArukeresoProductMapperService {
     currency?: string | null;
     /** Always set on this path — see toAvailability for why silence means in stock. */
     availability: OfferAvailability;
+    condition?: OfferCondition | null;
     url: string;
     externalId?: string;
     /** As published — validated and normalized when stored on the Offer. */
@@ -379,6 +382,10 @@ export class ArukeresoProductMapperService {
       ),
       availability: this.toAvailability(
         this.asString(await this.resolveTarget(config, item, 'availability')),
+      ),
+      condition: mappedOrNone(
+        'condition',
+        parseOfferCondition(await this.resolveTarget(config, item, 'condition')),
       ),
       url: normalizeUrl(url),
       externalId: this.asString(await this.resolveTarget(config, item, 'externalId')),

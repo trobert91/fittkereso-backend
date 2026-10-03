@@ -120,6 +120,15 @@ export class ProductSourceSimulateScrapeTools {
     );
     L.push(`- **imageUrls**: ${result.extraction.imageUrls.length} found`);
     L.push(`- **rawOffers**: ${result.extraction.rawOffers.length} found`);
+    // As the pipelines produced them: a mapped field that found nothing is
+    // null, an unmapped one absent.
+    const describe = (value: string | null | undefined) =>
+      value === undefined ? '_not mapped_' : (value ?? '_none_');
+    result.extraction.rawOffers.forEach((offer, index) => {
+      L.push(
+        `  - offer ${index + 1}: price ${offer.price ?? '_none_'} · availability ${describe(offer.availability)} · condition ${describe(offer.condition)}`,
+      );
+    });
     L.push('');
     L.push('### Identifiers (per offer)');
     L.push(

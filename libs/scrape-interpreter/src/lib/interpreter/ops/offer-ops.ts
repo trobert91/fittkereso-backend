@@ -55,6 +55,11 @@ export function makeAssembleOffer(
           | undefined) ?? null)
       : undefined;
 
+    const condition = op.condition
+      ? (((await runner.run(op.condition, ctx, input)) as string | undefined) ??
+        null)
+      : undefined;
+
     const url = op.url
       ? (((await runner.run(op.url, ctx, input)) as string | undefined) ?? null)
       : undefined;
@@ -95,6 +100,7 @@ export function makeAssembleOffer(
       priceWithoutDiscount,
       currency,
       availability,
+      condition,
       url,
       externalId,
       gtin,

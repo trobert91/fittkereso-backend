@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   Brand,
+  Offer,
+  OfferCondition,
   ProductCategory,
   ProductCategoryRepository,
   ProductModelRepository,
   ProductModel,
 } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
+import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import type {
   FilterBucket,
   FilterSpecConfig,
@@ -14,7 +17,8 @@ import type {
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
-import { sumBy } from 'lodash';
+import { isEmpty, sumBy } from 'lodash';
+import { SelectQueryBuilder } from 'typeorm';
 import {
   CategoryListDto,
   CategoryDetailDto,
@@ -31,6 +35,11 @@ import {
   ProductImageDtoService,
   ProductSpecSortService,
 } from '@fittkereso-backend/product';
+import {
+  currentOfferInConditionsSql,
+  OFFER_CONDITION_LABELS,
+  parseConditionFilter,
+} from './offer-condition-filter';
 
 interface FilterWhereSql {
   conditions: string[];
@@ -45,6 +54,7 @@ export class PublicCategoriesService {
     private readonly productImageDtoService: ProductImageDtoService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly productSpecSortService: ProductSpecSortService,
+    private readonly offerFreshness: OfferFreshnessService,
   ) {}
 
   async getCategories(): Promise<CategoryListDto[]> {
@@ -122,13 +132,15 @@ export class PublicCategoriesService {
       const schema = dto.jsonSchema;
       if (schema?.properties && config) {
         const filterSpecs = this.resolveFilterSpecs(schema, config);
-        const [aggregations, brands, totalProducts] = await Promise.all([
+        const [aggregations, brands, conditions, totalProducts] = await Promise.all([
           this.aggregateFilterFields(category.id, schema, filterSpecs),
           this.aggregateBrands(category.id),
+          this.aggregateConditions(category.id),
           this.aggregateTotalProducts(category.id),
         ]);
         dto.aggregations = aggregations;
         dto.brands = brands;
+        dto.conditions = conditions;
         dto.totalProducts = totalProducts;
       }
     }
@@ -145,6 +157,7 @@ export class PublicCategoriesService {
       pageSize = 20,
       name,
       brand,
+      condition,
       specs,
       sortBy,
       sortDir = 'desc',
@@ -191,6 +204,11 @@ export class PublicCategoriesService {
         `(product."${nameOf<ProductModel>('displayName')}" ILIKE :namePattern OR brand.${nameOf<Brand>('name')} ILIKE :namePattern)`,
         { namePattern: `%${name}%` },
       );
+    }
+
+    const offerConditions = parseConditionFilter(condition);
+    if (offerConditions) {
+      this.whereCurrentOfferIn(qb, offerConditions);
     }
 
     if (specs) {
@@ -338,7 +356,7 @@ export class PublicCategoriesService {
     if (schema?.properties && config) {
       const filterSpecs = this.resolveFilterSpecs(schema, config);
       if (filterSpecs.length > 0) {
-        const [aggregations, brands] = await Promise.all([
+        const [aggregations, brands, conditions] = await Promise.all([
           this.aggregateFilterFields(
             category.id,
             schema,
@@ -347,9 +365,11 @@ export class PublicCategoriesService {
             arraySpecKeys,
           ),
           this.aggregateBrands(category.id, query, arraySpecKeys),
+          this.aggregateConditions(category.id, query, arraySpecKeys),
         ]);
         result.aggregations = aggregations;
         result.brands = brands;
+        result.conditions = conditions;
       }
     }
 
@@ -384,6 +404,7 @@ export class PublicCategoriesService {
    * Uses positional parameters starting from $startParam.
    * excludeSpecKey: omit this spec from the WHERE (for faceted counting of that spec).
    * excludeBrand: omit brand filter (for faceted counting of brands).
+   * excludeCondition: omit the offer-condition filter (for faceted counting of conditions).
    */
   private buildFilterWhereSql(
     query: ProductQueryDto,
@@ -391,6 +412,7 @@ export class PublicCategoriesService {
     options?: {
       excludeSpecKey?: string;
       excludeBrand?: boolean;
+      excludeCondition?: boolean;
       arraySpecKeys?: Set<string>;
     },
   ): FilterWhereSql {
@@ -405,6 +427,18 @@ export class PublicCategoriesService {
         `product.id IN (SELECT pm.id FROM product_model pm INNER JOIN brand b ON b.id = pm."brandId" WHERE b.slug IN (${placeholders}))`,
       );
       params.push(...brandSlugs);
+    }
+
+    const offerConditions = parseConditionFilter(query.condition);
+    if (offerConditions && !options?.excludeCondition) {
+      const offerFilter = currentOfferInConditionsSql({
+        conditions: offerConditions,
+        cutoff: this.offerFreshness.visibleCutoff(),
+        startParam: paramIdx,
+      });
+      conditions.push(offerFilter.sql);
+      params.push(...offerFilter.params);
+      paramIdx += offerFilter.params.length;
     }
 
     if (query.name) {
@@ -516,6 +550,7 @@ export class PublicCategoriesService {
     options?: {
       excludeSpecKey?: string;
       excludeBrand?: boolean;
+      excludeCondition?: boolean;
       arraySpecKeys?: Set<string>;
     },
   ): { sql: string; params: unknown[] } {
@@ -842,6 +877,66 @@ export class PublicCategoriesService {
       label: row.label,
       count: Number(row.count),
     }));
+  }
+
+  /**
+   * Products per condition among their current offers, under every other
+   * filter. A product with a new and a used offer counts under both.
+   */
+  private async aggregateConditions(
+    categoryId: string,
+    query?: ProductQueryDto,
+    arraySpecKeys?: Set<string>,
+  ): Promise<FilterOptionDto[]> {
+    const filterSuffix = query
+      ? this.buildFilterWhereSuffix(query, 3, {
+          excludeCondition: true,
+          arraySpecKeys,
+        })
+      : { sql: '', params: [] };
+
+    const rows: { value: OfferCondition; count: string }[] =
+      await this.productModelRepo.repo.query(
+        `SELECT o.condition AS value, COUNT(DISTINCT product.id)::int AS count
+         FROM product_model product
+         INNER JOIN offer o ON o."modelId" = product.id AND o."lastSynced" >= $2
+         WHERE product."productCategoryId" = $1
+           AND product.enabled = true${filterSuffix.sql}
+         GROUP BY o.condition
+         ORDER BY o.condition`,
+        [categoryId, this.offerFreshness.visibleCutoff(), ...filterSuffix.params],
+      );
+
+    return rows.map((row) => ({
+      value: row.value,
+      label: OFFER_CONDITION_LABELS[row.value] ?? row.value,
+      count: Number(row.count),
+    }));
+  }
+
+  /** The listing's side of currentOfferInConditionsSql. */
+  private whereCurrentOfferIn(
+    qb: SelectQueryBuilder<ProductModel>,
+    conditions: OfferCondition[],
+  ): void {
+    if (isEmpty(conditions)) {
+      qb.andWhere('1 = 0');
+      return;
+    }
+    const offers = qb
+      .subQuery()
+      .select('1')
+      .from(Offer, 'conditionOffer')
+      .where(
+        `conditionOffer.${nameOf<Offer>('model')} = product.${nameOf<ProductModel>('id')}`,
+      )
+      .andWhere(`conditionOffer.${nameOf<Offer>('lastSynced')} >= :conditionCutoff`)
+      .andWhere(`conditionOffer.${nameOf<Offer>('condition')} IN (:...offerConditions)`)
+      .getQuery();
+    qb.andWhere(`EXISTS ${offers}`, {
+      conditionCutoff: this.offerFreshness.visibleCutoff(),
+      offerConditions: conditions,
+    });
   }
 
   private async aggregateTotalProducts(

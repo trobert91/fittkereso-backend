@@ -35,6 +35,14 @@ export class ProductQueryDto {
   @IsString()
   brand?: string;
 
+  /**
+   * Offer conditions, comma-separated like `brand` (`used,refurbished`): the
+   * products with a current offer in any of them.
+   */
+  @IsOptional()
+  @IsString()
+  condition?: string;
+
   @IsOptional()
   @IsEnum(SortBy)
   sortBy?: SortBy = SortBy.releaseYear;

@@ -17,9 +17,6 @@
   "color": {
     "ui:widget": "text"
   },
-  "condition": {
-    "ui:widget": "select"
-  },
   "mileage": {
     "ui:widget": "updown"
   },
@@ -342,7 +339,6 @@
     "gearCount",
     "brand",
     "color",
-    "condition",
     "mileage",
     "motorBrand",
     "motorPosition",

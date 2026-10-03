@@ -1,4 +1,9 @@
-import { OfferAvailability, ScrapedOffer } from '@fittkereso-backend/database';
+import {
+  OfferAvailability,
+  OfferCondition,
+  parseOfferCondition,
+  ScrapedOffer,
+} from '@fittkereso-backend/database';
 import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
 import { normalizeUrl } from '@fittkereso-backend/utils';
 
@@ -28,6 +33,7 @@ export function toScrapedOffers(rawOffers: RawOfferRecord[]): ScrapedOffer[] {
       priceWithoutDiscount: offer.priceWithoutDiscount,
       currency: offer.currency,
       availability: parseAvailability(offer.availability),
+      condition: parseCondition(offer.condition),
       url: offer.url ? normalizeUrl(offer.url) : offer.url,
       externalId: offer.externalId,
       gtin: offer.gtin,
@@ -48,4 +54,12 @@ function parseAvailability(
   return value && (Object.values(OfferAvailability) as string[]).includes(value)
     ? (value as OfferAvailability)
     : null;
+}
+
+/** Likewise: a mapped condition that is not one of the three is "none", read as new. */
+function parseCondition(
+  value: string | null | undefined,
+): OfferCondition | null | undefined {
+  if (value === undefined) return undefined;
+  return parseOfferCondition(value) ?? null;
 }

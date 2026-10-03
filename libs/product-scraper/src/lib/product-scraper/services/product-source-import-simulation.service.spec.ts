@@ -3,13 +3,19 @@ import { ProductSourceImportSimulationService } from './product-source-import-si
 import { ArukeresoFeedParserService } from '../../arukereso/arukereso-feed-parser.service';
 import { ArukeresoProductMapperService } from '../../arukereso/arukereso-product-mapper.service';
 import { ListProductRefreshService } from './list-product-refresh.service';
+import { OfferCondition } from '@fittkereso-backend/database';
 import type { ProductSource } from '@fittkereso-backend/database';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('ProductSourceImportSimulationService', () => {
   let service: ProductSourceImportSimulationService;
-  let mapper: { classify: jest.Mock; map: jest.Mock; resolveTarget: jest.Mock };
+  let mapper: {
+    classify: jest.Mock;
+    map: jest.Mock;
+    resolveTarget: jest.Mock;
+    isMapped: jest.Mock;
+  };
   let interpreter: { runValuePipeline: jest.Mock; runListPage: jest.Mock };
   let scraperService: { getHtml: jest.Mock; stream: jest.Mock };
   let scrapingImport: { planRun: jest.Mock };
@@ -78,6 +84,14 @@ describe('ProductSourceImportSimulationService', () => {
           {} as never,
           {} as never,
         ).resolveTarget(...args),
+      ),
+      isMapped: jest.fn((...args: Parameters<ArukeresoProductMapperService['isMapped']>) =>
+        new ArukeresoProductMapperService(
+          interpreter as never,
+          {} as never,
+          {} as never,
+          {} as never,
+        ).isMapped(...args),
       ),
     };
     interpreter = { runValuePipeline: jest.fn(), runListPage: jest.fn() };
@@ -231,6 +245,39 @@ describe('ProductSourceImportSimulationService', () => {
       const result = await service.simulate(feedSource);
 
       expect(result.feed?.rowsWithOldPrice).toBe(1);
+    });
+
+    // What tells a config author the mapping reads the shop's labels.
+    it('counts the rows per condition once the config maps it', async () => {
+      givenFeed(feed(['a', 'b', 'c', 'd']));
+      const conditions = [OfferCondition.new, OfferCondition.used, null, OfferCondition.new];
+      let row = 0;
+      mapper.map.mockImplementation(async () => ({
+        status: 'mapped',
+        url: `https://speedbike.hu/p/${row}`,
+        scrapedProduct: {
+          offers: [{ externalId: `sku-${row}`, price: 1, condition: conditions[row++] }],
+        },
+      }));
+      const mapsCondition = {
+        ...feedSource,
+        config: {
+          ...feedSource.config,
+          mapping: { externalId: { field: 'identifier' }, condition: { field: 'condition' } },
+        },
+      } as ProductSource;
+
+      const result = await service.simulate(mapsCondition);
+
+      expect(result.feed?.conditions).toEqual({ new: 2, used: 1, none: 1 });
+    });
+
+    it('leaves the condition tally out when the config does not map it', async () => {
+      givenFeed(feed(['a']));
+
+      const result = await service.simulate(feedSource);
+
+      expect(result.feed?.conditions).toBeUndefined();
     });
 
     it('leaves the offer match unreported for an identifying source', async () => {

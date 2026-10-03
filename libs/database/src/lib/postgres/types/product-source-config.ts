@@ -343,6 +343,13 @@ export const ARUKERESO_MAPPING_TARGETS = [
   'currency',
   /** Mapped onto OfferAvailability; anything unrecognised becomes `unknown`. */
   'availability',
+  /**
+   * `new`, `used` or `refurbished`, case ignored — Google's `condition` column
+   * as it stands. Translate other labels with `mapValue`. Empty or any other
+   * value reads as new; unmapped, the seller's other sources decide, and new
+   * when none does. A used-only shop maps a `literal`.
+   */
+  'condition',
   /** Primary image, or a list of them when the pipeline yields an array. */
   'imageUrl',
   'description',

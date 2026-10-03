@@ -131,6 +131,16 @@ export class ProductSourceSimulateImportTools {
       );
     }
     L.push(`  - ${feed.rowsWithOldPrice} rows carry an old price above their price`);
+    if (feed.conditions) {
+      const counts = Object.entries(feed.conditions)
+        .map(([condition, count]) => `${condition} ${count}`)
+        .join(' · ');
+      L.push(
+        `  - condition: ${counts || '_no rows_'} (\`none\` is an empty or unrecognised value, stored as new)`,
+      );
+    } else {
+      L.push('  - condition: _not mapped_ (new, unless another source of the seller says otherwise)');
+    }
     if (feed.duplicateUrls > 0) {
       L.push(`  - ${feed.duplicateUrls} rows share a URL with an earlier row; only the last of each is imported`);
     }

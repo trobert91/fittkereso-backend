@@ -99,6 +99,7 @@ describe('assembleOffer: none versus silent', () => {
       priceWithoutDiscount: [{ op: 'jsonPath', path: 'oldPrice' }],
       currency: [{ op: 'jsonPath', path: 'currency' }],
       availability: [{ op: 'jsonPath', path: 'stock' }],
+      condition: [{ op: 'jsonPath', path: 'state' }],
       url: [{ op: 'jsonPath', path: 'link' }],
       locations: [{ op: 'jsonPath', path: 'stores' }],
     });
@@ -108,6 +109,7 @@ describe('assembleOffer: none versus silent', () => {
       priceWithoutDiscount: null,
       currency: null,
       availability: null,
+      condition: null,
       url: null,
       locations: null,
     });
@@ -120,7 +122,7 @@ describe('assembleOffer: none versus silent', () => {
     });
 
     expect(offer).toBeDefined();
-    for (const field of ['priceWithoutDiscount', 'currency', 'availability', 'url', 'locations'] as const) {
+    for (const field of ['priceWithoutDiscount', 'currency', 'availability', 'condition', 'url', 'locations'] as const) {
       expect(offer?.[field]).toBeUndefined();
     }
   });
@@ -133,5 +135,19 @@ describe('assembleOffer: none versus silent', () => {
     });
 
     expect(offer?.priceWithoutDiscount).toBe(2269000);
+  });
+
+  // The shop's label as the page shows it, translated in config.
+  it('produces the condition its sub-pipeline maps', async () => {
+    const offer = await assemble(makeContext(), { price: 899000, state: 'Használt' }, {
+      op: 'assembleOffer',
+      price,
+      condition: [
+        { op: 'jsonPath', path: 'state' },
+        { op: 'mapValue', cases: { Használt: 'used', Felújított: 'refurbished' }, default: 'new' },
+      ],
+    });
+
+    expect(offer?.condition).toBe('used');
   });
 });
