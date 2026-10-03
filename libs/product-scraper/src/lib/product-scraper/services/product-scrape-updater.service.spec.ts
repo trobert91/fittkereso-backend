@@ -31,7 +31,8 @@ import type {
   ScrapedProduct,
 } from '@fittkereso-backend/product';
 
-jest.mock('@fittkereso-backend/product-identity', () => ({}));
+// The services are injected as mocks; only the threshold the updater reads is real.
+jest.mock('@fittkereso-backend/product-identity', () => ({ NEAR_MISS_SCORE: 70 }));
 
 // A new product's id is chosen before its insert. Tests name it through this.
 const mockRandomUUID = jest.fn();
@@ -154,7 +155,8 @@ describe('ProductScrapeUpdaterService', () => {
   let mockLocks: { withLocks: jest.Mock };
   let mockOfferComposer: jest.Mocked<OfferComposerService>;
   let mockContributorDetach: jest.Mocked<ContributorDetachService>;
-  let mockMatchQuery: { matcherModelKeyOf: jest.Mock };
+  let mockMatchQuery: { matcherModelKeyOf: jest.Mock; requiresMatcherModel: jest.Mock };
+  let mockTaskConfig: { maxAttempts: number };
 
   beforeEach(() => {
     knownModels = [];
@@ -310,7 +312,9 @@ describe('ProductScrapeUpdaterService', () => {
 
     mockMatchQuery = {
       matcherModelKeyOf: jest.fn((_listing, text?: string) => (text ? `key:${text}` : undefined)),
+      requiresMatcherModel: jest.fn().mockReturnValue(false),
     };
+    mockTaskConfig = { maxAttempts: 3 };
 
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
@@ -335,6 +339,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockOfferComposer,
       mockContributorDetach,
       mockMatchQuery as unknown as ProductMatchQueryService,
+      mockTaskConfig as never,
     );
   });
 
@@ -492,6 +497,72 @@ describe('ProductScrapeUpdaterService', () => {
       'arukereso',
       'llm_declined',
     );
+  });
+
+  // Where keys are required, a listing the extraction failed on has none, so
+  // the score alone decided it; a near-miss may be the product a key would
+  // have joined.
+  describe('a keyless near-miss where keys are required', () => {
+    const nearMiss = () =>
+      mockListingMatch.match.mockResolvedValueOnce({
+        decision: {
+          outcome: 'created',
+          nameKey: 'mx keys',
+          candidates: [{ productId: 'model-near', displayName: 'Near', score: 75, matchedOn: 'name', failedGates: [] }],
+        },
+      } as never);
+    const failedListing = () => makeScrapedProduct({ flags: ['identity_failed'] });
+
+    beforeEach(() => {
+      mockMatchQuery.requiresMatcherModel.mockReturnValue(true);
+      mockProductRepo.findOne.mockResolvedValue(null);
+      mockRandomUUID.mockReturnValue('model-keyless');
+    });
+
+    it('fails the task to be retried instead of creating a product', async () => {
+      nearMiss();
+      const task = { ...makeTask(), attempts: 0 } as ProductImportTask;
+
+      await expect(service.createOrUpdateProduct(contextFromTask(task), failedListing())).rejects.toThrow(
+        /no matcherModel key, and product model-near scores 75/,
+      );
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'deferred_no_matcher_model',
+      );
+      expect(mockMetricsService.scrapeResolutionOutcome).not.toHaveBeenCalledWith('arukereso', 'created');
+    });
+
+    it('creates the product on the last attempt', async () => {
+      nearMiss();
+      const task = { ...makeTask(), attempts: 2 } as ProductImportTask;
+
+      await service.createOrUpdateProduct(contextFromTask(task), failedListing());
+
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith('arukereso', 'created');
+    });
+
+    const firstAttempt = () => contextFromTask({ ...makeTask(), attempts: 0 } as ProductImportTask);
+    const expectCreated = () =>
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith('arukereso', 'created');
+
+    it('creates at once when nothing was near', async () => {
+      await service.createOrUpdateProduct(firstAttempt(), failedListing());
+      expectCreated();
+    });
+
+    it('creates at once when the extraction gave the listing its key', async () => {
+      nearMiss();
+      await service.createOrUpdateProduct(firstAttempt(), makeScrapedProduct());
+      expectCreated();
+    });
+
+    it('creates at once where the category does not require keys', async () => {
+      mockMatchQuery.requiresMatcherModel.mockReturnValue(false);
+      nearMiss();
+      await service.createOrUpdateProduct(firstAttempt(), failedListing());
+      expectCreated();
+    });
   });
 
   it('creates a product when the brand did not resolve, with no name key to store', async () => {

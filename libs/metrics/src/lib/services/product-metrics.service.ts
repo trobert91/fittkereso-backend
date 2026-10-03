@@ -59,7 +59,11 @@ export type ScrapeResolutionOutcome =
   | 'contributed'
   /** A source that does not identify products found no offer of its seller
    *  to join: its listing waits unattached until one is written. */
-  | 'unattached';
+  | 'unattached'
+  /** Path 4, where the category requires matcherModel keys: the extraction
+   *  failed, so the listing has no key, and a candidate scored a near-miss.
+   *  The task fails to be retried rather than create a likely duplicate. */
+  | 'deferred_no_matcher_model';
 
 /**
  * How two things came to claim one offer identity.

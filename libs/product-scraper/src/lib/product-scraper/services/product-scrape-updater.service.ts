@@ -28,6 +28,7 @@ import {
   IdentifierTier,
   KeyMatch,
   ListingMatchService,
+  NEAR_MISS_SCORE,
   ProductDuplicateService,
   ProductKeyLookupService,
   ProductMatchQueryService,
@@ -44,7 +45,7 @@ import {
   storedOfferExternalId,
 } from '@fittkereso-backend/utils';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { CategoryConfigService } from '@fittkereso-backend/config';
+import { CategoryConfigService, TaskConfigService } from '@fittkereso-backend/config';
 import {
   BRAND_NOT_IDENTIFIED,
   BrandResolutionService,
@@ -143,6 +144,9 @@ interface Recheck {
   };
 }
 
+/** Used only when the collector's config sets no task.max_attempts. */
+const FALLBACK_MAX_ATTEMPTS = 3;
+
 @Injectable()
 export class ProductScrapeUpdaterService {
   private readonly logger = new CustomLogger(ProductScrapeUpdaterService.name);
@@ -170,6 +174,7 @@ export class ProductScrapeUpdaterService {
     private readonly offerComposer: OfferComposerService,
     private readonly contributorDetach: ContributorDetachService,
     private readonly matchQuery: ProductMatchQueryService,
+    private readonly taskConfig: TaskConfigService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -743,11 +748,50 @@ export class ProductScrapeUpdaterService {
         'llm_declined',
       );
     }
+    this.deferKeylessNearMiss(context, scrapedProduct, decision);
 
     return {
       identity: { isExistingMatch: false, decision, keyMatches, keyGates },
       brandResolved,
     };
+  }
+
+  /**
+   * Where a category requires matcherModel keys, a listing whose identity
+   * extraction failed has no key, so the score rule alone decided it. When a
+   * candidate was close enough to be the same product, a new one may be a
+   * duplicate the key would have prevented: the task fails, to be retried on
+   * the manager's backoff, until its last attempt creates the product. An LLM
+   * error is usually gone by then. A source with the extraction off has no
+   * key to wait for.
+   */
+  private deferKeylessNearMiss(
+    context: ProductImportContext,
+    scrapedProduct: ScrapedProduct,
+    decision: ListingMatchDecision,
+  ): void {
+    const { task } = context;
+    const maxAttempts = this.taskConfig.maxAttempts ?? FALLBACK_MAX_ATTEMPTS;
+    const lastAttempt = !task || task.attempts + 1 >= maxAttempts;
+    const nearMiss = decision.candidates.find(
+      (candidate) => candidate.score >= NEAR_MISS_SCORE,
+    );
+    if (
+      lastAttempt ||
+      !nearMiss ||
+      !scrapedProduct.flags?.includes('identity_failed') ||
+      !this.matchQuery.requiresMatcherModel(scrapedProduct.category.slug)
+    ) {
+      return;
+    }
+
+    this.productMetricsService.scrapeResolutionOutcome(
+      context.source.name,
+      'deferred_no_matcher_model',
+    );
+    throw new Error(
+      `Deferred: the identity extraction failed, so this listing has no matcherModel key, and product ${nearMiss.productId} scores ${nearMiss.score} by name. Retrying before creating a product it may duplicate (attempt ${task.attempts + 1} of ${maxAttempts}).`,
+    );
   }
 
   /**
