@@ -18,7 +18,7 @@ import { matcherModelWords } from '../product-normalizer.service';
  * it when the rule changes, and the next import of each listing re-extracts
  * its matcherModel alone.
  */
-export const MATCHER_MODEL_PROMPT_VERSION = 1;
+export const MATCHER_MODEL_PROMPT_VERSION = 2;
 
 /** What the identity extraction is told about the matcherModel. */
 export interface MatcherModelRequest {
@@ -477,6 +477,7 @@ export class ProductSourcePostProcessService {
       `Take it from rawModel's own words, in their order and spelling there: leave words out, but never add, translate, correct or reorder one. ` +
       `KEEP the model line and family words, every model number and alphanumeric code — a number stays even when it also states a spec value, as long as it is part of the model's name — and every variant, edition, trim or equipment marker. ` +
       `LEAVE OUT the brand;${leaveOutSpecs} category, marketing and shop wording (condition, stock, "new", what kind of product it is). ` +
+      `A number written together with its unit (a capacity, a size, a weight) states a spec value, not the model's name: leave it out. So does a short code that only abbreviates such a value, such as a letter for who the product is made for. ` +
       `A word that would state such a value stays when it is part of the model's own name rather than this listing's value. ` +
       `Two listings of the same model from different shops must get the same matcherModel, and two different models never may: when unsure whether a word tells two models apart, keep it.\n` +
       examples
