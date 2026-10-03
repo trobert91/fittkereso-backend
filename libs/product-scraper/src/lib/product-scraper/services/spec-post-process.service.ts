@@ -4,6 +4,7 @@ import {
   isArukeresoConfig,
   isScrapingConfig,
   matcherModelExcludedSpecKeys,
+  ProductSource,
   ProductSourceConfig,
   ProductSourcePostProcessConfig,
   ProductSourceRecord,
@@ -103,6 +104,21 @@ export class SpecPostProcessService {
     };
   }
 
+  /** Whether this source runs the identity extraction (`postProcess.identity`, on by default). */
+  public identityEnabledFor(source: ProductSource): boolean {
+    return postProcessConfigOf(source.config)?.identity !== false;
+  }
+
+  /**
+   * The contract a matcherModel of this category is asked under now
+   * (ScrapedProduct.matcherModelContract): a stored one under another is
+   * asked again. Undefined for a category without a schema.
+   */
+  public matcherModelContractOf(categorySlug: string): string | undefined {
+    const schema = this.categoryConfigService.getJsonSchema(categorySlug);
+    return schema ? contractOf(this.scopesOf(categorySlug, schema)) : undefined;
+  }
+
   /**
    * The listing's clean name and identity specs.
    *
@@ -150,10 +166,7 @@ export class SpecPostProcessService {
     const identityInputHash = hashOf({ ...data, rows, description });
 
     const enabled = config?.identity !== false;
-    const matcherModelContract = hashOf({
-      ...scopes.matcherModel,
-      version: MATCHER_MODEL_PROMPT_VERSION,
-    });
+    const matcherModelContract = contractOf(scopes);
     const callIdentity = () =>
       this.postProcess.extractIdentity({
         data,
@@ -477,6 +490,11 @@ function withIdentityFlag(
 
 function hashOf(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+/** What a matcherModel is asked under: its left-out specs, examples and prompt version. */
+function contractOf(scopes: CategorySpecScopes): string {
+  return hashOf({ ...scopes.matcherModel, version: MATCHER_MODEL_PROMPT_VERSION });
 }
 
 /** `taskId` is present on the scrape path only, and absent on a feed run. */

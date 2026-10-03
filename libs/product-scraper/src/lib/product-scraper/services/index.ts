@@ -8,6 +8,7 @@ export * from './scraping-import.service';
 export * from './product-source-importer-registry.service';
 export * from './product-source-simulation.service';
 export * from './spec-post-process.service';
+export * from './matcher-model-backfill.service';
 export * from './product-scrape-updater.service';
 export * from './deterministic-specs';
 export * from './product-source-import-simulation.service';
