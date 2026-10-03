@@ -67,6 +67,19 @@ export function scoreOf(baseScore: number, failedGates: FailedGate[]): number {
 }
 
 /**
+ * 100 minus the spec gates alone — primary, missing and matcher specs — for a
+ * candidate whose matcherModel key equals the query's. The name is not in
+ * question there, and equal keys already carry equal model numbers, so the
+ * model-number gate would only read a size one shop wrote into its title.
+ */
+export function keyScoreOf(failedGates: FailedGate[]): number {
+  return scoreOf(
+    100,
+    failedGates.filter((gate) => gate.gate !== 'modelNumberMismatch'),
+  );
+}
+
+/**
  * Whether a spec carries a value a gate may compare. Beyond null/undefined, an
  * empty string and a zero are absences a scraper wrote down: a label matched
  * with nothing after it, or a number it could not parse. Neither contradicts

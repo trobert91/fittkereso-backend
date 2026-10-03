@@ -83,6 +83,11 @@ export class ProductDuplicatePair extends BasePostgresEntity {
   @Transform(transfromExposeAll())
   nameSimilarity?: NameSimilarity | null;
 
+  /** Whether the two products share a matcherModel key; null when either has none. */
+  @Column({ type: 'boolean', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList] })
+  matcherModelMatch?: boolean | null;
+
   @Column({ type: 'varchar' })
   @Expose({ groups: [SerializeGroup.adminList] })
   detectedBy: DuplicateDetectedBy;

@@ -707,6 +707,14 @@ export class ProductScrapeUpdaterService {
       // empty taskId in the logs would read as a lost one.
       context.task ? { taskId: context.task.id } : {},
     );
+    if (decision.mode && decision.alternative) {
+      this.productMetricsService.listingMatchShadow(
+        context.source.name,
+        decision.mode,
+        decision.alternative.comparison,
+        decision.alternative.kind,
+      );
+    }
 
     if (productId) {
       const model = await this.productRepo.findOneOrFail({

@@ -1,4 +1,4 @@
-import { pairRowOf } from './duplicate-pairs';
+import { pairRowOf, pairScoreOf } from './duplicate-pairs';
 import type { ProductCandidate } from './types';
 
 const SMALLER = '11111111-1111-1111-1111-111111111111';
@@ -21,6 +21,7 @@ function candidateOf(productId: string): ProductCandidate {
         candidateValue: 2024,
       },
     ],
+    keyScore: 70,
   };
 }
 
@@ -42,7 +43,20 @@ describe('pairRowOf', () => {
         },
       ],
       nameSimilarity: { trigram: 0.9, levenshtein: 1 },
+      matcherModelMatch: null,
       detectedBy: 'scan',
+    });
+  });
+
+  it('scores two products sharing a matcherModel key by their spec gates when the name scores lower', () => {
+    const differentlyWorded = { ...candidateOf(LARGER), score: 27, keyScore: 100, failedGates: [] };
+
+    expect(pairScoreOf({ ...differentlyWorded, matcherModelMatch: true })).toBe(100);
+    expect(pairScoreOf({ ...differentlyWorded, matcherModelMatch: false })).toBe(27);
+    expect(pairScoreOf(differentlyWorded)).toBe(27);
+    expect(pairRowOf(SMALLER, { ...differentlyWorded, matcherModelMatch: true }, 'scan')).toMatchObject({
+      similarityScore: 100,
+      matcherModelMatch: true,
     });
   });
 

@@ -45,6 +45,7 @@ export class ProductMatchQueryService {
     brand: Brand,
   ): ProductMatchQuery {
     const { category } = scrapedProduct;
+    const key = this.matcherModelKeyOf(scrapedProduct, scrapedProduct.matcherModel);
     return {
       brandId: brand.id,
       brandName: brand.name,
@@ -56,6 +57,7 @@ export class ProductMatchQueryService {
         categorySlug: category.slug,
       }),
       specs: scrapedProduct.specs,
+      matcherModelKeys: key ? [key] : [],
     };
   }
 
@@ -121,6 +123,18 @@ export class ProductMatchQueryService {
       brand: listing.brand,
       dropValues: uniq(dropValues),
     });
+  }
+
+  /**
+   * Whether the category's name matches need equal matcherModel keys
+   * (`matchingConfig.matcherModel.required`): the rule that acts. The other
+   * one still runs, in shadow.
+   */
+  public requiresMatcherModel(categorySlug: string): boolean {
+    return (
+      this.categoryConfigService.getConfig(categorySlug)?.matchingConfig?.matcherModel
+        ?.required === true
+    );
   }
 
   /**

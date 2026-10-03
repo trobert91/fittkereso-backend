@@ -14,11 +14,13 @@ import {
   decideListingMatch,
   FailedGate,
   NEAR_MISS_SCORE,
+  pairScoreOf,
   ProductCandidate,
   ProductCandidateFinderService,
   ProductMatchQuery,
   ProductMatchQueryService,
 } from '@fittkereso-backend/product-identity';
+import type { ListingMatchMode } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 
 interface MatchSubject {
@@ -39,7 +41,7 @@ export class ProductIdentityTools {
   @Tool({
     name: 'find_product_candidates',
     description:
-      'Explains product matching. Pass productId to see a stored product\'s duplicate candidates, or sourceRecordId to replay that listing as if it were scraped now (the brand is the attached product\'s). Returns the name key, every recalled candidate with trigram and Levenshtein similarity, base score, failed gates with both values, and final score, plus what would happen: the duplicate pairs (score 70+) for a product, or the listing match outcome (attach / ask the LLM / create) for a listing. Read-only; never calls the LLM.',
+      'Explains product matching. Pass productId to see a stored product\'s duplicate candidates, or sourceRecordId to replay that listing as if it were scraped now (the brand is the attached product\'s). Returns the name key and matcherModel key, every recalled candidate (by name, alias or matcherModel key) with trigram and Levenshtein similarity, base score, failed gates with both values, final score, whether it shares the matcherModel key and its key score (spec gates alone), plus what would happen: the duplicate pairs (70+ by name, or by key score when the keys match) for a product, or the listing match outcome (attach / ask the LLM / create) under both the score rule and the key rule for a listing, marking the one the category acts on. Read-only; never calls the LLM.',
     parameters: z.object({
       productId: z
         .string()
@@ -135,12 +137,19 @@ export class ProductIdentityTools {
 
     const { kind, title, query } = subject;
     const candidates = await this.finder.findCandidates(query);
+    const keys = query.matcherModelKeys;
+    const keyText =
+      keys === undefined
+        ? "its listings' (the finder loads them)"
+        : keys.length
+          ? keys.map((key) => `\`${key}\``).join(', ')
+          : 'none';
 
     const L: string[] = [];
     L.push(`# Product candidates for ${title}`);
     L.push('');
     L.push(
-      `Name key: \`${query.nameKey}\` · brand ${query.brandName} · category ${query.categorySlug}`,
+      `Name key: \`${query.nameKey}\` · matcherModel key: ${keyText} · brand ${query.brandName} · category ${query.categorySlug}`,
     );
     L.push('');
 
@@ -148,16 +157,16 @@ export class ProductIdentityTools {
       L.push('Recall found no candidates.');
     } else {
       L.push(
-        '| # | Product | Matched on | Trigram | Levenshtein | Alignment | Base | Failed gates | Score |',
+        '| # | Product | Matched on | Trigram | Levenshtein | Alignment | Base | Failed gates | Score | Key | Key score |',
       );
       L.push(
-        '|---|---------|------------|---------|-------------|-----------|------|--------------|-------|',
+        '|---|---------|------------|---------|-------------|-----------|------|--------------|-------|-----|-----------|',
       );
       candidates.forEach((candidate, index) => {
         const { trigram, levenshtein, alignment } = candidate.nameSimilarity;
         const align = alignment === undefined ? '—' : alignment.toFixed(2);
         L.push(
-          `| ${index + 1} | ${candidate.displayName} (${candidate.productId}) | ${candidate.matchedOn}: \`${candidate.matchedValue}\` | ${trigram.toFixed(2)} | ${levenshtein.toFixed(2)} | ${align} | ${baseScore(candidate.nameSimilarity)} | ${this.formatGates(candidate.failedGates)} | ${candidate.score} |`,
+          `| ${index + 1} | ${candidate.displayName} (${candidate.productId}) | ${candidate.matchedOn}: \`${candidate.matchedValue}\` | ${trigram.toFixed(2)} | ${levenshtein.toFixed(2)} | ${align} | ${baseScore(candidate.nameSimilarity)} | ${this.formatGates(candidate.failedGates)} | ${candidate.score} | ${this.formatKeyMatch(candidate)} | ${candidate.keyScore} |`,
         );
       });
     }
@@ -165,31 +174,62 @@ export class ProductIdentityTools {
     L.push('');
     L.push(
       kind === 'listing'
-        ? this.describeListingMatch(candidates)
+        ? this.describeListingMatch(candidates, query)
         : this.describePairs(candidates),
     );
     return L.join('\n');
   }
 
-  private describeListingMatch(candidates: ProductCandidate[]): string {
-    const outcome = decideListingMatch(candidates);
+  /** Both rules; the category's `matcherModel.required` picks the one that acts. */
+  private describeListingMatch(
+    candidates: ProductCandidate[],
+    query: ProductMatchQuery,
+  ): string {
+    const [key] = query.matcherModelKeys ?? [];
+    const acting: ListingMatchMode =
+      key && this.queryService.requiresMatcherModel(query.categorySlug)
+        ? 'key'
+        : 'score';
+    const lines = [this.describeRule('score', candidates, acting)];
+    lines.push(
+      key
+        ? this.describeRule('key', candidates, acting, key.split(' ').length < 2)
+        : '- Key rule: the listing has no matcherModel key, so the score rule decides.',
+    );
+    return ['Listing match:', ...lines].join('\n');
+  }
+
+  private describeRule(
+    mode: ListingMatchMode,
+    candidates: ProductCandidate[],
+    acting: ListingMatchMode,
+    shortKey = false,
+  ): string {
+    const rule = mode === 'key' ? 'Key rule' : 'Score rule';
+    const label = `- ${rule} (${mode === acting ? 'acts' : 'shadow'}):`;
+    const outcome = decideListingMatch(candidates, { mode, shortKey });
     if (outcome.kind === 'attach') {
-      return `Listing match: attach to ${outcome.candidate.displayName} (${outcome.candidate.productId}).`;
+      return `${label} attach to ${outcome.candidate.displayName} (${outcome.candidate.productId}).`;
     }
     if (outcome.kind === 'ask_llm') {
-      return `Listing match: ask the LLM about ${outcome.candidates.length} candidate(s): ${outcome.candidates.map((candidate) => candidate.productId).join(', ')}.`;
+      return `${label} ask the LLM about ${outcome.candidates.length} candidate(s): ${outcome.candidates.map((candidate) => candidate.productId).join(', ')}.`;
     }
-    return `Listing match: create a new product (no candidate scores ${NEAR_MISS_SCORE}+).`;
+    return `${label} create a new product.`;
   }
 
   private describePairs(candidates: ProductCandidate[]): string {
     const paired = candidates.filter(
-      (candidate) => candidate.score >= NEAR_MISS_SCORE,
+      (candidate) => pairScoreOf(candidate) >= NEAR_MISS_SCORE,
     );
     if (paired.length === 0) {
-      return `Duplicate detection: no pair (no candidate scores ${NEAR_MISS_SCORE}+).`;
+      return `Duplicate detection: no pair (no candidate scores ${NEAR_MISS_SCORE}+ by name, or by key score with the same key).`;
     }
     return `Duplicate detection: pairs with ${paired.map((candidate) => candidate.productId).join(', ')}.`;
+  }
+
+  private formatKeyMatch(candidate: ProductCandidate): string {
+    if (candidate.matcherModelMatch === undefined) return '—';
+    return candidate.matcherModelMatch ? 'same' : 'other';
   }
 
   private formatGates(gates: FailedGate[]): string {

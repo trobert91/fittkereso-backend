@@ -4,6 +4,7 @@ import { PrometheusService } from '../prometheus.service';
 import {
   IDENTITY_EXTRACTION_TOTAL,
   MATCHER_MODEL_TOTAL,
+  LISTING_MATCH_SHADOW_TOTAL,
   IDENTITY_KEY_CONFLICT_TOTAL,
   IDENTITY_KEY_DISAGREEMENT_TOTAL,
   IDENTITY_RECHECK_ATTACHED_TOTAL,
@@ -120,6 +121,7 @@ export class ProductMetricsService {
   private readonly identityRecheckAttachedCounter: client.Counter<string>;
   private readonly identityExtractionCounter: client.Counter<string>;
   private readonly matcherModelCounter: client.Counter<string>;
+  private readonly listingMatchShadowCounter: client.Counter<string>;
   private readonly identitySpecRowsHistogram: client.Histogram<string>;
   private readonly specUnificationCounter: client.Counter<string>;
   private readonly sourceRecordUrlChangedCounter: client.Counter<string>;
@@ -227,6 +229,12 @@ export class ProductMetricsService {
       labelNames: ['source', 'result'],
       registers: [this.prometheusService.register],
     });
+    this.listingMatchShadowCounter = new client.Counter({
+      name: LISTING_MATCH_SHADOW_TOTAL,
+      help: 'Name-matched listings by how the shadow rule compares with the acting one',
+      labelNames: ['source', 'mode', 'comparison', 'shadow'],
+      registers: [this.prometheusService.register],
+    });
     this.identitySpecRowsHistogram = new client.Histogram({
       name: IDENTITY_SPEC_ROWS_MATCHED,
       help: 'Spec-table rows the identity extraction received per listing, for sources with a row list',
@@ -329,6 +337,16 @@ export class ProductMetricsService {
 
   matcherModel(source: string, result: MatcherModelResult): void {
     this.matcherModelCounter.inc({ source, result });
+  }
+
+  /** One name-matched listing's shadow comparison (LISTING_MATCH_SHADOW_TOTAL). */
+  listingMatchShadow(
+    source: string,
+    mode: string,
+    comparison: string,
+    shadow: string,
+  ): void {
+    this.listingMatchShadowCounter.inc({ source, mode, comparison, shadow });
   }
 
   identitySpecRowsMatched(source: string, rows: number): void {

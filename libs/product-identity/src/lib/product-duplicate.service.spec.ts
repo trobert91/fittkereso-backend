@@ -15,6 +15,7 @@ function candidateOf(productId: string, score: number): ProductCandidate {
     matchedValue: '140 hybrid stereo',
     nameSimilarity: { trigram: 1, levenshtein: 1 },
     failedGates: [],
+    keyScore: 100,
   };
 }
 
@@ -79,6 +80,26 @@ describe('ProductDuplicateService', () => {
       ]);
     });
 
+    it('pairs a product sharing a matcherModel key by its spec gates, however its name scores', async () => {
+      // "Tour CX 830" against "Macina Tour CX830": the model-number gate sinks
+      // the name, the shared key and clean specs say one bike.
+      finder.findCandidates.mockResolvedValue([
+        { ...candidateOf(OTHER_ID, 27), matcherModelMatch: true, keyScore: 100 },
+        { ...candidateOf('33333333-3333-3333-3333-333333333333', 27), matcherModelMatch: false },
+      ]);
+
+      await service.detect(PRODUCT_ID, 'scan');
+
+      const [rows] = pairRepo.upsertPairs.mock.calls[0];
+      expect(rows).toEqual([
+        expect.objectContaining({
+          productBId: OTHER_ID,
+          similarityScore: 100,
+          matcherModelMatch: true,
+        }),
+      ]);
+    });
+
     it('writes nothing when no candidate reaches 70', async () => {
       finder.findCandidates.mockResolvedValue([candidateOf(OTHER_ID, 69)]);
 
@@ -97,6 +118,7 @@ describe('ProductDuplicateService', () => {
         matchedValue: '09008594503199',
         failedGates: [],
         nameSimilarity: null,
+        matcherModelMatch: null,
         detectedBy: 'scan',
       };
 

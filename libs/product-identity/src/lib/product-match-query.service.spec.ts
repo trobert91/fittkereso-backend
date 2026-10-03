@@ -95,11 +95,32 @@ describe('ProductMatchQueryService', () => {
       specs: { modelYear: 2024 },
     };
 
-    expect(service.ofListing(listingOf({ specs: { modelYear: 2024 } }), cube)).toEqual(scope);
+    expect(service.ofListing(listingOf({ specs: { modelYear: 2024 } }), cube)).toEqual({
+      ...scope,
+      matcherModelKeys: [],
+    });
+    // The finder loads a stored product's keys.
     expect(service.ofProduct(productOf({ specs: { modelYear: 2024 } }))).toEqual({
       productId: 'product-1',
       ...scope,
     });
+  });
+
+  it("carries a listing's matcherModel key, built as its record stores it", () => {
+    const listing = listingOf({ matcherModel: 'Stereo Hybrid 140 Pro' });
+
+    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual([
+      service.matcherModelKeyOf(listing, 'Stereo Hybrid 140 Pro'),
+    ]);
+    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual(['140 hybrid pro stereo']);
+  });
+
+  it('requires matcherModel keys only where the category says so', () => {
+    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { matcherModel: { required: true } } });
+    expect(service.requiresMatcherModel('ebikes')).toBe(true);
+
+    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { matcherModel: {} } });
+    expect(service.requiresMatcherModel('ebikes')).toBe(false);
   });
 
   it('refuses a product loaded without its brand or category', () => {

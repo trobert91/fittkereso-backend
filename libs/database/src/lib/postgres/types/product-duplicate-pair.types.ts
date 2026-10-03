@@ -18,12 +18,19 @@ export type IdentityGate =
 export type IdentityGateValue = string | number | boolean | string[];
 
 /**
- * What connects a pair. `name` and `alias` are the recall arms that found a
- * candidate by its name key or one of its aliases. The rest are identifiers
- * the two products share, found when a listing was imported: a size its shop
+ * What connects a pair. `name`, `alias` and `matcherModel` are the recall
+ * arms that found a candidate: by its name key, one of its aliases, or a
+ * listing of it with the same matcherModel key. The rest are identifiers the
+ * two products share, found when a listing was imported: a size its shop
  * declared as a sibling, a GTIN, or an MPN within one brand.
  */
-export type CandidateMatchedOn = 'name' | 'alias' | 'sibling' | 'gtin' | 'mpn';
+export type CandidateMatchedOn =
+  | 'name'
+  | 'alias'
+  | 'matcherModel'
+  | 'sibling'
+  | 'gtin'
+  | 'mpn';
 
 /** How a pair was first found; set on insert and never changed. */
 export type DuplicateDetectedBy = 'scrape' | 'scan' | 'merge';
@@ -62,5 +69,10 @@ export interface DuplicatePairRow {
   matchedValue: string;
   failedGates: DuplicatePairFailedGate[];
   nameSimilarity: NameSimilarity | null;
+  /**
+   * Whether the two products share a matcherModel key; null when either has
+   * none, or for an identifier pair, which compares no names.
+   */
+  matcherModelMatch: boolean | null;
   detectedBy: DuplicateDetectedBy;
 }

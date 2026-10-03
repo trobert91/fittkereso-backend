@@ -17,6 +17,7 @@ function makeRow(overrides: Partial<DuplicatePairRow> = {}): DuplicatePairRow {
     matchedValue: '140 hybrid stereo',
     failedGates: [],
     nameSimilarity: { trigram: 0.8, levenshtein: 0.75 },
+    matcherModelMatch: null,
     detectedBy: 'scan',
     ...overrides,
   };
@@ -110,15 +111,17 @@ describe('ProductDuplicatePairRepository.upsertPairs', () => {
     await repository.upsertPairs(
       [
         makeRow({ productAId: ID_2, productBId: ID_3 }),
-        makeRow({ productAId: ID_1, productBId: ID_2, failedGates: gates }),
+        makeRow({ productAId: ID_1, productBId: ID_2, failedGates: gates, matcherModelMatch: true }),
       ],
       manager as never,
     );
 
     const [, params] = manager.query.mock.calls[0];
-    expect(params).toHaveLength(16);
+    expect(params).toHaveLength(18);
     expect(params.slice(0, 2)).toEqual([ID_1, ID_2]);
     expect(params[5]).toBe(JSON.stringify(gates));
-    expect(params.slice(8, 10)).toEqual([ID_2, ID_3]);
+    expect(params[7]).toBe(true);
+    expect(params.slice(9, 11)).toEqual([ID_2, ID_3]);
+    expect(params[16]).toBeNull();
   });
 });

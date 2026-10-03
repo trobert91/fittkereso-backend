@@ -110,3 +110,92 @@ describe('decideListingMatch', () => {
     expect(decideListingMatch([twoMismatches])).toEqual({ kind: 'not_found' });
   });
 });
+
+describe('decideListingMatch in key mode', () => {
+  type Gate = 'primarySpecMismatch' | 'matcherSpecMismatch' | 'modelNumberMismatch' | 'specMissing';
+  const keyed = (
+    productId: string,
+    score: number,
+    match: boolean | undefined,
+    gates: Gate[] = [],
+    createdAt = '2026-01-01',
+  ) => ({
+    productId,
+    score,
+    matcherModelMatch: match,
+    failedGates: gates.map((gate) => ({ gate })),
+    keyScore: scoreOf(
+      100,
+      gates
+        .filter((gate) => gate !== 'modelNumberMismatch')
+        .map((gate) => ({ gate, severity: gate === 'primarySpecMismatch' ? 30 : 10, queryValue: null, candidateValue: null })),
+    ),
+    createdAt: new Date(createdAt),
+  });
+  const byKey = (candidates: ReturnType<typeof keyed>[], shortKey = false) =>
+    decideListingMatch(candidates, { mode: 'key', shortKey });
+
+  it('attaches on equal keys and clean spec gates however low the name scores', () => {
+    // "Tour CX 830" against "Macina Tour CX830": the model-number gate sinks the name.
+    const sameBike = keyed('same', 27, true, ['modelNumberMismatch']);
+
+    expect(byKey([sameBike])).toEqual({ kind: 'attach', candidate: sameBike });
+  });
+
+  it('never attaches a perfect name with another key, and asks the LLM about it', () => {
+    // "Style 810" against "Style 810 Di2".
+    const variant = keyed('variant', 100, false);
+
+    expect(byKey([variant])).toEqual({ kind: 'ask_llm', candidates: [variant] });
+  });
+
+  it('keeps a candidate the spec gates bring below 80 from attaching, keys or not', () => {
+    // Equal keys, a year apart (a primary mismatch) and one matcher spec off.
+    const lastYear = keyed('last-year', 100, true, ['primarySpecMismatch']);
+
+    expect(byKey([lastYear])).toEqual({ kind: 'not_found' });
+  });
+
+  it("attaches a men's frame to the women's at 90: one matcher spec apart", () => {
+    const otherFrame = keyed('other-frame', 90, true, ['matcherSpecMismatch']);
+
+    expect(byKey([otherFrame])).toEqual({ kind: 'attach', candidate: otherFrame });
+  });
+
+  it('sends the LLM only names at 70 with no primary and at most one matcher contradiction', () => {
+    const clean = keyed('clean', 100, false);
+    const oneOff = keyed('one-off', 90, false, ['matcherSpecMismatch']);
+    const twoOff = keyed('two-off', 80, false, ['matcherSpecMismatch', 'matcherSpecMismatch']);
+    const primary = keyed('primary', 70, false, ['primarySpecMismatch']);
+    const weakName = keyed('weak-name', 69, false);
+    const missingSpec = keyed('missing', 75, false, ['specMissing']);
+
+    expect(byKey([twoOff, weakName, primary, oneOff, missingSpec, clean])).toEqual({
+      kind: 'ask_llm',
+      candidates: [clean, oneOff, missingSpec],
+    });
+    expect(byKey([twoOff, primary, weakName])).toEqual({ kind: 'not_found' });
+  });
+
+  it('wants the name score at 80 too behind a one-word key', () => {
+    const weakName = keyed('weak-name', 75, true);
+    const strongName = keyed('strong-name', 85, true);
+
+    expect(byKey([weakName], true)).toEqual({ kind: 'ask_llm', candidates: [weakName] });
+    expect(byKey([weakName, strongName], true)).toEqual({ kind: 'attach', candidate: strongName });
+  });
+
+  it('picks among products sharing the key by spec gates, then name, then age — never a tie that blocks', () => {
+    const older = keyed('older', 95, true, [], '2025-01-01');
+    const newer = keyed('newer', 95, true, [], '2026-01-01');
+    const betterName = keyed('better-name', 98, true, ['matcherSpecMismatch']);
+
+    expect(byKey([newer, betterName, older])).toEqual({ kind: 'attach', candidate: older });
+  });
+
+  it('never attaches a candidate whose key is unknown', () => {
+    const unkeyed = keyed('unkeyed', 100, undefined);
+
+    expect(byKey([unkeyed])).toEqual({ kind: 'ask_llm', candidates: [unkeyed] });
+  });
+});

@@ -20,6 +20,12 @@ export interface ProductMatchQuery {
   /** Drives trigram recall and Levenshtein. */
   nameKey: string;
   specs?: ProductSpecs;
+  /**
+   * The matcherModel keys to compare: a listing's own (none or one), or a
+   * stored product's listings' (any number). Left unset for a stored product,
+   * the finder loads them.
+   */
+  matcherModelKeys?: string[];
 }
 
 /**
@@ -41,4 +47,11 @@ export interface ProductCandidate {
   nameSimilarity: NameSimilarity;
   failedGates: FailedGate[];
   specs?: ProductSpecs;
+  /**
+   * Whether one of the product's listings has one of the query's matcherModel
+   * keys. Undefined when either side has none.
+   */
+  matcherModelMatch?: boolean;
+  /** 100 minus the spec gates alone (keyScoreOf): what the key rule attaches on. */
+  keyScore: number;
 }

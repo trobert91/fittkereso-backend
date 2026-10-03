@@ -38,8 +38,22 @@ export const GATE_SEVERITY: Record<Exclude<IdentityGate, 'specMissing'>, number>
   matcherSpecMismatch: 10,
 };
 
+/**
+ * In key mode, the matcher-spec contradictions a candidate with another key
+ * may have and still go to the LLM: one shop's weight or gear count can be
+ * off, two different numbers rarely are. A primary-spec contradiction always
+ * keeps it away.
+ */
+export const LLM_MAX_MATCHER_SPEC_MISMATCHES = 1;
+
 /** Rows the recall query returns, name and alias rows together. */
 export const NAME_HITS = 20;
+
+/**
+ * Products the matcherModel recall returns. Equal keys within one brand are
+ * one model, so more than a handful means duplicates already stored.
+ */
+export const KEY_HITS = 20;
 
 /**
  * How much a name's alignment similarity counts against trigram and

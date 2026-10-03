@@ -19,6 +19,7 @@ const INSERTED: (keyof DuplicatePairRow)[] = [
   'matchedValue',
   'failedGates',
   'nameSimilarity',
+  'matcherModelMatch',
   'detectedBy',
 ];
 
@@ -29,6 +30,7 @@ const REFRESHED: (keyof DuplicatePairRow)[] = [
   'matchedValue',
   'failedGates',
   'nameSimilarity',
+  'matcherModelMatch',
 ];
 
 @Injectable()
@@ -66,9 +68,10 @@ export class ProductDuplicatePairRepository extends BasePostgresRepository<Produ
         // Stringified: node-postgres would send a JS array as a Postgres array, not JSON.
         JSON.stringify(row.failedGates),
         row.nameSimilarity ? JSON.stringify(row.nameSimilarity) : null,
+        row.matcherModelMatch,
         row.detectedBy,
       );
-      return `($${base + 1}::uuid, $${base + 2}::uuid, $${base + 3}::int, $${base + 4}, $${base + 5}, $${base + 6}::jsonb, $${base + 7}::jsonb, $${base + 8})`;
+      return `(${base + 1}::uuid, ${base + 2}::uuid, ${base + 3}::int, ${base + 4}, ${base + 5}, ${base + 6}::jsonb, ${base + 7}::jsonb, ${base + 8}::boolean, ${base + 9})`;
     });
 
     const written: unknown[] = await (manager ?? this.repo.manager).query(

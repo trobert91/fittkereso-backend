@@ -13,7 +13,7 @@ import {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ProductMergeService } from '@fittkereso-backend/product';
 import { nameOf } from '@fittkereso-backend/utils';
-import { pairRowOf } from './duplicate-pairs';
+import { pairRowOf, pairScoreOf } from './duplicate-pairs';
 import { NEAR_MISS_SCORE } from './product-identity.constants';
 import { ProductCandidateFinderService } from './product-candidate-finder.service';
 import { ProductKeyLookupService } from './product-key-lookup.service';
@@ -39,7 +39,9 @@ export class ProductDuplicateService {
 
   /**
    * Writes a pair for every candidate of this product scoring NEAR_MISS_SCORE
-   * or above — the bar below which a listing simply becomes a new product — and
+   * or above (pairScoreOf: by name, or by spec gates alone when the two share
+   * a matcherModel key) — the bar below which a listing simply becomes a new
+   * product — and
    * for every product sharing one of its identifiers (a GTIN, an MPN, a
    * declared size). Returns the pairs written; already-dismissed pairs aren't
    * reopened and don't count.
@@ -72,7 +74,7 @@ export class ProductDuplicateService {
     const rows = [
       ...identifierRows,
       ...candidates
-        .filter((candidate) => candidate.score >= NEAR_MISS_SCORE)
+        .filter((candidate) => pairScoreOf(candidate) >= NEAR_MISS_SCORE)
         .map((candidate) => pairRowOf(product.id, candidate, detectedBy)),
     ];
     if (isEmpty(rows)) return 0;

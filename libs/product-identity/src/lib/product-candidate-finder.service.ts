@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
-import { compact, groupBy, isEmpty, keyBy, orderBy } from 'lodash';
+import { compact, groupBy, intersection, isEmpty, keyBy, orderBy } from 'lodash';
 import {
   NameSimilarity,
   ProductModelRepository,
+  ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
-import { applyGates, scoreOf } from './gates';
+import { applyGates, keyScoreOf, scoreOf } from './gates';
 import { TokenIdf, baseScore, nameSimilarity } from './name-similarity';
 import { CandidateRecallService, RecallRow } from './candidate-recall.service';
 import { ProductMatchQueryService } from './product-match-query.service';
@@ -25,6 +26,10 @@ interface ScoredRow {
  * recalled candidate, best first, with its score and failed gates — thresholds
  * are the callers' (listing match, duplicate detection), so a low score stays
  * visible. Only reads.
+ *
+ * Recall runs by name and, when the query has a matcherModel key, by key. Each
+ * candidate also says whether it shares a key with the query and what its spec
+ * gates alone leave (`keyScore`), for the key rule.
  */
 @Injectable()
 export class ProductCandidateFinderService {
@@ -34,12 +39,27 @@ export class ProductCandidateFinderService {
     private readonly queryService: ProductMatchQueryService,
     private readonly categoryConfigService: CategoryConfigService,
     private readonly tokenIdf: TokenIdfService,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
   public async findCandidates(
     query: ProductMatchQuery,
   ): Promise<ProductCandidate[]> {
-    const rows = (await this.recall.recall(query)).filter(
+    // A stored product's keys are its listings'.
+    const queryKeys =
+      query.matcherModelKeys ??
+      (query.productId
+        ? ((await this.sourceRecordRepo.findMatcherModelKeysByModelIds([query.productId])).get(
+            query.productId,
+          ) ?? [])
+        : []);
+    const keyedQuery = { ...query, matcherModelKeys: queryKeys };
+
+    const [nameRows, keyRows] = await Promise.all([
+      this.recall.recall(keyedQuery),
+      this.recall.recallByMatcherModel(keyedQuery),
+    ]);
+    const rows = [...nameRows, ...keyRows].filter(
       (row) => row.productId !== query.productId,
     );
     if (isEmpty(rows)) return [];
@@ -49,13 +69,17 @@ export class ProductCandidateFinderService {
     const bestRows = this.bestRowPerProduct(query, rows, idf);
     if (isEmpty(bestRows)) return [];
 
-    const products = keyBy(
-      await this.productRepo.find({
-        where: { id: In(bestRows.map(({ row }) => row.productId)) },
+    const productIds = bestRows.map(({ row }) => row.productId);
+    const [loaded, productKeys] = await Promise.all([
+      this.productRepo.find({
+        where: { id: In(productIds) },
         select: { id: true, displayName: true, createdAt: true, specs: true },
       }),
-      (product) => product.id,
-    );
+      isEmpty(queryKeys)
+        ? new Map<string, string[]>()
+        : this.sourceRecordRepo.findMatcherModelKeysByModelIds(productIds),
+    ]);
+    const products = keyBy(loaded, (product) => product.id);
     const categoryConfig = this.categoryConfigService.getConfig(
       query.categorySlug,
     );
@@ -74,6 +98,7 @@ export class ProductCandidateFinderService {
           categoryConfig,
         });
 
+        const keys = productKeys.get(product.id) ?? [];
         return {
           productId: product.id,
           displayName: product.displayName,
@@ -84,6 +109,11 @@ export class ProductCandidateFinderService {
           nameSimilarity: similarity,
           failedGates,
           specs: product.specs,
+          matcherModelMatch:
+            isEmpty(queryKeys) || isEmpty(keys)
+              ? undefined
+              : !isEmpty(intersection(queryKeys, keys)),
+          keyScore: keyScoreOf(failedGates),
         };
       }),
     );
@@ -97,8 +127,10 @@ export class ProductCandidateFinderService {
 
   /**
    * Scores each row on its name and keeps each product's best, preferring its
-   * name row on a tie. Aliases are stored raw or keyed by another rule, so
-   * they're re-keyed the way the query key was built before Levenshtein.
+   * name row on a tie (a matcherModel row carries the same name key, so it
+   * stays only for a product the name arm didn't recall). Aliases are stored
+   * raw or keyed by another rule, so they're re-keyed the way the query key
+   * was built before Levenshtein.
    */
   private bestRowPerProduct(
     query: ProductMatchQuery,

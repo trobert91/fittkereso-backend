@@ -561,6 +561,28 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     );
   }
 
+  /**
+   * Each product's matcherModel keys: those of its identifying sources'
+   * listings (a contributing source's listing stores none). A product without
+   * one is absent from the map.
+   */
+  async findMatcherModelKeysByModelIds(modelIds: string[]): Promise<Map<string, string[]>> {
+    const keys = new Map<string, string[]>();
+    if (modelIds.length === 0) return keys;
+
+    const model = `"${nameOf<ProductSourceRecord>('model')}Id"`;
+    const key = `"${nameOf<ProductSourceRecord>('matcherModelKey')}"`;
+    const rows: { modelId: string; keys: string[] }[] = await this.repo.query(
+      `SELECT ${model} AS "modelId", array_agg(DISTINCT ${key}) AS keys
+         FROM ${this.repo.metadata.tableName}
+        WHERE ${model} = ANY($1::uuid[]) AND ${key} IS NOT NULL
+        GROUP BY ${model}`,
+      [modelIds],
+    );
+    for (const row of rows) keys.set(row.modelId, row.keys);
+    return keys;
+  }
+
   async findModelIdsWithStaleContributors(params: {
     visibleCutoff: Date;
     deleteCutoff: Date;

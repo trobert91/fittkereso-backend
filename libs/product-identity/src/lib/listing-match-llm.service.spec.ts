@@ -27,6 +27,7 @@ function candidateOf(
     matchedValue: 'kapoho macina master',
     nameSimilarity: { trigram: 1, levenshtein: 1 },
     failedGates: [],
+    keyScore: 100,
     ...overrides,
   };
 }

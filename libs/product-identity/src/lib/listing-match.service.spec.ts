@@ -25,7 +25,11 @@ const QUERY = {
   specs: { modelYear: 2024 },
 };
 
-function candidateOf(productId: string, score: number): ProductCandidate {
+function candidateOf(
+  productId: string,
+  score: number,
+  keyed: Pick<ProductCandidate, 'matcherModelMatch'> & Partial<ProductCandidate> = {},
+): ProductCandidate {
   return {
     productId,
     displayName: 'KTM Macina Kapoho Master',
@@ -34,12 +38,14 @@ function candidateOf(productId: string, score: number): ProductCandidate {
     matchedValue: 'kapoho macina master',
     nameSimilarity: { trigram: 1, levenshtein: 1 },
     failedGates: [],
+    keyScore: 100,
+    ...keyed,
   };
 }
 
 describe('ListingMatchService', () => {
   let brandResolution: { resolve: jest.Mock };
-  let queryService: { ofListing: jest.Mock };
+  let queryService: { ofListing: jest.Mock; requiresMatcherModel: jest.Mock };
   let finder: { findCandidates: jest.Mock };
   let llmService: { pick: jest.Mock };
   let service: ListingMatchService;
@@ -48,7 +54,10 @@ describe('ListingMatchService', () => {
     brandResolution = {
       resolve: jest.fn().mockResolvedValue({ entity: BRAND, similarity: 1 }),
     };
-    queryService = { ofListing: jest.fn().mockReturnValue(QUERY) };
+    queryService = {
+      ofListing: jest.fn().mockReturnValue(QUERY),
+      requiresMatcherModel: jest.fn().mockReturnValue(false),
+    };
     finder = { findCandidates: jest.fn().mockResolvedValue([]) };
     llmService = { pick: jest.fn() };
     service = new ListingMatchService(
@@ -98,6 +107,7 @@ describe('ListingMatchService', () => {
           expect.objectContaining({ productId: MATCH_ID, score: 92 }),
           expect.objectContaining({ productId: OTHER_ID, score: 64 }),
         ],
+        mode: 'score',
       },
     });
     expect(llmService.pick).not.toHaveBeenCalled();
@@ -227,5 +237,68 @@ describe('ListingMatchService', () => {
     expect(result.productId).toBeUndefined();
     expect(result.decision.outcome).toBe('created');
     expect(llmService.pick).not.toHaveBeenCalled();
+  });
+
+  describe('matcherModel keys', () => {
+    const KEY = 'kapoho macina master';
+    beforeEach(() => {
+      queryService.ofListing.mockReturnValue({ ...QUERY, matcherModelKeys: [KEY] });
+    });
+
+    it('acts on the score and records what the key rule would have done', async () => {
+      finder.findCandidates.mockResolvedValue([
+        candidateOf(MATCH_ID, 92, { matcherModelMatch: false }),
+        candidateOf(OTHER_ID, 64, { matcherModelMatch: true }),
+      ]);
+
+      const { productId, decision } = await service.match(SCRAPED);
+
+      expect(productId).toBe(MATCH_ID);
+      expect(decision).toMatchObject({
+        mode: 'score',
+        matcherModelKey: KEY,
+        alternative: { mode: 'key', kind: 'attach', productId: OTHER_ID, comparison: 'switch' },
+      });
+      expect(decision.candidates[1]).toMatchObject({ matcherModelMatch: true, keyScore: 100 });
+    });
+
+    it('records a split when the key rule would keep the listing off the product the score chose', async () => {
+      // "Style 810" against "Style 810 Di2": a perfect name, another key.
+      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 100, { matcherModelMatch: false })]);
+
+      const { productId, decision } = await service.match(SCRAPED);
+
+      expect(productId).toBe(MATCH_ID);
+      expect(decision.alternative).toMatchObject({ kind: 'ask_llm', llmCandidates: 1, comparison: 'split' });
+    });
+
+    it('acts on equal keys where the category requires them, the chosen product first', async () => {
+      queryService.requiresMatcherModel.mockReturnValue(true);
+      finder.findCandidates.mockResolvedValue([
+        candidateOf(MATCH_ID, 92, { matcherModelMatch: false }),
+        candidateOf(OTHER_ID, 64, { matcherModelMatch: true }),
+      ]);
+
+      const { productId, decision } = await service.match(SCRAPED);
+
+      expect(queryService.requiresMatcherModel).toHaveBeenCalledWith('ebikes');
+      expect(productId).toBe(OTHER_ID);
+      expect(decision.mode).toBe('key');
+      expect(decision.candidates.map((candidate) => candidate.productId)).toEqual([OTHER_ID, MATCH_ID]);
+      expect(decision.alternative).toMatchObject({ mode: 'score', productId: MATCH_ID, comparison: 'switch' });
+    });
+
+    it('goes by the score, with nothing to compare, for a listing without a key', async () => {
+      queryService.requiresMatcherModel.mockReturnValue(true);
+      queryService.ofListing.mockReturnValue({ ...QUERY, matcherModelKeys: [] });
+      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 92)]);
+
+      const { productId, decision } = await service.match(SCRAPED);
+
+      expect(productId).toBe(MATCH_ID);
+      expect(decision.mode).toBe('score');
+      expect(decision.alternative).toBeUndefined();
+      expect(decision.matcherModelKey).toBeUndefined();
+    });
   });
 });
