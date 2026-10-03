@@ -250,6 +250,25 @@ describe('gates on the real KTM catalog', () => {
       expect(gatesOf('Női', 'Uniszex')).toEqual([]);
     });
 
+    it('lets Unisex through in either spelling and any case', () => {
+      const gatesOf = (queryGender: string, candidateGender: string) =>
+        applyGates({
+          queryKey: '720 macina style',
+          candidateKey: '720 macina style',
+          querySpecs: { gender: queryGender },
+          candidateSpecs: { gender: candidateGender },
+          categoryConfig: EBIKES,
+        });
+
+      expect(gatesOf('Unisex', 'Férfi')).toEqual([]);
+      expect(gatesOf('NŐI', 'unisex')).toEqual([]);
+      expect(gatesOf('uniszex', 'FÉRFI')).toEqual([]);
+      expect(gatesOf('Unisex', 'Uniszex')).toEqual([]);
+      expect(gatesOf('férfi', 'NŐI')).toEqual([
+        expect.objectContaining({ gate: 'matcherSpecMismatch', spec: 'gender' }),
+      ]);
+    });
+
     it('never refuses an identifier join over the rider', () => {
       // bikelife calls KTM's low-step frame Női, bringaboard the same article
       // Uniszex; a product voted Férfi can hold either shop's listing.

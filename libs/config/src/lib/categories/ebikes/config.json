@@ -266,6 +266,10 @@
         "Uniszex": [
           "Férfi",
           "Női"
+        ],
+        "Unisex": [
+          "Férfi",
+          "Női"
         ]
       }
     },

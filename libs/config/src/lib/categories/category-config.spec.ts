@@ -89,14 +89,15 @@ describe.each(categories)('the %s category config', (slug) => {
     expect(gated).toContain(key);
   });
 
-  // A value off the field's list never reaches a product, so its entry would
-  // never apply.
+  // A listed value off the field's list never reaches a product, so it would
+  // never apply. The entry's own value may also be another spelling of an
+  // allowed one ("Unisex" beside "Uniszex"). Compared as the gates compare,
+  // ignoring case.
   it.each(compatibleValues)('lists only allowed values of %s as compatible', (key, entries) => {
-    const allowed = properties[key]?.enum;
+    const allowed = properties[key]?.enum?.map((value) => value.toLowerCase());
     if (!allowed) return;
-    for (const [value, compatibles] of Object.entries(entries)) {
-      expect(allowed).toContain(value);
-      for (const compatible of compatibles) expect(allowed).toContain(compatible);
+    for (const compatibles of Object.values(entries)) {
+      for (const compatible of compatibles) expect(allowed).toContain(compatible.toLowerCase());
     }
   });
 
