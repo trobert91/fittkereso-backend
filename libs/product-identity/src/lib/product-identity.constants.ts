@@ -4,6 +4,19 @@ import type { IdentityGate } from '@fittkereso-backend/database';
 export const ACCEPT_SCORE = 80;
 
 /**
+ * When several candidates reach ACCEPT_SCORE, the best still attaches if it
+ * scores at least CLEAR_WINNER_SCORE and leads the runner-up by at least
+ * CLEAR_WINNER_LEAD. A perfect name with no failed gate beside a variant at
+ * 81–85 ("… 400X" against "… 400X FE") is not a tie worth a new product.
+ *
+ * Measured on the 2026-10-02 wave-1 test imports: with the LLM off, every such
+ * listing became a new product, about 60 rows across five shops, 34 of them
+ * with a 100 on top.
+ */
+export const CLEAR_WINNER_SCORE = 100;
+export const CLEAR_WINNER_LEAD = 10;
+
+/**
  * Candidates at or above this are near-misses: a listing sends them to the
  * LLM, and two stored products become a duplicate pair.
  */
