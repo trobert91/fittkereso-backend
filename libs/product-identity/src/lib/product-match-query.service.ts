@@ -2,12 +2,24 @@ import { Injectable } from '@nestjs/common';
 import type {
   Brand,
   ProductModel,
+  ProductSpecs,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
 import { listingNames } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
+import { flatMap, isArray, isNumber, isString, uniq } from 'lodash';
 import type { ProductMatchQuery } from './types';
+
+/**
+ * The words a spec value would appear as in a model name: a string or a
+ * number as written, each item of a list. A yes/no value has none.
+ */
+function spokenValuesOf(value: ProductSpecs[string]): string[] {
+  if (isArray(value)) return value.filter(isString);
+  if (isString(value) || isNumber(value)) return [String(value)];
+  return [];
+}
 
 /**
  * Turns what the finder is asked about — a listing that isn't a product yet,
@@ -71,6 +83,54 @@ export class ProductMatchQueryService {
       }),
       specs: product.specs,
     };
+  }
+
+  /**
+   * A listing's matcherModel key: `text` (the identity extraction's
+   * `matcherModel`) normalized with the listing's own brand, minus the
+   * listing's values of the category's `matcherModel.excludeSpecs` (its year,
+   * say), in case the extraction kept one. The only place a key is built, and
+   * built from the listing alone, so the key its record stores and the key a
+   * query of it compares are the same. Undefined when nothing is left.
+   *
+   * The offer-level values (size, colour) are left out by the prompt but not
+   * dropped here: a size label doubles as a model word ("Team XL" is a model,
+   * and a listing of it can carry "XL" as its frame size), and dropping it
+   * would key two models alike.
+   */
+  public matcherModelKeyOf(
+    listing: Pick<ScrapedProduct, 'brand' | 'category' | 'specs' | 'offers'>,
+    text: string | undefined,
+  ): string | undefined {
+    const excluded =
+      this.categoryConfigService.getConfig(listing.category.slug)?.matchingConfig
+        ?.matcherModel?.excludeSpecs ?? [];
+    const specSets = [
+      listing.specs,
+      ...(listing.offers ?? []).map((offer) => offer.specs),
+    ];
+    const dropValues = flatMap(specSets, (specs) =>
+      flatMap(excluded, (key) => spokenValuesOf(specs?.[key])),
+    );
+
+    return this.productNormalizer.normalizeMatcherModel({
+      text,
+      brand: listing.brand,
+      dropValues: uniq(dropValues),
+    });
+  }
+
+  /**
+   * The specs a matcherModel leaves out, as the extraction prompt names them:
+   * the category's offer-level specs (they describe a listing, not a model)
+   * and its `matchingConfig.matcherModel.excludeSpecs`.
+   */
+  public excludedSpecKeysOf(categorySlug: string): string[] {
+    const config = this.categoryConfigService.getConfig(categorySlug);
+    return uniq([
+      ...(config?.offerLevelSpecs ?? []),
+      ...(config?.matchingConfig?.matcherModel?.excludeSpecs ?? []),
+    ]);
   }
 
   /**

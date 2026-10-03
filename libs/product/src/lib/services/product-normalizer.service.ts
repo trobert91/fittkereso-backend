@@ -1,7 +1,80 @@
 import { Injectable } from '@nestjs/common';
+import { uniq } from 'lodash';
 
 @Injectable()
 export class ProductNormalizerService {
+  /**
+   * The key two listings of one model share: a `matcherModel` (the identity
+   * extraction's model designation) reduced to its sorted, de-duplicated
+   * words, so it can be compared for equality. Undefined when nothing is left.
+   *
+   * Every step removes a difference that says nothing about which model it
+   * is, and keeps every word that does:
+   * - accents and case go ("Trapéz" and "TRAPEZ" agree);
+   * - "+" becomes the word `plus` ("Move" and "Move+" are different bikes);
+   * - other punctuation splits words ("C:62", "400X/FE");
+   * - letters and digits split ("CX830" and "CX 830" agree, as do "ONE22" and
+   *   "ONE 22");
+   * - the brand's words go, wherever they stand;
+   * - each of `dropValues` goes where its words stand in a row: the listing's
+   *   own values of the specs a key leaves out (its year, its wheel size), in
+   *   case the extraction kept one.
+   *
+   * Lossy by construction: splitting then sorting lets "E5 … 1" and
+   * "E1 … 5" collide. Matching never acts on a key alone: the spec gates
+   * still apply.
+   */
+  public normalizeMatcherModel({
+    text,
+    brand,
+    dropValues = [],
+  }: {
+    text: string | undefined;
+    brand?: string;
+    dropValues?: string[];
+  }): string | undefined {
+    const brandWords = new Set(this.matcherModelWords(brand));
+    const words = dropValues
+      .reduce(
+        (remaining, value) => this.withoutRun(remaining, this.matcherModelWords(value)),
+        this.matcherModelWords(text),
+      )
+      .filter((word) => !brandWords.has(word));
+
+    return uniq(words).sort().join(' ') || undefined;
+  }
+
+  private matcherModelWords(text: string | undefined): string[] {
+    if (!text) return [];
+    return text
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/\+/g, ' plus ')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .replace(/(\p{L})(\p{N})/gu, '$1 $2')
+      .replace(/(\p{N})(\p{L})/gu, '$1 $2')
+      .split(' ')
+      .filter(Boolean);
+  }
+
+  /** `words` without every occurrence of `run` as consecutive words. */
+  private withoutRun(words: string[], run: string[]): string[] {
+    if (run.length === 0) return words;
+
+    const kept: string[] = [];
+    for (let i = 0; i < words.length; ) {
+      const matches = run.every((word, offset) => words[i + offset] === word);
+      if (matches) {
+        i += run.length;
+      } else {
+        kept.push(words[i]);
+        i += 1;
+      }
+    }
+    return kept;
+  }
+
   /**
    * Produce the pg_trgm similarity key for a product: a compact, lowercased,
    * brand-less string of model identifiers.

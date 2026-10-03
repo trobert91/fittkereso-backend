@@ -31,6 +31,14 @@ export interface ScrapedProduct {
   /** `${brand} ${model}`, set exactly when `model` is. */
   displayName?: string;
   /**
+   * The model designation two listings of one model share, as the identity
+   * extraction wrote it: line, model numbers and variant or equipment
+   * markers, without the brand and without the specs the category's
+   * `matchingConfig.matcherModel` leaves out. Compared only as a normalized
+   * key (ProductMatchQueryService.matcherModelKeyOf), never shown.
+   */
+  matcherModel?: string;
+  /**
    * The title exactly as the shop publishes it. Every importer sets it; the
    * identity extraction reads it, and it stays as scraped.
    */

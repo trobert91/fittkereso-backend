@@ -291,6 +291,10 @@
     },
     "specMismatchPenalty": {
       "modelYear": 50
+    },
+    "matcherModel": {
+      "excludeSpecs": ["modelYear", "gender", "wheelSize"],
+      "required": false
     }
   },
   "normalizationStrategy": "full-sorted",

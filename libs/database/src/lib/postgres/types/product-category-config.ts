@@ -31,6 +31,26 @@ export interface CategoryMatchingConfig {
    *  reaches review, since that pair scores 100 whatever it contradicts.
    *  0 turns the gate off, as in `missingSpecPenalty`. */
   specMismatchPenalty?: Record<string, number>;
+  /** How the identity extraction's `matcherModel` is keyed and used. See
+   *  CategoryMatcherModelConfig. */
+  matcherModel?: CategoryMatcherModelConfig;
+}
+
+/** The `matcherModel`: the model designation two listings of one model share,
+ *  compared as a normalized key (ProductNormalizerService.normalizeMatcherModel).
+ *  A listing auto-attaches by name only to a product with the same key; a
+ *  close name with another key goes to review. */
+export interface CategoryMatcherModelConfig {
+  /** Spec keys whose values the key leaves out, on top of the category's
+   *  `offerLevelSpecs` (always left out: size and colour describe a listing,
+   *  not a model). For a spec a model's name may state while one shop's title
+   *  leaves it out — the year — or that differs between sizes of one model,
+   *  so the spec gates judge it rather than the key. A spec whose words tell
+   *  models apart even when only one side states its value stays in. */
+  excludeSpecs?: string[];
+  /** Whether name matching requires equal keys. Off, keys are extracted,
+   *  stored and compared, but the old score rule decides (shadow mode). */
+  required?: boolean;
 }
 
 /** How far apart two numeric values may be and still count as the same.

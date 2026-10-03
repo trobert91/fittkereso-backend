@@ -276,6 +276,14 @@ export class CategoryTools {
       const mismatchPenalties = Object.entries(
         matchingConfig.specMismatchPenalty ?? {},
       ).map(([key, points]) => `${key} −${points}`);
+      const matcherModel = matchingConfig.matcherModel;
+      const matcherModelLine = matcherModel
+        ? `matcherModel ${matcherModel.required ? 'required' : 'shadow'}, leaves out offer-level specs${
+            matcherModel.excludeSpecs?.length
+              ? ` + ${matcherModel.excludeSpecs.join(', ')}`
+              : ''
+          }`
+        : 'no matcherModel';
       lines.push(
         `- **Matching Config**: Yes (${
           tolerances.length
@@ -289,7 +297,7 @@ export class CategoryTools {
           mismatchPenalties.length
             ? `mismatch penalties: ${mismatchPenalties.join(', ')}`
             : 'default mismatch penalties'
-        })`,
+        }; ${matcherModelLine})`,
       );
     } else {
       lines.push('- **Matching Config**: No');

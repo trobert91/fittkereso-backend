@@ -198,4 +198,52 @@ describe('ProductNormalizerService', () => {
       );
     });
   });
+  describe('normalizeMatcherModel', () => {
+    const key = (text: string | undefined, brand = 'KTM', dropValues: string[] = []) =>
+      service.normalizeMatcherModel({ text, brand, dropValues });
+
+    it.each([
+      ['spacing inside a model number', 'Macina Tour CX830', 'Macina Tour CX 830'],
+      ['a number glued to a trim word', 'Stereo Hybrid ONE22 Pro 800', 'Stereo Hybrid ONE 22 Pro 800'],
+      ['word order', 'Macina Cross 720', 'Cross Macina 720'],
+      ['case and accents', 'Trapéz', 'TRAPEZ'],
+      ['punctuation', 'Nuroad Hybrid C:62 Race 400X', 'Nuroad Hybrid C62 Race 400 X'],
+      ['the brand anywhere', 'KTM Macina Style 810', 'Macina Style 810 KTM'],
+    ])('agrees across %s', (_case, a, b) => {
+      expect(key(a)).toBe(key(b));
+    });
+
+    it.each([
+      ['Di2', 'Macina Style 810 Di2', 'Macina Style 810'],
+      ['a trim swap', 'Stereo Hybrid ONE22 Pro 800', 'Stereo Hybrid ONE22 SLX 800'],
+      ['FE', 'Nuroad Hybrid C:62 Race 400X FE', 'Nuroad Hybrid C:62 Race 400X'],
+      ['a plus', 'Move+', 'Move'],
+      ['the model number', 'Macina Style 810', 'Macina Style 820'],
+    ])('tells apart %s', (_case, a, b) => {
+      expect(key(a)).not.toBe(key(b));
+    });
+
+    it('sorts and de-duplicates the words', () => {
+      expect(key('Macina Style 810 Style')).toBe('810 macina style');
+    });
+
+    it('keeps a plus as the word plus', () => {
+      expect(key('Move+', 'Kalkhoff')).toBe('move plus');
+    });
+
+    it('drops every word of a multi-word brand', () => {
+      expect(key('Rock Machine Crossride e500', 'Rock Machine')).toBe('500 crossride e');
+    });
+
+    it('drops a dropped value only where its words stand in a row', () => {
+      // The year and the wheel size go; the 5 of 'E5' stays.
+      expect(key('Macina E5 2026 27,5', 'KTM', ['2026', '27,5'])).toBe('5 e macina');
+    });
+
+    it('is undefined when nothing is left', () => {
+      expect(key(undefined)).toBeUndefined();
+      expect(key('KTM')).toBeUndefined();
+      expect(key(' - ')).toBeUndefined();
+    });
+  });
 });

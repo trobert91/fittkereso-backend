@@ -8,6 +8,15 @@ import { ProductModel } from '../models/product-model.entity';
 import { Seller } from '../models/seller.entity';
 import { nameOf } from '@fittkereso-backend/utils';
 
+/** Two listings whose offers share an identifier (findRecordPairsSharingIdentifier). */
+export interface RecordIdentifierPair {
+  /** Source record ids, `a` < `b`. */
+  a: string;
+  b: string;
+  via: 'gtin' | 'mpn';
+  value: string;
+}
+
 @Injectable()
 export class OfferRepository extends BasePostgresRepository<Offer> {
   constructor(
@@ -159,6 +168,36 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
     });
     return offers.flatMap((offer) =>
       offer.gtin ? [{ modelId: offer.model.id, gtin: offer.gtin }] : [],
+    );
+  }
+
+  /**
+   * Pairs of listings (source records) whose offers carry the same
+   * identifier: a GTIN, or an MPN within one brand. Ground truth for "the
+   * same model" when a matching rule is measured, whichever products the two
+   * sit on today. Each pair once, with the lower record id first.
+   */
+  async findRecordPairsSharingIdentifier(): Promise<RecordIdentifierPair[]> {
+    const record = `"${nameOf<Offer>('sourceRecord')}Id"`;
+    const model = `"${nameOf<Offer>('model')}Id"`;
+    const brand = `"${nameOf<ProductModel>('brand')}Id"`;
+    const gtin = `"${nameOf<Offer>('gtin')}"`;
+    const mpn = `"${nameOf<Offer>('mpn')}"`;
+    const offers = this.repo.metadata.tableName;
+    const products = this.repo.manager.getRepository(ProductModel).metadata.tableName;
+
+    return this.repo.query(
+      `SELECT DISTINCT a.${record} AS "a", b.${record} AS "b", 'gtin' AS "via", a.${gtin} AS "value"
+         FROM ${offers} a
+         JOIN ${offers} b ON b.${gtin} = a.${gtin} AND b.${record} > a.${record}
+        WHERE a.${gtin} IS NOT NULL
+       UNION
+       SELECT DISTINCT a.${record}, b.${record}, 'mpn', a.${mpn}
+         FROM ${offers} a
+         JOIN ${offers} b ON b.${mpn} = a.${mpn} AND b.${record} > a.${record}
+         JOIN ${products} pa ON pa.id = a.${model}
+         JOIN ${products} pb ON pb.id = b.${model} AND pb.${brand} = pa.${brand}
+        WHERE a.${mpn} IS NOT NULL`,
     );
   }
 

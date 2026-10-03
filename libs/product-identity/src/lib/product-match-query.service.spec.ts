@@ -1,6 +1,8 @@
 import type {
   Brand,
   ProductModel,
+  ProductSpecs,
+  ScrapedOffer,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
@@ -104,5 +106,62 @@ describe('ProductMatchQueryService', () => {
     expect(() => service.ofProduct(productOf({ productCategory: undefined }))).toThrow(
       'needs brand and productCategory loaded',
     );
+  });
+
+  describe('matcherModelKeyOf', () => {
+    const matchingConfig = {
+      offerLevelSpecs: ['frameSizeLabel', 'color'],
+      matchingConfig: { matcherModel: { excludeSpecs: ['modelYear', 'wheelSize'] } },
+    };
+
+    const offerWith = (specs: ProductSpecs) => ({ specs }) as ScrapedOffer;
+
+    beforeEach(() => categoryConfigService.getConfig.mockReturnValue(matchingConfig));
+
+    it('keys on the text with the listing brand stripped', () => {
+      const listing = listingOf({ brand: 'Cube' });
+
+      expect(service.matcherModelKeyOf(listing, 'Cube Stereo Hybrid ONE22 Pro 800')).toBe(
+        '22 800 hybrid one pro stereo',
+      );
+    });
+
+    it("drops the listing's own values of the excluded specs, from the listing and its offers", () => {
+      const listing = listingOf({
+        specs: { modelYear: 2026 },
+        offers: [offerWith({ wheelSize: 29 }), offerWith({ wheelSize: '27.5' })],
+      });
+
+      expect(service.matcherModelKeyOf(listing, 'Reaction Hybrid Pro 750 2026 29')).toBe(
+        '750 hybrid pro reaction',
+      );
+      expect(service.matcherModelKeyOf(listing, 'Reaction Hybrid Pro 750 27.5')).toBe(
+        '750 hybrid pro reaction',
+      );
+    });
+
+    // "XL" is KTM's heavy-duty model and a frame size; dropping the listing's
+    // size would key Team XL like Team.
+    it('keeps a word that only equals an offer-level value', () => {
+      const listing = listingOf({
+        brand: 'KTM',
+        offers: [offerWith({ frameSizeLabel: 'XL' })],
+      });
+
+      expect(service.matcherModelKeyOf(listing, 'Macina Team XL')).toBe('macina team xl');
+    });
+
+    it('is undefined without text', () => {
+      expect(service.matcherModelKeyOf(listingOf(), undefined)).toBeUndefined();
+    });
+
+    it('lists the offer-level and the configured specs as left out', () => {
+      expect(service.excludedSpecKeysOf('ebikes')).toEqual([
+        'frameSizeLabel',
+        'color',
+        'modelYear',
+        'wheelSize',
+      ]);
+    });
   });
 });

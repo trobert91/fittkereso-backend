@@ -22,6 +22,18 @@ export interface FeedRowState {
   modelId: string | null;
 }
 
+/** A listing of an identifying source, as findIdentifyingListingsInCategory reads it. */
+export interface IdentifyingListingRow {
+  id: string;
+  /** The product it sits on; null while it is unattached. */
+  modelId: string | null;
+  sourceId: string;
+  sourceName: string;
+  sellerId: string;
+  /** The stored listing without its spec table, description and images. */
+  listing: Partial<ScrapedProduct>;
+}
+
 /** What a list of listings can be ordered by. */
 export const PRODUCT_SOURCE_RECORD_SORTS = [
   'title',
@@ -458,6 +470,44 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    * picked up for a bounded number of nightly runs), next to a current record
    * of the same seller on the same product.
    */
+  /**
+   * Every listing a product-identifying source has in this category, with
+   * what a matcherModel key is built from: its stored listing (brand, names,
+   * specs, offers — the spec table and description are left out), the
+   * product it sits on, and its source and seller. For measuring matching
+   * rules; nothing here writes.
+   */
+  async findIdentifyingListingsInCategory(
+    categorySlug: string,
+  ): Promise<IdentifyingListingRow[]> {
+    const model = nameOf<ProductSourceRecord>('model');
+    const source = nameOf<ProductSourceRecord>('source');
+    const scraped = `record."${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
+    const seller = nameOf<ProductSource>('seller');
+    const identifies = nameOf<ProductSource>('identifiesProducts');
+    const heavy = [
+      nameOf<ScrapedProduct>('rawSpecs'),
+      nameOf<ScrapedProduct>('description'),
+      nameOf<ScrapedProduct>('images'),
+    ];
+
+    return this.repo
+      .createQueryBuilder('record')
+      .select('record.id', 'id')
+      .addSelect(`record."${model}Id"`, 'modelId')
+      .addSelect('source.id', 'sourceId')
+      .addSelect('source.name', 'sourceName')
+      .addSelect(`source."${seller}Id"`, 'sellerId')
+      .addSelect(`${scraped} - ARRAY[:...heavy]::text[]`, 'listing')
+      .innerJoin(`record.${source}`, 'source')
+      .where(`source."${identifies}" IS NOT FALSE`)
+      .andWhere(`${scraped}->'${nameOf<ScrapedProduct>('category')}'->>'slug' = :categorySlug`, {
+        categorySlug,
+      })
+      .setParameter('heavy', heavy)
+      .getRawMany();
+  }
+
   async findModelIdsWithStaleContributors(params: {
     visibleCutoff: Date;
     deleteCutoff: Date;

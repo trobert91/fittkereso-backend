@@ -9,7 +9,11 @@ interface SchemaProperty {
 interface CategoryConfig {
   primarySpecs?: string[];
   matcherSpecs?: string[];
-  matchingConfig?: { specMismatchPenalty?: Record<string, unknown> };
+  offerLevelSpecs?: string[];
+  matchingConfig?: {
+    specMismatchPenalty?: Record<string, unknown>;
+    matcherModel?: { excludeSpecs?: string[] };
+  };
 }
 
 // Every category directory holding both files. Read from disk rather than
@@ -38,6 +42,17 @@ describe.each(categories)('the %s category config', (slug) => {
     .properties;
   const gated = [...(config.primarySpecs ?? []), ...(config.matcherSpecs ?? [])];
   const penalties = Object.entries(config.matchingConfig?.specMismatchPenalty ?? {});
+  const keyExcludes = config.matchingConfig?.matcherModel?.excludeSpecs ?? [];
+
+  it.each(keyExcludes)('leaves %s out of the matcherModel key, a field of the schema', (key) => {
+    expect(Object.keys(properties)).toContain(key);
+  });
+
+  // The offer-level specs are always left out; listing one again only hides
+  // that the two lists can drift apart.
+  it.each(keyExcludes)('lists %s only once, outside the offer-level specs', (key) => {
+    expect(config.offerLevelSpecs ?? []).not.toContain(key);
+  });
 
   it.each(penalties)('prices a mismatch on %s, a spec the gates compare', (key) => {
     expect(gated).toContain(key);
