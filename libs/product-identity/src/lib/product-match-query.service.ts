@@ -5,7 +5,10 @@ import type {
   ProductSpecs,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
-import { listingNames } from '@fittkereso-backend/database';
+import {
+  listingNames,
+  matcherModelExcludedSpecKeys,
+} from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
 import { flatMap, isArray, isNumber, isString, uniq } from 'lodash';
@@ -126,11 +129,9 @@ export class ProductMatchQueryService {
    * and its `matchingConfig.matcherModel.excludeSpecs`.
    */
   public excludedSpecKeysOf(categorySlug: string): string[] {
-    const config = this.categoryConfigService.getConfig(categorySlug);
-    return uniq([
-      ...(config?.offerLevelSpecs ?? []),
-      ...(config?.matchingConfig?.matcherModel?.excludeSpecs ?? []),
-    ]);
+    return matcherModelExcludedSpecKeys(
+      this.categoryConfigService.getConfig(categorySlug),
+    );
   }
 
   /**

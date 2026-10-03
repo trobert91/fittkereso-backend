@@ -294,7 +294,15 @@
     },
     "matcherModel": {
       "excludeSpecs": ["modelYear", "gender", "wheelSize"],
-      "required": false
+      "required": false,
+      "examples": [
+        { "title": "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl", "matcherModel": "MACINA STYLE 810 Di2" },
+        { "title": "Cube Kathmandu Hybrid ONE 800 smaragdgrey'n'black 2025 Trapeze 54", "matcherModel": "Kathmandu Hybrid ONE 800 Trapeze" },
+        { "title": "Cube Nuroad Hybrid C:62 Race 400X FE 2027 M", "matcherModel": "Nuroad Hybrid C:62 Race 400X FE" },
+        { "title": "KTM Macina Team XL 2023 elektromos MTB kerékpár 53 cm", "matcherModel": "Macina Team XL" },
+        { "title": "Scott Axis eRIDE FS 20 férfi elektromos kerékpár 29\" L", "matcherModel": "Axis eRIDE FS 20" },
+        { "title": "Kellys Estima 40 Black Ebike/ Pedelec City 9 fokozatú Altus váltó", "matcherModel": "Estima 40" }
+      ]
     }
   },
   "normalizationStrategy": "full-sorted",

@@ -39,6 +39,13 @@ export interface ScrapedProduct {
    */
   matcherModel?: string;
   /**
+   * Digest of what `matcherModel` was asked under: the category's left-out
+   * specs, its examples and the prompt's version. A stored matcherModel under
+   * another contract is extracted again, alone — the rest of the stored
+   * extraction is kept, so nothing is renamed.
+   */
+  matcherModelContract?: string;
+  /**
    * The title exactly as the shop publishes it. Every importer sets it; the
    * identity extraction reads it, and it stays as scraped.
    */

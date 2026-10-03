@@ -120,6 +120,10 @@ export class EntityTools {
         }
         if (record.normalizedSourceName)
           L.push(`- **Normalized Source Name**: ${record.normalizedSourceName}`);
+        if (record.scrapedProduct?.matcherModel || record.matcherModelKey)
+          L.push(
+            `- **matcherModel**: "${record.scrapedProduct?.matcherModel ?? '–'}" → \`${record.matcherModelKey ?? '–'}\``,
+          );
 
         // What this source says, before the seller's sources are composed.
         const entries = record.scrapedProduct?.offers ?? [];

@@ -876,6 +876,74 @@ describe('ProductSourcePostProcessService', () => {
       expect(systemPrompt).not.toMatch(/modelYear|frameSize|Pay particular attention/);
     });
 
+    describe('matcherModel', () => {
+      const schemaWithKeys: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'E-bike',
+        properties: {
+          weight: { type: 'number', title: 'Weight', meta: { unit: 'kg' } },
+          frameSize: { type: 'number', title: 'Frame size', meta: { unit: 'cm' } },
+          modelYear: { type: 'number', title: 'Model year' },
+        },
+      };
+      const rawTitle = 'KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl';
+      const extract = (matcherModel?: string, withRequest = true) => {
+        aiChat.createChat.mockResolvedValueOnce({
+          content: '{}',
+          parsed: { model: 'Macina Style 810 Di2', ...(matcherModel ? { matcherModel } : {}) },
+        });
+        return service.extractIdentity({
+          data: { brand: 'KTM', model: rawTitle, specs: {} },
+          schema: schemaWithKeys,
+          outputKeys: ['weight', 'frameSize', 'modelYear'],
+          offerLevelSpecs: ['frameSize'],
+          ...(withRequest
+            ? {
+                matcherModel: {
+                  excludedKeys: ['frameSize', 'modelYear'],
+                  examples: [
+                    { title: 'Cube Reaction Hybrid Pro 750 27.5" M', matcherModel: 'Reaction Hybrid Pro 750' },
+                  ],
+                },
+              }
+            : {}),
+        });
+      };
+      const systemPrompt = () => aiChat.createChat.mock.calls[0][0].messages[0].content as string;
+
+      it('asks for it with the left-out fields by title and the category examples', async () => {
+        await extract('Macina Style 810 Di2');
+
+        expect(systemPrompt()).toContain('"matcherModel"');
+        expect(systemPrompt()).toContain('a value of Frame size, Model year');
+        expect(systemPrompt()).toContain('"Cube Reaction Hybrid Pro 750 27.5" M" → "Reaction Hybrid Pro 750"');
+        expect(aiChat.createChat.mock.calls[0][0].schema.properties.matcherModel).toEqual({ type: 'string' });
+      });
+
+      it('returns the words the title has', async () => {
+        expect((await extract('Macina Style 810 Di2'))?.matcherModel).toBe('Macina Style 810 Di2');
+      });
+
+      // A word the shop never printed can't be agreed on by two shops.
+      it('drops a word the title does not have, comparing words the way the key does', async () => {
+        const result = await extract('macina STYLE 810-Di2 Electric');
+
+        expect(result?.matcherModel).toBe('macina STYLE 810-Di2');
+      });
+
+      it('is undefined when no word of it is in the title', async () => {
+        expect((await extract('Elektromos kerékpár'))?.matcherModel).toBeUndefined();
+      });
+
+      it('neither asks nor returns one without a request', async () => {
+        const result = await extract('Macina Style 810 Di2', false);
+
+        expect(systemPrompt()).not.toContain('"matcherModel"');
+        expect(aiChat.createChat.mock.calls[0][0].schema.properties.matcherModel).toBeUndefined();
+        expect(result?.matcherModel).toBeUndefined();
+      });
+    });
+
     describe('offerLevelSpecs extraction guidance', () => {
       const schemaWithFrameSize: SpecDefinitionJsonSchema = {
         type: 'object',

@@ -172,6 +172,18 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   normalizedSourceName?: string | null;
 
+  /**
+   * The listing's matcherModel key (ProductMatchQueryService.
+   * matcherModelKeyOf over scrapedProduct.matcherModel): what name matching
+   * compares for equality. A product's keys are its identifying listings'.
+   * Null on the records of a source that does not identify products, and
+   * while a listing has no matcherModel.
+   */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  matcherModelKey?: string | null;
+
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @OneToMany(() => Offer, (offer) => offer.sourceRecord)
   offers?: Offer[];

@@ -5,11 +5,13 @@ import {
   PRODUCT_SOURCE_FETCH_MODES,
   ProductSourceFetchMode,
   ProductSourceRepository,
+  ScrapedProduct,
 } from '@fittkereso-backend/database';
 import {
   ProductSourceImportSimulationResult,
   ProductSourceImportSimulationService,
 } from '@fittkereso-backend/product-scraper';
+import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
 import { formatListingIdentifiers } from './identifier-format';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class ProductSourceSimulateImportTools {
   constructor(
     private readonly simulation: ProductSourceImportSimulationService,
     private readonly productSourceRepo: ProductSourceRepository,
+    private readonly matchQuery: ProductMatchQueryService,
   ) {}
 
   @Tool({
@@ -168,7 +171,11 @@ export class ProductSourceSimulateImportTools {
     if (feed.productIdentifiers.length) {
       L.push('## Previewed items: what identity resolution would look up');
       feed.productIdentifiers.forEach((identifiers, index) => {
-        L.push(`- ${feed.products[index]?.originalName ?? `item ${index + 1}`}`);
+        const product = feed.products[index];
+        L.push(`- ${product?.originalName ?? `item ${index + 1}`}`);
+        if (product) {
+          L.push(`  - **matcherModel**: ${this.matcherModelLine(product)}`);
+        }
         L.push(...formatListingIdentifiers(identifiers, '  '));
       });
       L.push('');
@@ -178,6 +185,13 @@ export class ProductSourceSimulateImportTools {
     L.push('```json');
     L.push(JSON.stringify(feed.products, null, 2));
     L.push('```');
+  }
+
+  /** The extracted matcherModel and the key name matching would compare. */
+  private matcherModelLine(product: ScrapedProduct): string {
+    if (!product.matcherModel) return 'none';
+    const key = this.matchQuery.matcherModelKeyOf(product, product.matcherModel);
+    return `"${product.matcherModel}" → \`${key ?? '–'}\``;
   }
 
   private formatFeedIdentifiers(

@@ -576,4 +576,23 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
     });
     expect(existing.normalizedSourceName).toBeNull();
   });
+
+  it('stores the matcherModel key it is given, clears it on null and keeps it when none is passed', () => {
+    const existing = { id: 'record-ktm', model: null, matcherModelKey: '810 di macina style' } as any;
+    const upsert = (matcherModelKey?: string | null) =>
+      service.upsertUnattached({
+        existing,
+        source: google,
+        scrapedProduct: listing,
+        sourceUrl: 'https://speedbike.hu/haibike',
+        matcherModelKey,
+      });
+
+    upsert();
+    expect(existing.matcherModelKey).toBe('810 di macina style');
+    upsert('sduro haibike');
+    expect(existing.matcherModelKey).toBe('sduro haibike');
+    upsert(null);
+    expect(existing.matcherModelKey).toBeNull();
+  });
 });

@@ -12,7 +12,10 @@ interface CategoryConfig {
   offerLevelSpecs?: string[];
   matchingConfig?: {
     specMismatchPenalty?: Record<string, unknown>;
-    matcherModel?: { excludeSpecs?: string[] };
+    matcherModel?: {
+      excludeSpecs?: string[];
+      examples?: { title: string; matcherModel: string }[];
+    };
   };
 }
 
@@ -52,6 +55,22 @@ describe.each(categories)('the %s category config', (slug) => {
   // that the two lists can drift apart.
   it.each(keyExcludes)('lists %s only once, outside the offer-level specs', (key) => {
     expect(config.offerLevelSpecs ?? []).not.toContain(key);
+  });
+
+  // The prompt tells the LLM to keep only the title's own words, in order; an
+  // example that breaks the rule teaches it to.
+  it.each(
+    (config.matchingConfig?.matcherModel?.examples ?? []).map(
+      (example) => [example.matcherModel, example] as const,
+    ),
+  )("shows a matcherModel of the title's own words, in order: %s", (_name, example) => {
+    const titleWords = example.title.split(/\s+/);
+    let from = 0;
+    for (const word of example.matcherModel.split(/\s+/)) {
+      const at = titleWords.indexOf(word, from);
+      expect(at).toBeGreaterThanOrEqual(from);
+      from = at + 1;
+    }
   });
 
   it.each(penalties)('prices a mismatch on %s, a spec the gates compare', (key) => {

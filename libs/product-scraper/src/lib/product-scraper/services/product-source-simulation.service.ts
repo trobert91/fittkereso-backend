@@ -49,6 +49,8 @@ export interface SimulatedProductPreview {
   /** Absent when the identity extraction gave no name (see `flags`). */
   model?: string;
   displayName?: string;
+  /** The identity extraction's matcherModel: what name matching keys this listing on. */
+  matcherModel?: string;
   originalName?: string;
   flags?: ScrapedProductFlag[];
   categorySlug: string;
@@ -320,6 +322,7 @@ export class ProductSourceSimulationService {
       brand: identified.brand,
       model: identified.model,
       displayName: identified.displayName,
+      matcherModel: identified.matcherModel,
       originalName: detail.model,
       flags: identified.flags,
       categorySlug: category.slug,

@@ -42,6 +42,8 @@ export class ProductSourceRecordUpdaterService {
     externalId?: string;
     sourceUrl?: string;
     normalizedSourceName?: string | null;
+    /** The listing's matcherModel key; null clears it, undefined keeps it. */
+    matcherModelKey?: string | null;
     /** A feed row's hash, stored so the next feed run can tell it unchanged. */
     feedRowHash?: string;
   }): Promise<ProductSourceRecord | undefined> {
@@ -185,6 +187,7 @@ export class ProductSourceRecordUpdaterService {
     externalId?: string;
     sourceUrl: string;
     normalizedSourceName?: string | null;
+    matcherModelKey?: string | null;
     feedRowHash?: string;
   }): ProductSourceRecord {
     const record = params.existing ?? new ProductSourceRecord();
@@ -254,6 +257,7 @@ export class ProductSourceRecordUpdaterService {
       externalId?: string;
       sourceUrl?: string;
       normalizedSourceName?: string | null;
+      matcherModelKey?: string | null;
       feedRowHash?: string;
       processedSpecs: NonNullable<ScrapedProduct['specs']>;
       validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
@@ -264,6 +268,7 @@ export class ProductSourceRecordUpdaterService {
       externalId,
       sourceUrl,
       normalizedSourceName,
+      matcherModelKey,
       processedSpecs,
       validation,
     } = params;
@@ -314,6 +319,7 @@ export class ProductSourceRecordUpdaterService {
     // undefined leaves it as stored.
     if (normalizedSourceName !== undefined)
       source.normalizedSourceName = normalizedSourceName;
+    if (matcherModelKey !== undefined) source.matcherModelKey = matcherModelKey;
     if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;
   }
 

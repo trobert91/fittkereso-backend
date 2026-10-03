@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import {
   isArukeresoConfig,
   isScrapingConfig,
+  matcherModelExcludedSpecKeys,
   ProductSourceConfig,
   ProductSourcePostProcessConfig,
   ProductSourceRecord,
@@ -15,6 +16,8 @@ import {
 import {
   getYearSpecKeys,
   IdentityContribution,
+  MATCHER_MODEL_PROMPT_VERSION,
+  MatcherModelRequest,
   normalizeYearSpecs,
   ProductSourcePostProcessMergeService,
   ProductSourcePostProcessService,
@@ -41,6 +44,8 @@ export interface CategorySpecScopes {
   offerLevelKeys: string[];
   /** Every other schema field: what full spec unification fills. */
   unificationKeys: string[];
+  /** What the identity extraction is told about the matcherModel. */
+  matcherModel: MatcherModelRequest;
 }
 
 /**
@@ -83,10 +88,18 @@ export class SpecPostProcessService {
       ...offerLevelKeys,
     ]).filter((key) => schemaKeys.includes(key));
 
+    const examples = config?.matchingConfig?.matcherModel?.examples;
+
     return {
       identityKeys,
       offerLevelKeys,
       unificationKeys: schemaKeys.filter((key) => !identityKeys.includes(key)),
+      matcherModel: {
+        excludedKeys: matcherModelExcludedSpecKeys(config).filter((key) =>
+          schemaKeys.includes(key),
+        ),
+        ...(examples?.length ? { examples } : {}),
+      },
     };
   }
 
@@ -136,6 +149,23 @@ export class SpecPostProcessService {
     };
     const identityInputHash = hashOf({ ...data, rows, description });
 
+    const enabled = config?.identity !== false;
+    const matcherModelContract = hashOf({
+      ...scopes.matcherModel,
+      version: MATCHER_MODEL_PROMPT_VERSION,
+    });
+    const callIdentity = () =>
+      this.postProcess.extractIdentity({
+        data,
+        rawSpecs: rows,
+        description,
+        schema,
+        outputKeys: scopes.identityKeys,
+        offerLevelSpecs: scopes.offerLevelKeys,
+        matcherModel: scopes.matcherModel,
+        ...llmOptionsOf(config),
+      });
+
     // Only a result that named the listing is worth keeping: one that did
     // not (the call failed, or was off) is asked again.
     const stored = ownRecord?.scrapedProduct;
@@ -147,8 +177,13 @@ export class SpecPostProcessService {
       stored.identityInputHash === identityInputHash
     ) {
       this.productMetrics.identityExtraction(context.source.name, 'reused');
+      const reused = this.reuse(scrapedProduct, stored, identityInputHash, scopes);
+      const current =
+        stored.matcherModel && stored.matcherModelContract === matcherModelContract;
       return withNormalizedYears(
-        this.reuse(scrapedProduct, stored, identityInputHash, scopes),
+        current || !enabled
+          ? reused
+          : await this.refreshMatcherModel(reused, callIdentity, matcherModelContract, context),
         schema,
       );
     }
@@ -158,7 +193,6 @@ export class SpecPostProcessService {
     }
 
     let identity: IdentityContribution | undefined;
-    const enabled = config?.identity !== false;
     if (!enabled) {
       this.productMetrics.identityExtraction(context.source.name, 'disabled');
     } else {
@@ -166,15 +200,7 @@ export class SpecPostProcessService {
         ...logContextOf(context),
         specRows: rows.length,
       });
-      identity = await this.postProcess.extractIdentity({
-        data,
-        rawSpecs: rows,
-        description,
-        schema,
-        outputKeys: scopes.identityKeys,
-        offerLevelSpecs: scopes.offerLevelKeys,
-        ...llmOptionsOf(config),
-      });
+      identity = await callIdentity();
       this.productMetrics.identityExtraction(
         context.source.name,
         identity ? 'extracted' : 'failed',
@@ -190,6 +216,9 @@ export class SpecPostProcessService {
     // keeping; fresh deterministic values still win over it.
     const carried = pick(stored?.specs, scopes.unificationKeys);
     const offerLevel = pick(merged.specs, scopes.offerLevelKeys);
+    const matcherModel = enabled
+      ? this.matcherModelOf(identity, merged.model, context)
+      : undefined;
 
     return withNormalizedYears(
       {
@@ -199,6 +228,8 @@ export class SpecPostProcessService {
         // title alone, and its flags say why.
         model: merged.model,
         displayName: merged.model ? `${merged.brand} ${merged.model}` : undefined,
+        matcherModel,
+        matcherModelContract: matcherModel ? matcherModelContract : undefined,
         specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
         flags: withIdentityFlag(
           scrapedProduct.flags,
@@ -296,6 +327,55 @@ export class SpecPostProcessService {
    * offer's listing-level specs come from the record, while price,
    * availability, images and identifiers stay as imported now.
    */
+  /**
+   * The matcherModel of a fresh extraction. A call that named the model but
+   * returned no matcherModel falls back to the model: its extra words key it
+   * apart from its peers, so the listing reaches review rather than a wrong
+   * merge — and the fallback is counted. None when the call named nothing.
+   */
+  private matcherModelOf(
+    identity: IdentityContribution | undefined,
+    model: string | undefined,
+    context: ProductImportContext,
+  ): string | undefined {
+    if (identity?.matcherModel) {
+      this.productMetrics.matcherModel(context.source.name, 'extracted');
+      return identity.matcherModel;
+    }
+    this.productMetrics.matcherModel(context.source.name, model ? 'fallback' : 'failed');
+    return model;
+  }
+
+  /**
+   * A reused extraction whose matcherModel is missing or was asked under
+   * another contract (other left-out specs, examples or prompt version): asks
+   * the LLM again and takes only the matcherModel from it. Everything else
+   * stays as stored, so no listing is renamed by a change to the key alone.
+   * A failed call leaves the listing without one, to be asked on its next
+   * import.
+   */
+  private async refreshMatcherModel(
+    reused: ScrapedProduct,
+    callIdentity: () => Promise<IdentityContribution | undefined>,
+    contract: string,
+    context: ProductImportContext,
+  ): Promise<ScrapedProduct> {
+    this.logger.debug('Refreshing the matcherModel of a reused extraction', logContextOf(context));
+    const identity = await callIdentity();
+    if (!identity) {
+      this.productMetrics.matcherModel(context.source.name, 'failed');
+      return { ...reused, matcherModel: undefined, matcherModelContract: undefined };
+    }
+
+    const fallback = !identity.matcherModel;
+    this.productMetrics.matcherModel(context.source.name, fallback ? 'fallback' : 'refreshed');
+    return {
+      ...reused,
+      matcherModel: identity.matcherModel ?? reused.model,
+      matcherModelContract: contract,
+    };
+  }
+
   private reuse(
     scrapedProduct: ScrapedProduct,
     stored: Partial<ScrapedProduct>,
@@ -315,6 +395,8 @@ export class SpecPostProcessService {
       brand: stored.brand ?? scrapedProduct.brand,
       model: stored.model,
       displayName: stored.displayName,
+      matcherModel: stored.matcherModel,
+      matcherModelContract: stored.matcherModelContract,
       specs: stored.specs ?? scrapedProduct.specs,
       flags: withIdentityFlag(scrapedProduct.flags, undefined),
       identityInputHash,

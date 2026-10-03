@@ -15,6 +15,7 @@ import type {
   ListingMatchService,
   ProductDuplicateService,
   ProductKeyLookupService,
+  ProductMatchQueryService,
 } from '@fittkereso-backend/product-identity';
 import type { CategoryConfigService } from '@fittkereso-backend/config';
 import type {
@@ -153,6 +154,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockLocks: { withLocks: jest.Mock };
   let mockOfferComposer: jest.Mocked<OfferComposerService>;
   let mockContributorDetach: jest.Mocked<ContributorDetachService>;
+  let mockMatchQuery: { matcherModelKeyOf: jest.Mock };
 
   beforeEach(() => {
     knownModels = [];
@@ -306,6 +308,10 @@ describe('ProductScrapeUpdaterService', () => {
       detachRecords: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<ContributorDetachService>;
 
+    mockMatchQuery = {
+      matcherModelKeyOf: jest.fn((_listing, text?: string) => (text ? `key:${text}` : undefined)),
+    };
+
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
       mockDuplicateService,
@@ -328,6 +334,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockLocks as never,
       mockOfferComposer,
       mockContributorDetach,
+      mockMatchQuery as unknown as ProductMatchQueryService,
     );
   });
 
@@ -832,6 +839,20 @@ describe('ProductScrapeUpdaterService', () => {
             specs: { layout: 'UK', tubeless: true },
           }),
         }),
+      );
+    });
+
+    it('stores the listing\x27s matcherModel key on its record', async () => {
+      savedAs('model-new');
+      mockSpecPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) => ({
+        ...scrapedProduct,
+        matcherModel: 'Macina Style 810 Di2',
+      }));
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ matcherModelKey: 'key:Macina Style 810 Di2' }),
       );
     });
 

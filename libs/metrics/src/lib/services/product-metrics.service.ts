@@ -3,6 +3,7 @@ import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
   IDENTITY_EXTRACTION_TOTAL,
+  MATCHER_MODEL_TOTAL,
   IDENTITY_KEY_CONFLICT_TOTAL,
   IDENTITY_KEY_DISAGREEMENT_TOTAL,
   IDENTITY_RECHECK_ATTACHED_TOTAL,
@@ -88,6 +89,9 @@ export type IdentityRecheckVia = IdentityResolvedVia | 'name';
 /** What happened to one listing's identity extraction. */
 export type IdentityExtractionResult = 'extracted' | 'reused' | 'failed' | 'disabled';
 
+/** What happened to one listing's matcherModel (MATCHER_MODEL_TOTAL). */
+export type MatcherModelResult = 'extracted' | 'fallback' | 'refreshed' | 'failed';
+
 /**
  * Why a product's spec unification ran: it was created, a source first
  * contributed, or an admin forced a resync of one listing.
@@ -115,6 +119,7 @@ export class ProductMetricsService {
   private readonly identityKeyDisagreementCounter: client.Counter<string>;
   private readonly identityRecheckAttachedCounter: client.Counter<string>;
   private readonly identityExtractionCounter: client.Counter<string>;
+  private readonly matcherModelCounter: client.Counter<string>;
   private readonly identitySpecRowsHistogram: client.Histogram<string>;
   private readonly specUnificationCounter: client.Counter<string>;
   private readonly sourceRecordUrlChangedCounter: client.Counter<string>;
@@ -216,6 +221,12 @@ export class ProductMetricsService {
       labelNames: ['source', 'result'],
       registers: [this.prometheusService.register],
     });
+    this.matcherModelCounter = new client.Counter({
+      name: MATCHER_MODEL_TOTAL,
+      help: 'Listing matcherModels by result and source',
+      labelNames: ['source', 'result'],
+      registers: [this.prometheusService.register],
+    });
     this.identitySpecRowsHistogram = new client.Histogram({
       name: IDENTITY_SPEC_ROWS_MATCHED,
       help: 'Spec-table rows the identity extraction received per listing, for sources with a row list',
@@ -314,6 +325,10 @@ export class ProductMetricsService {
 
   identityExtraction(source: string, result: IdentityExtractionResult): void {
     this.identityExtractionCounter.inc({ source, result });
+  }
+
+  matcherModel(source: string, result: MatcherModelResult): void {
+    this.matcherModelCounter.inc({ source, result });
   }
 
   identitySpecRowsMatched(source: string, rows: number): void {

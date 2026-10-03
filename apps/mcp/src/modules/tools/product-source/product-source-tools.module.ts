@@ -7,6 +7,7 @@ import { ProductScraperModule } from '@fittkereso-backend/product-scraper';
 import { AiModule } from '@fittkereso-backend/ai';
 import { TaskModule } from '@fittkereso-backend/task';
 import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
+import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { McpModule } from '@rekog/mcp-nest';
 import { ProductSourceTools } from './product-source.tools';
 import { ProductSourceConfigGeneratorTools } from './product-source-config-generator.tools';
@@ -25,6 +26,7 @@ import { OfferSweepTools } from './offer-sweep.tools';
     SearchModule,
     ScraperModule,
     ProductScraperModule,
+    ProductIdentityModule,
     AiModule,
     TaskModule,
     McpModule.forFeature(

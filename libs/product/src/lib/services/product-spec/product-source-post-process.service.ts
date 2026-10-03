@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AiChatService } from '@fittkereso-backend/ai';
 import type {
+  CategoryMatcherModelExample,
   ProductSpecs,
   ScrapedProductSpec,
   SpecDefinitionJsonSchema,
@@ -9,6 +10,22 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { isEmpty, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
 import { getVerbatimSpecKeys } from './product-level-specs';
+import { matcherModelWords } from '../product-normalizer.service';
+
+/**
+ * The version of the matcherModel rule in the identity prompt. Part of every
+ * stored matcherModel's contract (ScrapedProduct.matcherModelContract): bump
+ * it when the rule changes, and the next import of each listing re-extracts
+ * its matcherModel alone.
+ */
+export const MATCHER_MODEL_PROMPT_VERSION = 1;
+
+/** What the identity extraction is told about the matcherModel. */
+export interface MatcherModelRequest {
+  /** The specs whose values the matcherModel leaves out (matcherModelExcludedSpecKeys). */
+  excludedKeys: string[];
+  examples?: CategoryMatcherModelExample[];
+}
 
 /**
  * gpt-6-luna since 2026-09-23, replacing gpt-5.6-luna (itself swapped in from
@@ -78,6 +95,8 @@ export interface DeterministicProductData {
 export interface IdentityContribution {
   brand?: string;
   model?: string;
+  /** Only words of the raw title (see guardMatcherModel); absent when not asked. */
+  matcherModel?: string;
   specs?: ProductSpecs;
 }
 
@@ -92,6 +111,7 @@ export interface ModelSpecContribution {
 interface RawLlmResponse {
   brand?: string;
   model?: string;
+  matcherModel?: string;
   specs?: ProductSpecs;
 }
 
@@ -166,6 +186,8 @@ export class ProductSourcePostProcessService {
     outputKeys: string[];
     /** The listing-level subset of `outputKeys` (size, colour) — never part of the model name. */
     offerLevelSpecs: string[];
+    /** Asks for a matcherModel too; without it, none is asked for. */
+    matcherModel?: MatcherModelRequest;
     model?: string;
     thinking?: boolean;
     effort?: string;
@@ -179,9 +201,14 @@ export class ProductSourcePostProcessService {
         schema,
         outputKeys,
         offerLevelSpecs,
+        params.matcherModel,
       ),
       userMessage: this.buildUserMessage(data, rawSpecs, undefined, description),
-      responseSchema: this.buildIdentityResponseSchema(schema, outputKeys),
+      responseSchema: this.buildIdentityResponseSchema(
+        schema,
+        outputKeys,
+        Boolean(params.matcherModel),
+      ),
       model: params.model,
       thinking: params.thinking,
       effort: params.effort ?? DEFAULT_IDENTITY_EFFORT,
@@ -192,6 +219,9 @@ export class ProductSourcePostProcessService {
     const sanitized: IdentityContribution = {
       brand: response.brand?.trim() || undefined,
       model: response.model?.trim() || undefined,
+      matcherModel: params.matcherModel
+        ? this.guardMatcherModel(response.matcherModel, data.model)
+        : undefined,
       specs: response.specs
         ? this.specNormalizer.normalize(response.specs, schema)
         : undefined,
@@ -276,8 +306,28 @@ export class ProductSourcePostProcessService {
     return (
       c.brand === undefined &&
       c.model === undefined &&
+      c.matcherModel === undefined &&
       c.specs === undefined
     );
+  }
+
+  /**
+   * The matcherModel is the title's own words, some left out: a word the
+   * title doesn't have (a translation, a correction, an invention) is dropped
+   * rather than keyed, so two shops can only agree on what both printed.
+   * Words are compared the way the key compares them (matcherModelWords).
+   * Undefined when nothing is left.
+   */
+  private guardMatcherModel(
+    text: string | undefined,
+    rawTitle: string,
+  ): string | undefined {
+    const titleWords = new Set(matcherModelWords(rawTitle));
+    const kept = (text ?? '').split(/\s+/).filter((word) => {
+      const parts = matcherModelWords(word);
+      return parts.length > 0 && parts.every((part) => titleWords.has(part));
+    });
+    return kept.join(' ') || undefined;
   }
 
   /**
@@ -404,10 +454,40 @@ export class ProductSourcePostProcessService {
 
   // ─── Identity extraction prompt/schema ──────────────────────────────────
 
+  /**
+   * The matcherModel rule: a key two shops' listings of one model share, so
+   * it is the title's own words, never rewritten. Names no category's words —
+   * the category's `matchingConfig.matcherModel.examples` show them.
+   */
+  private buildMatcherModelRule(
+    schema: SpecDefinitionJsonSchema,
+    request: MatcherModelRequest,
+  ): string {
+    const excludedTitles = this.titlesOf(schema, request.excludedKeys);
+    const leaveOutSpecs = excludedTitles.length
+      ? ` the words that only state a value of ${excludedTitles.join(', ')} — those are compared separately;`
+      : '';
+    const examples = request.examples?.length
+      ? `  Examples (rawModel → matcherModel):\n${request.examples
+          .map((example) => `  - "${example.title}" → "${example.matcherModel}"`)
+          .join('\n')}\n`
+      : '';
+    return (
+      `- "matcherModel": the part of rawModel that tells this model apart from the brand's other models — what two shops selling this exact model would both print. ` +
+      `Take it from rawModel's own words, in their order and spelling there: leave words out, but never add, translate, correct or reorder one. ` +
+      `KEEP the model line and family words, every model number and alphanumeric code — a number stays even when it also states a spec value, as long as it is part of the model's name — and every variant, edition, trim or equipment marker. ` +
+      `LEAVE OUT the brand;${leaveOutSpecs} category, marketing and shop wording (condition, stock, "new", what kind of product it is). ` +
+      `A word that would state such a value stays when it is part of the model's own name rather than this listing's value. ` +
+      `Two listings of the same model from different shops must get the same matcherModel, and two different models never may: when unsure whether a word tells two models apart, keep it.\n` +
+      examples
+    );
+  }
+
   private buildIdentitySystemPrompt(
     schema: SpecDefinitionJsonSchema,
     outputKeys: string[],
     offerLevelSpecs: string[],
+    matcherModel?: MatcherModelRequest,
   ): string {
     const fieldDescriptions = this.buildFieldDescriptions(schema, outputKeys);
 
@@ -434,6 +514,12 @@ export class ProductSourcePostProcessService {
     const yearRule = outputKeys.includes('modelYear')
       ? `- modelYear: take it from an explicit year field in rawSpecs or deterministicSpecs when there is one (a two-digit value such as "26" means 2026); otherwise from the title ("'26", "MY26", "2026" all mean 2026). When an explicit field and the title disagree, the explicit field wins. Never assume a year the input does not state.\n`
       : '';
+    const matcherModelRule = matcherModel
+      ? this.buildMatcherModelRule(schema, matcherModel)
+      : '';
+    const returnedNames = matcherModel
+      ? 'optional "brand"/"model"/"matcherModel" keys'
+      : 'optional "brand"/"model" keys';
 
     return (
       `${this.buildTranslationPreamble(schema, verbatimTitles)} The "model" field should stay in whatever language the source uses for model names — do not translate it.\n\n` +
@@ -441,6 +527,7 @@ export class ProductSourcePostProcessService {
       `The user message has the already-known "brand", "rawModel" (the source's raw, uncleaned product title), "deterministicSpecs" (values a label-matching pass already mapped onto the canonical fields above) and, when available, "rawSpecs" — rows from the source's spec table, label/value exactly as scraped, sometimes grouped under a "section", sometimes carrying a per-row free-text "description". Return "brand", "model" and "specs", each only as far as you can confidently produce it — omit anything rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
       `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and the year — but first move every canonical field value the title states (a size, a color, a model year, a frame type, ...) into "specs" when "specs" does not already have it, BEFORE removing it from "model". The raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given title is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
+      matcherModelRule +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
       `- "specs": see the rules below.\n\n` +
       `Rules for "specs":\n` +
@@ -454,13 +541,14 @@ export class ProductSourcePostProcessService {
       this.buildAllowedValuesRule() +
       `- Give a number in the unit shown for its field above, as a bare number.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
-      `- Return a single JSON object with a "specs" key (the canonical field names above only, confidently-known values only) and optional "brand"/"model" keys per the field-specific guidance above.`
+      `- Return a single JSON object with a "specs" key (the canonical field names above only, confidently-known values only) and ${returnedNames} per the field-specific guidance above.`
     );
   }
 
   private buildIdentityResponseSchema(
     schema: SpecDefinitionJsonSchema,
     outputKeys: string[],
+    withMatcherModel: boolean,
   ): unknown {
     return {
       type: 'object',
@@ -468,6 +556,7 @@ export class ProductSourcePostProcessService {
       properties: {
         brand: { type: 'string' },
         model: { type: 'string' },
+        ...(withMatcherModel ? { matcherModel: { type: 'string' } } : {}),
         specs: {
           type: 'object',
           additionalProperties: false,

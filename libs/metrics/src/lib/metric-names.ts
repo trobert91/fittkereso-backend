@@ -142,6 +142,14 @@ export const IDENTITY_RECHECK_ATTACHED_TOTAL = 'identity_recheck_attached_total'
  */
 export const IDENTITY_EXTRACTION_TOTAL = 'identity_extraction_total';
 /**
+ * The matcherModel of a listing whose identity extraction ran, by result:
+ * `extracted` (the call returned one), `fallback` (it returned a model but no
+ * matcherModel, so the model stands in: its extra words key it apart, to
+ * review rather than to a wrong merge), `refreshed` (a stored extraction kept,
+ * its matcherModel asked again under a new contract) and `failed`.
+ */
+export const MATCHER_MODEL_TOTAL = 'matcher_model_total';
+/**
  * Spec-table rows the source's identityExtraction.specRows let through, per
  * listing. A source whose listings suddenly match none has renamed its labels;
  * the extraction would then see the title alone and fill far fewer specs.

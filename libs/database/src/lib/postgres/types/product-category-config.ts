@@ -51,6 +51,33 @@ export interface CategoryMatcherModelConfig {
   /** Whether name matching requires equal keys. Off, keys are extracted,
    *  stored and compared, but the old score rule decides (shadow mode). */
   required?: boolean;
+  /** Worked examples the extraction prompt shows, raw title → matcherModel.
+   *  The prompt's own rules name no category's words; these carry them. */
+  examples?: CategoryMatcherModelExample[];
+}
+
+/** One worked example of the matcherModel the extraction should return. */
+export interface CategoryMatcherModelExample {
+  /** A raw title, as a shop would publish it. */
+  title: string;
+  /** The matcherModel for it: only words of `title`, in their order. */
+  matcherModel: string;
+}
+
+/**
+ * The specs a matcherModel leaves out: the category's offer-level specs (they
+ * describe a listing, not a model) and its `matchingConfig.matcherModel.
+ * excludeSpecs`.
+ */
+export function matcherModelExcludedSpecKeys(
+  config: ProductCategoryConfig | undefined,
+): string[] {
+  return [
+    ...new Set([
+      ...(config?.offerLevelSpecs ?? []),
+      ...(config?.matchingConfig?.matcherModel?.excludeSpecs ?? []),
+    ]),
+  ];
 }
 
 /** How far apart two numeric values may be and still count as the same.

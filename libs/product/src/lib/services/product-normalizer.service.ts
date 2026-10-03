@@ -1,6 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { uniq } from 'lodash';
 
+/**
+ * The words a matcherModel key is built from (normalizeMatcherModel): accents
+ * and case dropped, "+" as the word `plus`, other punctuation splitting
+ * words, letters and digits split. Exported so the identity extraction can
+ * check its matcherModel against the title word for word, the same way.
+ */
+export function matcherModelWords(text: string | undefined): string[] {
+  if (!text) return [];
+  return text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/\+/g, ' plus ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/(\p{L})(\p{N})/gu, '$1 $2')
+    .replace(/(\p{N})(\p{L})/gu, '$1 $2')
+    .split(' ')
+    .filter(Boolean);
+}
+
 @Injectable()
 export class ProductNormalizerService {
   /**
@@ -33,29 +53,15 @@ export class ProductNormalizerService {
     brand?: string;
     dropValues?: string[];
   }): string | undefined {
-    const brandWords = new Set(this.matcherModelWords(brand));
+    const brandWords = new Set(matcherModelWords(brand));
     const words = dropValues
       .reduce(
-        (remaining, value) => this.withoutRun(remaining, this.matcherModelWords(value)),
-        this.matcherModelWords(text),
+        (remaining, value) => this.withoutRun(remaining, matcherModelWords(value)),
+        matcherModelWords(text),
       )
       .filter((word) => !brandWords.has(word));
 
     return uniq(words).sort().join(' ') || undefined;
-  }
-
-  private matcherModelWords(text: string | undefined): string[] {
-    if (!text) return [];
-    return text
-      .normalize('NFKD')
-      .replace(/\p{M}/gu, '')
-      .toLowerCase()
-      .replace(/\+/g, ' plus ')
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .replace(/(\p{L})(\p{N})/gu, '$1 $2')
-      .replace(/(\p{N})(\p{L})/gu, '$1 $2')
-      .split(' ')
-      .filter(Boolean);
   }
 
   /** `words` without every occurrence of `run` as consecutive words. */

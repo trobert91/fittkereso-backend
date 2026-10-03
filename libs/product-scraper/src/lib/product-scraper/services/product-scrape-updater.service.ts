@@ -30,6 +30,7 @@ import {
   ListingMatchService,
   ProductDuplicateService,
   ProductKeyLookupService,
+  ProductMatchQueryService,
 } from '@fittkereso-backend/product-identity';
 import {
   filterDefinedSpecs,
@@ -116,6 +117,8 @@ interface ListingWrite {
   listing: ScrapedProduct;
   /** Null for a source that does not identify products: nothing matches on its listings. */
   normalizedSourceName: string | null;
+  /** The listing's matcherModel key (matcherModelKeyOf); null likewise, or without a matcherModel. */
+  matcherModelKey: string | null;
   identifiers: OfferIdentifiers[];
   /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
   externalIds: (string | undefined)[];
@@ -166,6 +169,7 @@ export class ProductScrapeUpdaterService {
     private readonly locks: AdvisoryLockService,
     private readonly offerComposer: OfferComposerService,
     private readonly contributorDetach: ContributorDetachService,
+    private readonly matchQuery: ProductMatchQueryService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -250,6 +254,7 @@ export class ProductScrapeUpdaterService {
         extracted,
         listing: this.withStoredOffers(listing, externalIds),
         normalizedSourceName: this.buildNormalizedSourceName(listing),
+        matcherModelKey: this.matchQuery.matcherModelKeyOf(listing, listing.matcherModel) ?? null,
         identifiers,
         externalIds,
       };
@@ -337,6 +342,7 @@ export class ProductScrapeUpdaterService {
       extracted,
       listing: this.withStoredOffers(extracted, externalIds),
       normalizedSourceName: null,
+      matcherModelKey: null,
       identifiers: [],
       externalIds,
     };
@@ -388,7 +394,7 @@ export class ProductScrapeUpdaterService {
     productId: string,
     keys: string[],
   ): Promise<ProductModel | undefined> {
-    const { context, listing, normalizedSourceName } = write;
+    const { context, listing, normalizedSourceName, matcherModelKey } = write;
     const seller = context.source.seller;
 
     return this.locks.withLocks([productLock(productId)], async () => {
@@ -409,6 +415,7 @@ export class ProductScrapeUpdaterService {
         source: context.source,
         sourceUrl: context.url,
         normalizedSourceName,
+        matcherModelKey,
         feedRowHash: context.feedRowHash,
       });
       await this.mergeService.mergeSources(model);
@@ -475,6 +482,7 @@ export class ProductScrapeUpdaterService {
           externalId: write.listingId,
           sourceUrl: context.url,
           normalizedSourceName: write.normalizedSourceName,
+          matcherModelKey: write.matcherModelKey,
           feedRowHash: context.feedRowHash,
         });
         await this.sourceRecordRepo.save(record);
@@ -1112,7 +1120,7 @@ export class ProductScrapeUpdaterService {
     sourceRecord: ProductSourceRecord | undefined;
     previousExternalIds: string[];
   }> {
-    const { context, listing, normalizedSourceName } = write;
+    const { context, listing, normalizedSourceName, matcherModelKey } = write;
     const previousExternalIds = this.storedExternalIdsOf(write, model);
 
     this.applyScrapedProductDetails(model, listing);
@@ -1127,6 +1135,7 @@ export class ProductScrapeUpdaterService {
       source: context.source,
       sourceUrl: context.url,
       normalizedSourceName,
+      matcherModelKey,
       feedRowHash: context.feedRowHash,
     });
 
