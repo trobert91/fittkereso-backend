@@ -1,7 +1,9 @@
 import {
+  ArukeresoMappingTarget,
   ArukeresoSourceConfig,
   ProductSourceConfig,
   ProductSourceType,
+  ScrapedProductSpec,
   ScrapingSourceConfig,
   ProductSourceConfigValidatorService,
   SourceSpecMapping,
@@ -11,8 +13,19 @@ import {
   ProductSpecNormalizationService,
   SpecExtractionService,
 } from '@fittkereso-backend/product';
-import { pick } from 'lodash';
+import { normalizeYear } from '@fittkereso-backend/utils';
+import { castArray, isArray, isEmpty, isNil, isString, pick } from 'lodash';
+import { ScrapeInterpreterService } from '../scrape-interpreter.service';
+import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
+import { ScrapeOpRegistryService } from '../services/scrape-op-registry.service';
+import { ProductValueMapperService } from '../services/product-value-mapper.service';
+import { registerOps } from '../ops/register-ops';
+import akosbikeArukeresoConfig from './akosbike-arukereso.config.json';
+import ambringaArukeresoConfig from './ambringa-arukereso.config.json';
+import bikelifeArukeresoConfig from './bikelife-arukereso.config.json';
+import bringaboardArukeresoConfig from './bringaboard-arukereso.config.json';
 import ebikeshopConfig from './ebikeshop.config.json';
+import mangobikeArukeresoConfig from './mangobike-arukereso.config.json';
 import speedbikeConfig from './speedbike.config.json';
 import speedbikeArukeresoConfig from './speedbike-arukereso.config.json';
 import speedbikeGoogleshopConfig from './speedbike-googleshop.config.json';
@@ -22,6 +35,22 @@ import speedbikeGoogleshopConfig from './speedbike-googleshop.config.json';
 import ebikesJsonSchema from '../../../../../config/src/lib/categories/ebikes/jsonSchema.json';
 
 const SIZE_KEYS = ['frameSize', 'frameSizeLabel'];
+
+/** What a mapping fallback list moves past: no value at all. */
+function isBlank(value: unknown): boolean {
+  return isNil(value) || (isString(value) && !value.trim()) || (isArray(value) && isEmpty(value));
+}
+
+function asText(value: unknown): string | undefined {
+  return isNil(value) ? undefined : String(value).trim() || undefined;
+}
+
+const asFeedConfig = (json: unknown) => json as ArukeresoSourceConfig;
+
+/** Presence in the feed means in stock; Árukereső's documented "NO" overrides it. */
+const IN_STOCK_UNLESS_NO = [
+  { op: 'mapValue', cases: { NO: 'out_of_stock' }, default: 'in_stock' },
+];
 
 // Schema validation of the hand-authored production configs — not a live-site
 // test, but it catches typos in op names, missing or misspelled op
@@ -35,9 +64,16 @@ const SIZE_KEYS = ['frameSize', 'frameSizeLabel'];
 // compares it against that same registry directly.
 describe('hand-authored source configs', () => {
   let validator: ProductSourceConfigValidatorService;
+  let interpreter: ScrapeInterpreterService;
 
   beforeAll(() => {
     validator = new ProductSourceConfigValidatorService();
+
+    const registry = new ScrapeOpRegistryService();
+    const runner = new ScrapePipelineRunnerService(registry);
+    registerOps(registry, runner, new ProductValueMapperService());
+    // No value pipeline in a feed config reads the runtime.
+    interpreter = new ScrapeInterpreterService(runner, {} as never);
   });
 
   function assertConfigValid(
@@ -51,6 +87,51 @@ describe('hand-authored source configs', () => {
     // a bare "expected null, got [object Object]" would make somebody re-run
     // this by hand to find out which path was wrong.
     expect(problems ? `${label}: ${validator.format(problems)}` : null).toBeNull();
+  }
+
+  // A feed row's mapping target and category, read the way
+  // ArukeresoProductMapperService.resolveTarget and resolveCategory read them,
+  // through the real interpreter. That service lives in product-scraper, which
+  // depends on this library, so this spec can't import it. Fields are keyed
+  // here exactly as the config names them, so the importer's spelling-tolerant
+  // field lookup isn't needed.
+  //
+  // A target mapped to a list takes the first non-empty value, which is what
+  // the bikelife and mangobike gates are built on. The result is trimmed text,
+  // and an empty one is no value, as the importer reads every target here.
+  async function readText(
+    config: ArukeresoSourceConfig,
+    target: ArukeresoMappingTarget,
+    fields: Record<string, string>,
+  ): Promise<string | undefined> {
+    let value: unknown;
+    for (const mapping of castArray(config.mapping[target] ?? [])) {
+      const raw = mapping.field ? fields[mapping.field] : undefined;
+      value = isEmpty(mapping.pipeline)
+        ? raw
+        : await interpreter.runValuePipeline(mapping.pipeline ?? [], raw, {
+            baseUrl: config.baseUrl,
+          });
+      if (!isBlank(value)) break;
+    }
+    return asText(value);
+  }
+
+  async function slugOf(
+    config: ArukeresoSourceConfig,
+    fields: Record<string, string>,
+    attributes: ScrapedProductSpec[] = [],
+  ): Promise<string | undefined> {
+    const rawLabel = await readText(config, 'categoryLabel', fields);
+    const label = isEmpty(config.category.labelFrom)
+      ? rawLabel
+      : asText(
+          await interpreter.runValuePipeline(config.category.labelFrom ?? [], rawLabel, {
+            baseUrl: config.baseUrl,
+          }),
+        );
+
+    return interpreter.resolveCategoryFromRules(config.category.slugLookup, label, attributes);
   }
 
   it('validates the ebikeshop config against the config schema', () => {
@@ -295,9 +376,7 @@ describe('hand-authored source configs', () => {
     it('reads presence in the feed as in stock, and lets "NO" override it', () => {
       expect(config.mapping['availability']).toEqual({
         field: 'delivery_time',
-        pipeline: [
-          { op: 'mapValue', cases: { NO: 'out_of_stock' }, default: 'in_stock' },
-        ],
+        pipeline: IN_STOCK_UNLESS_NO,
       });
     });
   });
@@ -337,6 +416,293 @@ describe('hand-authored source configs', () => {
     // It identifies nothing and carries no specs: no LLM call has anything to do.
     it('turns both LLM calls off', () => {
       expect(config.postProcess).toEqual({ identity: false, specs: false });
+    });
+  });
+
+  // Wave 1 of the e-bike shop onboarding (docs/webshops/plans/, 2026-10-02):
+  // five shops, each with one identifying Árukereső-format feed.
+  describe.each([
+    ['ambringa-arukereso', ambringaArukeresoConfig],
+    ['akosbike-arukereso', akosbikeArukeresoConfig],
+    ['bikelife-arukereso', bikelifeArukeresoConfig],
+    ['mangobike-arukereso', mangobikeArukeresoConfig],
+    ['bringaboard-arukereso', bringaboardArukeresoConfig],
+  ])('wave-1 feed config %s', (name, json) => {
+    const config = asFeedConfig(json);
+
+    it('validates against the Árukereső config schema', () => {
+      assertConfigValid(config, name, 'arukereso');
+    });
+
+    // The test round's KTM/Cube/Scott `filter` and its `maxItems` go on the
+    // live row only. In the fixture, which the seeds push, a filter would mark
+    // every run incomplete, so a hasAllProducts source would never remove an
+    // offer it no longer sees.
+    it('carries no test-round filter or cap', () => {
+      expect(pick(config, ['filter', 'maxItems'])).toEqual({});
+    });
+
+    // An identifying source: both LLM calls run.
+    it('leaves postProcess at its default', () => {
+      expect(config.postProcess).toBeUndefined();
+    });
+  });
+
+  describe("ambringa's Árgép feed config", () => {
+    const config = asFeedConfig(ambringaArukeresoConfig);
+
+    // The full path, matched exactly: the e-bike parts sit one level below the
+    // e-bike category, and one discounted e-bike is filed under the offers.
+    it.each([
+      ['Elektromos kerékpár', 'ebikes'],
+      ['Akciók és ajánlatok > Akciós ebike modellek', 'ebikes'],
+      ['Elektromos kerékpár > Elektromos kerékpár alkatrészek és tartozékok', undefined],
+      ['Rekumbens - fekvőkerékpár', undefined],
+      ['Bringás webshop > Kerékpár kiegészítő', undefined],
+    ])('gates the category %j to %s', async (category, slug) => {
+      expect(await slugOf(config, { category })).toBe(slug);
+    });
+
+    // ShopRenter's per-row identifier, unique on all 811 rows; the sizes of a
+    // bike share their title, so nothing else tells them apart.
+    it('keys offers on sku and reads the GTIN from gtin', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'sku' });
+      expect(config.mapping['gtin']).toEqual({ field: 'gtin' });
+    });
+
+    // Size codes shared across different BULLS bikes, and a GTIN in the MPN
+    // column, would merge unrelated bikes by MPN.
+    it.each([
+      ['24-M', undefined],
+      ['23-24-M', undefined],
+      ['4063518360666', undefined],
+      ['1230101111', '1230101111'],
+      ['525803480845', '525803480845'],
+      ['112110-54', '112110-54'],
+      ['BK29431-44COLO01', 'BK29431-44COLO01'],
+    ])('reads the MPN %j as %j', async (partNumber, mpn) => {
+      expect(
+        await readText(config, 'mpn', { manufacturer_partnumber: partNumber }),
+      ).toBe(mpn);
+    });
+
+    // Only KTM's 10-digit `1YYxxxxxxx` article number carries a year, and the
+    // pattern is brand-blind, so Giant's and ZEG's codes must not match it.
+    // The pipeline yields two digits, which the importer reads as 20YY.
+    it.each([
+      ['1260167141', 2026],
+      ['2303308105', undefined],
+      ['5060021105', undefined],
+      ['525702440855', undefined],
+      ['112110-54', undefined],
+    ])('reads the model year of article number %j as %j', async (partNumber, year) => {
+      const releaseYear = await readText(config, 'releaseYear', {
+        manufacturer_partnumber: partNumber,
+      });
+
+      expect(normalizeYear(releaseYear)).toBe(year);
+    });
+
+    it('trims "Bike" off the BULLS brand label', async () => {
+      expect(await readText(config, 'brand', { manufacturer: 'BULLS Bike' })).toBe('BULLS');
+      expect(await readText(config, 'brand', { manufacturer: 'KTM' })).toBe('KTM');
+    });
+  });
+
+  describe("akosbike's Árukereső feed config", () => {
+    const config = asFeedConfig(akosbikeArukeresoConfig);
+    const newEbikes = 'Elektromos kerékpárok > Új E-bike Kerékpár > Cross, Trekking E-bike kerékpár';
+    const condition = (value: string) => [{ name: 'Állapot', values: [value] }];
+
+    it.each([
+      [newEbikes, 'Új kerékpár', 'ebikes'],
+      ['Cube kerékpárok > MTB kerékpár', 'Új kerékpár', undefined],
+      ['Kiegészítők > Táskák és kosarak > Hátizsák', 'Új termék', undefined],
+    ])('gates the category %j (Állapot %j) to %s', async (category, state, slug) => {
+      expect(await slugOf(config, { category }, condition(state))).toBe(slug);
+    });
+
+    // The one demo/ex-rental bike filed with the new e-bikes stays out until
+    // the user decides it may come in as new.
+    it('drops a demo bike filed with the new e-bikes', async () => {
+      expect(
+        await slugOf(config, { category: newEbikes }, condition('új, bemutató kerékpár')),
+      ).toBeUndefined();
+    });
+
+    // `identifier` is unique on every row; `sku` holds shop notes on 27% of
+    // rows. It is the distributor's VLB_ code, not Cube's article number, so
+    // it is no MPN either.
+    it('keys offers on identifier, reads the GTIN from ean_code, and maps no MPN', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+      expect(config.mapping['gtin']).toEqual({ field: 'ean_code' });
+      expect(config.mapping['mpn']).toBeUndefined();
+    });
+  });
+
+  describe("bikelife's Árgép feed config", () => {
+    const config = asFeedConfig(bikelifeArukeresoConfig);
+
+    // The `Kerékpárok` tree mixes e-bikes with every other bike, and only the
+    // shop's `0200` SKU prefix tells them apart; `0201`–`0203` are e-bike
+    // parts and `1901` e-scooters. Rows outside the tree keep their own path,
+    // which no rule matches.
+    it.each([
+      ['Kerékpárok', '020052000082', 'ebikes'],
+      ['Kerékpárok > Pedelec kerékpárok', '020054000009', 'ebikes'],
+      ['Kerékpárok', '020100000001', undefined],
+      ['Alkatrészek > Elektromos kerékpár alkatrészek', '020100000001', undefined],
+      ['Alkatrészek > Elektromos kerékpár alkatrészek', '020052000082', undefined],
+      ['Kerékpárok > Elektromos roller', '190100000001', undefined],
+    ])('gates the category %j with SKU %j to %s', async (category, sku, slug) => {
+      expect(await slugOf(config, { category, sku })).toBe(slug);
+    });
+
+    // The feed has no `identifier`, and `sku` is unique on all 11,296 rows.
+    it('keys offers on sku and reads the GTIN from gtin', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'sku' });
+      expect(config.mapping['gtin']).toEqual({ field: 'gtin' });
+    });
+
+    // Kellys writes its EAN into the part-number column.
+    it.each([
+      ['1260149146', '1260149146'],
+      ['8585053831129', undefined],
+    ])('reads the MPN %j as %j', async (partNumber, mpn) => {
+      expect(
+        await readText(config, 'mpn', { manufacturer_partnumber: partNumber }),
+      ).toBe(mpn);
+    });
+
+    it.each([
+      ['1260149146', 2026],
+      ['8585053831129', undefined],
+    ])('reads the model year of article number %j as %j', async (partNumber, year) => {
+      const releaseYear = await readText(config, 'releaseYear', {
+        manufacturer_partnumber: partNumber,
+      });
+
+      expect(normalizeYear(releaseYear)).toBe(year);
+    });
+
+    // `SzállításiIdő` is 1 or 5 days on every row, never "NO".
+    it('reads presence in the feed as in stock, and lets "NO" override it', async () => {
+      expect(config.mapping['availability']).toEqual({
+        field: 'SzállításiIdő',
+        pipeline: IN_STOCK_UNLESS_NO,
+      });
+      expect(await readText(config, 'availability', { SzállításiIdő: '5' })).toBe('in_stock');
+      expect(await readText(config, 'availability', { SzállításiIdő: 'NO' })).toBe('out_of_stock');
+    });
+  });
+
+  describe("mangobike's Árukereső feed config", () => {
+    const config = asFeedConfig(mangobikeArukeresoConfig);
+    const navJunk = '-&nbsp;-&nbsp;start_nav&nbsp;-&nbsp;-  > ';
+    const trekking =
+      'Elektromos Kerékpárok > Elektromos Túra Kerékpárok > Elektromos Onroad Trekking Kerékpár';
+    const ktm = 'KTM Macina Style 820 XL Machine Grey Matt';
+    const imageOf = (sku: string) =>
+      `https://www.mangobike.hu/_upload/images/catalog/${sku}/${sku}_bike.png`;
+
+    // The first path segment after the navigation junk, which is stripped
+    // whether the feed sends it entity-encoded, decoded or not at all. Cube's
+    // cargo trikes, filed under an e-MTB category, are dropped by name.
+    it.each([
+      [`${navJunk}${trekking}`, ktm, 'ebikes'],
+      [`${navJunk.replace(/&nbsp;/g, ' ')}${trekking}`, ktm, 'ebikes'],
+      [trekking, ktm, 'ebikes'],
+      [`${navJunk}Alkatrészek > Elektromos kerékpár alkatrészek > Akkumulátorok`, ktm, undefined],
+      [`${navJunk}Kerékpárok > Trekking Kerékpárok`, ktm, undefined],
+      [
+        `${navJunk}Elektromos Kerékpárok > Elektromos MTB Kerékpárok > Elektromos Light Hardtail MTB`,
+        'Cube Trike Family Hybrid 750 grey´n´reflex',
+        undefined,
+      ],
+    ])('gates the category %j (title %j) to %s', async (category, title, slug) => {
+      expect(await slugOf(config, { category, name: title })).toBe(slug);
+    });
+
+    it('keys offers on identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // The image folder is the size-level SKU; only KTM's (`KT-` plus the
+    // 10-digit article number) is a manufacturer code, and its `1YY` prefix
+    // is the model year.
+    it.each([
+      ['KT-1260152106', '1260152106', 2026],
+      ['VB-1107672-L', undefined, undefined],
+    ])('reads the MPN and model year off the image folder %j', async (sku, mpn, year) => {
+      const fields = { image_url: imageOf(sku) };
+
+      expect(await readText(config, 'mpn', fields)).toBe(mpn);
+      expect(normalizeYear(await readText(config, 'releaseYear', fields))).toBe(year);
+    });
+
+    it('blanks the shop placeholder image', async () => {
+      expect(
+        await readText(config, 'imageUrl', {
+          image_url: 'https://www.mangobike.hu/img/default-placeholder.png',
+        }),
+      ).toBeUndefined();
+      expect(await readText(config, 'imageUrl', { image_url: imageOf('KT-1260152106') })).toBe(
+        imageOf('KT-1260152106'),
+      );
+    });
+  });
+
+  describe("bringaboard's Árukereső feed config", () => {
+    const config = asFeedConfig(bringaboardArukeresoConfig);
+    const freewheel = (value: string) => [{ name: 'Cassette / freewheel', values: [value] }];
+
+    // Two e-bike branches. The e-scooters under E-BIKE are cut by labelFrom,
+    // and the Kross LIFTIE kids' bikes, which are not electric, by their
+    // single-speed freewheel.
+    it.each([
+      ['E-BIKE > E-MTB FULLY > Unisex', [], 'ebikes'],
+      ['Kerékpár > E-Bike kerékpárok > női', [], 'ebikes'],
+      ['Kerékpár > E-Bike kerékpárok > férfi', freewheel('Shimano CS-M5100 11-51T'), 'ebikes'],
+      ['E-BIKE > E-ROLLER', [], undefined],
+      ['Akció > Kerékpárok', [], undefined],
+      ['Kerékpár > E-Bike kerékpárok > gyerek', freewheel('SINGLE'), undefined],
+    ])('gates the category %j (%j) to %s', async (category, attributes, slug) => {
+      expect(await slugOf(config, { category }, attributes)).toBe(slug);
+    });
+
+    // Unique on all 36,641 rows; it falls back to the name where `sku` is empty.
+    it('keys offers on identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // Some rows leave ean_code empty and carry a valid EAN-13 as their sku.
+    it.each([
+      ['4054571529404', '8585053831129', '4054571529404'],
+      ['', '8585053831129', '8585053831129'],
+      ['', 'ktm-1250041113', undefined],
+    ])('reads the GTIN from ean_code %j, else the 13-digit sku %j', async (eanCode, sku, gtin) => {
+      expect(await readText(config, 'gtin', { ean_code: eanCode, sku })).toBe(gtin);
+    });
+
+    // Only KTM's (`ktm-` stripped) and Giant's 10-digit article numbers are
+    // manufacturer codes; every other sku is the shop's own or an EAN.
+    it.each([
+      ['ktm-1250041113', '1250041113'],
+      ['2103235144', '2103235144'],
+      ['8585053831129', undefined],
+    ])('reads the MPN from sku %j as %j', async (sku, mpn) => {
+      expect(await readText(config, 'mpn', { sku })).toBe(mpn);
+    });
+
+    it('drops the Árukereső tracking query from the URL', async () => {
+      const page =
+        'https://www.bringaboard.hu/ktm-macina-scarp-sx-prime-gx-t-type-2025-ferfi-e-bike-velvet-petrol-matt-blkgold-xl';
+
+      expect(
+        await readText(config, 'url', {
+          product_url: `${page}?utm_source=arukereso&utm_medium=cpp&utm_campaign=direct_link`,
+        }),
+      ).toBe(page);
     });
   });
 });

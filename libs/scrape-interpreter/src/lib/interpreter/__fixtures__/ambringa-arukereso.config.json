@@ -1,0 +1,90 @@
+{
+  "baseUrl": "https://www.ambringa.hu",
+  "feedUrl": "https://www.ambringa.hu/api/?route=export/feed&id=argep",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "Elektromos kerékpár"
+    }
+  },
+  "category": {
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "Elektromos kerékpár"
+        },
+        "slug": "ebikes"
+      },
+      {
+        "when": {
+          "equalsIgnoreCase": "Akciók és ajánlatok > Akciós ebike modellek"
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "sku"
+    },
+    "brand": {
+      "field": "manufacturer",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "\\s+Bike$",
+          "flags": "i"
+        }
+      ]
+    },
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": {
+      "field": "category"
+    },
+    "gtin": {
+      "field": "gtin"
+    },
+    "mpn": {
+      "field": "manufacturer_partnumber",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "^(\\d{2}(-\\d{2})?-[A-Z]{1,3}|\\d{13})$"
+        }
+      ]
+    },
+    "releaseYear": {
+      "field": "manufacturer_partnumber",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^1(2\\d)\\d{7}$",
+          "group": 1
+        }
+      ]
+    }
+  }
+}

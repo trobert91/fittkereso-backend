@@ -1,0 +1,131 @@
+{
+  "baseUrl": "https://www.bikelife.hu",
+  "feedUrl": "https://www.bikelife.hu/api/?route=export/feed&id=argep",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "Pedelec kerékpárok"
+    }
+  },
+  "category": {
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "Pedelec kerékpárok"
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "sku"
+    },
+    "brand": [
+      {
+        "field": "manufacturer"
+      },
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\S+)",
+            "group": 1
+          }
+        ]
+      }
+    ],
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "availability": {
+      "field": "SzállításiIdő",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": [
+      {
+        "field": "category",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(?!Kerékpárok(?: >|$))(.+)$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(0200)\\d{8}$",
+            "group": 1
+          },
+          {
+            "op": "mapValue",
+            "cases": {
+              "0200": "Pedelec kerékpárok"
+            }
+          }
+        ]
+      }
+    ],
+    "gtin": {
+      "field": "gtin"
+    },
+    "mpn": {
+      "field": "manufacturer_partnumber",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^(?!\\d{13}$)(.+)$",
+          "group": 1
+        }
+      ]
+    },
+    "releaseYear": {
+      "field": "manufacturer_partnumber",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^1(2\\d)\\d{7}$",
+          "group": 1
+        },
+        {
+          "op": "prependPrefix",
+          "prefix": "20"
+        }
+      ]
+    }
+  }
+}

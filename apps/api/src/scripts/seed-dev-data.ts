@@ -9,7 +9,8 @@
  * The rows here are not invented fixtures - they mirror what the dev database
  * (127.0.0.1:5432/fittkereso) actually held on 2026-09-18, so a re-created dev
  * DB comes back with the same brands, category, sellers and sources the running
- * dev environment was built on. The two scrape configs are read from
+ * dev environment was built on, plus the wave-1 feed shops onboarded on
+ * 2026-10-02. The scrape configs are read from
  * libs/scrape-interpreter's fixtures, the same hand-authored files that
  * library's test suite validates and that
  * apps/product-collector/scripts/seed-product-source-configs.ts pushes from the
@@ -215,7 +216,48 @@ const SOURCES: SeedSourceSpec[] = [
       requestsPerHour: 180,
     },
   },
+  // Wave 1 of the e-bike shop onboarding (docs/webshops/plans/, 2026-10-02).
+  // The user approved the direct fetches on 2026-10-02: Zyte truncates
+  // anything over 10 MB.
+  //
+  // 4.4 MB, under Zyte's 10 MB, and the shop has not agreed to be read directly.
+  feedOnlySource('ambringa', 'proxied'),
+  // The feed is 17.2 MB.
+  feedOnlySource('akosbike', 'direct'),
+  // The feed is 32.1 MB.
+  feedOnlySource('bikelife', 'direct'),
+  // The feed is 28.8 MB.
+  feedOnlySource('mangobike', 'direct'),
+  // The feed is 89.7 MB.
+  feedOnlySource('bringaboard', 'direct'),
 ];
+
+/**
+ * A `<shop>.hu` read through its Árukereső-format feed alone, as speedbike-
+ * arukereso is: the same low caps (one request a run), identifying, the whole
+ * catalogue, nightly, and scheduling off until its dry run. The seller has no
+ * caps of its own.
+ */
+function feedOnlySource(shop: string, fetchMode: ProductSourceFetchMode): SeedSourceSpec {
+  const name = `${shop}-arukereso`;
+  const domain = `${shop}.hu`;
+
+  return {
+    name,
+    type: 'arukereso',
+    configFile: `${name}.config.json`,
+    maxConcurrent: 1,
+    requestsPerHour: 10,
+    priority: 60,
+    identifiesProducts: true,
+    hasAllProducts: true,
+    fetchMode,
+    schedulingEnabled: false,
+    processingEnabled: true,
+    frequency: '1 day',
+    seller: { name: domain, domains: [domain] },
+  };
+}
 
 function assertNotProd(app: INestApplicationContext): void {
   const environment = app.get(AppConfigService).environment;

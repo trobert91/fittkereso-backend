@@ -1,11 +1,11 @@
 /**
  * One-time idempotent seed for the ProductSource.config JSONB rows —
- * ebikeshop (scraping) and speedbike-arukereso (feed) — reading the
+ * ebikeshop (scraping), speedbike-arukereso and the wave-1 feed shops — reading the
  * hand-authored config JSON from libs/scrape-interpreter's fixtures directory
  * (the same files validated by that library's test suite).
  *
  * For a dev database this is the narrow, collector-side path: apps/api/src/
- * scripts/seed-dev-data.ts (npm run seed:dev-data) seeds these same two sellers
+ * scripts/seed-dev-data.ts (npm run seed:dev-data) seeds these same sellers
  * and sources from the same fixture files, alongside the brands and product
  * category dev needs. The two source lists must stay in step - this one exists
  * so the configs can be re-pushed without the api app.
@@ -146,7 +146,47 @@ const SOURCES: SeedSourceSpec[] = [
     // the identity keying behave as expected against the live feed.
     schedulingEnabled: false,
   },
+  // Wave 1 of the e-bike shop onboarding (docs/webshops/plans/, 2026-10-02).
+  // The user approved the direct fetches on 2026-10-02: Zyte truncates
+  // anything over 10 MB.
+  //
+  // 4.4 MB, under Zyte's 10 MB, and the shop has not agreed to be read directly.
+  feedOnlySource('ambringa', 'proxied'),
+  // The feed is 17.2 MB.
+  feedOnlySource('akosbike', 'direct'),
+  // The feed is 32.1 MB.
+  feedOnlySource('bikelife', 'direct'),
+  // The feed is 28.8 MB.
+  feedOnlySource('mangobike', 'direct'),
+  // The feed is 89.7 MB.
+  feedOnlySource('bringaboard', 'direct'),
 ];
+
+/**
+ * A `<shop>.hu` read through its Árukereső-format feed alone, as speedbike-
+ * arukereso is: the same low caps (one request a run), identifying, the whole
+ * catalogue, nightly, and scheduling off until its dry run. The seller has no
+ * caps of its own.
+ */
+function feedOnlySource(shop: string, fetchMode: ProductSourceFetchMode): SeedSourceSpec {
+  const name = `${shop}-arukereso`;
+  const domain = `${shop}.hu`;
+
+  return {
+    name,
+    type: 'arukereso',
+    configFile: `${name}.config.json`,
+    maxConcurrent: 1,
+    requestsPerHour: 10,
+    priority: 60,
+    identifiesProducts: true,
+    hasAllProducts: true,
+    fetchMode,
+    frequency: '1 day',
+    seller: { name: domain, slug: `${shop}-hu`, domains: [domain] },
+    schedulingEnabled: false,
+  };
+}
 
 async function resolveOrCreateSeller(
   sellerRepo: SellerRepository,

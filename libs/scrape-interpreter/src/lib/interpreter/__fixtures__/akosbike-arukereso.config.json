@@ -1,0 +1,452 @@
+{
+  "baseUrl": "https://akosbike.hu",
+  "feedUrl": "https://akosbike.hu/api/?route=export/feed&id=arukereso",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "Új E-bike Kerékpár"
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "regexCapture",
+        "pattern": "^(Elektromos kerékpárok > Új E-bike Kerékpár)(?: > |$)",
+        "group": 1
+      }
+    ],
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "Elektromos kerékpárok > Új E-bike Kerékpár"
+        },
+        "unless": {
+          "specValueIncludes": {
+            "label": "Állapot",
+            "anyOf": [
+              "használt",
+              "bemutató",
+              "futott",
+              "újszerű"
+            ]
+          }
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "identityExtraction": {
+    "specRows": [
+      "Vázméret",
+      "Kialakítás",
+      "Szín",
+      "Váz",
+      "Villa/Teleszkóp",
+      "Villa",
+      "Rugóstag",
+      "Hátsó rugóstag",
+      "Hátsó tag",
+      "Motor",
+      "Akkumulátor",
+      "Kerékszett",
+      "Felni",
+      "Első gumi",
+      "Hátsó gumi",
+      "Gumi",
+      "Gumik",
+      "Váltó",
+      "Hátsó váltó",
+      "Váltókar",
+      "Hajtómű",
+      "Fogaskoszorú",
+      "Szíj",
+      "Súly",
+      "Tömeg"
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "identifier"
+    },
+    "brand": {
+      "field": "manufacturer"
+    },
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "availability": {
+      "field": "delivery_time",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": {
+      "field": "category"
+    },
+    "releaseYear": [
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "\\b(20[2-3]\\d)\\b",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "product_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "-(20[2-3]\\d)(?:-|$|\\?)",
+            "group": 1
+          }
+        ]
+      }
+    ],
+    "gtin": {
+      "field": "ean_code"
+    }
+  },
+  "specMapping": {
+    "ebikes": {
+      "mappings": [
+        {
+          "key": "frameType",
+          "labels": [
+            "Kialakítás",
+            "Vázméret"
+          ],
+          "valueMap": {
+            "XS": "Magas",
+            "S": "Magas",
+            "M": "Magas",
+            "L": "Magas",
+            "XL": "Magas",
+            "XXL": "Magas",
+            "S, M, L, XL": "Magas",
+            "50 cm": "Magas",
+            "54 cm": "Magas",
+            "58 cm": "Magas",
+            "62 cm": "Magas",
+            "64 cm": "Magas",
+            "50 cm / S": "Magas",
+            "58 cm / L": "Magas",
+            "50 cm/S, alacsony-átlagos testmagasságnak megfelelő": "Magas"
+          },
+          "trimSuffixes": [
+            "\\d.*",
+            "\\s(?:XXL|XL|XS|S|M|L)"
+          ],
+          "replacePatterns": [
+            {
+              "from": "Easy Entry",
+              "to": "Alacsony"
+            },
+            {
+              "from": "Trapeze",
+              "to": "Trapéz"
+            }
+          ]
+        },
+        {
+          "key": "frameSize",
+          "labels": [
+            "Vázméret"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "^(?:(?:Easy Entry|Trapeze)\\s+)?(\\d+(?:[.,]\\d+)?)\\s*cm"
+          ]
+        },
+        {
+          "key": "frameSizeLabel",
+          "labels": [
+            "Vázméret"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "^(?:(?:Easy Entry|Trapeze)\\s+)?(?:\\d+\\s*cm\\s*/\\s*)?(XXL|XL|XS|S|M|L)\\b(?!\\s*,\\s*(?:XXL|XL|XS|S|M|L)\\b)"
+          ]
+        },
+        {
+          "key": "color",
+          "labels": [
+            "Szín"
+          ]
+        },
+        {
+          "key": "mileage",
+          "labels": [
+            "Km állás"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "batteryCapacity",
+          "labels": [
+            "Akkumulátor"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(?:^|\\s)(\\d{3,4})\\s*(?:Wh)?(?:\\s|$)"
+          ]
+        },
+        {
+          "key": "torque",
+          "labels": [
+            "Motor"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(\\d{2,3})\\s*Nm"
+          ]
+        },
+        {
+          "key": "gearCount",
+          "labels": [
+            "Váltó",
+            "Hátsó váltó"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(\\d{1,2})-Speed"
+          ]
+        },
+        {
+          "key": "weight",
+          "labels": [
+            "Súly",
+            "Tömeg"
+          ],
+          "replacePatterns": [
+            {
+              "from": ",",
+              "to": "."
+            }
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "maxTotalWeight",
+          "labels": [
+            "Max.terhelhetőség"
+          ],
+          "extract": "number"
+        },
+        {
+          "key": "motorModel",
+          "labels": [
+            "Motor"
+          ]
+        },
+        {
+          "key": "batteryModel",
+          "labels": [
+            "Akkumulátor"
+          ]
+        },
+        {
+          "key": "chargerModel",
+          "labels": [
+            "Töltő"
+          ]
+        },
+        {
+          "key": "chargerCurrent",
+          "labels": [
+            "Töltő"
+          ],
+          "extract": "regexpList",
+          "extractPatterns": [
+            "(\\d+(?:[.,]\\d+)?)\\s*A\\b"
+          ]
+        },
+        {
+          "key": "controlUnit",
+          "labels": [
+            "Kezelőszerv",
+            "Távirányító"
+          ]
+        },
+        {
+          "key": "displayModel",
+          "labels": [
+            "Kijelző"
+          ],
+          "skipValues": [
+            "nincs",
+            "N/A"
+          ]
+        },
+        {
+          "key": "frameModel",
+          "labels": [
+            "Váz"
+          ]
+        },
+        {
+          "key": "forkModel",
+          "labels": [
+            "Villa/Teleszkóp",
+            "Villa"
+          ]
+        },
+        {
+          "key": "rearShockModel",
+          "labels": [
+            "Rugóstag",
+            "Hátsó rugóstag",
+            "Hátsó tag"
+          ]
+        },
+        {
+          "key": "rearDerailleur",
+          "labels": [
+            "Váltó",
+            "Hátsó váltó"
+          ]
+        },
+        {
+          "key": "shifter",
+          "labels": [
+            "Váltókar",
+            "Fékváltókar"
+          ]
+        },
+        {
+          "key": "crankset",
+          "labels": [
+            "Hajtómű"
+          ]
+        },
+        {
+          "key": "cassette",
+          "labels": [
+            "Fogaskoszorú"
+          ]
+        },
+        {
+          "key": "chain",
+          "labels": [
+            "Lánc",
+            "Szíj"
+          ],
+          "skipValues": [
+            "nincs infó"
+          ]
+        },
+        {
+          "key": "brakeModel",
+          "labels": [
+            "Fékek",
+            "Fék szett"
+          ]
+        },
+        {
+          "key": "wheelset",
+          "labels": [
+            "Kerékszett"
+          ]
+        },
+        {
+          "key": "rimModel",
+          "labels": [
+            "Felni",
+            "Felnik"
+          ]
+        },
+        {
+          "key": "hubModel",
+          "labels": [
+            "Első agy",
+            "Hátsó agy"
+          ]
+        },
+        {
+          "key": "tireModel",
+          "labels": [
+            "Első gumi",
+            "Gumi",
+            "Gumik",
+            "Gumik első",
+            "Hátsó gumi",
+            "Gumi hátsó"
+          ]
+        },
+        {
+          "key": "handlebar",
+          "labels": [
+            "Kormány"
+          ]
+        },
+        {
+          "key": "stem",
+          "labels": [
+            "Kormányszár"
+          ]
+        },
+        {
+          "key": "headset",
+          "labels": [
+            "Kormánycsapágy"
+          ]
+        },
+        {
+          "key": "grips",
+          "labels": [
+            "Markolat/Bandázs",
+            "Markolat",
+            "Kormánybandázs"
+          ]
+        },
+        {
+          "key": "saddle",
+          "labels": [
+            "Nyereg"
+          ]
+        },
+        {
+          "key": "seatpost",
+          "labels": [
+            "Nyeregcső"
+          ]
+        },
+        {
+          "key": "pedals",
+          "labels": [
+            "Pedál"
+          ]
+        }
+      ]
+    }
+  }
+}

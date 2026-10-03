@@ -1,0 +1,121 @@
+{
+  "baseUrl": "https://www.mangobike.hu",
+  "feedUrl": "https://www.mangobike.hu/xml/arukereso.xml",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "sourceTitle": "Elektromos Kerékpárok"
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "stripPattern",
+        "pattern": "^[^>]*start_nav[^>]*>\\s*"
+      },
+      {
+        "op": "splitAndTake",
+        "separator": " > ",
+        "index": 0,
+        "trim": true
+      }
+    ],
+    "slugLookup": [
+      {
+        "when": {
+          "equalsIgnoreCase": "Elektromos Kerékpárok"
+        },
+        "slug": "ebikes"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "identifier"
+    },
+    "brand": {
+      "field": "manufacturer"
+    },
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "availability": {
+      "field": "delivery_time",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "^.*/img/default-placeholder\\.png$"
+        }
+      ]
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": [
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "\\b([Tt]rike)\\b",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "category"
+      }
+    ],
+    "releaseYear": {
+      "field": "image_url",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "/catalog/KT-1(\\d{2})\\d{7}/",
+          "group": 1
+        },
+        {
+          "op": "prependPrefix",
+          "prefix": "20"
+        }
+      ]
+    },
+    "mpn": {
+      "field": "image_url",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "/catalog/KT-(1\\d{9})/",
+          "group": 1
+        }
+      ]
+    }
+  }
+}
