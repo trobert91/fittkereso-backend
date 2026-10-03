@@ -18,7 +18,7 @@ import { matcherModelWords } from '../product-normalizer.service';
  * it when the rule changes, and the next import of each listing re-extracts
  * its matcherModel alone.
  */
-export const MATCHER_MODEL_PROMPT_VERSION = 2;
+export const MATCHER_MODEL_PROMPT_VERSION = 3;
 
 /** What the identity extraction is told about the matcherModel. */
 export interface MatcherModelRequest {
@@ -523,10 +523,13 @@ export class ProductSourcePostProcessService {
       ? ` Copy a value of ${verbatimTitles.join(', ')} exactly as the source writes it — its words, language, spelling and casing — and never translate it, not even a plain word: a title's "BLACK" stays "BLACK", never "fekete". Such a value is often a stylized marketing name rather than a plain word (e.g. "Space Galaxy Matt", "Olive Pearl"), sometimes followed by a literal breakdown in parentheses right after it (e.g. "Space Galaxy Matt (Grey+Black)"). Treat the name together with any such parenthetical as one value — never leave the name in "model" while dropping the parenthetical, and never leave either part unextracted just because it isn't a plain word.`
       : '';
     const offerLevelRule = offerLevelTitles.length
-      ? `- Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title rather than the spec table (e.g. a size code like "M/43" or a color name), and must be extracted from there if present.${verbatimHint}\n`
+      ? `- Pay particular attention to ${offerLevelList} — these are frequently embedded only in the raw title rather than the spec table (e.g. a size code like "M/43" or a color name), and must be extracted from there if present — but never from a word of the model's own name (see "model").${verbatimHint}\n`
       : '';
+    // A size letter can name a model version (#9, issue 4: KTM's "Macina
+    // Style XL" lost its "XL" to the size field on every shop that sells it),
+    // so the hint says how a title marks the listing's own value apart.
     const offerLevelModelHint = offerLevelTitles.length
-      ? ` ${offerLevelList} describe this specific listing (this exact size, this exact color), not the product model, so they must never remain in "model" once extracted.`
+      ? ` ${offerLevelList} describe this specific listing (this exact size, this exact color), not the product model, so they must never remain in "model" once extracted. A word of the model's own name is never one of them, though, even when it reads like one: a size letter can name a model version. Tell them apart by how the input writes the word. This listing's own size or color is marked as such: written together with its number (e.g. "XL/53"), next to a word for size, in a spec row, or after a dash at the end of the title. A size letter that continues the name right after the line name or a model number, before the year, audience, usage or color words, belongs to the name. A listing has one size: when the input already states it (e.g. "46cm") and a size letter elsewhere in the title isn't written together with it, that letter is part of the name.`
       : '';
     // The year is the one identity field shops mostly print only in the
     // title, and the one whose formats vary most ('26, MY26, 2026).
@@ -545,7 +548,7 @@ export class ProductSourcePostProcessService {
       `Canonical spec fields — the ones that tell this product apart from similar ones, plus the ones that describe this specific listing:\n${fieldDescriptions}\n\n` +
       `The user message has the already-known "brand", "rawModel" (the source's raw, uncleaned product title), "deterministicSpecs" (values a label-matching pass already mapped onto the canonical fields above) and, when available, "rawSpecs" — rows from the source's spec table, label/value exactly as scraped, sometimes grouped under a "section", sometimes carrying a per-row free-text "description". Return "brand", "model" and "specs", each only as far as you can confidently produce it — omit anything rather than guessing.\n\n` +
       `Field-specific guidance:\n` +
-      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and the year — but first move every canonical field value the title states (a size, a color, a model year, a frame type, ...) into "specs" when "specs" does not already have it, BEFORE removing it from "model". The raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name.${offerLevelModelHint} KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige"). If the given title is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.\n` +
+      `- "model": strip the brand (it's already given separately, don't repeat it), marketing/category boilerplate (e.g. a bike's usage type or "electric bicycle" wording), gender/target-audience words, and the year — but first move every canonical field value the title states (a size, a color, a model year, a frame type, ...) into "specs" when "specs" does not already have it, BEFORE removing it from "model". The raw title is often the only place such a value appears at all, so stripping it without first extracting it destroys the information rather than just cleaning the name. KEEP genuine model designation tokens (line name, numeric/alphanumeric variant codes, edition names like "Di2", "SX", "Prestige") and every other word of the model's own name, even one that also states a field's value (a model number that equals a capacity, a word that names a version of the model, wherever the title prints it): moving a value into "specs" never removes a word of the name from "model".${offerLevelModelHint} If the given title is already clean, return it unchanged. Never invent a model name that isn't derivable from the input.${matcherModel?.examples?.length ? ' The matcherModel examples below show which words of a title are the name.' : ''}\n` +
       matcherModelRule +
       `- "brand": only return this if you can confidently correct or normalize the given brand (e.g. fixing inconsistent casing or a misspelling) based on evidence in the input — never invent or guess a different brand.\n` +
       `- "specs": see the rules below.\n\n` +

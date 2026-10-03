@@ -965,10 +965,19 @@ describe('ProductSourcePostProcessService', () => {
         expect((await extract('Elektromos kerékpár'))?.matcherModel).toBeUndefined();
       });
 
+      // One list teaches both names which words of a title are the name.
+      it('points the "model" rule at its examples', async () => {
+        await extract('Macina Style 810 Di2');
+
+        expect(systemPrompt()).toContain(
+          'The matcherModel examples below show which words of a title are the name.',
+        );
+      });
+
       it('neither asks nor returns one without a request', async () => {
         const result = await extract('Macina Style 810 Di2', false);
 
-        expect(systemPrompt()).not.toContain('"matcherModel"');
+        expect(systemPrompt()).not.toContain('matcherModel');
         expect(aiChat.createChat.mock.calls[0][0].schema.properties.matcherModel).toBeUndefined();
         expect(result?.matcherModel).toBeUndefined();
       });
@@ -1013,6 +1022,29 @@ describe('ProductSourcePostProcessService', () => {
         );
       });
 
+      // #9, issue 4: "Macina Style XL" lost its "XL" to the size field.
+      it('keeps a word of the model\'s own name in "model", and says how a listing\'s own size is written', async () => {
+        aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'KTM', model: 'raw title', specs: {} },
+          schema: schemaWithFrameSize,
+          outputKeys: ['weight', 'frameSize', 'color'],
+          offerLevelSpecs: ['frameSize', 'color'],
+        });
+
+        const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
+        expect(systemPrompt).toContain(
+          'moving a value into "specs" never removes a word of the name from "model"',
+        );
+        expect(systemPrompt).toContain('A word of the model\'s own name is never one of them');
+        expect(systemPrompt).toContain('written together with its number (e.g. "XL/53")');
+        expect(systemPrompt).toContain('A listing has one size');
+        expect(systemPrompt).toContain(
+          'must be extracted from there if present — but never from a word of the model\'s own name',
+        );
+      });
+
       it('omits the offer-level hint entirely when no offerLevelSpecs are configured for the category', async () => {
         aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
 
@@ -1025,6 +1057,7 @@ describe('ProductSourcePostProcessService', () => {
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
         expect(systemPrompt).not.toContain('Pay particular attention to');
+        expect(systemPrompt).not.toContain('A listing has one size');
       });
 
       it('extracts a frame size embedded only in the raw title into specs, per the KTM example', async () => {
