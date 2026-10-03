@@ -185,7 +185,7 @@ describe('case 2: the same bike in both shops, named differently, merges', () =>
 
     it('treats a more specific usage type as the same kind of bike', () => {
       // speedbike says "Összteleszkópos MTB" where ebikeshop says "MTB"; the
-      // ebikes hierarchy makes the pair compatible rather than contradictory.
+      // ebikes compatible values make the pair compatible rather than contradictory.
       const product = productOf('chacana lfc macina', 2023);
       const fromSpeedbike = listingOfProduct(SPEEDBIKE, product.id);
       const fromEbikeshop = listingOfProduct(EBIKESHOP, product.id);

@@ -1,4 +1,4 @@
-import { applyGates } from '../gates';
+import { applyGates, primarySpecMismatches } from '../gates';
 import {
   CATALOG,
   EBIKES,
@@ -15,13 +15,18 @@ describe('gates on the real KTM catalog', () => {
     // shops publish a real frame shape (Magas / Trapéz / Alacsony) and a
     // different shape is a different product, so it costs 30, not 5.
     //
-    // `gender` was split out of it on 2026-09-17. One enum used to hold two
-    // unrelated concepts — the step-over geometry ebikeshop publishes and the
-    // rider speedbike names in its titles — with no value in common, so every
-    // cross-shop pair that had both populated mismatched on vocabulary rather
-    // than on the bikes. It is primary at the same 30 because within one shop
-    // a Férfi/Női difference was a different product on all 28 pairs of the
-    // catalog that have one, and the same product on none.
+    // `gender` was split out of it on 2026-09-17: one enum used to hold the
+    // step-over geometry ebikeshop publishes and the rider speedbike names in
+    // its titles, with no value in common.
+    //
+    // It moved from primarySpecs to matcherSpecs on 2026-10-03 (#9, issue 3).
+    // A Férfi/Női difference is a different frame article of one model, but
+    // the wave-1 shops can't keep frames apart: most never state the rider
+    // (akosbike 0 of 200 titles, ambringa 3 of 86), and those that do label
+    // KTM's low-step frame Női at one shop and Uniszex at another. As primary
+    // it split one model across products and refused correct GTIN/MPN joins;
+    // as a matcher spec a model's frames share a product, and Uniszex is
+    // compatible with both (`matchingConfig.compatibleValues`).
     expect(EBIKES.primarySpecs).toEqual([
       'modelYear',
       'batteryCapacity',
@@ -29,7 +34,6 @@ describe('gates on the real KTM catalog', () => {
       'torque',
       'usageType',
       'frameType',
-      'gender',
     ]);
     expect(EBIKES.matcherSpecs).toEqual([
       'motorPower',
@@ -37,6 +41,7 @@ describe('gates on the real KTM catalog', () => {
       'frameMaterial',
       'gearCount',
       'topSpeed',
+      'gender',
     ]);
     expect(EBIKES.matchingConfig?.specTolerances?.['modelYear']).toEqual({
       absolute: 0,
@@ -212,10 +217,10 @@ describe('gates on the real KTM catalog', () => {
     });
   });
 
-  describe('hierarchies and tolerances', () => {
+  describe('compatible values and tolerances', () => {
     it('treats a more specific usage type as compatible with its parent', () => {
       // The catalog carries both "MTB" and "Összteleszkópos MTB"; the ebikes
-      // hierarchy says the latter is a kind of the former.
+      // compatible values say the latter is a kind of the former.
       const gates = applyGates({
         queryKey: 'same key',
         candidateKey: 'same key',
@@ -225,6 +230,36 @@ describe('gates on the real KTM catalog', () => {
       });
 
       expect(gates).toEqual([]);
+    });
+
+    it('prices a men\'s against a women\'s frame as a matcher spec, and lets Uniszex through', () => {
+      const gatesOf = (queryGender: string, candidateGender: string) =>
+        applyGates({
+          queryKey: '720 macina style',
+          candidateKey: '720 macina style',
+          querySpecs: { gender: queryGender },
+          candidateSpecs: { gender: candidateGender },
+          categoryConfig: EBIKES,
+        });
+
+      // 10 points: identical names still attach at 90.
+      expect(gatesOf('Férfi', 'Női')).toEqual([
+        expect.objectContaining({ gate: 'matcherSpecMismatch', spec: 'gender', severity: 10 }),
+      ]);
+      expect(gatesOf('Uniszex', 'Férfi')).toEqual([]);
+      expect(gatesOf('Női', 'Uniszex')).toEqual([]);
+    });
+
+    it('never refuses an identifier join over the rider', () => {
+      // bikelife calls KTM's low-step frame Női, bringaboard the same article
+      // Uniszex; a product voted Férfi can hold either shop's listing.
+      expect(
+        primarySpecMismatches({
+          querySpecs: { gender: 'Női' },
+          candidateSpecs: { gender: 'Férfi' },
+          categoryConfig: EBIKES,
+        }),
+      ).toEqual([]);
     });
 
     it('holds model year and battery capacity to an exact match', () => {

@@ -46,7 +46,8 @@
     },
     "gender": {
       "meta": {
-        "order": 2
+        "order": 2,
+        "explicitOnly": true
       },
       "enum": [
         "Férfi",

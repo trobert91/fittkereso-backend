@@ -53,6 +53,14 @@ export interface SpecDefinitionMeta {
    * would reject as unknown.
    */
   format?: 'year';
+  /**
+   * The LLM fills this field only from a value the input states in words — a
+   * title word, a spec row, the description — never from another field, a
+   * code, or the product's name. For a field shops state inconsistently and a
+   * model could guess (who a product is made for), where a guess would decide
+   * matching.
+   */
+  explicitOnly?: boolean;
 }
 
 export interface SpecDefinitionProperty {

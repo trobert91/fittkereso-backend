@@ -96,7 +96,7 @@ describe('compareSpecValue', () => {
     });
   });
 
-  describe('hierarchy', () => {
+  describe('compatible values', () => {
     const panelTypes = {
       OLED: ['QD-OLED', 'W-OLED', 'WOLED'],
       LCD: ['IPS', 'VA', 'TN'],

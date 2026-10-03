@@ -9,10 +9,10 @@ import { ACCEPT_SCORE, NEAR_MISS_SCORE } from './product-identity.constants';
 const ebikes: ProductCategoryConfig = {
   primarySpecs: ['modelYear', 'batteryCapacity', 'usageType'],
   matcherSpecs: ['motorPower', 'weight', 'frameMaterial', 'usageType'],
-  matcherSpecHierarchies: {
-    usageType: { MTB: ['Összteleszkópos MTB'], Trekking: ['Cross Trekking'] },
-  },
   matchingConfig: {
+    compatibleValues: {
+      usageType: { MTB: ['Összteleszkópos MTB'], Trekking: ['Cross Trekking'] },
+    },
     specTolerances: {
       modelYear: { absolute: 0 },
       batteryCapacity: { absolute: 0 },
@@ -64,8 +64,8 @@ describe('applyGates', () => {
     expect(applyGates({ queryKey: KEY, candidateKey: KEY, categoryConfig: ebikes })).toEqual([]);
   });
 
-  it('uses the category tolerances and hierarchies', () => {
-    // batteryCapacity is exact; weight keeps the 5% default; usageType has a hierarchy.
+  it('uses the category tolerances and compatible values', () => {
+    // batteryCapacity is exact; weight keeps the 5% default; usageType lists compatible values.
     expect(specGates({ batteryCapacity: 750 }, { batteryCapacity: 760 })).toHaveLength(1);
     expect(specGates({ weight: 22 }, { weight: 22.5 })).toEqual([]);
     expect(specGates({ usageType: 'Összteleszkópos MTB' }, { usageType: 'MTB' })).toEqual([]);

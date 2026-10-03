@@ -31,6 +31,14 @@ export interface CategoryMatchingConfig {
    *  reaches review, since that pair scores 100 whatever it contradicts.
    *  0 turns the gate off, as in `missingSpecPenalty`. */
   specMismatchPenalty?: Record<string, number>;
+  /** Values that don't contradict each other, keyed by spec name: a value →
+   *  the values it is compatible with. Either side may hold either value, so
+   *  the spec gates (primary and matcher alike) let the pair through. For a
+   *  general value against its specific kinds, or a value that covers others.
+   *  Example: `{ usageType: { MTB: ["Összteleszkópos MTB"] },
+   *  gender: { Uniszex: ["Férfi", "Női"] } }` — Férfi against Női still
+   *  contradicts. */
+  compatibleValues?: Record<string, Record<string, string[]>>;
   /** How the identity extraction's `matcherModel` is keyed and used. See
    *  CategoryMatcherModelConfig. */
   matcherModel?: CategoryMatcherModelConfig;
@@ -189,12 +197,6 @@ export interface ProductCategoryConfig {
    *  between products that share identical primarySpecs.
    *  Example: ["brightness", "weightWithStand", "powerConsumption"] */
   matcherSpecs?: string[];
-  /** Hierarchical value relationships for spec comparison.
-   *  Maps spec key → parent value → list of child values that are subtypes of the parent.
-   *  When one product has a parent value and the other has a child value (or vice versa),
-   *  the comparison result is 'compatible' rather than 'mismatch'.
-   *  Example: { "panelType": { "OLED": ["QD-OLED", "W-OLED"] } } */
-  matcherSpecHierarchies?: Record<string, Record<string, string[]>>;
   /** Public-facing description for the category page SEO and header. */
   categoryDescription?: string;
   /** Ordered list of filterable specs with their UI type. */

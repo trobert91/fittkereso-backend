@@ -51,6 +51,13 @@ export function getVerbatimSpecKeys(
   });
 }
 
+/** The fields the LLM fills only from a value the input states (`meta.explicitOnly`). */
+export function getExplicitOnlySpecKeys(schema: SpecDefinitionJsonSchema): string[] {
+  return Object.keys(schema.properties).filter(
+    (key) => schema.properties[key].meta?.explicitOnly === true,
+  );
+}
+
 /** The schema's year fields: numbers holding a calendar year (`meta.format: 'year'`). */
 export function getYearSpecKeys(schema: SpecDefinitionJsonSchema): string[] {
   return Object.keys(schema.properties).filter(

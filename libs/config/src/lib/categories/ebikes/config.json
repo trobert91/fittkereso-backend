@@ -242,27 +242,33 @@
     "wheelSize",
     "torque",
     "usageType",
-    "frameType",
-    "gender"
+    "frameType"
   ],
-  "matcherSpecHierarchies": {
-    "usageType": {
-      "MTB": [
-        "Összteleszkópos MTB"
-      ],
-      "Trekking": [
-        "Cross Trekking"
-      ]
-    }
-  },
   "matcherSpecs": [
     "motorPower",
     "weight",
     "frameMaterial",
     "gearCount",
-    "topSpeed"
+    "topSpeed",
+    "gender"
   ],
   "matchingConfig": {
+    "compatibleValues": {
+      "usageType": {
+        "MTB": [
+          "Összteleszkópos MTB"
+        ],
+        "Trekking": [
+          "Cross Trekking"
+        ]
+      },
+      "gender": {
+        "Uniszex": [
+          "Férfi",
+          "Női"
+        ]
+      }
+    },
     "specTolerances": {
       "modelYear": {
         "absolute": 0

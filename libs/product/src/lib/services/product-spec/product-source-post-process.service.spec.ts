@@ -674,6 +674,36 @@ describe('ProductSourcePostProcessService', () => {
       expect(systemPrompt).toContain('deterministicSpecs is merged in automatically after your response');
     });
 
+    it('tells the LLM to fill an explicit-only field only from a stated value, naming it by title', async () => {
+      aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+      const schemaWithRider: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'E-bike',
+        properties: {
+          weight: { type: 'number', title: 'Weight', meta: { unit: 'kg' } },
+          gender: { type: 'string', title: 'Target rider', meta: { explicitOnly: true } },
+        },
+      };
+      const extract = (outputKeys: string[]) =>
+        service.extractIdentity({
+          data: { brand: 'KTM', model: 'raw title', specs: {} },
+          schema: schemaWithRider,
+          outputKeys,
+          offerLevelSpecs: [],
+        });
+
+      await extract(['weight', 'gender']);
+      await extract(['weight']);
+
+      const [withField, withoutField] = aiChat.createChat.mock.calls.map(
+        (call) => call[0].messages[0].content as string,
+      );
+      expect(withField).toContain(
+        '- Fill Target rider only when the input states the value itself in words',
+      );
+      expect(withoutField).not.toContain('only when the input states the value itself');
+    });
+
     it('puts exactly its output keys in the response schema, beside brand and model', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
       const schemaWithFrameSize: SpecDefinitionJsonSchema = {

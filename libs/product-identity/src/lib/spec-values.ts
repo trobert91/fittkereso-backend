@@ -5,7 +5,7 @@ import { levenshtein } from './name-similarity';
 /** A present spec value: ProductSpecs' value types without `undefined`. */
 export type SpecValue = string | number | boolean | string[];
 
-/** `compatible`: one value is a hierarchy parent of the other. */
+/** `compatible`: the category lists the two values as compatible (`matchingConfig.compatibleValues`). */
 export type SpecMatchResult = 'match' | 'compatible' | 'mismatch';
 
 /** Relative tolerance for two numbers when the spec has no override. */
@@ -18,12 +18,12 @@ const PLAIN_NUMBER = /^\d+(\.\d+)?$/;
  * SpecComparisonService.compareValues). Numbers match within tolerance,
  * booleans exactly, arrays when one is a subset of the other. Anything
  * involving a string is compared by its number when both sides hold exactly
- * one, then by the category's value hierarchy, then by a fuzzy string match.
+ * one, then by the category's compatible values, then by a fuzzy string match.
  */
 export function compareSpecValue(
   valueA: SpecValue,
   valueB: SpecValue,
-  hierarchy?: Record<string, string[]>,
+  compatibleValues?: Record<string, string[]>,
   tolerance?: SpecTolerance,
 ): SpecMatchResult {
   if (typeof valueA === 'number' && typeof valueB === 'number') {
@@ -52,7 +52,7 @@ export function compareSpecValue(
       : 'mismatch';
   }
 
-  if (hierarchy && isHierarchyCompatible(stringA, stringB, hierarchy)) {
+  if (compatibleValues && isCompatibleValue(stringA, stringB, compatibleValues)) {
     return 'compatible';
   }
 
@@ -96,35 +96,36 @@ function extractStandaloneNumber(value: string): number | null {
 }
 
 /**
- * True when one value resolves to a parent and the other to one of its
- * children. A value resolves to a name by equality or by containing it as a
- * whitespace/hyphen-delimited token, so "matte WOLED" maps to the "WOLED"
- * entry, while siblings (IPS vs VA) stay a mismatch.
+ * True when one value resolves to an entry's value and the other to one of the
+ * values listed with it, either way round. A value resolves to a name by
+ * equality or by containing it as a whitespace/hyphen-delimited token, so
+ * "matte WOLED" maps to the "WOLED" entry, while two listed values (IPS vs VA)
+ * stay a mismatch.
  */
-function isHierarchyCompatible(
+function isCompatibleValue(
   valueA: string,
   valueB: string,
-  hierarchy: Record<string, string[]>,
+  compatibleValues: Record<string, string[]>,
 ): boolean {
   const a = valueA.toLowerCase().trim();
   const b = valueB.toLowerCase().trim();
 
-  return Object.entries(hierarchy).some(([parent, children]) => {
-    const normalizedParent = parent.toLowerCase().trim();
-    const normalizedChildren = children.map((child) =>
-      child.toLowerCase().trim(),
+  return Object.entries(compatibleValues).some(([value, compatibles]) => {
+    const normalizedValue = value.toLowerCase().trim();
+    const normalizedCompatibles = compatibles.map((compatible) =>
+      compatible.toLowerCase().trim(),
     );
-    const isChild = (value: string) =>
-      normalizedChildren.some((child) => matchesHierarchyName(value, child));
+    const isListed = (candidate: string) =>
+      normalizedCompatibles.some((compatible) => matchesValueName(candidate, compatible));
 
     return (
-      (matchesHierarchyName(a, normalizedParent) && isChild(b)) ||
-      (matchesHierarchyName(b, normalizedParent) && isChild(a))
+      (matchesValueName(a, normalizedValue) && isListed(b)) ||
+      (matchesValueName(b, normalizedValue) && isListed(a))
     );
   });
 }
 
-function matchesHierarchyName(value: string, name: string): boolean {
+function matchesValueName(value: string, name: string): boolean {
   return value === name || compact(value.split(/[\s-]+/)).includes(name);
 }
 

@@ -9,7 +9,7 @@ import type {
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { isEmpty, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
-import { getVerbatimSpecKeys } from './product-level-specs';
+import { getExplicitOnlySpecKeys, getVerbatimSpecKeys } from './product-level-specs';
 import { matcherModelWords } from '../product-normalizer.service';
 
 /**
@@ -446,6 +446,24 @@ export class ProductSourcePostProcessService {
     return `- For a spec field with "allowed values" listed above: if the source gives a value for that field, you MUST translate/normalize it to one of those exact Hungarian strings (never invent a new label, never leave it untranslated) — but only when the source value genuinely describes that field's own concept. A source value describing a *different* concept (e.g. a riding-discipline/category term like "All Mountain" when the field asks for frame geometry, or a gendered variant like "Cross férfi" when a category-only enum value like "Cross Trekking" fits better) must be routed to whichever field it actually matches, or dropped if no field fits — never force it into an enum value it doesn't really mean just because the field has no other value to offer. If nothing in the input specifically describes what the field is asking about, omit the key.\n`;
   }
 
+  /**
+   * The fields of this call the LLM fills only from a stated value
+   * (`meta.explicitOnly`). Follows the rule that lets a categorical value
+   * follow from a named component, and overrides it for them.
+   */
+  private buildExplicitOnlyRule(
+    schema: SpecDefinitionJsonSchema,
+    outputKeys: string[],
+  ): string {
+    const titles = this.titlesOf(
+      schema,
+      getExplicitOnlySpecKeys(schema).filter((key) => outputKeys.includes(key)),
+    );
+    return titles.length
+      ? `- Fill ${titles.join(', ')} only when the input states the value itself in words: a word in rawModel, a rawSpecs row, or the description. Never derive it from another field's value, a code or abbreviation, the product's name, or what such products usually are — the rule above about values that follow from a named component does not apply here. When the input doesn't state it, omit it.\n`
+      : '';
+  }
+
   private titlesOf(schema: SpecDefinitionJsonSchema, keys: string[]): string[] {
     return keys
       .map((key) => schema.properties[key]?.title)
@@ -538,6 +556,7 @@ export class ProductSourcePostProcessService {
       yearRule +
       offerLevelRule +
       `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it (e.g. a spec table listing a rear shock describes a full-suspension frame). This never extends to numbers: never fill a numeric field (power, torque, capacity, weight, size, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
+      this.buildExplicitOnlyRule(schema, outputKeys) +
       `- When available, the user message also has a top-level "description" string — the listing's own marketing prose. Treat it as LOWER confidence than rawModel or rawSpecs: only extract a value from it when clearly, specifically and unambiguously stated, never from general marketing tone, and prefer rawModel/rawSpecs/deterministicSpecs whenever they have a value for the same field.\n` +
       this.buildAllowedValuesRule() +
       `- Give a number in the unit shown for its field above, as a bare number.\n` +
@@ -597,6 +616,7 @@ export class ProductSourcePostProcessService {
       // stopped it from filling motorPower/torque from its own knowledge of
       // a named drive unit.
       `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it: e.g. a Bosch Performance Line / BDU drive unit is a mid-drive motor (motorPosition), a Shimano shifter/derailleur without Di2 is mechanical shiftingActuation while Di2/AXS is electronic, a stated 25 km/h assist limit means pedelecClass "Pedelec", a named display or remote (Purion, Kiox, LED Remote, Mini Remote) means display true, and "Smart System" components mean smartConnectivity true. An equipment row that is present in rawSpecs but has no value (e.g. "Első sárvédő" with empty values) means that item is not included. This never extends to numbers: never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
+      this.buildExplicitOnlyRule(schema, outputKeys) +
       `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
       `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated (e.g. "a váz felső csövéből egyszerűen eltávolítható akkumulátor" clearly states batteryRemovable=true) — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
       this.buildAllowedValuesRule() +

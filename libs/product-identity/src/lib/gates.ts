@@ -13,7 +13,7 @@ export interface GateInput {
   candidateKey: string;
   querySpecs?: ProductSpecs;
   candidateSpecs?: ProductSpecs;
-  /** Supplies the spec lists, hierarchies and tolerances. */
+  /** Supplies the spec lists, compatible values and tolerances. */
   categoryConfig?: ProductCategoryConfig;
 }
 
@@ -138,7 +138,7 @@ function specGate(
   const result = compareSpecValue(
     queryValue,
     candidateValue,
-    categoryConfig?.matcherSpecHierarchies?.[key],
+    categoryConfig?.matchingConfig?.compatibleValues?.[key],
     categoryConfig?.matchingConfig?.specTolerances?.[key],
   );
   if (result !== 'mismatch') return undefined;

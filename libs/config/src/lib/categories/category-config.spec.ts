@@ -3,6 +3,7 @@ import * as path from 'path';
 
 interface SchemaProperty {
   type: string;
+  enum?: string[];
   meta?: { format?: string };
 }
 
@@ -12,6 +13,7 @@ interface CategoryConfig {
   offerLevelSpecs?: string[];
   matchingConfig?: {
     specMismatchPenalty?: Record<string, unknown>;
+    compatibleValues?: Record<string, Record<string, string[]>>;
     matcherModel?: {
       excludeSpecs?: string[];
       examples?: { title: string; matcherModel: string }[];
@@ -46,6 +48,7 @@ describe.each(categories)('the %s category config', (slug) => {
   const gated = [...(config.primarySpecs ?? []), ...(config.matcherSpecs ?? [])];
   const penalties = Object.entries(config.matchingConfig?.specMismatchPenalty ?? {});
   const keyExcludes = config.matchingConfig?.matcherModel?.excludeSpecs ?? [];
+  const compatibleValues = Object.entries(config.matchingConfig?.compatibleValues ?? {});
 
   it.each(keyExcludes)('leaves %s out of the matcherModel key, a field of the schema', (key) => {
     expect(Object.keys(properties)).toContain(key);
@@ -80,6 +83,21 @@ describe.each(categories)('the %s category config', (slug) => {
   it.each(penalties)('prices a %s mismatch in points, 0 or more', (_key, points) => {
     expect(typeof points).toBe('number');
     expect(points).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each(compatibleValues)('lists compatible values of %s, a spec the gates compare', (key) => {
+    expect(gated).toContain(key);
+  });
+
+  // A value off the field's list never reaches a product, so its entry would
+  // never apply.
+  it.each(compatibleValues)('lists only allowed values of %s as compatible', (key, entries) => {
+    const allowed = properties[key]?.enum;
+    if (!allowed) return;
+    for (const [value, compatibles] of Object.entries(entries)) {
+      expect(allowed).toContain(value);
+      for (const compatible of compatibles) expect(allowed).toContain(compatible);
+    }
   });
 
   it.each(
