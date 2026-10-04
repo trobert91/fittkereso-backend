@@ -30,6 +30,8 @@ export class ProductDetailService {
         nameOf<ProductModel>('mainImage'),
         nameOf<ProductModel>('sources'),
         `sources.${nameOf<ProductSourceRecord>('source')}`,
+        // Each listing's resolved brand, beside the brand string it scraped.
+        `sources.${nameOf<ProductSourceRecord>('brand')}`,
         // The admin Sources tab groups a product's listings by shop.
         `sources.${nameOf<ProductSourceRecord>('source')}.${nameOf<ProductSource>('seller')}`,
         `sources.${nameOf<ProductSourceRecord>('offers')}`,
