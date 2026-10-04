@@ -174,7 +174,7 @@ export class ProductSourceSimulateImportTools {
         const product = feed.products[index];
         L.push(`- ${product?.originalName ?? `item ${index + 1}`}`);
         if (product) {
-          L.push(`  - **matcherModel**: ${this.matcherModelLine(product)}`);
+          L.push(`  - **model**: ${this.modelLine(product)}`);
         }
         L.push(...formatListingIdentifiers(identifiers, '  '));
       });
@@ -187,11 +187,11 @@ export class ProductSourceSimulateImportTools {
     L.push('```');
   }
 
-  /** The extracted matcherModel and the key name matching would compare. */
-  private matcherModelLine(product: ScrapedProduct): string {
-    if (!product.matcherModel) return 'none';
-    const key = this.matchQuery.matcherModelKeyOf(product, product.matcherModel);
-    return `"${product.matcherModel}" → \`${key ?? '–'}\``;
+  /** The extracted model and the normalizedModel name matching would compare. */
+  private modelLine(product: ScrapedProduct): string {
+    if (!product.model) return 'none';
+    const key = this.matchQuery.normalizedModelOf(product);
+    return `"${product.model}" → \`${key ?? '–'}\``;
   }
 
   private formatFeedIdentifiers(

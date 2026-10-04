@@ -38,7 +38,7 @@ export interface ListingMatchOptions {
  * scraper persists, and stores the decision on its task.
  *
  * Two rules decide (decideListingMatch): the name score, and equal
- * matcherModel keys. The category's `matchingConfig.matcherModel.required`
+ * matcherModel keys. The category's `matchingConfig.model.required`
  * picks the one that acts; the other runs in shadow and the decision records
  * what it would have done (`alternative`). A listing without a key always goes
  * by the score.

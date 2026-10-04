@@ -27,6 +27,7 @@ import {
   RuntimeDataProviderService,
   ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
+import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
 import { isEqual, omitBy, pick } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { foldReleaseYear, splitDeterministicSpecs } from './deterministic-specs';
@@ -49,8 +50,8 @@ export interface SimulatedProductPreview {
   /** Absent when the identity extraction gave no name (see `flags`). */
   model?: string;
   displayName?: string;
-  /** The identity extraction's matcherModel: what name matching keys this listing on. */
-  matcherModel?: string;
+  /** The model normalized: what name matching keys this listing on. */
+  normalizedModel?: string;
   originalName?: string;
   flags?: ScrapedProductFlag[];
   categorySlug: string;
@@ -128,6 +129,7 @@ export class ProductSourceSimulationService {
     private readonly translationSelector: SpecTranslationSelectorService,
     private readonly translationService: TranslationService,
     private readonly brandResolution: BrandResolutionService,
+    private readonly matchQuery: ProductMatchQueryService,
   ) {}
 
   public async simulateDetailPageScrape(
@@ -322,7 +324,7 @@ export class ProductSourceSimulationService {
       brand: identified.brand,
       model: identified.model,
       displayName: identified.displayName,
-      matcherModel: identified.matcherModel,
+      normalizedModel: this.matchQuery.normalizedModelOf(identified),
       originalName: detail.model,
       flags: identified.flags,
       categorySlug: category.slug,

@@ -11,8 +11,6 @@ import {
 } from '@fittkereso-backend/database';
 import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
 
-type KeyMode = 'model' | 'matcherModel';
-
 interface KeyedListing extends IdentifyingListingRow {
   text?: string;
   key?: string;
@@ -32,11 +30,11 @@ interface PairTally {
 }
 
 /**
- * Measures whether matcherModel keys say "same model" exactly when they
- * should, before any matching rule relies on them. Read-only.
+ * Measures whether listings' normalizedModel keys say "same model" exactly
+ * when they should. Read-only.
  */
 @Injectable()
-export class MatcherModelConsistencyTools {
+export class NormalizedModelConsistencyTools {
   constructor(
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerRepo: OfferRepository,
@@ -44,14 +42,10 @@ export class MatcherModelConsistencyTools {
   ) {}
 
   @Tool({
-    name: 'matcher_model_consistency',
+    name: 'normalized_model_consistency',
     description:
-      "Measures matcherModel keys against ground truth, over every listing of a product-identifying source in a category. Same model: listings whose offers share a GTIN, or an MPN within one brand — reported cross-shop and same-shop apart, as the share whose keys are equal (target ≥ 95%). Different models: the pairs you pass (record ids), as the share whose keys differ (target 100%). Also lists products whose listings disagree on the key — candidates for a wrong merge. mode 'model' keys the stored cleaned model name (the free baseline, no LLM); mode 'matcherModel' keys the extracted matcherModel. Read-only.",
+      "Measures the normalizedModel keys built from listings' model names against ground truth, over every listing of a product-identifying source in a category. Same model: listings whose offers share a GTIN, or an MPN within one brand — reported cross-shop and same-shop apart, as the share whose keys are equal (target ≥ 95%). Different models: the pairs you pass (record ids), as the share whose keys differ (target 100%). Also lists products whose listings disagree on the key — candidates for a wrong merge. Keys are built from the stored models, so no LLM is called. Read-only.",
     parameters: z.object({
-      mode: z
-        .enum(['model', 'matcherModel'])
-        .default('model')
-        .describe("'model': the stored model name; 'matcherModel': the extracted key text"),
       categorySlug: z.string().default('ebikes'),
       differentPairs: z
         .array(
@@ -68,16 +62,15 @@ export class MatcherModelConsistencyTools {
     annotations: { readOnlyHint: true },
   })
   async measure(args: {
-    mode: KeyMode;
     categorySlug: string;
     differentPairs?: { a: string; b: string; note?: string }[];
     samples: number;
   }): Promise<string> {
-    const { mode, categorySlug, differentPairs = [], samples } = args;
+    const { categorySlug, differentPairs = [], samples } = args;
     try {
       const listings = (
         await this.sourceRecordRepo.findIdentifyingListingsInCategory(categorySlug)
-      ).map((row) => this.keyed(row, mode));
+      ).map((row) => this.keyed(row));
       const byId = keyBy(listings, (listing) => listing.id);
 
       const sharing = (await this.offerRepo.findRecordPairsSharingIdentifier()).filter(
@@ -88,7 +81,7 @@ export class MatcherModelConsistencyTools {
       );
 
       const L: string[] = [
-        `# matcherModel consistency — ${categorySlug}, mode \`${mode}\``,
+        `# normalizedModel consistency — ${categorySlug}`,
         '',
         this.coverageLine(listings),
         '',
@@ -126,17 +119,16 @@ export class MatcherModelConsistencyTools {
       L.push(...this.conflictLines(listings, samples));
       return L.join('\n');
     } catch (error) {
-      return `Error measuring matcherModel consistency: ${(error as Error).message}`;
+      return `Error measuring normalizedModel consistency: ${(error as Error).message}`;
     }
   }
 
-  private keyed(row: IdentifyingListingRow, mode: KeyMode): KeyedListing {
+  private keyed(row: IdentifyingListingRow): KeyedListing {
     const listing = row.listing as ScrapedProduct;
-    const text = mode === 'model' ? listing.model : listing.matcherModel;
     return {
       ...row,
-      text,
-      key: listing.category ? this.queryService.matcherModelKeyOf(listing, text) : undefined,
+      text: listing.model,
+      key: listing.category ? this.queryService.normalizedModelOf(listing) : undefined,
     };
   }
 

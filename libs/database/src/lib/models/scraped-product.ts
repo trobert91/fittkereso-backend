@@ -21,30 +21,26 @@ export interface ScrapedProduct {
   category: { id: string; slug: string; name: string };
   brand: string;
   /**
-   * The model name the identity extraction read off the title, without the
-   * brand, size, colour or marketing words. Set only when that call returned
-   * one (now, or on an earlier import whose result was reused); otherwise
-   * absent, and `flags` says why. A reader that needs some name either way
-   * takes listingNames().
+   * The model name the identity extraction read off the title: the title's
+   * own words that tell this model apart from the brand's others — line,
+   * model numbers, variant and equipment markers — without the brand and
+   * without the values of the specs the category's `matchingConfig.model`
+   * leaves out (size, colour, year, ...). What the product is shown as, and,
+   * normalized (ProductMatchQueryService.normalizedModelOf), what its listings
+   * are matched on. Set only when that call returned one (now, or on an
+   * earlier import whose result was reused); otherwise absent, and `flags`
+   * says why. A reader that needs some name either way takes listingNames().
    */
   model?: string;
   /** `${brand} ${model}`, set exactly when `model` is. */
   displayName?: string;
   /**
-   * The model designation two listings of one model share, as the identity
-   * extraction wrote it: line, model numbers and variant or equipment
-   * markers, without the brand and without the specs the category's
-   * `matchingConfig.matcherModel` leaves out. Compared only as a normalized
-   * key (ProductMatchQueryService.matcherModelKeyOf), never shown.
+   * Digest of what `model` was asked under: the category's left-out specs,
+   * its examples and the prompt's version. A stored model under another
+   * contract is extracted again, alone — the rest of the stored extraction
+   * (its specs) is kept.
    */
-  matcherModel?: string;
-  /**
-   * Digest of what `matcherModel` was asked under: the category's left-out
-   * specs, its examples and the prompt's version. A stored matcherModel under
-   * another contract is extracted again, alone — the rest of the stored
-   * extraction is kept, so nothing is renamed.
-   */
-  matcherModelContract?: string;
+  modelContract?: string;
   /**
    * The title exactly as the shop publishes it. Every importer sets it; the
    * identity extraction reads it, and it stays as scraped.

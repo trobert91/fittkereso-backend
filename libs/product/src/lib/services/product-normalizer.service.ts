@@ -2,40 +2,42 @@ import { Injectable } from '@nestjs/common';
 import { uniq } from 'lodash';
 
 /**
- * The words a matcherModel key is built from (normalizeMatcherModel): accents
- * and case dropped, "+" as the word `plus`, other punctuation splitting
- * words, letters and digits split. Exported so the identity extraction can
- * check its matcherModel against the title word for word, the same way.
+ * The words a listing's `normalizedModel` is built from (normalizeModel):
+ * accents and case dropped, punctuation other than "+" splitting words,
+ * letters and digits split. A "+" stays on its word ("Move+", "+EQ"), and one
+ * standing alone joins the word before it ("E +" is "e+"). Words with no
+ * letter or digit go. Exported so the identity extraction can check its model
+ * against the title word for word, the same way.
  */
-export function matcherModelWords(text: string | undefined): string[] {
+export function identityWords(text: string | undefined): string[] {
   if (!text) return [];
   return text
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .toLowerCase()
-    .replace(/\+/g, ' plus ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+\+(?=\s|$)/g, '+')
+    .replace(/[^\p{L}\p{N}+]+/gu, ' ')
     .replace(/(\p{L})(\p{N})/gu, '$1 $2')
     .replace(/(\p{N})(\p{L})/gu, '$1 $2')
     .split(' ')
-    .filter(Boolean);
+    .filter((word) => /[\p{L}\p{N}]/u.test(word));
 }
 
 @Injectable()
 export class ProductNormalizerService {
   /**
-   * The key two listings of one model share: a `matcherModel` (the identity
-   * extraction's model designation) reduced to its sorted, de-duplicated
-   * words, so it can be compared for equality. Undefined when nothing is left.
+   * The key two listings of one model share: a listing's `model` reduced to
+   * its sorted, de-duplicated words (identityWords), so it can be compared for
+   * equality. Undefined when nothing is left.
    *
    * Every step removes a difference that says nothing about which model it
    * is, and keeps every word that does:
    * - accents and case go ("Trapéz" and "TRAPEZ" agree);
-   * - "+" becomes the word `plus` ("Move" and "Move+" are different bikes);
+   * - "+" stays on its word ("Move" and "Move+" are different bikes);
    * - other punctuation splits words ("C:62", "400X/FE");
    * - letters and digits split ("CX830" and "CX 830" agree, as do "ONE22" and
    *   "ONE 22");
-   * - the brand's words go, wherever they stand;
+   * - the words of each of `brands` go, wherever they stand;
    * - each of `dropValues` goes where its words stand in a row: the listing's
    *   own values of the specs a key leaves out (its year, its wheel size), in
    *   case the extraction kept one.
@@ -44,20 +46,20 @@ export class ProductNormalizerService {
    * "E1 … 5" collide. Matching never acts on a key alone: the spec gates
    * still apply.
    */
-  public normalizeMatcherModel({
+  public normalizeModel({
     text,
-    brand,
+    brands = [],
     dropValues = [],
   }: {
     text: string | undefined;
-    brand?: string;
+    brands?: (string | undefined)[];
     dropValues?: string[];
   }): string | undefined {
-    const brandWords = new Set(matcherModelWords(brand));
+    const brandWords = new Set(brands.flatMap((brand) => identityWords(brand)));
     const words = dropValues
       .reduce(
-        (remaining, value) => this.withoutRun(remaining, matcherModelWords(value)),
-        matcherModelWords(text),
+        (remaining, value) => this.withoutRun(remaining, identityWords(value)),
+        identityWords(text),
       )
       .filter((word) => !brandWords.has(word));
 

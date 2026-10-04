@@ -180,7 +180,7 @@ export class ProductIdentityTools {
     return L.join('\n');
   }
 
-  /** Both rules; the category's `matcherModel.required` picks the one that acts. */
+  /** Both rules; the category's `model.required` picks the one that acts. */
   private describeListingMatch(
     candidates: ProductCandidate[],
     query: ProductMatchQuery,

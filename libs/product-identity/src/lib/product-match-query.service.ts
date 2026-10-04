@@ -7,7 +7,7 @@ import type {
 } from '@fittkereso-backend/database';
 import {
   listingNames,
-  matcherModelExcludedSpecKeys,
+  modelExcludedSpecKeys,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
@@ -45,7 +45,7 @@ export class ProductMatchQueryService {
     brand: Brand,
   ): ProductMatchQuery {
     const { category } = scrapedProduct;
-    const key = this.matcherModelKeyOf(scrapedProduct, scrapedProduct.matcherModel);
+    const key = this.normalizedModelOf(scrapedProduct);
     return {
       brandId: brand.id,
       brandName: brand.name,
@@ -91,25 +91,26 @@ export class ProductMatchQueryService {
   }
 
   /**
-   * A listing's matcherModel key: `text` (the identity extraction's
-   * `matcherModel`) normalized with the listing's own brand, minus the
-   * listing's values of the category's `matcherModel.excludeSpecs` (its year,
-   * say), in case the extraction kept one. The only place a key is built, and
-   * built from the listing alone, so the key its record stores and the key a
-   * query of it compares are the same. Undefined when nothing is left.
+   * A listing's normalizedModel: its `model` (the identity extraction's name
+   * for it) normalized, without the words of its own brand and of
+   * `resolvedBrandName`, and without the listing's values of the category's
+   * `model.excludeSpecs` (its year, say), in case the extraction kept one.
+   * The only place a key is built, and built from the listing alone, so the
+   * key its record stores and the key a query of it compares are the same.
+   * Undefined without a model, or when nothing is left.
    *
    * The offer-level values (size, colour) are left out by the prompt but not
    * dropped here: a size label doubles as a model word ("Team XL" is a model,
    * and a listing of it can carry "XL" as its frame size), and dropping it
    * would key two models alike.
    */
-  public matcherModelKeyOf(
-    listing: Pick<ScrapedProduct, 'brand' | 'category' | 'specs' | 'offers'>,
-    text: string | undefined,
+  public normalizedModelOf(
+    listing: Pick<ScrapedProduct, 'brand' | 'model' | 'category' | 'specs' | 'offers'>,
+    resolvedBrandName?: string,
   ): string | undefined {
     const excluded =
       this.categoryConfigService.getConfig(listing.category.slug)?.matchingConfig
-        ?.matcherModel?.excludeSpecs ?? [];
+        ?.model?.excludeSpecs ?? [];
     const specSets = [
       listing.specs,
       ...(listing.offers ?? []).map((offer) => offer.specs),
@@ -118,34 +119,32 @@ export class ProductMatchQueryService {
       flatMap(excluded, (key) => spokenValuesOf(specs?.[key])),
     );
 
-    return this.productNormalizer.normalizeMatcherModel({
-      text,
-      brand: listing.brand,
+    return this.productNormalizer.normalizeModel({
+      text: listing.model,
+      brands: [listing.brand, resolvedBrandName],
       dropValues: uniq(dropValues),
     });
   }
 
   /**
-   * Whether the category's name matches need equal matcherModel keys
-   * (`matchingConfig.matcherModel.required`): the rule that acts. The other
-   * one still runs, in shadow.
+   * Whether the category's name matches need equal keys
+   * (`matchingConfig.model.required`): the rule that acts. The other one
+   * still runs, in shadow.
    */
   public requiresMatcherModel(categorySlug: string): boolean {
     return (
-      this.categoryConfigService.getConfig(categorySlug)?.matchingConfig?.matcherModel
+      this.categoryConfigService.getConfig(categorySlug)?.matchingConfig?.model
         ?.required === true
     );
   }
 
   /**
-   * The specs a matcherModel leaves out, as the extraction prompt names them:
-   * the category's offer-level specs (they describe a listing, not a model)
-   * and its `matchingConfig.matcherModel.excludeSpecs`.
+   * The specs a model leaves out, as the extraction prompt names them: the
+   * category's offer-level specs (they describe a listing, not a model) and
+   * its `matchingConfig.model.excludeSpecs`.
    */
   public excludedSpecKeysOf(categorySlug: string): string[] {
-    return matcherModelExcludedSpecKeys(
-      this.categoryConfigService.getConfig(categorySlug),
-    );
+    return modelExcludedSpecKeys(this.categoryConfigService.getConfig(categorySlug));
   }
 
   /**

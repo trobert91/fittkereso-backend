@@ -470,6 +470,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
       expect(identityResult?.brand).toBe('KTM');
     });
@@ -484,6 +485,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -503,6 +505,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result?.brand).toBe('KTM');
@@ -525,6 +528,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result?.model).toBe(cleanedModel);
@@ -553,6 +557,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -571,6 +576,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -589,6 +595,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       // Model alone resolving to nothing means the whole contribution is empty.
@@ -606,6 +613,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result?.brand).toBeUndefined();
@@ -620,6 +628,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result).toBeUndefined();
@@ -638,6 +647,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result).toBeUndefined();
@@ -651,6 +661,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(result).toBeUndefined();
@@ -668,6 +679,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -690,6 +702,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithRider,
           outputKeys,
           offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
         });
 
       await extract(['weight', 'gender']);
@@ -720,6 +733,7 @@ describe('ProductSourcePostProcessService', () => {
         schema: schemaWithFrameSize,
         outputKeys: ['frameSize'],
         offerLevelSpecs: ['frameSize'],
+        modelRule: { excludedKeys: [] },
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -740,6 +754,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -758,6 +773,7 @@ describe('ProductSourcePostProcessService', () => {
         schema,
         outputKeys: ['weight', 'frameType'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       expect(JSON.parse(aiChat.createChat.mock.calls[0][0].messages[1].content)).toEqual({
@@ -788,6 +804,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithVariants,
           outputKeys: ['storage', 'finish', 'sizeLabel', 'weight'],
           offerLevelSpecs: ['storage', 'finish', 'sizeLabel'],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -805,6 +822,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithVariants,
           outputKeys: ['storage', 'finish', 'sizeLabel', 'weight'],
           offerLevelSpecs: ['storage', 'sizeLabel'],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -831,6 +849,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithYear,
           outputKeys: ['modelYear', 'weight'],
           offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -847,6 +866,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithYear,
           outputKeys: ['weight'],
           offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -864,6 +884,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithYear,
           outputKeys: ['modelYear', 'weight'],
           offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
         });
 
         expect(result).toEqual({
@@ -893,6 +914,7 @@ describe('ProductSourcePostProcessService', () => {
         schema: monitors,
         outputKeys: ['screenSize', 'resolution'],
         offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
       });
 
       const callArgs = aiChat.createChat.mock.calls[0][0];
@@ -906,7 +928,7 @@ describe('ProductSourcePostProcessService', () => {
       expect(systemPrompt).not.toMatch(/modelYear|frameSize|Pay particular attention/);
     });
 
-    describe('matcherModel', () => {
+    describe('the model rule', () => {
       const schemaWithKeys: SpecDefinitionJsonSchema = {
         type: 'object',
         title: 'E-bike',
@@ -917,69 +939,72 @@ describe('ProductSourcePostProcessService', () => {
         },
       };
       const rawTitle = 'KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl';
-      const extract = (matcherModel?: string, withRequest = true) => {
+      const extract = (model?: string) => {
         aiChat.createChat.mockResolvedValueOnce({
           content: '{}',
-          parsed: { model: 'Macina Style 810 Di2', ...(matcherModel ? { matcherModel } : {}) },
+          parsed: model ? { model } : { specs: { weight: 25 } },
         });
         return service.extractIdentity({
           data: { brand: 'KTM', model: rawTitle, specs: {} },
           schema: schemaWithKeys,
           outputKeys: ['weight', 'frameSize', 'modelYear'],
           offerLevelSpecs: ['frameSize'],
-          ...(withRequest
-            ? {
-                matcherModel: {
-                  excludedKeys: ['frameSize', 'modelYear'],
-                  examples: [
-                    { title: 'Cube Reaction Hybrid Pro 750 27.5" M', matcherModel: 'Reaction Hybrid Pro 750' },
-                  ],
-                },
-              }
-            : {}),
+          modelRule: {
+            excludedKeys: ['frameSize', 'modelYear'],
+            examples: [
+              { title: 'Cube Reaction Hybrid Pro 750 27.5" M', model: 'Reaction Hybrid Pro 750' },
+            ],
+          },
         });
       };
       const systemPrompt = () => aiChat.createChat.mock.calls[0][0].messages[0].content as string;
 
-      it('asks for it with the left-out fields by title and the category examples', async () => {
+      it('asks for the model with the left-out fields by title and the category examples', async () => {
         await extract('Macina Style 810 Di2');
 
-        expect(systemPrompt()).toContain('"matcherModel"');
+        expect(systemPrompt()).toContain('- "model": the part of rawModel that tells this model apart');
         expect(systemPrompt()).toContain('a value of Frame size, Model year');
+        expect(systemPrompt()).toContain('Examples (rawModel → model):');
         expect(systemPrompt()).toContain('"Cube Reaction Hybrid Pro 750 27.5" M" → "Reaction Hybrid Pro 750"');
-        expect(aiChat.createChat.mock.calls[0][0].schema.properties.matcherModel).toEqual({ type: 'string' });
+      });
+
+      it('asks for no second name', async () => {
+        await extract('Macina Style 810 Di2');
+
+        expect(systemPrompt()).not.toContain('matcherModel');
+        expect(Object.keys(aiChat.createChat.mock.calls[0][0].schema.properties)).toEqual([
+          'brand',
+          'model',
+          'specs',
+        ]);
+      });
+
+      // The model is what the listing is keyed on, and the title is often the
+      // only place the values it leaves out appear.
+      it('moves a value into specs before leaving its word out', async () => {
+        await extract('Macina Style 810 Di2');
+
+        expect(systemPrompt()).toContain('move that value into "specs"');
       });
 
       it('returns the words the title has', async () => {
-        expect((await extract('Macina Style 810 Di2'))?.matcherModel).toBe('Macina Style 810 Di2');
+        expect((await extract('Macina Style 810 Di2'))?.model).toBe('Macina Style 810 Di2');
       });
 
       // A word the shop never printed can't be agreed on by two shops.
       it('drops a word the title does not have, comparing words the way the key does', async () => {
         const result = await extract('macina STYLE 810-Di2 Electric');
 
-        expect(result?.matcherModel).toBe('macina STYLE 810-Di2');
+        expect(result?.model).toBe('macina STYLE 810-Di2');
       });
 
-      it('is undefined when no word of it is in the title', async () => {
-        expect((await extract('Elektromos kerékpár'))?.matcherModel).toBeUndefined();
+      // The call did name the listing; without a model it couldn't be matched.
+      it('keeps the model as returned when no word of it is in the title', async () => {
+        expect((await extract('Elektromos kerékpár'))?.model).toBe('Elektromos kerékpár');
       });
 
-      // One list teaches both names which words of a title are the name.
-      it('points the "model" rule at its examples', async () => {
-        await extract('Macina Style 810 Di2');
-
-        expect(systemPrompt()).toContain(
-          'The matcherModel examples below show which words of a title are the name.',
-        );
-      });
-
-      it('neither asks nor returns one without a request', async () => {
-        const result = await extract('Macina Style 810 Di2', false);
-
-        expect(systemPrompt()).not.toContain('matcherModel');
-        expect(aiChat.createChat.mock.calls[0][0].schema.properties.matcherModel).toBeUndefined();
-        expect(result?.matcherModel).toBeUndefined();
+      it('is undefined when the call names nothing', async () => {
+        expect((await extract(undefined))?.model).toBeUndefined();
       });
     });
 
@@ -1002,6 +1027,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithFrameSize,
           outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: ['frameSize', 'color'],
+          modelRule: { excludedKeys: [] },
         });
 
         expect(aiChat.createChat).toHaveBeenCalledWith(
@@ -1017,8 +1043,8 @@ describe('ProductSourcePostProcessService', () => {
         );
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
         expect(systemPrompt).toContain('rawModel');
-        expect(systemPrompt).toMatch(
-          /into "specs" when "specs" does not already have it, BEFORE removing it from "model"/,
+        expect(systemPrompt).toContain(
+          'Before leaving out a word that states a canonical field\'s value, move that value into "specs" when "specs" does not already have it',
         );
       });
 
@@ -1031,11 +1057,12 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithFrameSize,
           outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: ['frameSize', 'color'],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
         expect(systemPrompt).toContain(
-          'moving a value into "specs" never removes a word of the name from "model"',
+          'Moving a value into "specs" never removes a word of the model\'s own name.',
         );
         expect(systemPrompt).toContain('A word of the model\'s own name is never one of them');
         expect(systemPrompt).toContain('written together with its number (e.g. "XL/53")');
@@ -1053,6 +1080,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithFrameSize,
           outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
         });
 
         const systemPrompt = aiChat.createChat.mock.calls[0][0].messages[0].content;
@@ -1080,6 +1108,7 @@ describe('ProductSourcePostProcessService', () => {
           schema: schemaWithFrameSize,
           outputKeys: ['weight', 'frameSize', 'color'],
           offerLevelSpecs: ['frameSize', 'color'],
+          modelRule: { excludedKeys: [] },
         });
 
         expect(result?.model).toBe(cleanedModel);

@@ -20,7 +20,6 @@ describe('SpecPostProcessService', () => {
     identityExtraction: jest.Mock;
     identitySpecRowsMatched: jest.Mock;
     specUnification: jest.Mock;
-    matcherModel: jest.Mock;
   };
 
   const schema: SpecDefinitionJsonSchema = {
@@ -93,7 +92,6 @@ describe('SpecPostProcessService', () => {
       identityExtraction: jest.fn(),
       identitySpecRowsMatched: jest.fn(),
       specUnification: jest.fn(),
-      matcherModel: jest.fn(),
     };
 
     service = new SpecPostProcessService(
@@ -111,8 +109,8 @@ describe('SpecPostProcessService', () => {
         identityKeys: ['modelYear', 'batteryCapacity', 'weight', 'frameSize', 'color'],
         offerLevelKeys: ['frameSize', 'color'],
         unificationKeys: ['forkTravel', 'tubeless'],
-        // The offer-level specs are always left out of the matcherModel.
-        matcherModel: { excludedKeys: ['frameSize', 'color'] },
+        // The offer-level specs are always left out of the model.
+        modelRule: { excludedKeys: ['frameSize', 'color'] },
       });
     });
   });
@@ -136,7 +134,7 @@ describe('SpecPostProcessService', () => {
         schema,
         outputKeys: ['modelYear', 'batteryCapacity', 'weight', 'frameSize', 'color'],
         offerLevelSpecs: ['frameSize', 'color'],
-        matcherModel: { excludedKeys: ['frameSize', 'color'] },
+        modelRule: { excludedKeys: ['frameSize', 'color'] },
         model: undefined,
         thinking: undefined,
         effort: undefined,
@@ -255,46 +253,32 @@ describe('SpecPostProcessService', () => {
       expect(result.model).toBe('Macina Scarp SX Prestige Di2');
     });
 
-    describe('the matcherModel', () => {
-      it('asks for it, leaving out the offer-level and the configured specs, with the category examples', async () => {
-        const examples = [{ title: 'KTM Macina Style 810 Di2 46cm', matcherModel: 'Macina Style 810 Di2' }];
+    describe('the model rule', () => {
+      it('asks for the model leaving out the offer-level and the configured specs, with the category examples', async () => {
+        const examples = [{ title: 'KTM Macina Style 810 Di2 46cm', model: 'Macina Style 810 Di2' }];
         categoryConfigService.getConfig.mockReturnValue({
           primarySpecs: ['modelYear', 'batteryCapacity'],
           offerLevelSpecs: ['frameSize', 'color'],
-          matchingConfig: { matcherModel: { excludeSpecs: ['modelYear', 'notInSchema'], examples } },
+          matchingConfig: { model: { excludeSpecs: ['modelYear', 'notInSchema'], examples } },
         });
 
         await service.extractIdentity({ context: context(), scrapedProduct: listing() });
 
         expect(postProcess.extractIdentity).toHaveBeenCalledWith(
           expect.objectContaining({
-            matcherModel: { excludedKeys: ['frameSize', 'color', 'modelYear'], examples },
+            modelRule: { excludedKeys: ['frameSize', 'color', 'modelYear'], examples },
           }),
         );
       });
 
-      it('stores the one the call returned, with its contract', async () => {
-        postProcess.extractIdentity.mockResolvedValueOnce({
-          model: 'Macina Scarp SX Prestige Di2',
-          matcherModel: 'MACINA SCARP SX PRESTIGE Di2',
-        });
-
+      it('stores the model with the contract it was asked under', async () => {
         const result = await service.extractIdentity({ context: context(), scrapedProduct: listing() });
 
-        expect(result.matcherModel).toBe('MACINA SCARP SX PRESTIGE Di2');
-        expect(result.matcherModelContract).toEqual(expect.any(String));
-        expect(metrics.matcherModel).toHaveBeenCalledWith('speedbike-arukereso', 'extracted');
+        expect(result.model).toBe('Macina Scarp SX Prestige Di2');
+        expect(result.modelContract).toBe(service.modelContractOf('ebikes'));
       });
 
-      // Its extra words key it apart: review, never a wrong merge.
-      it('falls back to the model when the call named the model only', async () => {
-        const result = await service.extractIdentity({ context: context(), scrapedProduct: listing() });
-
-        expect(result.matcherModel).toBe('Macina Scarp SX Prestige Di2');
-        expect(metrics.matcherModel).toHaveBeenCalledWith('speedbike-arukereso', 'fallback');
-      });
-
-      it('has none when the call failed, or for a source with the extraction off', async () => {
+      it('has no contract when the call failed, or for a source with the extraction off', async () => {
         postProcess.extractIdentity.mockResolvedValueOnce(undefined);
         const failed = await service.extractIdentity({ context: context(), scrapedProduct: listing() });
         const off = await service.extractIdentity({
@@ -302,9 +286,19 @@ describe('SpecPostProcessService', () => {
           scrapedProduct: listing(),
         });
 
-        expect(failed.matcherModel).toBeUndefined();
-        expect(failed.matcherModelContract).toBeUndefined();
-        expect(off.matcherModel).toBeUndefined();
+        expect(failed.modelContract).toBeUndefined();
+        expect(off.modelContract).toBeUndefined();
+      });
+
+      // The contract follows the rule: other left-out specs or examples ask again.
+      it('changes its contract with the left-out specs', () => {
+        const before = service.modelContractOf('ebikes');
+        categoryConfigService.getConfig.mockReturnValue({
+          offerLevelSpecs: ['frameSize', 'color'],
+          matchingConfig: { model: { excludeSpecs: ['modelYear'] } },
+        });
+
+        expect(service.modelContractOf('ebikes')).not.toBe(before);
       });
     });
 
@@ -429,12 +423,19 @@ describe('SpecPostProcessService', () => {
         expect(postProcess.extractIdentity).toHaveBeenCalled();
       });
 
-      describe('a stored matcherModel', () => {
-        const refreshed = { model: 'Some Other Name', matcherModel: 'MACINA SCARP SX PRESTIGE Di2' };
-
-        it('asks again for it alone when the stored one is missing, renaming nothing', async () => {
+      describe('a model asked under an older rule', () => {
+        const refreshed = {
+          model: 'MACINA SCARP SX PRESTIGE Di2',
+          specs: { modelYear: 2027, batteryCapacity: 625 },
+        };
+        const storedUnder = async (contract: string | undefined) => {
           const ownRecord = await storedRecord();
-          delete ownRecord.scrapedProduct?.matcherModel;
+          ownRecord.scrapedProduct = { ...ownRecord.scrapedProduct, modelContract: contract };
+          return ownRecord;
+        };
+
+        it('asks again for the model alone, keeping the stored specs', async () => {
+          const ownRecord = await storedUnder('old');
           postProcess.extractIdentity.mockResolvedValueOnce(refreshed);
 
           const result = await service.extractIdentity({
@@ -444,16 +445,17 @@ describe('SpecPostProcessService', () => {
           });
 
           expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
-          expect(result.model).toBe('Macina Scarp SX Prestige Di2');
-          expect(result.displayName).toBe('KTM Macina Scarp SX Prestige Di2');
-          expect(result.matcherModel).toBe('MACINA SCARP SX PRESTIGE Di2');
-          expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'reused');
-          expect(metrics.matcherModel).toHaveBeenCalledWith('speedbike-arukereso', 'refreshed');
+          expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
+          expect(result.displayName).toBe('KTM MACINA SCARP SX PRESTIGE Di2');
+          expect(result.modelContract).toBe(service.modelContractOf('ebikes'));
+          expect(result.specs).toMatchObject({ modelYear: 2026, batteryCapacity: 750, tubeless: true });
+          expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'refreshed');
+          expect(metrics.identityExtraction).not.toHaveBeenCalledWith('speedbike-arukereso', 'reused');
         });
 
-        it('asks again when it was asked under another contract', async () => {
-          const ownRecord = await storedRecord();
-          ownRecord.scrapedProduct = { ...ownRecord.scrapedProduct, matcherModelContract: 'old' };
+        // Stored before models had contracts.
+        it('asks again for a model stored without a contract', async () => {
+          const ownRecord = await storedUnder(undefined);
           postProcess.extractIdentity.mockResolvedValueOnce(refreshed);
 
           const result = await service.extractIdentity({
@@ -462,13 +464,11 @@ describe('SpecPostProcessService', () => {
             ownRecord,
           });
 
-          expect(result.matcherModel).toBe('MACINA SCARP SX PRESTIGE Di2');
-          expect(result.matcherModelContract).not.toBe('old');
+          expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
         });
 
-        it('leaves none after a failed call, so the next import asks again', async () => {
-          const ownRecord = await storedRecord();
-          delete ownRecord.scrapedProduct?.matcherModel;
+        it('keeps the stored model after a failed call, so the next import asks again', async () => {
+          const ownRecord = await storedUnder('old');
           postProcess.extractIdentity.mockResolvedValueOnce(undefined);
 
           const result = await service.extractIdentity({
@@ -478,14 +478,13 @@ describe('SpecPostProcessService', () => {
           });
 
           expect(result.model).toBe('Macina Scarp SX Prestige Di2');
-          expect(result.matcherModel).toBeUndefined();
-          expect(result.matcherModelContract).toBeUndefined();
-          expect(metrics.matcherModel).toHaveBeenCalledWith('speedbike-arukereso', 'failed');
+          expect(result.modelContract).toBe('old');
+          expect(result.flags).toBeUndefined();
+          expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'refresh_failed');
         });
 
         it('asks nothing for a source that turned the extraction off since', async () => {
-          const ownRecord = await storedRecord();
-          delete ownRecord.scrapedProduct?.matcherModel;
+          const ownRecord = await storedUnder('old');
 
           await service.extractIdentity({
             context: context({ postProcess: { identity: false } }),
@@ -494,6 +493,23 @@ describe('SpecPostProcessService', () => {
           });
 
           expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+        });
+
+        // A contributing source's listing names no product and is matched on nothing.
+        it('asks nothing for a source that does not identify products', async () => {
+          const ownRecord = await storedUnder('old');
+          const contributing = context();
+          contributing.source = { ...contributing.source, identifiesProducts: false } as ProductSource;
+
+          const result = await service.extractIdentity({
+            context: contributing,
+            scrapedProduct: listing(),
+            ownRecord,
+          });
+
+          expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+          expect(result.model).toBe('Macina Scarp SX Prestige Di2');
+          expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'reused');
         });
       });
     });

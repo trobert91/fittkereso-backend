@@ -17,7 +17,7 @@ import { SellerTools } from './seller.tools';
 import { ScrapeRunTools } from './scrape-run.tools';
 import { ProductSourceRecordsTools } from './product-source-records.tools';
 import { OfferSweepTools } from './offer-sweep.tools';
-import { MatcherModelBackfillTools } from './matcher-model-backfill.tools';
+import { ListingModelRefreshTools } from './listing-model-refresh.tools';
 
 @Module({
   imports: [
@@ -40,14 +40,14 @@ import { MatcherModelBackfillTools } from './matcher-model-backfill.tools';
         ScrapeRunTools,
         ProductSourceRecordsTools,
         OfferSweepTools,
-        MatcherModelBackfillTools,
+        ListingModelRefreshTools,
       ],
       'fittkereso',
     ),
   ],
   providers: [
     OfferSweepTools,
-    MatcherModelBackfillTools,
+    ListingModelRefreshTools,
     ProductSourceTools,
     ProductSourceConfigGeneratorTools,
     ProductSourceSimulateScrapeTools,

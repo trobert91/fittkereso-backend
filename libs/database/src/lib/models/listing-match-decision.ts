@@ -48,7 +48,7 @@ export interface ListingMatchCandidate {
  * Which rule decides a name match. `score`: the best name score minus every
  * failed gate (the clear-winner rule). `key`: equal matcherModel keys and spec
  * gates at ACCEPT_SCORE, the name score only ranking — on for a category with
- * `matchingConfig.matcherModel.required`, for a listing with a key.
+ * `matchingConfig.model.required`, for a listing with a key.
  */
 export type ListingMatchMode = 'score' | 'key';
 

@@ -137,18 +137,13 @@ export const IDENTITY_RECHECK_ATTACHED_TOTAL = 'identity_recheck_attached_total'
 /**
  * The LLM identity extraction, per listing: extracted fresh, reused because
  * the listing's input did not change, failed (the listing continues on its
- * deterministic data), or disabled for the source. On a nightly re-import of
- * an unchanged catalogue, everything should land in `reused`.
+ * deterministic data), or disabled for the source. `refreshed`: reused, but
+ * its model was asked under an older rule, so the model alone was asked
+ * again; `refresh_failed`: that call named nothing, and the stored model
+ * stays. On a nightly re-import of an unchanged catalogue, everything should
+ * land in `reused`.
  */
 export const IDENTITY_EXTRACTION_TOTAL = 'identity_extraction_total';
-/**
- * The matcherModel of a listing whose identity extraction ran, by result:
- * `extracted` (the call returned one), `fallback` (it returned a model but no
- * matcherModel, so the model stands in: its extra words key it apart, to
- * review rather than to a wrong merge), `refreshed` (a stored extraction kept,
- * its matcherModel asked again under a new contract) and `failed`.
- */
-export const MATCHER_MODEL_TOTAL = 'matcher_model_total';
 /**
  * Name-matched listings with a matcherModel key, by how the rule that didn't
  * act compares with the one that did (ListingMatchAlternative): `agree`,

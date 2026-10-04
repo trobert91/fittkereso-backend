@@ -155,7 +155,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockLocks: { withLocks: jest.Mock };
   let mockOfferComposer: jest.Mocked<OfferComposerService>;
   let mockContributorDetach: jest.Mocked<ContributorDetachService>;
-  let mockMatchQuery: { matcherModelKeyOf: jest.Mock; requiresMatcherModel: jest.Mock };
+  let mockMatchQuery: { normalizedModelOf: jest.Mock; requiresMatcherModel: jest.Mock };
   let mockTaskConfig: { maxAttempts: number };
 
   beforeEach(() => {
@@ -311,7 +311,7 @@ describe('ProductScrapeUpdaterService', () => {
     } as unknown as jest.Mocked<ContributorDetachService>;
 
     mockMatchQuery = {
-      matcherModelKeyOf: jest.fn((_listing, text?: string) => (text ? `key:${text}` : undefined)),
+      normalizedModelOf: jest.fn((listing: ScrapedProduct) => (listing.model ? `key:${listing.model}` : undefined)),
       requiresMatcherModel: jest.fn().mockReturnValue(false),
     };
     mockTaskConfig = { maxAttempts: 3 };
@@ -913,11 +913,11 @@ describe('ProductScrapeUpdaterService', () => {
       );
     });
 
-    it('stores the listing\x27s matcherModel key on its record', async () => {
+    it('stores the key of the listing\x27s model on its record', async () => {
       savedAs('model-new');
       mockSpecPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) => ({
         ...scrapedProduct,
-        matcherModel: 'Macina Style 810 Di2',
+        model: 'Macina Style 810 Di2',
       }));
 
       await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());

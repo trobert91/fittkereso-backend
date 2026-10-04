@@ -14,9 +14,9 @@ interface CategoryConfig {
   matchingConfig?: {
     specMismatchPenalty?: Record<string, unknown>;
     compatibleValues?: Record<string, Record<string, string[]>>;
-    matcherModel?: {
+    model?: {
       excludeSpecs?: string[];
-      examples?: { title: string; matcherModel: string }[];
+      examples?: { title: string; model: string }[];
     };
   };
 }
@@ -47,10 +47,10 @@ describe.each(categories)('the %s category config', (slug) => {
     .properties;
   const gated = [...(config.primarySpecs ?? []), ...(config.matcherSpecs ?? [])];
   const penalties = Object.entries(config.matchingConfig?.specMismatchPenalty ?? {});
-  const keyExcludes = config.matchingConfig?.matcherModel?.excludeSpecs ?? [];
+  const keyExcludes = config.matchingConfig?.model?.excludeSpecs ?? [];
   const compatibleValues = Object.entries(config.matchingConfig?.compatibleValues ?? {});
 
-  it.each(keyExcludes)('leaves %s out of the matcherModel key, a field of the schema', (key) => {
+  it.each(keyExcludes)('leaves %s out of the model, a field of the schema', (key) => {
     expect(Object.keys(properties)).toContain(key);
   });
 
@@ -63,13 +63,13 @@ describe.each(categories)('the %s category config', (slug) => {
   // The prompt tells the LLM to keep only the title's own words, in order; an
   // example that breaks the rule teaches it to.
   it.each(
-    (config.matchingConfig?.matcherModel?.examples ?? []).map(
-      (example) => [example.matcherModel, example] as const,
+    (config.matchingConfig?.model?.examples ?? []).map(
+      (example) => [example.model, example] as const,
     ),
-  )("shows a matcherModel of the title's own words, in order: %s", (_name, example) => {
+  )("shows a model of the title's own words, in order: %s", (_name, example) => {
     const titleWords = example.title.split(/\s+/);
     let from = 0;
-    for (const word of example.matcherModel.split(/\s+/)) {
+    for (const word of example.model.split(/\s+/)) {
       const at = titleWords.indexOf(word, from);
       expect(at).toBeGreaterThanOrEqual(from);
       from = at + 1;

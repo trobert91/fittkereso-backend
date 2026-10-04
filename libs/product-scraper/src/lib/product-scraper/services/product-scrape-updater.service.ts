@@ -118,7 +118,7 @@ interface ListingWrite {
   listing: ScrapedProduct;
   /** Null for a source that does not identify products: nothing matches on its listings. */
   normalizedSourceName: string | null;
-  /** The listing's matcherModel key (matcherModelKeyOf); null likewise, or without a matcherModel. */
+  /** The listing's model key (normalizedModelOf); null likewise, or without a model. */
   matcherModelKey: string | null;
   identifiers: OfferIdentifiers[];
   /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
@@ -259,7 +259,7 @@ export class ProductScrapeUpdaterService {
         extracted,
         listing: this.withStoredOffers(listing, externalIds),
         normalizedSourceName: this.buildNormalizedSourceName(listing),
-        matcherModelKey: this.matchQuery.matcherModelKeyOf(listing, listing.matcherModel) ?? null,
+        matcherModelKey: this.matchQuery.normalizedModelOf(listing) ?? null,
         identifiers,
         externalIds,
       };

@@ -302,20 +302,20 @@
     "specMismatchPenalty": {
       "modelYear": 50
     },
-    "matcherModel": {
+    "model": {
       "excludeSpecs": ["modelYear", "gender", "wheelSize"],
       "required": false,
       "examples": [
-        { "title": "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl", "matcherModel": "MACINA STYLE 810 Di2" },
-        { "title": "Cube Kathmandu Hybrid ONE 800 smaragdgrey'n'black 2025 Trapeze 54", "matcherModel": "Kathmandu Hybrid ONE 800 Trapeze" },
-        { "title": "Cube Supreme Hybrid Pro 625 blue´n´grey Easy Entry 50 cm elektromos városi kerékpár - 2026", "matcherModel": "Supreme Hybrid Pro 625 Easy Entry" },
-        { "title": "Cube Nuroad Hybrid C:62 Race 400X FE 2027 M", "matcherModel": "Nuroad Hybrid C:62 Race 400X FE" },
-        { "title": "KTM Macina Team XL 2023 elektromos MTB kerékpár 53 cm", "matcherModel": "Macina Team XL" },
-        { "title": "Scott Axis eRIDE FS 20 férfi elektromos kerékpár 29\" L", "matcherModel": "Axis eRIDE FS 20" },
-        { "title": "Kellys Estima 40 Black Ebike/ Pedelec City 9 fokozatú Altus váltó", "matcherModel": "Estima 40" },
-        { "title": "KTM MACINA TOUR CX 610 H 56 Férfi elektromos trekking kerékpár MATT BLACK színben", "matcherModel": "MACINA TOUR CX 610" },
-        { "title": "KTM MACINA SPORT 630 US 46 Unisex elektromos kerékpár", "matcherModel": "MACINA SPORT 630" },
-        { "title": "KTM Macina Fun 610 625Wh Elektromos Trekking Kerékpár - fekete", "matcherModel": "Macina Fun 610" }
+        { "title": "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl", "model": "MACINA STYLE 810 Di2" },
+        { "title": "Cube Kathmandu Hybrid ONE 800 smaragdgrey'n'black 2025 Trapeze 54", "model": "Kathmandu Hybrid ONE 800 Trapeze" },
+        { "title": "Cube Supreme Hybrid Pro 625 blue´n´grey Easy Entry 50 cm elektromos városi kerékpár - 2026", "model": "Supreme Hybrid Pro 625 Easy Entry" },
+        { "title": "Cube Nuroad Hybrid C:62 Race 400X FE 2027 M", "model": "Nuroad Hybrid C:62 Race 400X FE" },
+        { "title": "KTM Macina Team XL 2023 elektromos MTB kerékpár 53 cm", "model": "Macina Team XL" },
+        { "title": "Scott Axis eRIDE FS 20 férfi elektromos kerékpár 29\" L", "model": "Axis eRIDE FS 20" },
+        { "title": "Kellys Estima 40 Black Ebike/ Pedelec City 9 fokozatú Altus váltó", "model": "Estima 40" },
+        { "title": "KTM MACINA TOUR CX 610 H 56 Férfi elektromos trekking kerékpár MATT BLACK színben", "model": "MACINA TOUR CX 610" },
+        { "title": "KTM MACINA SPORT 630 US 46 Unisex elektromos kerékpár", "model": "MACINA SPORT 630" },
+        { "title": "KTM Macina Fun 610 625Wh Elektromos Trekking Kerékpár - fekete", "model": "Macina Fun 610" }
       ]
     }
   },

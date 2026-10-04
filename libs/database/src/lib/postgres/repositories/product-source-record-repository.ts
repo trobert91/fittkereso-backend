@@ -511,9 +511,9 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   /**
    * One page of identifying sources' listings that have a stored extraction
    * (a model), in id order after `afterId`, with their source loaded — its
-   * config drives the extraction. For the matcherModel backfill.
+   * config drives the extraction. For the listing model refresh.
    */
-  async findForMatcherModelBackfill(params: {
+  async findForModelRefresh(params: {
     sourceId?: string;
     categorySlug?: string;
     afterId?: string;
@@ -539,25 +539,26 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Writes a listing's matcherModel alone — the text and its contract into
-   * the stored listing, the key into its column. A plain UPDATE rather than
-   * an entity save: `lastUpdated` stays (name merging reads it for recency),
-   * and an import writing the record meanwhile keeps its offers.
+   * Writes a listing's model alone — the name, its display name and its
+   * contract into the stored listing, the key into its column. A plain UPDATE
+   * rather than an entity save: `lastUpdated` stays, and an import writing the
+   * record meanwhile keeps its offers.
    */
-  async setMatcherModel(
+  async setModel(
     id: string,
-    values: { matcherModel: string; contract: string; key: string | null },
+    values: { model: string; displayName: string; contract: string; key: string | null },
   ): Promise<void> {
     const scraped = `"${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
     const key = `"${nameOf<ProductSourceRecord>('matcherModelKey')}"`;
     await this.repo.query(
       `UPDATE ${this.repo.metadata.tableName}
           SET ${key} = $1,
-              ${scraped} = jsonb_set(
-                jsonb_set(COALESCE(${scraped}, '{}'::jsonb), '{${nameOf<ScrapedProduct>('matcherModel')}}', to_jsonb($2::text)),
-                '{${nameOf<ScrapedProduct>('matcherModelContract')}}', to_jsonb($3::text))
-        WHERE id = $4`,
-      [values.key, values.matcherModel, values.contract, id],
+              ${scraped} = COALESCE(${scraped}, '{}'::jsonb) || jsonb_build_object(
+                '${nameOf<ScrapedProduct>('model')}', $2::text,
+                '${nameOf<ScrapedProduct>('displayName')}', $3::text,
+                '${nameOf<ScrapedProduct>('modelContract')}', $4::text)
+        WHERE id = $5`,
+      [values.key, values.model, values.displayName, values.contract, id],
     );
   }
 

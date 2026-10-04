@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { McpModule } from '@rekog/mcp-nest';
-import { MatcherModelConsistencyTools } from './matcher-model-consistency.tools';
+import { NormalizedModelConsistencyTools } from './normalized-model-consistency.tools';
 import { ProductIdentityTools } from './product-identity.tools';
 
 @Module({
@@ -10,10 +10,10 @@ import { ProductIdentityTools } from './product-identity.tools';
     DatabaseModule,
     ProductIdentityModule,
     McpModule.forFeature(
-      [ProductIdentityTools, MatcherModelConsistencyTools],
+      [ProductIdentityTools, NormalizedModelConsistencyTools],
       'fittkereso',
     ),
   ],
-  providers: [ProductIdentityTools, MatcherModelConsistencyTools],
+  providers: [ProductIdentityTools, NormalizedModelConsistencyTools],
 })
 export class ProductIdentityToolsModule {}

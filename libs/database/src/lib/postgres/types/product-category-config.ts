@@ -39,17 +39,17 @@ export interface CategoryMatchingConfig {
    *  gender: { Uniszex: ["Férfi", "Női"] } }` — Férfi against Női still
    *  contradicts. */
   compatibleValues?: Record<string, Record<string, string[]>>;
-  /** How the identity extraction's `matcherModel` is keyed and used. See
-   *  CategoryMatcherModelConfig. */
-  matcherModel?: CategoryMatcherModelConfig;
+  /** What the identity extraction's `model` leaves out, and the examples it is
+   *  shown. See CategoryModelConfig. */
+  model?: CategoryModelConfig;
 }
 
-/** The `matcherModel`: the model designation two listings of one model share,
- *  compared as a normalized key (ProductNormalizerService.normalizeMatcherModel).
- *  A listing auto-attaches by name only to a product with the same key; a
- *  close name with another key goes to review. */
-export interface CategoryMatcherModelConfig {
-  /** Spec keys whose values the key leaves out, on top of the category's
+/** The `model`: the name two listings of one model share. A product is shown
+ *  by it, and its listings are matched on it as a normalized key
+ *  (ProductNormalizerService.normalizeModel, stored as the record's
+ *  normalizedModel). */
+export interface CategoryModelConfig {
+  /** Spec keys whose values the model leaves out, on top of the category's
    *  `offerLevelSpecs` (always left out: size and colour describe a listing,
    *  not a model). For a spec a model's name may state while one shop's title
    *  leaves it out — the year — or that differs between sizes of one model,
@@ -59,31 +59,28 @@ export interface CategoryMatcherModelConfig {
   /** Whether name matching requires equal keys. Off, keys are extracted,
    *  stored and compared, but the old score rule decides (shadow mode). */
   required?: boolean;
-  /** Worked examples the extraction prompt shows, raw title → matcherModel.
-   *  The prompt's own rules name no category's words; these carry them. */
-  examples?: CategoryMatcherModelExample[];
+  /** Worked examples the extraction prompt shows, raw title → model. The
+   *  prompt's own rules name no category's words; these carry them. */
+  examples?: CategoryModelExample[];
 }
 
-/** One worked example of the matcherModel the extraction should return. */
-export interface CategoryMatcherModelExample {
+/** One worked example of the model the extraction should return. */
+export interface CategoryModelExample {
   /** A raw title, as a shop would publish it. */
   title: string;
-  /** The matcherModel for it: only words of `title`, in their order. */
-  matcherModel: string;
+  /** The model for it: only words of `title`, in their order. */
+  model: string;
 }
 
 /**
- * The specs a matcherModel leaves out: the category's offer-level specs (they
- * describe a listing, not a model) and its `matchingConfig.matcherModel.
- * excludeSpecs`.
+ * The specs a model leaves out: the category's offer-level specs (they
+ * describe a listing, not a model) and its `matchingConfig.model.excludeSpecs`.
  */
-export function matcherModelExcludedSpecKeys(
-  config: ProductCategoryConfig | undefined,
-): string[] {
+export function modelExcludedSpecKeys(config: ProductCategoryConfig | undefined): string[] {
   return [
     ...new Set([
       ...(config?.offerLevelSpecs ?? []),
-      ...(config?.matchingConfig?.matcherModel?.excludeSpecs ?? []),
+      ...(config?.matchingConfig?.model?.excludeSpecs ?? []),
     ]),
   ];
 }

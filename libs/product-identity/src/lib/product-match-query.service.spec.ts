@@ -97,7 +97,7 @@ describe('ProductMatchQueryService', () => {
 
     expect(service.ofListing(listingOf({ specs: { modelYear: 2024 } }), cube)).toEqual({
       ...scope,
-      matcherModelKeys: [],
+      matcherModelKeys: ['140 hybrid stereo'],
     });
     // The finder loads a stored product's keys.
     expect(service.ofProduct(productOf({ specs: { modelYear: 2024 } }))).toEqual({
@@ -106,20 +106,26 @@ describe('ProductMatchQueryService', () => {
     });
   });
 
-  it("carries a listing's matcherModel key, built as its record stores it", () => {
-    const listing = listingOf({ matcherModel: 'Stereo Hybrid 140 Pro' });
+  it("carries the key of a listing's model, built as its record stores it", () => {
+    const listing = listingOf({ model: 'Stereo Hybrid 140 Pro' });
 
     expect(service.ofListing(listing, cube).matcherModelKeys).toEqual([
-      service.matcherModelKeyOf(listing, 'Stereo Hybrid 140 Pro'),
+      service.normalizedModelOf(listing),
     ]);
     expect(service.ofListing(listing, cube).matcherModelKeys).toEqual(['140 hybrid pro stereo']);
   });
 
-  it('requires matcherModel keys only where the category says so', () => {
-    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { matcherModel: { required: true } } });
+  it('carries no key for a listing the extraction did not name', () => {
+    const listing = listingOf({ model: undefined, originalName: 'Cube Stereo Hybrid 140' });
+
+    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual([]);
+  });
+
+  it('requires keys only where the category says so', () => {
+    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { model: { required: true } } });
     expect(service.requiresMatcherModel('ebikes')).toBe(true);
 
-    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { matcherModel: {} } });
+    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { model: {} } });
     expect(service.requiresMatcherModel('ebikes')).toBe(false);
   });
 
@@ -129,21 +135,35 @@ describe('ProductMatchQueryService', () => {
     );
   });
 
-  describe('matcherModelKeyOf', () => {
+  describe('normalizedModelOf', () => {
     const matchingConfig = {
       offerLevelSpecs: ['frameSizeLabel', 'color'],
-      matchingConfig: { matcherModel: { excludeSpecs: ['modelYear', 'wheelSize'] } },
+      matchingConfig: { model: { excludeSpecs: ['modelYear', 'wheelSize'] } },
     };
 
     const offerWith = (specs: ProductSpecs) => ({ specs }) as ScrapedOffer;
 
     beforeEach(() => categoryConfigService.getConfig.mockReturnValue(matchingConfig));
 
-    it('keys on the text with the listing brand stripped', () => {
-      const listing = listingOf({ brand: 'Cube' });
+    it('keys on the model with the listing brand stripped', () => {
+      const listing = listingOf({ brand: 'Cube', model: 'Cube Stereo Hybrid ONE22 Pro 800' });
 
-      expect(service.matcherModelKeyOf(listing, 'Cube Stereo Hybrid ONE22 Pro 800')).toBe(
-        '22 800 hybrid one pro stereo',
+      expect(service.normalizedModelOf(listing)).toBe('22 800 hybrid one pro stereo');
+    });
+
+    // The shop's brand string need not be the brand's name.
+    it('strips the resolved brand name too', () => {
+      const listing = listingOf({ brand: 'Cube Bikes', model: 'CUBE Stereo Hybrid 140' });
+
+      expect(service.normalizedModelOf(listing)).toBe('140 hybrid stereo');
+      expect(service.normalizedModelOf(listingOf({ brand: 'C.B.', model: 'Cube Stereo' }), 'Cube')).toBe(
+        'stereo',
+      );
+    });
+
+    it('keys "Tour CX830" and "Tour CX 830" alike', () => {
+      expect(service.normalizedModelOf(listingOf({ brand: 'KTM', model: 'Macina Tour CX830' }))).toBe(
+        service.normalizedModelOf(listingOf({ brand: 'KTM', model: 'Macina Tour CX 830' })),
       );
     });
 
@@ -153,12 +173,12 @@ describe('ProductMatchQueryService', () => {
         offers: [offerWith({ wheelSize: 29 }), offerWith({ wheelSize: '27.5' })],
       });
 
-      expect(service.matcherModelKeyOf(listing, 'Reaction Hybrid Pro 750 2026 29')).toBe(
-        '750 hybrid pro reaction',
-      );
-      expect(service.matcherModelKeyOf(listing, 'Reaction Hybrid Pro 750 27.5')).toBe(
-        '750 hybrid pro reaction',
-      );
+      expect(
+        service.normalizedModelOf({ ...listing, model: 'Reaction Hybrid Pro 750 2026 29' }),
+      ).toBe('750 hybrid pro reaction');
+      expect(
+        service.normalizedModelOf({ ...listing, model: 'Reaction Hybrid Pro 750 27.5' }),
+      ).toBe('750 hybrid pro reaction');
     });
 
     // "XL" is KTM's heavy-duty model and a frame size; dropping the listing's
@@ -166,14 +186,15 @@ describe('ProductMatchQueryService', () => {
     it('keeps a word that only equals an offer-level value', () => {
       const listing = listingOf({
         brand: 'KTM',
+        model: 'Macina Team XL',
         offers: [offerWith({ frameSizeLabel: 'XL' })],
       });
 
-      expect(service.matcherModelKeyOf(listing, 'Macina Team XL')).toBe('macina team xl');
+      expect(service.normalizedModelOf(listing)).toBe('macina team xl');
     });
 
-    it('is undefined without text', () => {
-      expect(service.matcherModelKeyOf(listingOf(), undefined)).toBeUndefined();
+    it('is undefined without a model', () => {
+      expect(service.normalizedModelOf(listingOf({ model: undefined }))).toBeUndefined();
     });
 
     it('lists the offer-level and the configured specs as left out', () => {
