@@ -71,7 +71,7 @@ export class ProductDuplicatePairRepository extends BasePostgresRepository<Produ
         row.normalizedModelMatch,
         row.detectedBy,
       );
-      return `(${base + 1}::uuid, ${base + 2}::uuid, ${base + 3}::int, ${base + 4}, ${base + 5}, ${base + 6}::jsonb, ${base + 7}::jsonb, ${base + 8}::boolean, ${base + 9})`;
+      return `($${base + 1}::uuid, $${base + 2}::uuid, $${base + 3}::int, $${base + 4}, $${base + 5}, $${base + 6}::jsonb, $${base + 7}::jsonb, $${base + 8}::boolean, $${base + 9})`;
     });
 
     const written: unknown[] = await (manager ?? this.repo.manager).query(

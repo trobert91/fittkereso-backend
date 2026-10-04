@@ -116,7 +116,13 @@ describe('ProductDuplicatePairRepository.upsertPairs', () => {
       manager as never,
     );
 
-    const [, params] = manager.query.mock.calls[0];
+    const [sql, params] = manager.query.mock.calls[0];
+    // Numbered placeholders, one run per pair: a value written into the SQL
+    // instead ("1::uuid") fails on Postgres, never in a mocked test.
+    expect(sql).toContain(
+      'VALUES ($1::uuid, $2::uuid, $3::int, $4, $5, $6::jsonb, $7::jsonb, $8::boolean, $9), ' +
+        '($10::uuid, $11::uuid, $12::int, $13, $14, $15::jsonb, $16::jsonb, $17::boolean, $18)',
+    );
     expect(params).toHaveLength(18);
     expect(params.slice(0, 2)).toEqual([ID_1, ID_2]);
     expect(params[5]).toBe(JSON.stringify(gates));
