@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import {
   AdvisoryLockKey,
   AdvisoryLockService,
+  Brand,
   brandLock,
   listingNames,
   offerKeyLock,
@@ -116,10 +117,14 @@ interface ListingWrite {
    * the product, with each offer carrying the externalId it is stored under.
    */
   listing: ScrapedProduct;
-  /** Null for a source that does not identify products: nothing matches on its listings. */
-  normalizedSourceName: string | null;
-  /** The listing's model key (normalizedModelOf); null likewise, or without a model. */
-  matcherModelKey: string | null;
+  /** The brand the listing's brand resolved to; null when it did not. */
+  brand: Brand | null;
+  /**
+   * The listing's normalizedModel (normalizedModelOf). Null for a source that
+   * does not identify products — nothing matches on its listings — and for a
+   * listing without a model.
+   */
+  normalizedModel: string | null;
   identifiers: OfferIdentifiers[];
   /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
   externalIds: (string | undefined)[];
@@ -238,7 +243,7 @@ export class ProductScrapeUpdaterService {
 
       // The decision reads what the extraction produced: the sanity check
       // compares its specs, and name matching its cleaned name.
-      const { identity, brandResolved } = await this.resolveProductIdentity(
+      const { identity, brand } = await this.resolveProductIdentity(
         context,
         extracted,
         identifiers,
@@ -248,7 +253,7 @@ export class ProductScrapeUpdaterService {
         context,
         extracted,
         identity,
-        brandResolved,
+        !!brand,
       );
 
       // Everything above only reads (and calls the LLM). Everything below
@@ -258,8 +263,8 @@ export class ProductScrapeUpdaterService {
         listingId,
         extracted,
         listing: this.withStoredOffers(listing, externalIds),
-        normalizedSourceName: this.buildNormalizedSourceName(listing),
-        matcherModelKey: this.matchQuery.normalizedModelOf(listing) ?? null,
+        brand: brand ?? null,
+        normalizedModel: this.matchQuery.normalizedModelOf(listing, brand?.name) ?? null,
         identifiers,
         externalIds,
       };
@@ -346,8 +351,10 @@ export class ProductScrapeUpdaterService {
       listingId,
       extracted,
       listing: this.withStoredOffers(extracted, externalIds),
-      normalizedSourceName: null,
-      matcherModelKey: null,
+      brand:
+        (await this.brandResolution.resolve(extracted.brand, extracted.originalName))?.entity ??
+        null,
+      normalizedModel: null,
       identifiers: [],
       externalIds,
     };
@@ -399,7 +406,7 @@ export class ProductScrapeUpdaterService {
     productId: string,
     keys: string[],
   ): Promise<ProductModel | undefined> {
-    const { context, listing, normalizedSourceName, matcherModelKey } = write;
+    const { context, listing, brand, normalizedModel } = write;
     const seller = context.source.seller;
 
     return this.locks.withLocks([productLock(productId)], async () => {
@@ -419,8 +426,8 @@ export class ProductScrapeUpdaterService {
         externalId: write.listingId,
         source: context.source,
         sourceUrl: context.url,
-        normalizedSourceName,
-        matcherModelKey,
+        brand,
+        normalizedModel,
         feedRowHash: context.feedRowHash,
       });
       await this.mergeService.mergeSources(model);
@@ -473,7 +480,7 @@ export class ProductScrapeUpdaterService {
           context.source.id,
           write.listingId,
         );
-        if (existing?.model) return false;
+        if (existing?.product) return false;
         if (existing) {
           // Saved without its loaded offers: a stale list would re-bind an
           // offer another writer has pointed at another record since.
@@ -486,8 +493,8 @@ export class ProductScrapeUpdaterService {
           scrapedProduct: listing,
           externalId: write.listingId,
           sourceUrl: context.url,
-          normalizedSourceName: write.normalizedSourceName,
-          matcherModelKey: write.matcherModelKey,
+          brand: write.brand,
+          normalizedModel: write.normalizedModel,
           feedRowHash: context.feedRowHash,
         });
         await this.sourceRecordRepo.save(record);
@@ -518,7 +525,7 @@ export class ProductScrapeUpdaterService {
       context.source.id,
       write.listingId,
     );
-    const productId = own?.model?.id;
+    const productId = own?.product?.id;
     if (!own || !productId || productId === targetProductId) return;
 
     await this.locks.withLocks([productLock(productId)], async () => {
@@ -568,14 +575,14 @@ export class ProductScrapeUpdaterService {
 
     const own = await this.sourceRecordRepo.findBySourceAndExternalId(context.source.id, listingId);
     if (!own) return;
-    if (own.model) {
+    if (own.product) {
       throw new Error(
-        `Listing ${listingId} of ${context.source.name} moved to product ${own.model.id} meanwhile; the task retries it`,
+        `Listing ${listingId} of ${context.source.name} moved to product ${own.product.id} meanwhile; the task retries it`,
       );
     }
     own.offers = undefined;
     own.source = context.source;
-    own.model = model;
+    own.product = model;
     model.sources = [...(model.sources ?? []), own];
   }
 
@@ -597,7 +604,7 @@ export class ProductScrapeUpdaterService {
     );
     if (isEmpty(waiting)) return;
 
-    for (const record of waiting) record.model = model;
+    for (const record of waiting) record.product = model;
     model.sources = [...(model.sources ?? []), ...waiting];
     this.logger.log('Attached the listings that waited for this listing\'s offers', {
       taskId: context.task?.id,
@@ -643,13 +650,13 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct,
     identifiers: OfferIdentifiers[],
     history: HistoryHit | undefined,
-  ): Promise<{ identity: ResolvedIdentity; brandResolved: boolean }> {
+  ): Promise<{ identity: ResolvedIdentity; brand?: Brand }> {
     const brand = await this.brandResolution.resolve(
       scrapedProduct.brand,
       listingNames(scrapedProduct).displayName,
     );
     const brandId = brand?.entity?.id;
-    const brandResolved = !!brandId;
+    const resolved = brand?.entity ?? undefined;
     const { keyMatches, verdict, keyGates } = await this.lookupKeys(
       context,
       scrapedProduct,
@@ -661,7 +668,7 @@ export class ProductScrapeUpdaterService {
       this.recordDisagreements(context, keyMatches, history.model.id, history.via);
       return {
         identity: { model: history.model, isExistingMatch: true, keyMatches, keyGates },
-        brandResolved,
+        brand: resolved,
       };
     }
 
@@ -677,7 +684,7 @@ export class ProductScrapeUpdaterService {
       this.recordDisagreements(context, keyMatches, model.id, verdict.via);
       return {
         identity: { model, isExistingMatch: true, keyMatches, keyGates },
-        brandResolved,
+        brand: resolved,
       };
     }
 
@@ -733,7 +740,7 @@ export class ProductScrapeUpdaterService {
       this.productMetricsService.productMatched(context.source.name);
       return {
         identity: { model, isExistingMatch: true, decision, keyMatches, keyGates },
-        brandResolved,
+        brand: resolved,
       };
     }
 
@@ -752,7 +759,7 @@ export class ProductScrapeUpdaterService {
 
     return {
       identity: { isExistingMatch: false, decision, keyMatches, keyGates },
-      brandResolved,
+      brand: resolved,
     };
   }
 
@@ -929,12 +936,12 @@ export class ProductScrapeUpdaterService {
         listingId,
         this.getProductRelations(),
       );
-    if (existingSource?.model) {
+    if (existingSource?.product) {
       this.productMetricsService.scrapeResolutionOutcome(
         context.source.name,
         'external_id_hit',
       );
-      return { model: existingSource.model, via: 'external_id' };
+      return { model: existingSource.product, via: 'external_id' };
     }
 
     return undefined;
@@ -1172,7 +1179,7 @@ export class ProductScrapeUpdaterService {
     sourceRecord: ProductSourceRecord | undefined;
     previousExternalIds: string[];
   }> {
-    const { context, listing, normalizedSourceName, matcherModelKey } = write;
+    const { context, listing, brand, normalizedModel } = write;
     const previousExternalIds = this.storedExternalIdsOf(write, model);
 
     this.applyScrapedProductDetails(model, listing);
@@ -1186,8 +1193,8 @@ export class ProductScrapeUpdaterService {
       externalId: write.listingId,
       source: context.source,
       sourceUrl: context.url,
-      normalizedSourceName,
-      matcherModelKey,
+      brand,
+      normalizedModel,
       feedRowHash: context.feedRowHash,
     });
 
@@ -1700,17 +1707,15 @@ export class ProductScrapeUpdaterService {
     return result.generatedMaps.length || result.identifiers.length;
   }
 
+  /**
+   * The listing's category on its product. Not its names: the name merge
+   * (mergeSources, right after) names the product after its highest-priority
+   * source, which this listing may not be.
+   */
   private applyScrapedProductDetails(
     model: ProductModel,
     scrapedProduct: ScrapedProduct,
   ): void {
-    if (scrapedProduct.displayName) {
-      model.displayName = scrapedProduct.displayName;
-    }
-    if (scrapedProduct.model) {
-      model.model = scrapedProduct.model;
-    }
-
     // Only replace productCategory when it's actually changing — it's normally
     // the fully-loaded entity fetched via getProductRelations(), and a bare
     // { id } stub here (TypeORM only needs the id for the FK save) is fine

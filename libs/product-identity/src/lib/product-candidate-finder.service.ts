@@ -49,7 +49,7 @@ export class ProductCandidateFinderService {
     const queryKeys =
       query.matcherModelKeys ??
       (query.productId
-        ? ((await this.sourceRecordRepo.findMatcherModelKeysByModelIds([query.productId])).get(
+        ? ((await this.sourceRecordRepo.findNormalizedModelsByProductIds([query.productId])).get(
             query.productId,
           ) ?? [])
         : []);
@@ -77,7 +77,7 @@ export class ProductCandidateFinderService {
       }),
       isEmpty(queryKeys)
         ? new Map<string, string[]>()
-        : this.sourceRecordRepo.findMatcherModelKeysByModelIds(productIds),
+        : this.sourceRecordRepo.findNormalizedModelsByProductIds(productIds),
     ]);
     const products = keyBy(loaded, (product) => product.id);
     const categoryConfig = this.categoryConfigService.getConfig(

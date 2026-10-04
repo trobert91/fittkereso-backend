@@ -246,7 +246,7 @@ async function deleteListingProducts(db: DataSource): Promise<void> {
   const products: { id: string; embeddingId: string | null }[] = await db.query(
     `SELECT DISTINCT m.id, m."embeddingId"
        FROM product_model m
-       JOIN product_source_record r ON r."modelId" = m.id
+       JOIN product_source_record r ON r."productId" = m.id
       WHERE r.url = ANY($1)`,
     [LISTING_URLS],
   );
@@ -273,7 +273,7 @@ async function checkRepetition(
   }
 
   const records: { url: string; modelId: string }[] = await db.query(
-    `SELECT url, "modelId" FROM product_source_record WHERE url = ANY($1)`,
+    `SELECT url, "productId" AS "modelId" FROM product_source_record WHERE url = ANY($1)`,
     [LISTING_URLS],
   );
   const productOf = new Map(records.map((record) => [record.url, record.modelId]));

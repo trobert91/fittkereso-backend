@@ -125,7 +125,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   async countByModelIds(modelIds: string[]): Promise<Map<string, number>> {
     return countByRelationIds(
       this.repo,
-      nameOf<ProductSourceRecord>('model'),
+      nameOf<ProductSourceRecord>('product'),
       modelIds,
     );
   }
@@ -145,7 +145,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   ): Promise<ProductSourceRecord | null> {
     return this.repo.findOne({
       where: { source: { id: sourceId }, externalId },
-      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
+      relations: [nameOf<ProductSourceRecord>('product'), nameOf<ProductSourceRecord>('offers')],
     });
   }
 
@@ -164,7 +164,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   ): Promise<ProductSourceRecord | null> {
     return this.repo.findOne({
       where: { source: { id: sourceId }, url },
-      relations: [nameOf<ProductSourceRecord>('model'), nameOf<ProductSourceRecord>('offers')],
+      relations: [nameOf<ProductSourceRecord>('product'), nameOf<ProductSourceRecord>('offers')],
       order: { updatedAt: 'DESC' },
     });
   }
@@ -189,7 +189,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         `record.${nameOf<ProductSourceRecord>('lastSeenAt')}`,
         `record.${nameOf<ProductSourceRecord>('lastUpdated')}`,
       ])
-      .leftJoin(`record.${nameOf<ProductSourceRecord>('model')}`, 'model')
+      .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model')
       .addSelect('model.id')
       .where(`record."${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, {
         sourceId,
@@ -204,7 +204,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         {
           feedRowHash: record.feedRowHash ?? null,
           seenAt: record.lastSeenAt ?? record.lastUpdated,
-          modelId: record.model?.id ?? null,
+          modelId: record.product?.id ?? null,
         },
       ]),
     );
@@ -244,7 +244,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .createQueryBuilder('record')
       .innerJoinAndSelect(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
       .innerJoinAndSelect(`source.${nameOf<ProductSource>('seller')}`, 'seller')
-      .where(`record."${nameOf<ProductSourceRecord>('model')}Id" IS NULL`)
+      .where(`record."${nameOf<ProductSourceRecord>('product')}Id" IS NULL`)
       .andWhere('seller.id = :sellerId', { sellerId })
       .andWhere(
         `EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(record."${nameOf<ProductSourceRecord>('scrapedProduct')}" -> '${offers}', '[]'::jsonb)) AS entry WHERE entry ->> '${resolvedExternalId}' IN (:...externalIds))`,
@@ -262,16 +262,18 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   async findDetailsById(id: string): Promise<ProductSourceRecord | null> {
     const source = nameOf<ProductSourceRecord>('source');
     const offers = nameOf<ProductSourceRecord>('offers');
-    const model = nameOf<ProductSourceRecord>('model');
+    const product = nameOf<ProductSourceRecord>('product');
     return this.repo.findOne({
       where: { id },
       relations: [
         source,
         `${source}.${nameOf<ProductSource>('seller')}`,
+        nameOf<ProductSourceRecord>('brand'),
         offers,
         `${offers}.${nameOf<Offer>('seller')}`,
-        model,
-        `${model}.${nameOf<ProductModel>('productCategory')}`,
+        product,
+        `${product}.${nameOf<ProductModel>('brand')}`,
+        `${product}.${nameOf<ProductModel>('productCategory')}`,
       ],
     });
   }
@@ -281,7 +283,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     return this.repo
       .createQueryBuilder('record')
       .where(`record."${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, { sourceId })
-      .andWhere(`record."${nameOf<ProductSourceRecord>('model')}Id" IS NULL`)
+      .andWhere(`record."${nameOf<ProductSourceRecord>('product')}Id" IS NULL`)
       .getCount();
   }
 
@@ -294,7 +296,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     await this.repo
       .createQueryBuilder()
       .update(ProductSourceRecord)
-      .set({ model: null })
+      .set({ product: null })
       .where({ id: In(ids) })
       .execute();
   }
@@ -317,8 +319,9 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     const price: keyof ScrapedOffer = 'price';
     const offerSpecs: keyof ScrapedOffer = 'specs';
     const seenAt = `COALESCE(${record('lastSeenAt')}, ${record('lastUpdated')})`;
-    // What the list shows as the listing's title.
-    const shownTitle = `COALESCE(${scraped} ->> '${originalName}', ${scraped} ->> '${displayName}')`;
+    // What the list shows as the listing's title: its column, else the stored
+    // listing's (a row written before the column existed).
+    const shownTitle = `COALESCE(${record('originalTitle')}, ${scraped} ->> '${originalName}', ${scraped} ->> '${displayName}')`;
     const offerExternalIds = `jsonb_path_query_array(${scraped}, '$.${offers}[*].resolvedExternalId')`;
     const entries = `jsonb_array_elements(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`;
     // The entry a listing is priced by: its cheapest size or colour.
@@ -342,7 +345,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .createQueryBuilder('record')
       .innerJoin(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
       .leftJoin(`source.${nameOf<ProductSource>('seller')}`, 'seller')
-      .leftJoin(`record.${nameOf<ProductSourceRecord>('model')}`, 'model');
+      .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model');
     if (params.productSourceId) {
       query.andWhere('source.id = :sourceId', { sourceId: params.productSourceId });
     }
@@ -356,7 +359,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     }
     if (params.attached !== undefined) {
       query.andWhere(
-        `record."${nameOf<ProductSourceRecord>('model')}Id" IS ${params.attached ? 'NOT NULL' : 'NULL'}`,
+        `record."${nameOf<ProductSourceRecord>('product')}Id" IS ${params.attached ? 'NOT NULL' : 'NULL'}`,
       );
     }
     if (params.valid !== undefined) {
@@ -370,7 +373,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
             .where(`record.${nameOf<ProductSourceRecord>('url')} ILIKE :search`)
             .orWhere(`${record('externalId')} ILIKE :search`)
             .orWhere(`${scraped} ->> '${displayName}' ILIKE :search`)
-            .orWhere(`${scraped} ->> '${originalName}' ILIKE :search`)
+            .orWhere(`${shownTitle} ILIKE :search`)
             .orWhere(`${offerExternalIds}::text ILIKE :search`),
         ),
         { search: `%${params.search}%` },
@@ -417,7 +420,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .addSelect(record('externalId'), 'externalId')
       .addSelect(offerExternalIds, 'offerExternalIds')
       .addSelect(`${scraped} ->> '${displayName}'`, 'title')
-      .addSelect(`${scraped} ->> '${originalName}'`, 'originalName')
+      .addSelect(shownTitle, 'originalName')
       .addSelect(`${scraped} ->> '${brand}'`, 'brand')
       .addSelect(`${scraped} -> '${category}' ->> 'name'`, 'categoryName')
       .addSelect(`${scraped} -> '${category}' ->> 'slug'`, 'categorySlug')
@@ -480,7 +483,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   async findIdentifyingListingsInCategory(
     categorySlug: string,
   ): Promise<IdentifyingListingRow[]> {
-    const model = nameOf<ProductSourceRecord>('model');
+    const model = nameOf<ProductSourceRecord>('product');
     const source = nameOf<ProductSourceRecord>('source');
     const scraped = `record."${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
     const seller = nameOf<ProductSource>('seller');
@@ -509,25 +512,34 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * One page of identifying sources' listings that have a stored extraction
-   * (a model), in id order after `afterId`, with their source loaded — its
-   * config drives the extraction. For the listing model refresh.
+   * One page of sources' listings, in id order after `afterId`, with their
+   * source loaded — its config drives the extraction — their brand, and the
+   * id of the product they sit on. `named`: only identifying
+   * sources' listings with a stored extraction (a model). For the listing
+   * model refresh.
    */
   async findForModelRefresh(params: {
     sourceId?: string;
     categorySlug?: string;
     afterId?: string;
     limit: number;
+    named: boolean;
   }): Promise<ProductSourceRecord[]> {
     const scraped = `record."${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
     const query = this.repo
       .createQueryBuilder('record')
       .innerJoinAndSelect(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
-      .where(`source."${nameOf<ProductSource>('identifiesProducts')}" IS NOT FALSE`)
-      .andWhere(`${scraped}->>'${nameOf<ScrapedProduct>('model')}' IS NOT NULL`)
+      .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'product')
+      .addSelect('product.id')
+      .leftJoinAndSelect(`record.${nameOf<ProductSourceRecord>('brand')}`, 'brand')
       .orderBy('record.id', 'ASC')
       .take(params.limit);
 
+    if (params.named) {
+      query
+        .andWhere(`source."${nameOf<ProductSource>('identifiesProducts')}" IS NOT FALSE`)
+        .andWhere(`${scraped}->>'${nameOf<ScrapedProduct>('model')}' IS NOT NULL`);
+    }
     if (params.sourceId) query.andWhere('source.id = :sourceId', { sourceId: params.sourceId });
     if (params.categorySlug) {
       query.andWhere(`${scraped}->'${nameOf<ScrapedProduct>('category')}'->>'slug' = :categorySlug`, {
@@ -540,19 +552,21 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
 
   /**
    * Writes a listing's model alone — the name, its display name and its
-   * contract into the stored listing, the key into its column. A plain UPDATE
-   * rather than an entity save: `lastUpdated` stays, and an import writing the
-   * record meanwhile keeps its offers.
+   * contract into the stored listing, the name and key into their columns. A
+   * plain UPDATE rather than an entity save: `lastUpdated` stays, and an
+   * import writing the record meanwhile keeps its offers.
    */
   async setModel(
     id: string,
     values: { model: string; displayName: string; contract: string; key: string | null },
   ): Promise<void> {
     const scraped = `"${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
-    const key = `"${nameOf<ProductSourceRecord>('matcherModelKey')}"`;
+    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
+    const model = `"${nameOf<ProductSourceRecord>('model')}"`;
     await this.repo.query(
       `UPDATE ${this.repo.metadata.tableName}
           SET ${key} = $1,
+              ${model} = $2,
               ${scraped} = COALESCE(${scraped}, '{}'::jsonb) || jsonb_build_object(
                 '${nameOf<ScrapedProduct>('model')}', $2::text,
                 '${nameOf<ScrapedProduct>('displayName')}', $3::text,
@@ -563,24 +577,50 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Each product's matcherModel keys: those of its identifying sources'
+   * Writes the columns a listing's record keeps beside its stored listing —
+   * its resolved brand, model, title and key — and nothing else. A plain
+   * UPDATE, so `lastUpdated` stays.
+   */
+  async setListingColumns(
+    id: string,
+    values: {
+      brandId: string | null;
+      model: string | null;
+      originalTitle: string | null;
+      normalizedModel: string | null;
+    },
+  ): Promise<void> {
+    const column = (field: keyof ProductSourceRecord) => `"${nameOf<ProductSourceRecord>(field)}"`;
+    await this.repo.query(
+      `UPDATE ${this.repo.metadata.tableName}
+          SET "${nameOf<ProductSourceRecord>('brand')}Id" = $1,
+              ${column('model')} = $2,
+              ${column('originalTitle')} = $3,
+              ${column('normalizedModel')} = $4
+        WHERE id = $5`,
+      [values.brandId, values.model, values.originalTitle, values.normalizedModel, id],
+    );
+  }
+
+  /**
+   * Each product's keys: the normalizedModels of its identifying sources'
    * listings (a contributing source's listing stores none). A product without
    * one is absent from the map.
    */
-  async findMatcherModelKeysByModelIds(modelIds: string[]): Promise<Map<string, string[]>> {
+  async findNormalizedModelsByProductIds(productIds: string[]): Promise<Map<string, string[]>> {
     const keys = new Map<string, string[]>();
-    if (modelIds.length === 0) return keys;
+    if (productIds.length === 0) return keys;
 
-    const model = `"${nameOf<ProductSourceRecord>('model')}Id"`;
-    const key = `"${nameOf<ProductSourceRecord>('matcherModelKey')}"`;
-    const rows: { modelId: string; keys: string[] }[] = await this.repo.query(
-      `SELECT ${model} AS "modelId", array_agg(DISTINCT ${key}) AS keys
+    const product = `"${nameOf<ProductSourceRecord>('product')}Id"`;
+    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
+    const rows: { productId: string; keys: string[] }[] = await this.repo.query(
+      `SELECT ${product} AS "productId", array_agg(DISTINCT ${key}) AS keys
          FROM ${this.repo.metadata.tableName}
-        WHERE ${model} = ANY($1::uuid[]) AND ${key} IS NOT NULL
-        GROUP BY ${model}`,
-      [modelIds],
+        WHERE ${product} = ANY($1::uuid[]) AND ${key} IS NOT NULL
+        GROUP BY ${product}`,
+      [productIds],
     );
-    for (const row of rows) keys.set(row.modelId, row.keys);
+    for (const row of rows) keys.set(row.productId, row.keys);
     return keys;
   }
 
@@ -589,7 +629,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     deleteCutoff: Date;
     limit: number;
   }): Promise<string[]> {
-    const model = nameOf<ProductSourceRecord>('model');
+    const model = nameOf<ProductSourceRecord>('product');
     const source = nameOf<ProductSourceRecord>('source');
     const seller = nameOf<ProductSource>('seller');
     const seenAt = (alias: string) =>
@@ -636,9 +676,9 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         externalId,
       },
       relations: [
-        nameOf<ProductSourceRecord>('model'),
+        nameOf<ProductSourceRecord>('product'),
         ...modelRelations.map(
-          (relation) => `${nameOf<ProductSourceRecord>('model')}.${relation}`,
+          (relation) => `${nameOf<ProductSourceRecord>('product')}.${relation}`,
         ),
       ],
     });
@@ -656,12 +696,12 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     if (externalIds.length === 0) return [];
     const records = await this.repo.find({
       where: { source: { id: sourceId }, externalId: In(externalIds) },
-      relations: { model: true },
-      select: { id: true, externalId: true, model: { id: true } },
+      relations: { product: true },
+      select: { id: true, externalId: true, product: { id: true } },
     });
     return records.flatMap((record) =>
-      record.model && record.externalId
-        ? [{ modelId: record.model.id, externalId: record.externalId }]
+      record.product && record.externalId
+        ? [{ modelId: record.product.id, externalId: record.externalId }]
         : [],
     );
   }
@@ -685,7 +725,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         `${record}.${nameOf<ProductSourceRecord>('scrapedProduct')} -> '${siblingExternalIds}'`,
         'siblingIds',
       )
-      .where(`${record}.${nameOf<ProductSourceRecord>('model')} = :modelId`, { modelId })
+      .where(`${record}.${nameOf<ProductSourceRecord>('product')} = :modelId`, { modelId })
       .getRawMany();
 
     return rows.flatMap((row) =>

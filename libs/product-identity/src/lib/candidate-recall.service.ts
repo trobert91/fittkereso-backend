@@ -77,7 +77,7 @@ export class CandidateRecallService {
 
   /**
    * Products of the query's brand and category with a listing keyed like the
-   * query (`matcherModelKey`), however far apart the names are: "Tour CX 830"
+   * query (`normalizedModel`), however far apart the names are: "Tour CX 830"
    * and "Macina Tour CX830" key alike and may not reach the trigram cut-off.
    * Each row carries the product's name key, so the finder scores it like a
    * name row. Its own limit, since the name arm's rows are capped at NAME_HITS.
@@ -91,8 +91,8 @@ export class CandidateRecallService {
     const normalizedName = `"${nameOf<ProductModel>('normalizedName')}"`;
     const brandId = `"${nameOf<ProductModel>('brand')}Id"`;
     const categoryId = `"${nameOf<ProductModel>('productCategory')}Id"`;
-    const modelId = `"${nameOf<ProductSourceRecord>('model')}Id"`;
-    const key = `"${nameOf<ProductSourceRecord>('matcherModelKey')}"`;
+    const modelId = `"${nameOf<ProductSourceRecord>('product')}Id"`;
+    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
 
     const rows: (Omit<RecallRow, 'trigram'> & { trigram: number | string })[] =
       await this.productRepo.repo.query(

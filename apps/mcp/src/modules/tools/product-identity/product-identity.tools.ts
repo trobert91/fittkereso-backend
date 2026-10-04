@@ -94,7 +94,7 @@ export class ProductIdentityTools {
   private async listingSubject(
     sourceRecordId: string,
   ): Promise<MatchSubject | string> {
-    const model = nameOf<ProductSourceRecord>('model');
+    const model = nameOf<ProductSourceRecord>('product');
     const record = await this.sourceRecordRepo.findOne({
       where: { id: sourceRecordId },
       relations: [
@@ -105,7 +105,7 @@ export class ProductIdentityTools {
     });
     if (!record) return `Source record ${sourceRecordId} not found.`;
 
-    const product = record.model;
+    const product = record.product;
     const scraped = record.scrapedProduct;
     if (!product?.brand || !product.productCategory) {
       return `Source record ${sourceRecordId} has no product with a brand and category.`;

@@ -16,19 +16,21 @@ describe('ProductNameMergeService.mergeNames', () => {
     fields: {
       brand?: string;
       model?: string;
-      displayName?: string;
       originalName?: string;
       aliases?: string[];
     },
-    opts: { lastUpdated?: string; priority?: number } = {},
+    opts: { lastUpdated?: string; createdAt?: string | null; priority?: number } = {},
   ): ProductSourceRecord {
     return {
       id,
       source: { id, priority: opts.priority ?? 0 } as any,
-      // A listing the identity extraction named carries a model beside its
-      // display name; only the title is left when it did not.
-      scrapedProduct: { model: fields.displayName, ...fields },
+      // A listing the identity extraction named carries a model; only the
+      // title is left when it did not.
+      scrapedProduct: { ...fields },
       lastUpdated: new Date(opts.lastUpdated ?? '2026-01-01T00:00:00Z'),
+      // null: a listing of this import, not saved yet.
+      createdAt:
+        opts.createdAt === null ? undefined : new Date(opts.createdAt ?? '2026-01-01T00:00:00Z'),
     } as unknown as ProductSourceRecord;
   }
 
@@ -65,119 +67,114 @@ describe('ProductNameMergeService.mergeNames', () => {
     expect(brandResolution.resolve).not.toHaveBeenCalled();
   });
 
-  it('picks the displayName the most sources agree on over a lone dissenter', async () => {
-    const model = makeModel();
-    const sources = [
-      makeSource('a', { displayName: 'Trek Marlin 7' }),
-      makeSource('b', { displayName: 'Trek Marlin 7' }),
-      makeSource('c', { displayName: 'Trek Marlin Seven' }),
-    ];
+  describe('the model', () => {
+    const trek = { id: 'brand-trek', name: 'Trek' } as any;
+    beforeEach(() => brandResolution.resolve.mockResolvedValue({ entity: trek, similarity: 1 }));
 
-    await service.mergeNames(model, sources, categorySlug);
+    it("is the highest-priority source's, however many lower ones agree on another", async () => {
+      const model = makeModel();
+      const sources = [
+        makeSource('a', { brand: 'Trek', model: 'Marlin Seven' }, { priority: 1 }),
+        makeSource('b', { brand: 'Trek', model: 'Marlin Seven' }, { priority: 1 }),
+        makeSource('c', { brand: 'Trek', model: 'Marlin 7' }, { priority: 10 }),
+      ];
 
-    expect(model.displayName).toBe('Trek Marlin 7');
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('Marlin 7');
+      expect(model.displayName).toBe('Trek Marlin 7');
+    });
+
+    // #9 issue 6: a joining shop renamed the product.
+    it('stays when a lower-priority source joins later', async () => {
+      const model = makeModel();
+      const sources = [
+        makeSource(
+          'speedbike',
+          { brand: 'Trek', model: 'Marlin 7 XL' },
+          { createdAt: '2025-01-01T00:00:00Z', lastUpdated: '2025-01-01T00:00:00Z', priority: 100 },
+        ),
+        makeSource(
+          'joiner',
+          { brand: 'Trek', model: 'Marlin 7' },
+          { createdAt: '2026-01-01T00:00:00Z', lastUpdated: '2026-01-01T00:00:00Z', priority: 60 },
+        ),
+      ];
+
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('Marlin 7 XL');
+    });
+
+    // Recency would hand the name back and forth on every import.
+    it('breaks a priority tie by the oldest listing, however recently the other was updated', async () => {
+      const model = makeModel();
+      const sources = [
+        makeSource(
+          'newer',
+          { brand: 'Trek', model: 'Marlin Seven' },
+          { createdAt: '2026-01-01T00:00:00Z', lastUpdated: '2026-01-01T00:00:00Z', priority: 60 },
+        ),
+        makeSource(
+          'older',
+          { brand: 'Trek', model: 'Marlin 7' },
+          { createdAt: '2025-01-01T00:00:00Z', lastUpdated: '2025-01-01T00:00:00Z', priority: 60 },
+        ),
+      ];
+
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('Marlin 7');
+    });
+
+    it("counts this import's listing, not saved yet, as the newest", async () => {
+      const model = makeModel();
+      const sources = [
+        makeSource('new', { brand: 'Trek', model: 'Marlin Seven' }, { createdAt: null, priority: 60 }),
+        makeSource('saved', { brand: 'Trek', model: 'Marlin 7' }, { priority: 60 }),
+      ];
+
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('Marlin 7');
+    });
+
+    // A listing whose identity extraction failed keeps only its raw title,
+    // sizes and colours included.
+    it('skips a listing the extraction did not name, whatever its priority', async () => {
+      const model = makeModel();
+      const sources = [
+        makeSource('named', { brand: 'Trek', model: 'Marlin 7' }, { priority: 0 }),
+        makeSource('title', { brand: 'Trek', originalName: 'TREK MARLIN 7 48cm narancs' }, { priority: 100 }),
+      ];
+
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('Marlin 7');
+    });
+
+    it('is the top title, without its brand, when no listing was named', async () => {
+      const model = makeModel();
+      const sources = [makeSource('title', { brand: 'Trek', originalName: 'TREK MARLIN 7 48cm' })];
+
+      await service.mergeNames(model, sources, categorySlug);
+
+      expect(model.model).toBe('MARLIN 7 48cm');
+      expect(model.displayName).toBe('Trek MARLIN 7 48cm');
+    });
   });
 
-  it('is case/whitespace-insensitive when grouping displayName candidates', async () => {
-    const model = makeModel();
-    const sources = [
-      makeSource('a', { displayName: 'Trek Marlin 7' }),
-      makeSource('b', { displayName: ' trek marlin 7 ' }),
-      makeSource('c', { displayName: 'Trek Marlin Seven' }),
-    ];
-
-    await service.mergeNames(model, sources, categorySlug);
-
-    expect(['Trek Marlin 7', ' trek marlin 7 ']).toContain(model.displayName);
-  });
-
-  it('breaks a corroboration tie by recency', async () => {
-    const model = makeModel();
-    const sources = [
-      makeSource(
-        'old',
-        { displayName: 'Trek Marlin 7' },
-        { lastUpdated: '2020-01-01T00:00:00Z', priority: 100 },
-      ),
-      makeSource(
-        'fresh',
-        { displayName: 'Trek Marlin Seven' },
-        { lastUpdated: '2026-01-01T00:00:00Z', priority: 1 },
-      ),
-    ];
-
-    await service.mergeNames(model, sources, categorySlug);
-
-    expect(model.displayName).toBe('Trek Marlin Seven');
-  });
-
-  it('falls back to source priority once recency ties', async () => {
-    const model = makeModel();
-    const sources = [
-      makeSource(
-        'low',
-        { displayName: 'Trek Marlin 7' },
-        { lastUpdated: '2026-01-01T00:00:00Z', priority: 1 },
-      ),
-      makeSource(
-        'high',
-        { displayName: 'Trek Marlin Seven' },
-        { lastUpdated: '2026-01-01T00:00:00Z', priority: 10 },
-      ),
-    ];
-
-    await service.mergeNames(model, sources, categorySlug);
-
-    expect(model.displayName).toBe('Trek Marlin Seven');
-  });
-
-  // A listing whose identity extraction failed keeps only its raw title,
-  // sizes and colours included — it must not outvote or out-date a name.
-  it('ignores the titles of unnamed listings whenever a named one exists', async () => {
-    const model = makeModel();
-    const sources = [
-      makeSource(
-        'named',
-        { model: 'Macina Scarp SX Exonic XX', displayName: 'KTM Macina Scarp SX Exonic XX' },
-        { lastUpdated: '2026-01-01T00:00:00Z' },
-      ),
-      makeSource(
-        'title-1',
-        { originalName: 'KTM MACINA SCARP SX EXONICX 48cm narancs' },
-        { lastUpdated: '2026-02-01T00:00:00Z' },
-      ),
-      makeSource(
-        'title-2',
-        { originalName: 'KTM MACINA SCARP SX EXONICX 48cm narancs' },
-        { lastUpdated: '2026-02-01T00:00:00Z' },
-      ),
-    ];
-
-    await service.mergeNames(model, sources, categorySlug);
-
-    expect(model.model).toBe('Macina Scarp SX Exonic XX');
-    expect(model.displayName).toBe('KTM Macina Scarp SX Exonic XX');
-  });
-
-  it('names the product from the titles when no listing was named', async () => {
-    const model = makeModel();
-    const sources = [makeSource('title', { originalName: 'KTM MACINA SCARP 48cm' })];
-
-    await service.mergeNames(model, sources, categorySlug);
-
-    expect(model.model).toBe('KTM MACINA SCARP 48cm');
-    expect(model.displayName).toBe('KTM MACINA SCARP 48cm');
-  });
-
-  it('resolves the winning brand string through BrandResolutionService and assigns the resolved entity', async () => {
+  it('resolves the winning brand string through BrandResolutionService, with the naming listing\x27s title, and assigns the resolved entity', async () => {
     const trekEntity = { id: 'brand-trek', name: 'Trek' } as any;
     brandResolution.resolve.mockResolvedValue({ entity: trekEntity, similarity: 1 });
     const model = makeModel();
-    const sources = [makeSource('a', { brand: 'Trek', displayName: 'Trek Marlin 7' })];
+    const sources = [
+      makeSource('a', { brand: 'Trek', model: 'Marlin 7', originalName: 'Trek Marlin 7 M' }),
+    ];
 
     await service.mergeNames(model, sources, categorySlug);
 
-    expect(brandResolution.resolve).toHaveBeenCalledWith('Trek', 'Trek Marlin 7');
+    expect(brandResolution.resolve).toHaveBeenCalledWith('Trek', 'Trek Marlin 7 M');
     expect(model.brand).toBe(trekEntity);
   });
 

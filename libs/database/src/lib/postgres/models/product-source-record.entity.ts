@@ -1,5 +1,6 @@
 import { Column, Entity, Index, ManyToOne, OneToMany, Unique } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
+import { Brand } from './brand.entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
 import { ScrapedProduct } from '../../models/scraped-product';
@@ -8,7 +9,7 @@ import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Offer } from './offer.entity';
 
 @Entity()
-@Index(['model', 'source'])
+@Index(['product', 'source'])
 @Index(['source', 'productSpecsHash'])
 // Page dispatch and a list card without a usable id look a record up by
 // (source, url). Not unique: a URL change moves a record, and two listings
@@ -31,12 +32,12 @@ export class ProductSourceRecord extends BasePostgresEntity {
   // `disable`: saving a ProductModel with a loaded, stale sources array must
   // never detach a row another writer attached meanwhile. TypeORM's default
   // (`nullify`) sets modelId to NULL on every row the array does not list.
-  @ManyToOne(() => ProductModel, (model) => model.sources, {
+  @ManyToOne(() => ProductModel, (product) => product.sources, {
     nullable: true,
     onDelete: 'CASCADE',
     orphanedRowAction: 'disable',
   })
-  model: ProductModel | null;
+  product: ProductModel | null;
 
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   @ManyToOne(() => ProductSource, { nullable: true, onDelete: 'SET NULL' })
@@ -161,28 +162,53 @@ export class ProductSourceRecord extends BasePostgresEntity {
   lastSeenAt?: Date | null;
 
   /**
-   * Normalized identity key derived from scrapedProduct.{brand,model,
-   * displayName} at scrape time (see ProductScrapeUpdaterService.
-   * buildNormalizedSourceName). Also feeds ProductModel.normalizedName on
-   * new products. Null on the records of a source that does not identify
-   * products: nothing matches on them.
+   * The brand the listing's own brand resolved to (BrandResolutionService).
+   * Null when it did not resolve, and on the admin's record. Also in
+   * scrapedProduct, as the shop wrote it; this is the brand entity.
    */
+  @ManyToOne(() => Brand, { nullable: true, onDelete: 'SET NULL' })
   @Index()
-  @Column({ type: 'varchar', nullable: true })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  normalizedSourceName?: string | null;
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  brand?: Brand | null;
 
   /**
-   * The listing's matcherModel key (ProductMatchQueryService.
-   * matcherModelKeyOf over scrapedProduct.matcherModel): what name matching
-   * compares for equality. A product's keys are its identifying listings'.
-   * Null on the records of a source that does not identify products, and
-   * while a listing has no matcherModel.
+   * The listing's model name (scrapedProduct.model): what the identity
+   * extraction named it. Null when it named nothing, and on the admin's
+   * record. A product shows the model of its highest-priority identifying
+   * source (ProductNameMergeService).
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  model?: string | null;
+
+  /**
+   * The title exactly as the shop publishes it (scrapedProduct.originalName),
+   * on the record itself so a list can show it without the listing's JSON.
+   * Null on the admin's record.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  originalTitle?: string | null;
+
+  /**
+   * The listing's model normalized (ProductMatchQueryService.
+   * normalizedModelOf): sorted unique words, letters and digits split. What
+   * name matching compares: equal keys make an attach candidate, trigram
+   * similarity finds the others. A product's keys are its identifying
+   * listings'. Null on the records of a source that does not identify
+   * products, and while a listing has no model.
+   *
+   * The trigram index is created by hand once per environment (TypeORM can't
+   * declare a GIN operator class), and `synchronize: false` keeps sync from
+   * dropping it:
+   * CREATE INDEX IF NOT EXISTS product_source_record_normalized_model_trgm_idx
+   *   ON product_source_record USING gin ("normalizedModel" gin_trgm_ops);
    */
   @Index()
+  @Index('product_source_record_normalized_model_trgm_idx', { synchronize: false })
   @Column({ type: 'varchar', nullable: true })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
-  matcherModelKey?: string | null;
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  normalizedModel?: string | null;
 
   @Expose({ groups: [SerializeGroup.adminDetails] })
   @OneToMany(() => Offer, (offer) => offer.sourceRecord)

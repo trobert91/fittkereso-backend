@@ -510,7 +510,7 @@ async function adminDescriptionScenario(
   }
   const idOf = async (): Promise<string> => {
     const [row]: { modelId: string }[] = await db.query(
-      `SELECT "modelId" FROM product_source_record WHERE "sourceId" = $1 AND url = $2`,
+      `SELECT "productId" AS "modelId" FROM product_source_record WHERE "sourceId" = $1 AND url = $2`,
       [sources.a.id, key.split(' | ')[0].slice(2)],
     );
     return row.modelId;
@@ -525,7 +525,7 @@ async function adminDescriptionScenario(
   // Its A rows import again: a changed hash is what queues a row.
   const reimport = async (): Promise<number> => {
     await db.query(
-      `UPDATE product_source_record SET "feedRowHash" = NULL WHERE "modelId" = $1 AND "sourceId" = $2`,
+      `UPDATE product_source_record SET "feedRowHash" = NULL WHERE "productId" = $1 AND "sourceId" = $2`,
       [await idOf(), sources.a.id],
     );
     const summary = await app.get(ArukeresoImportService).import(sources.a);
@@ -551,7 +551,7 @@ async function adminDescriptionScenario(
     "admin description: clearing it brings the sources' text back",
   );
   const admins: { count: string }[] = await db.query(
-    'SELECT count(*) FROM product_source_record WHERE "modelId" = $1 AND "sourceId" IS NULL',
+    'SELECT count(*) FROM product_source_record WHERE "productId" = $1 AND "sourceId" IS NULL',
     [await idOf()],
   );
   report(Number(admins[0].count) === 1, 'admin description: one admin record', admins[0].count);
@@ -619,7 +619,7 @@ async function snapshotOf(
   ]);
   const records: { id: string; sourceId: string; url: string; modelId: string | null }[] =
     await db.query(
-      `SELECT id, "sourceId", url, "modelId" FROM product_source_record WHERE "sourceId" = ANY($1)`,
+      `SELECT id, "sourceId", url, "productId" AS "modelId" FROM product_source_record WHERE "sourceId" = ANY($1)`,
       [[sources.a.id, sources.g.id]],
     );
   const listingsOf = new Map<string, string[]>();
@@ -831,7 +831,7 @@ async function wipe(db: DataSource, sources: { a: ProductSource; g: ProductSourc
   const ids = [sources.a.id, sources.g.id];
   const products: { id: string; embeddingId: string | null }[] = await db.query(
     `SELECT DISTINCT m.id, m."embeddingId" FROM product_model m
-       JOIN product_source_record r ON r."modelId" = m.id WHERE r."sourceId" = ANY($1)`,
+       JOIN product_source_record r ON r."productId" = m.id WHERE r."sourceId" = ANY($1)`,
     [ids],
   );
   if (products.length > 0) {

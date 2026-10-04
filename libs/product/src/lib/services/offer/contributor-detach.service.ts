@@ -81,7 +81,7 @@ export class ContributorDetachService {
     const ids = new Set(records.map((record) => record.id));
     await this.sourceRecordRepo.detach([...ids]);
     model.sources = (model.sources ?? []).filter((record) => !ids.has(record.id));
-    for (const record of records) record.model = null;
+    for (const record of records) record.product = null;
     await this.mergeService.mergeSources(model);
 
     this.logger.log('Detached contributing listings from a product', {

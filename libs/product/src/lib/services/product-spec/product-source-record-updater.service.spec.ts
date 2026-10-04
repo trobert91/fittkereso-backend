@@ -141,10 +141,11 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       } as any,
       externalId: 'sku-123',
       sourceUrl: 'https://speedbike.hu/product-1',
-      normalizedSourceName: 'ktm macina scarp',
+      normalizedModel: 'macina scarp',
     });
 
     expect(result).toBeDefined();
+    expect(result?.normalizedModel).toBe('macina scarp');
     expect(result?.scrapedProduct?.specs).toEqual({ weight: 22 });
     expect(result?.offerSpecsHash).toBe(hashSpecs({ frameSize: 43 }));
     expect(result?.productSpecsHash).toBe(hashSpecs({ weight: 22 }));
@@ -458,8 +459,11 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   let productMetrics: { productSourceSpecValidationFailed: jest.Mock; sourceRecordUrlChanged: jest.Mock };
 
   const google = { id: 'source-google', name: 'speedbike-googleshop' } as any;
+  const haibike = { id: 'brand-haibike', name: 'Haibike' } as any;
   const listing = {
     displayName: 'HAIBIKE SDURO',
+    model: 'SDURO',
+    originalName: 'HAIBIKE SDURO 2026 M',
     category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },
     specs: { weight: 22, motor: undefined },
     offers: [{ price: 1499990, priceWithoutDiscount: 2269000, resolvedExternalId: 'HAIBIKE-1' }],
@@ -492,16 +496,18 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
       scrapedProduct: listing,
       externalId: 'HAIBIKE-1',
       sourceUrl: 'https://speedbike.hu/haibike/',
-      normalizedSourceName: 'haibike sduro',
+      brand: haibike,
       feedRowHash: 'hash-1',
     });
 
     expect(record).toMatchObject({
-      model: null,
+      product: null,
       source: google,
       url: 'https://speedbike.hu/haibike',
       externalId: 'HAIBIKE-1',
-      normalizedSourceName: 'haibike sduro',
+      brand: haibike,
+      model: 'SDURO',
+      originalTitle: 'HAIBIKE SDURO 2026 M',
       feedRowHash: 'hash-1',
       specValid: false,
       specErrors: { weight: 'bad' },
@@ -515,7 +521,7 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   it('updates the record it already has for the listing', () => {
     const existing = {
       id: 'record-google',
-      model: null,
+      product: null,
       url: 'https://speedbike.hu/haibike',
       feedRowHash: 'old',
     } as any;
@@ -537,7 +543,7 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   it('moves the record it already has when the shop renamed the listing', () => {
     const existing = {
       id: 'record-google',
-      model: null,
+      product: null,
       url: 'https://speedbike.hu/haibike',
       externalId: 'HAIBIKE-1',
     } as any;
@@ -556,43 +562,48 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   });
 
   // A contributing source's record keeps no key; one stored before that goes.
-  it('clears a stored match key on null, and keeps it when none is passed', () => {
-    const existing = { id: 'record-google', model: null, normalizedSourceName: '- e+ talon' } as any;
-
-    service.upsertUnattached({
-      existing,
-      source: google,
-      scrapedProduct: listing,
-      sourceUrl: 'https://speedbike.hu/haibike',
-    });
-    expect(existing.normalizedSourceName).toBe('- e+ talon');
-
-    service.upsertUnattached({
-      existing,
-      source: google,
-      scrapedProduct: listing,
-      sourceUrl: 'https://speedbike.hu/haibike',
-      normalizedSourceName: null,
-    });
-    expect(existing.normalizedSourceName).toBeNull();
-  });
-
-  it('stores the matcherModel key it is given, clears it on null and keeps it when none is passed', () => {
-    const existing = { id: 'record-ktm', model: null, matcherModelKey: '810 di macina style' } as any;
-    const upsert = (matcherModelKey?: string | null) =>
+  it('stores the normalizedModel it is given, clears it on null and keeps it when none is passed', () => {
+    const existing = { id: 'record-ktm', product: null, normalizedModel: '810 di macina style' } as any;
+    const upsert = (normalizedModel?: string | null) =>
       service.upsertUnattached({
         existing,
         source: google,
         scrapedProduct: listing,
         sourceUrl: 'https://speedbike.hu/haibike',
-        matcherModelKey,
+        normalizedModel,
       });
 
     upsert();
-    expect(existing.matcherModelKey).toBe('810 di macina style');
-    upsert('sduro haibike');
-    expect(existing.matcherModelKey).toBe('sduro haibike');
+    expect(existing.normalizedModel).toBe('810 di macina style');
+    upsert('sduro');
+    expect(existing.normalizedModel).toBe('sduro');
     upsert(null);
-    expect(existing.matcherModelKey).toBeNull();
+    expect(existing.normalizedModel).toBeNull();
+  });
+
+  it('keeps the brand when none is passed', () => {
+    const existing = { id: 'record-google', product: null, brand: haibike } as any;
+
+    service.upsertUnattached({
+      existing,
+      source: google,
+      scrapedProduct: listing,
+      sourceUrl: 'https://speedbike.hu/haibike',
+    });
+
+    expect(existing.brand).toBe(haibike);
+  });
+
+  // A listing the extraction did not name keeps its title, and no model.
+  it('writes no model for a listing without one', () => {
+    const record = service.upsertUnattached({
+      existing: null,
+      source: google,
+      scrapedProduct: { ...listing, model: undefined },
+      sourceUrl: 'https://speedbike.hu/haibike',
+    });
+
+    expect(record.model).toBeNull();
+    expect(record.originalTitle).toBe('HAIBIKE SDURO 2026 M');
   });
 });

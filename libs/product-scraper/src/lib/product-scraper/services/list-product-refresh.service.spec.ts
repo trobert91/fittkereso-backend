@@ -44,7 +44,7 @@ describe('ListProductRefreshService', () => {
     const record = {
       id: 'record-1',
       url: 'https://speedbike.hu/termek/macina',
-      model: { id: 'model-1' },
+      product: { id: 'model-1' },
       source: { id: 'source-1', seller: SELLER },
       scrapedProduct: { offers },
       // Well inside the interval: its detail page is not due yet.
@@ -262,7 +262,7 @@ describe('ListProductRefreshService', () => {
 
     it('reports no_offer for a record not attached to a product', async () => {
       givenRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
-        model: null,
+        product: null,
       });
 
       await expect(
@@ -465,7 +465,7 @@ describe('ListProductRefreshService', () => {
     // No product lock to move it under: its detail import moves it.
     it('leaves an unattached record to its detail import', async () => {
       const record = givenMovedRecord([{ price: 1, externalId: 'SKU-1', resolvedExternalId: 'SKU-1' }], {
-        model: null,
+        product: null,
       });
 
       await expect(service.tryRefresh(SOURCE, card() as never)).resolves.toBe('no_offer');

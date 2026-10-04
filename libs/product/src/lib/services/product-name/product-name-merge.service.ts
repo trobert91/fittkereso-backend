@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ProductAlias, ProductAliasSource, ProductModel, ProductSource, ProductSourceRecord } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { isEmpty, orderBy } from 'lodash';
+import { orderBy } from 'lodash';
+import { productDisplayName } from '@fittkereso-backend/utils';
 import { BrandResolutionService } from '../brand/brand-resolution.service';
+import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
 import { ProductNormalizerService } from '../product-normalizer.service';
 import { EntityManager } from 'typeorm';
 import { ProductAliasRepository } from '@fittkereso-backend/database';
@@ -23,13 +25,15 @@ interface ValueGroup {
 
 /**
  * Recomputes ProductModel's name fields (brand/model/displayName/aliases,
- * plus the normalizedName key built from them) from its
+ * plus the normalizedName key built from them) from its identifying
  * ProductSourceRecords — the name-field counterpart to
  * ProductSpecMergeService, called from ProductMergeService.mergeSources
- * alongside the spec merge. Uses the same corroboration-then-recency/priority
- * tiebreak shape as ProductSpecMergeService.resolveKey's Tier 2/4, simplified
- * since name fields are single scalars, not schema-typed/numeric — there's no
- * schema-plausibility filter or numeric-precision tiebreak here.
+ * alongside the spec merge.
+ *
+ * The brand is voted on: corroboration, then recency, then priority, over
+ * each source's latest listing. The model is not: the product shows the model
+ * of its highest-priority source (namingRecordOf), so a lower-priority shop
+ * joining it never renames it.
  */
 @Injectable()
 export class ProductNameMergeService {
@@ -42,46 +46,77 @@ export class ProductNameMergeService {
     private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
+  /** `records`: the product's records of sources that identify products. */
   public async mergeNames(
     model: ProductModel,
-    latestPerSource: ProductSourceRecord[],
+    records: ProductSourceRecord[],
     categorySlug: string | undefined,
     manager?: EntityManager,
   ): Promise<void> {
+    const latestPerSource = getLatestSourcePerSource(records);
     const brandWinner = this.resolveField(
       latestPerSource,
       (r) => r.scrapedProduct?.brand,
     );
-    // A record has a `model` only when the identity extraction named it. When
-    // none has (the call failed, or is off for those sources), the shops'
-    // titles name the product — sizes, colours, marketing words and all.
-    const identified = latestPerSource.filter((r) => !!r.scrapedProduct?.model);
-    const modelWinner = isEmpty(identified)
-      ? this.resolveField(latestPerSource, (r) => r.scrapedProduct?.originalName)
-      : this.resolveField(identified, (r) => r.scrapedProduct?.model);
-    const displayNameWinner = isEmpty(identified)
-      ? this.resolveField(latestPerSource, (r) => r.scrapedProduct?.originalName)
-      : this.resolveField(identified, (r) => r.scrapedProduct?.displayName);
+    const naming = this.namingRecordOf(records);
 
     if (brandWinner !== undefined) {
       const resolved = await this.brandResolution.resolve(
         String(brandWinner),
-        displayNameWinner !== undefined ? String(displayNameWinner) : undefined,
+        naming?.scrapedProduct?.originalName,
       );
       if (resolved?.entity) {
         model.brand = resolved.entity;
       }
     }
-    if (modelWinner !== undefined) {
-      model.model = String(modelWinner);
-    }
-    if (displayNameWinner !== undefined) {
-      model.displayName = String(displayNameWinner);
+    const name = naming ? this.nameOf(naming, model.brand?.name) : undefined;
+    if (name) {
+      model.model = name;
+      model.displayName = productDisplayName(model.brand?.name, name);
     }
 
     // Before the alias merge, which skips aliases equal to the key.
     this.recomputeNormalizedName(model, categorySlug);
     await this.mergeAliases(model, latestPerSource, manager);
+  }
+
+  // ─── The model: the highest-priority source's ─────────────────────────
+
+  /**
+   * The record the product is named after: of the listings the identity
+   * extraction named, the highest-priority source's, its oldest on a tie —
+   * stable, so two shops of one priority, or one shop's size listings, don't
+   * take turns naming it. When no listing was named (the call failed, or is
+   * off for those sources), the same pick among all of them, named by its
+   * title.
+   */
+  private namingRecordOf(records: ProductSourceRecord[]): ProductSourceRecord | undefined {
+    const ranked = orderBy(
+      records,
+      [
+        (record) => this.getSourcePriority(record.source),
+        // A record not saved yet is this import's: the newest.
+        (record) => record.createdAt?.getTime() ?? Number.MAX_SAFE_INTEGER,
+      ],
+      ['desc', 'asc'],
+    );
+    return (
+      ranked.find((record) => !!record.scrapedProduct?.model) ??
+      ranked.find((record) => !!record.scrapedProduct?.originalName)
+    );
+  }
+
+  /** The record's model, else its title without a leading brand. */
+  private nameOf(record: ProductSourceRecord, brandName: string | undefined): string | undefined {
+    const scraped = record.scrapedProduct;
+    if (scraped?.model) return scraped.model;
+    const title = scraped?.originalName?.trim();
+    if (!title) return undefined;
+
+    const brand = [brandName, scraped?.brand].find(
+      (name) => !!name && title.toLowerCase().startsWith(`${name.toLowerCase()} `),
+    );
+    return brand ? title.slice(brand.length).trim() : title;
   }
 
   // ─── Per-field resolution (corroboration, then recency/priority) ───────

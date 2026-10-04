@@ -45,8 +45,8 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
     const seen = new Date('2026-09-20');
     const builder = makeQueryBuilder({
       getMany: [
-        { externalId: '1260042108', feedRowHash: 'h1', lastSeenAt: seen, model: { id: 'model-1' } },
-        { externalId: '1104300-XL', feedRowHash: 'h2', lastUpdated: seen, model: null },
+        { externalId: '1260042108', feedRowHash: 'h1', lastSeenAt: seen, product: { id: 'model-1' } },
+        { externalId: '1104300-XL', feedRowHash: 'h2', lastUpdated: seen, product: null },
       ],
     });
 
@@ -55,7 +55,7 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
       '1104300-XL',
     ]);
 
-    expect(builder['leftJoin']).toHaveBeenCalledWith('record.model', 'model');
+    expect(builder['leftJoin']).toHaveBeenCalledWith('record.product', 'model');
     expect(clauses(builder)).toEqual([
       'record."sourceId" = :sourceId',
       'record."externalId" IN (:...externalIds)',
@@ -109,7 +109,7 @@ describe('ProductSourceRecordRepository.findUnattachedBySellerAndExternalIds', (
       ['source.seller', 'seller'],
     ]);
     const where = clauses(builder);
-    expect(where).toContain('record."modelId" IS NULL');
+    expect(where).toContain('record."productId" IS NULL');
     expect(where).toContain('seller.id = :sellerId');
     expect(where.some((clause) => clause.includes("entry ->> 'resolvedExternalId' IN (:...externalIds)"))).toBe(true);
     expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), { externalIds: ['HAIBIKE-1'] });
@@ -121,7 +121,7 @@ describe('ProductSourceRecordRepository.countUnattached', () => {
     const builder = makeQueryBuilder({ getCount: 3 });
 
     expect(await repositoryWith(builder).countUnattached('source-1')).toBe(3);
-    expect(clauses(builder)).toEqual(['record."sourceId" = :sourceId', 'record."modelId" IS NULL']);
+    expect(clauses(builder)).toEqual(['record."sourceId" = :sourceId', 'record."productId" IS NULL']);
   });
 });
 
@@ -140,7 +140,7 @@ describe('ProductSourceRecordRepository.findBySourceAndExternalId', () => {
     await expect(repository.findBySourceAndExternalId('source-1', 'SKU-1')).resolves.toBe(record);
     expect(findOne).toHaveBeenCalledWith({
       where: { source: { id: 'source-1' }, externalId: 'SKU-1' },
-      relations: ['model', 'offers'],
+      relations: ['product', 'offers'],
     });
   });
 
@@ -189,7 +189,7 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     });
     const where = clauses(builder);
     expect(where).toContain('source.id = :sourceId');
-    expect(where).toContain('record."modelId" IS NULL');
+    expect(where).toContain('record."productId" IS NULL');
     expect(builder['andWhere']).toHaveBeenCalledWith(expect.anything(), { search: '%haibike%' });
     expect(builder['offset']).toHaveBeenCalledWith(50);
     expect(builder['limit']).toHaveBeenCalledWith(25);
@@ -202,7 +202,7 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
 
     const where = clauses(builder);
     expect(where).toContain('source."sellerId" = :sellerId');
-    expect(where).toContain('record."modelId" IS NOT NULL');
+    expect(where).toContain('record."productId" IS NOT NULL');
   });
 
   it('filters by several sources, validity, product name, brand and category', async () => {
@@ -252,11 +252,11 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     expect(byProduct['addOrderBy']).toHaveBeenCalledWith('record.id', 'ASC');
   });
 
-  it("sorts by the shop's original title, falling back to the cleaned one", async () => {
+  it("sorts by the shop's original title, falling back to the stored listing's", async () => {
     const builder = makeQueryBuilder({});
     await repositoryWith(builder).searchRecords({ sort: 'title', order: 'ASC' });
     expect(builder['orderBy']).toHaveBeenCalledWith(
-      `LOWER(COALESCE(record."scrapedProduct" ->> 'originalName', record."scrapedProduct" ->> 'displayName'))`,
+      `LOWER(COALESCE(record."originalTitle", record."scrapedProduct" ->> 'originalName', record."scrapedProduct" ->> 'displayName'))`,
       'ASC',
       'NULLS LAST',
     );

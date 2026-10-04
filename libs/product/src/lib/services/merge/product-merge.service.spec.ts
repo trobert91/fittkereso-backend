@@ -500,7 +500,9 @@ describe('ProductMergeService.mergeSources', () => {
     );
   });
 
-  it('dedupes the name merge to the latest row per source', async () => {
+  // The name merge picks among them itself: the brand by each source's latest,
+  // the model by the highest-priority source's oldest.
+  it('hands the name merge every listing of an identifying source', async () => {
     const stale = {
       id: 'src-a-stale',
       source: { id: 'source-1' },
@@ -511,14 +513,19 @@ describe('ProductMergeService.mergeSources', () => {
       source: { id: 'source-1' },
       lastUpdated: new Date('2026-01-01'),
     } as any;
+    const contributing = {
+      id: 'src-google',
+      source: { id: 'source-2', identifiesProducts: false },
+      lastUpdated: new Date('2026-01-01'),
+    } as any;
     const model = {
-      sources: [stale, fresh],
+      sources: [stale, fresh, contributing],
       productCategory: category,
     } as any;
 
     await service.mergeSources(model);
 
-    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [fresh], 'ebikes');
+    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [stale, fresh], 'ebikes');
   });
 
   // A manual record, or one stored before years were normalised, never went

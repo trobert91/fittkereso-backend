@@ -19,7 +19,7 @@ export class ListingModelRefreshTools {
   @Tool({
     name: 'refresh_listing_models',
     description:
-      "Asks the model name of identifying listings already stored again under the current rule, without re-importing them: each listing whose model was asked under an older contract (the category's left-out specs, examples or prompt version) goes through the identity extraction once more, and only its model, display name, contract and normalized key are written — no spec or offer changes. Skips listings already under the current contract, listings stored without a raw title, and sources with the identity extraction off. Costs one LLM call per listing asked (about $0.0003). dryRun (default) only counts.",
+      "Brings stored listings in line with the current model rule, without re-importing them, in two passes. First, every listing's record columns (resolved brand, model, title, normalizedModel) are filled from its stored listing — no LLM. Then each identifying listing whose model was asked under an older contract (the category's left-out specs, examples or prompt version) goes through the identity extraction once more; only its model, display name, contract and key are written — no spec or offer changes — and its product is named again (mergeSources, under the product's lock). Skips listings already under the current contract, listings stored without a raw title, and sources with the identity extraction off. Costs one LLM call per listing asked (about $0.0003); `limit` counts those calls. dryRun (default) only counts.",
     parameters: z.object({
       dryRun: z.boolean().default(true).describe('Count only; nothing called or written'),
       sourceId: z.string().optional().describe('Only this ProductSource'),
@@ -47,6 +47,11 @@ export class ListingModelRefreshTools {
     const L = [
       `# Listing model refresh${dryRun ? ' — dry run' : ''}`,
       '',
+      '## Record columns (no LLM)',
+      `- **read**: ${summary.columns.read} listings`,
+      `- **${dryRun ? 'would change' : 'changed'}**: ${summary.columns.changed}`,
+      '',
+      '## Models asked again',
       `- **read**: ${summary.read} identifying listings with a stored model`,
       `- **already under the current contract**: ${summary.current}`,
       `- **no raw title stored** (can't be asked): ${summary.noTitle}`,
@@ -56,6 +61,7 @@ export class ListingModelRefreshTools {
     if (!dryRun) {
       L.push(`- **renamed**: ${summary.written}`);
       L.push(`- **failed** (stored model kept, asked again next run or import): ${summary.failed}`);
+      L.push(`- **products named again**: ${summary.productsMerged}`);
     }
     if (summary.more) L.push('- **more left**: the limit was reached; run again.');
     return L.join('\n');

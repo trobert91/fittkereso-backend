@@ -923,7 +923,7 @@ describe('ProductScrapeUpdaterService', () => {
       await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
 
       expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
-        expect.objectContaining({ matcherModelKey: 'key:Macina Style 810 Di2' }),
+        expect.objectContaining({ normalizedModel: 'key:Macina Style 810 Di2' }),
       );
     });
 
@@ -974,7 +974,7 @@ describe('ProductScrapeUpdaterService', () => {
         } as never,
       ];
       mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
-        model: product,
+        product: product,
       } as never);
       mockProductRepo.findOneOrFail.mockResolvedValueOnce(product);
       mockProductRepo.save.mockResolvedValue(product);
@@ -1024,7 +1024,7 @@ describe('ProductScrapeUpdaterService', () => {
     it('finds a listing by its id under a new URL, and writes the same record', async () => {
       const known = makeExistingModel();
       mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
-        model: known,
+        product: known,
       } as never);
       mockProductRepo.save.mockResolvedValue(known);
 
@@ -1056,7 +1056,7 @@ describe('ProductScrapeUpdaterService', () => {
     it('keys a listing without an id by its URL slug', async () => {
       const known = makeExistingModel();
       mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce({
-        model: known,
+        product: known,
       } as never);
       mockProductRepo.save.mockResolvedValue(known);
 
@@ -1601,7 +1601,7 @@ describe('ProductScrapeUpdaterService', () => {
       const model = makeExistingModel();
       const waiting = {
         id: 'record-google',
-        model: null,
+        product: null,
         source: { id: 'source-google', identifiesProducts: false, seller: task.source.seller },
         scrapedProduct: { offers: [{ price: 90, resolvedExternalId: 'sku-1' }] },
       };
@@ -1623,7 +1623,7 @@ describe('ProductScrapeUpdaterService', () => {
         'seller-arukereso',
         ['sku-1'],
       );
-      expect(waiting.model).toBe(model);
+      expect(waiting.product).toBe(model);
       expect(mergedWith).toContain(waiting);
       // Before the listing's own record, which may be one of them.
       expect(
@@ -1658,7 +1658,7 @@ describe('ProductScrapeUpdaterService', () => {
     it('joins the offer its seller has, with no identity decision, no product fields and no match key', async () => {
       const model = makeExistingModel();
       // Stored while it waited for the offer.
-      const own = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', model: null };
+      const own = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', product: null };
       mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(own as never);
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
         ...offerOn('model-1'),
@@ -1679,7 +1679,6 @@ describe('ProductScrapeUpdaterService', () => {
         'HAIBIKE-1',
       );
       for (const identityStep of [
-        mockBrandResolution.resolve,
         mockKeyLookup.lookup,
         mockListingMatch.match,
         mockModelFactory.createShell,
@@ -1688,6 +1687,9 @@ describe('ProductScrapeUpdaterService', () => {
       ]) {
         expect(identityStep).not.toHaveBeenCalled();
       }
+      // Only for its record's brand column, from its own brand and title.
+      expect(mockBrandResolution.resolve).toHaveBeenCalledTimes(1);
+      expect(mockBrandResolution.resolve).toHaveBeenCalledWith('Logitech', 'HAIBIKE SDURO raw title');
       // The product's names are its identifying sources'.
       expect(model.displayName).toBe('Logitech MX Keys');
       expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
@@ -1696,7 +1698,7 @@ describe('ProductScrapeUpdaterService', () => {
           source: googleSource,
           externalId: 'HAIBIKE-1',
           feedRowHash: 'hash-1',
-          normalizedSourceName: null,
+          normalizedModel: null,
         }),
       );
       expect(mockMergeService.mergeSources).toHaveBeenCalledWith(model);
@@ -1771,7 +1773,7 @@ describe('ProductScrapeUpdaterService', () => {
         id: 'record-google',
         url: PAGE,
         externalId: 'HAIBIKE-1',
-        model: null,
+        product: null,
         offers: [{ id: 'x' }],
       };
       mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations.mockResolvedValue({
@@ -1784,7 +1786,7 @@ describe('ProductScrapeUpdaterService', () => {
       await contribute();
 
       expect(model.sources).toContain(waiting);
-      expect(waiting).toMatchObject({ model, source: googleSource, offers: undefined });
+      expect(waiting).toMatchObject({ product: model, source: googleSource, offers: undefined });
     });
 
     it('stores the listing unattached, under its offer key, when the seller has no such offer', async () => {
@@ -1819,7 +1821,7 @@ describe('ProductScrapeUpdaterService', () => {
 
     // The shop renamed the page while the listing waited: the same record, moved.
     it('keeps the record of a waiting listing whose URL changed', async () => {
-      const waiting = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', model: null };
+      const waiting = { id: 'record-google', url: PAGE, externalId: 'HAIBIKE-1', product: null };
       mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(waiting as never);
 
       await contribute(undefined, `${PAGE}-2026`);
@@ -1864,9 +1866,9 @@ describe('ProductScrapeUpdaterService', () => {
       oldProduct.sources = [own] as never;
       mockSourceRecordRepo.findBySourceAndExternalId
         // The extraction's own record, then the detach check's: on the old product.
-        .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
-        .mockResolvedValueOnce({ ...own, model: { id: 'model-old' } } as never)
-        .mockResolvedValue({ ...own, model: null } as never);
+        .mockResolvedValueOnce({ ...own, product: { id: 'model-old' } } as never)
+        .mockResolvedValueOnce({ ...own, product: { id: 'model-old' } } as never)
+        .mockResolvedValue({ ...own, product: null } as never);
 
       const result = await contribute();
 

@@ -132,9 +132,9 @@ export class ProductSplitService {
     const records = await this.sourceRecordRepo.find({
       where: ids.map((id) => ({ id })),
       relations: [
-        nameOf<ProductSourceRecord>('model'),
-        `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('brand')}`,
-        `${nameOf<ProductSourceRecord>('model')}.${nameOf<ProductModel>('productCategory')}`,
+        nameOf<ProductSourceRecord>('product'),
+        `${nameOf<ProductSourceRecord>('product')}.${nameOf<ProductModel>('brand')}`,
+        `${nameOf<ProductSourceRecord>('product')}.${nameOf<ProductModel>('productCategory')}`,
         nameOf<ProductSourceRecord>('source'),
       ],
     });
@@ -152,7 +152,7 @@ export class ProductSplitService {
   /** A split produces exactly one new product, so the records must start out on
    *  one product — otherwise the caller is asking for something ambiguous. */
   private assertSingleOrigin(records: ProductSourceRecord[]): string {
-    const originIds = uniq(compact(records.map((record) => record.model?.id)));
+    const originIds = uniq(compact(records.map((record) => record.product?.id)));
 
     if (originIds.length !== 1) {
       throw new BadRequestException(
@@ -175,7 +175,7 @@ export class ProductSplitService {
     );
     const newest = byNewest.find((record) => !!record.scrapedProduct?.model) ?? byNewest[0];
     const scraped = newest.scrapedProduct;
-    const categoryId = scraped?.category?.id ?? newest.model?.productCategory?.id;
+    const categoryId = scraped?.category?.id ?? newest.product?.productCategory?.id;
 
     if (!categoryId) {
       throw new BadRequestException(
@@ -186,15 +186,15 @@ export class ProductSplitService {
     // A manual/admin-entered record carries only specs, so fall back through
     // the record's own names and title before the product it is leaving.
     const displayName =
-      scraped?.displayName ?? scraped?.originalName ?? newest.model?.displayName;
+      scraped?.displayName ?? scraped?.originalName ?? newest.product?.displayName;
     if (!displayName) {
       throw new BadRequestException(
         'Cannot split: source record has no name to build a product from',
       );
     }
-    const model = scraped?.model ?? scraped?.originalName ?? newest.model?.model ?? displayName;
-    const brandName = scraped?.brand ?? newest.model?.brand?.name;
-    const categorySlug = scraped?.category?.slug ?? newest.model?.productCategory?.slug;
+    const model = scraped?.model ?? scraped?.originalName ?? newest.product?.model ?? displayName;
+    const brandName = scraped?.brand ?? newest.product?.brand?.name;
+    const categorySlug = scraped?.category?.slug ?? newest.product?.productCategory?.slug;
 
     return this.modelFactory.createShell({
       brandName,
@@ -223,7 +223,7 @@ export class ProductSplitService {
     await manager
       .createQueryBuilder()
       .update(ProductSourceRecord)
-      .set({ model: { id: newModelId } })
+      .set({ product: { id: newModelId } })
       .where('id IN (:...ids)', { ids })
       .execute();
   }

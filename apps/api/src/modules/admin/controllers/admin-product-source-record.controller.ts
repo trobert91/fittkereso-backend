@@ -65,7 +65,7 @@ export class AdminProductSourceRecordController {
 
     // The schema lives in the category config, not on the category row.
     const categorySlug =
-      record.model?.productCategory?.slug ?? record.scrapedProduct?.category?.slug;
+      record.product?.productCategory?.slug ?? record.scrapedProduct?.category?.slug;
 
     return Object.assign(new ProductSourceRecordDetailsDto(), {
       record,

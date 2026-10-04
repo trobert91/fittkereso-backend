@@ -505,7 +505,7 @@ describe('ProductSourceImportSimulationService', () => {
     const knownRecord = (overrides: Record<string, unknown> = {}) => ({
       id: 'record-1',
       url: 'https://ebikeshop.hu/p/1',
-      model: { id: 'model-1' },
+      product: { id: 'model-1' },
       scrapedProduct: { offers: [{ price: 90, resolvedExternalId: 'p/1' }] },
       lastUpdated: new Date(Date.now() - DAY),
       ...overrides,

@@ -65,7 +65,7 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminDetails] })
   aliases?: ProductAlias[];
 
-  @OneToMany(() => ProductSourceRecord, (source) => source.model, {
+  @OneToMany(() => ProductSourceRecord, (source) => source.product, {
     cascade: true,
     eager: false,
   })

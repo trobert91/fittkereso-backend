@@ -8,7 +8,7 @@ import type { ProductMatchQuery } from './types';
 
 describe('ProductCandidateFinderService.findCandidates', () => {
   let recall: { recall: jest.Mock; recallByMatcherModel: jest.Mock };
-  let sourceRecordRepo: { findMatcherModelKeysByModelIds: jest.Mock };
+  let sourceRecordRepo: { findNormalizedModelsByProductIds: jest.Mock };
   let productRepo: { find: jest.Mock };
   let categoryConfigService: { getConfig: jest.Mock };
   let tokenIdf: { forScope: jest.Mock };
@@ -42,7 +42,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       recall: jest.fn().mockResolvedValue([]),
       recallByMatcherModel: jest.fn().mockResolvedValue([]),
     };
-    sourceRecordRepo = { findMatcherModelKeysByModelIds: jest.fn().mockResolvedValue(new Map()) };
+    sourceRecordRepo = { findNormalizedModelsByProductIds: jest.fn().mockResolvedValue(new Map()) };
     productRepo = { find: jest.fn().mockResolvedValue([]) };
     categoryConfigService = { getConfig: jest.fn().mockReturnValue(undefined) };
     tokenIdf = { forScope: jest.fn().mockResolvedValue(FLAT_IDF) };
@@ -165,7 +165,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       recall.recall.mockResolvedValue([row('p-name', 'name', '140 hybrid stereo', 1)]);
       recall.recallByMatcherModel.mockResolvedValue([row('p-key', 'matcherModel', '140 hybrid', 0.6)]);
       productRepo.find.mockResolvedValue([product('p-name'), product('p-key')]);
-      sourceRecordRepo.findMatcherModelKeysByModelIds.mockResolvedValue(
+      sourceRecordRepo.findNormalizedModelsByProductIds.mockResolvedValue(
         new Map([
           ['p-name', ['810 macina style']],
           ['p-key', ['810 di 2 macina style', '810 di 2 macina style xl']],
@@ -175,7 +175,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       const candidates = await finder.findCandidates(listing);
 
       expect(recall.recallByMatcherModel).toHaveBeenCalledWith(expect.objectContaining({ matcherModelKeys: listing.matcherModelKeys }));
-      expect(sourceRecordRepo.findMatcherModelKeysByModelIds).toHaveBeenCalledWith(['p-name', 'p-key']);
+      expect(sourceRecordRepo.findNormalizedModelsByProductIds).toHaveBeenCalledWith(['p-name', 'p-key']);
       expect(candidates.find((c) => c.productId === 'p-name')).toMatchObject({ matchedOn: 'name', matcherModelMatch: false });
       expect(candidates.find((c) => c.productId === 'p-key')).toMatchObject({ matchedOn: 'matcherModel', matcherModelMatch: true });
     });
@@ -184,7 +184,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       categoryConfigService.getConfig.mockReturnValue({ primarySpecs: ['modelYear'] });
       recall.recall.mockResolvedValue([row('p1', 'name', '830 cx tour', 0.4)]);
       productRepo.find.mockResolvedValue([product('p1', { modelYear: 2024 })]);
-      sourceRecordRepo.findMatcherModelKeysByModelIds.mockResolvedValue(new Map([['p1', ['810 di 2 macina style']]]));
+      sourceRecordRepo.findNormalizedModelsByProductIds.mockResolvedValue(new Map([['p1', ['810 di 2 macina style']]]));
 
       const [candidate] = await finder.findCandidates({ ...listing, nameKey: '820 cx tour' });
 
@@ -204,13 +204,13 @@ describe('ProductCandidateFinderService.findCandidates', () => {
     it("loads a stored product's own keys when the query doesn't carry them", async () => {
       recall.recall.mockResolvedValue([row('p1', 'name', '140 hybrid stereo', 1)]);
       productRepo.find.mockResolvedValue([product('p1')]);
-      sourceRecordRepo.findMatcherModelKeysByModelIds
+      sourceRecordRepo.findNormalizedModelsByProductIds
         .mockResolvedValueOnce(new Map([['query-product', ['140 hybrid stereo']]]))
         .mockResolvedValueOnce(new Map([['p1', ['140 hybrid stereo']]]));
 
       const [candidate] = await finder.findCandidates(query);
 
-      expect(sourceRecordRepo.findMatcherModelKeysByModelIds).toHaveBeenNthCalledWith(1, ['query-product']);
+      expect(sourceRecordRepo.findNormalizedModelsByProductIds).toHaveBeenNthCalledWith(1, ['query-product']);
       expect(candidate.matcherModelMatch).toBe(true);
     });
 
@@ -220,7 +220,7 @@ describe('ProductCandidateFinderService.findCandidates', () => {
 
       await finder.findCandidates({ ...listing, matcherModelKeys: [] });
 
-      expect(sourceRecordRepo.findMatcherModelKeysByModelIds).not.toHaveBeenCalled();
+      expect(sourceRecordRepo.findNormalizedModelsByProductIds).not.toHaveBeenCalled();
     });
   });
 });

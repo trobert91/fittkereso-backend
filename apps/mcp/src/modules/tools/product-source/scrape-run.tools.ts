@@ -125,7 +125,7 @@ export class ScrapeRunTools {
       L.push(`- ${task.product.displayName ?? task.product.id} (${task.product.id})`);
 
       const sourceRow = await this.sourceRecordRepo.findOne({
-        where: { model: { id: task.product.id }, source: { id: task.source.id } },
+        where: { product: { id: task.product.id }, source: { id: task.source.id } },
       });
       if (sourceRow) {
         L.push(`- ProductSourceRecord: ${sourceRow.id} (created ${sourceRow.createdAt?.toISOString?.() ?? ''})`);

@@ -29,8 +29,7 @@ function makeRecord(
     id: 'record-1',
     url: 'https://shop.hu/p/1',
     lastUpdated: new Date('2024-05-01'),
-    normalizedSourceName: 'cube reaction hybrid',
-    model: { id: 'product-1', productCategory: { id: 'category-1' } },
+    product: { id: 'product-1', productCategory: { id: 'category-1' } },
     scrapedProduct: {
       brand: 'Cube',
       model: 'Reaction Hybrid',
@@ -127,7 +126,7 @@ describe('ProductSplitService', () => {
   it('refuses a split whose listings moved while it waited for the lock', async () => {
     sourceRecordRepo.find
       .mockResolvedValueOnce([makeRecord()])
-      .mockResolvedValueOnce([makeRecord({ model: { id: 'product-9' } as any })]);
+      .mockResolvedValueOnce([makeRecord({ product: { id: 'product-9' } as any })]);
 
     await expect(
       service.splitIntoNewProduct({ sourceRecordIds: ['record-1'], reason: 'test' }),
@@ -156,8 +155,8 @@ describe('ProductSplitService', () => {
   // listings that currently live on different products.
   it('refuses listings that span more than one product', async () => {
     sourceRecordRepo.find.mockResolvedValue([
-      makeRecord({ id: 'record-1', model: { id: 'product-1' } as any }),
-      makeRecord({ id: 'record-2', model: { id: 'product-2' } as any }),
+      makeRecord({ id: 'record-1', product: { id: 'product-1' } as any }),
+      makeRecord({ id: 'record-2', product: { id: 'product-2' } as any }),
     ]);
 
     await expect(
@@ -209,7 +208,6 @@ describe('ProductSplitService', () => {
       makeRecord({
         id: 'record-arukereso',
         lastUpdated: new Date('2026-09-25'),
-        normalizedSourceName: 'e+ talon',
         scrapedProduct: {
           brand: 'GIANT',
           model: 'Talon E+',
@@ -221,7 +219,6 @@ describe('ProductSplitService', () => {
       makeRecord({
         id: 'record-google',
         lastUpdated: new Date('2026-09-26'),
-        normalizedSourceName: null,
         scrapedProduct: {
           brand: 'GIANT',
           originalName: 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben',
@@ -248,7 +245,6 @@ describe('ProductSplitService', () => {
   it('falls back to the title when no record was identified', async () => {
     sourceRecordRepo.find.mockResolvedValue([
       makeRecord({
-        normalizedSourceName: null,
         scrapedProduct: {
           brand: 'GIANT',
           originalName: 'GIANT Talon E+ - M méretben',
@@ -278,7 +274,7 @@ describe('ProductSplitService', () => {
     // source records + offers + import tasks + price history
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(4);
     expect(queryBuilder.set).toHaveBeenCalledWith(
-      expect.objectContaining({ model: { id: 'product-new' } }),
+      expect.objectContaining({ product: { id: 'product-new' } }),
     );
   });
 

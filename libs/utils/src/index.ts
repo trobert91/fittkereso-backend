@@ -15,3 +15,4 @@ export * from './lib/retry';
 export * from './lib/auth-decorators';
 export * from './lib/offer-external-id';
 export * from './lib/html-to-text';
+export * from './lib/product-display-name';

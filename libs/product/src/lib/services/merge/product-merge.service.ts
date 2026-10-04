@@ -27,7 +27,6 @@ import { isEmpty, keyBy, uniq } from 'lodash';
 import { ProductSpecMergeService } from '../product-spec/product-spec-merge.service';
 import { ProductSpecSortService } from '../product-spec/product-spec-sort.service';
 import { ProductSpecValidatorService } from '../product-spec/product-spec-validator.service';
-import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
 import { groupRecordsBySeller } from '../product-spec/group-records-by-seller';
 import {
   getProductLevelSpecs,
@@ -178,9 +177,7 @@ export class ProductMergeService {
     // identifying sources' records carry no model to name the product with.
     await this.nameMergeService.mergeNames(
       model,
-      getLatestSourcePerSource(
-        model.sources.filter((record) => record.source?.identifiesProducts !== false),
-      ),
+      model.sources.filter((record) => record.source?.identifiesProducts !== false),
       categorySlug,
     );
 
@@ -346,7 +343,7 @@ export class ProductMergeService {
     await manager
       .createQueryBuilder()
       .update(ProductSourceRecord)
-      .set({ model: { id: target.id } })
+      .set({ product: { id: target.id } })
       .where('id IN (:...ids)', { ids: movedIds })
       .execute();
 

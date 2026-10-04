@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Brand,
   ProductModel,
   ProductSource,
   ProductSourceRecord,
@@ -41,9 +42,10 @@ export class ProductSourceRecordUpdaterService {
     /** The listing's key (listingExternalIdOf). Required with a source; the admin's record has none. */
     externalId?: string;
     sourceUrl?: string;
-    normalizedSourceName?: string | null;
-    /** The listing's matcherModel key; null clears it, undefined keeps it. */
-    matcherModelKey?: string | null;
+    /** The brand the listing's brand resolved to; null clears it, undefined keeps it. */
+    brand?: Brand | null;
+    /** The listing's normalizedModel; null clears it, undefined keeps it. */
+    normalizedModel?: string | null;
     /** A feed row's hash, stored so the next feed run can tell it unchanged. */
     feedRowHash?: string;
   }): Promise<ProductSourceRecord | undefined> {
@@ -148,7 +150,7 @@ export class ProductSourceRecordUpdaterService {
 
     if (!source) {
       source = new ProductSourceRecord();
-      source.model = model;
+      source.product = model;
       source.source = newSource;
       model.sources.push(source);
     }
@@ -186,13 +188,13 @@ export class ProductSourceRecordUpdaterService {
     scrapedProduct: ScrapedProduct;
     externalId?: string;
     sourceUrl: string;
-    normalizedSourceName?: string | null;
-    matcherModelKey?: string | null;
+    brand?: Brand | null;
+    normalizedModel?: string | null;
     feedRowHash?: string;
   }): ProductSourceRecord {
     const record = params.existing ?? new ProductSourceRecord();
     if (params.existing) this.moveUrl(record, params.sourceUrl, params.source.name);
-    record.model = null;
+    record.product = null;
     record.source = params.source;
 
     const categorySlug = params.scrapedProduct.category?.slug;
@@ -256,8 +258,8 @@ export class ProductSourceRecordUpdaterService {
       scrapedProduct?: Partial<ScrapedProduct>;
       externalId?: string;
       sourceUrl?: string;
-      normalizedSourceName?: string | null;
-      matcherModelKey?: string | null;
+      brand?: Brand | null;
+      normalizedModel?: string | null;
       feedRowHash?: string;
       processedSpecs: NonNullable<ScrapedProduct['specs']>;
       validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
@@ -267,8 +269,8 @@ export class ProductSourceRecordUpdaterService {
       scrapedProduct,
       externalId,
       sourceUrl,
-      normalizedSourceName,
-      matcherModelKey,
+      brand,
+      normalizedModel,
       processedSpecs,
       validation,
     } = params;
@@ -315,11 +317,15 @@ export class ProductSourceRecordUpdaterService {
     source.specErrors = validation.isValid ? {} : validation.errors;
     source.lastUpdated = new Date();
     this.markSeen(source);
-    // Null clears it (a source that does not identify products keeps none);
+    // The listing's names, beside its JSON, from what was just written.
+    if (scrapedProduct) {
+      source.model = scrapedProduct.model ?? null;
+      source.originalTitle = scrapedProduct.originalName ?? null;
+    }
+    // Null clears it (a source that does not identify products keeps no key);
     // undefined leaves it as stored.
-    if (normalizedSourceName !== undefined)
-      source.normalizedSourceName = normalizedSourceName;
-    if (matcherModelKey !== undefined) source.matcherModelKey = matcherModelKey;
+    if (brand !== undefined) source.brand = brand;
+    if (normalizedModel !== undefined) source.normalizedModel = normalizedModel;
     if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;
   }
 

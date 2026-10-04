@@ -13,7 +13,7 @@ describe('ContributorDetachService', () => {
   const record = (id: string, source: object, keys: string[]) => ({
     id,
     source,
-    model: { id: 'model-1' },
+    product: { id: 'model-1' },
     scrapedProduct: { offers: keys.map((key) => ({ price: 1, resolvedExternalId: key })) },
   });
 
@@ -44,7 +44,7 @@ describe('ContributorDetachService', () => {
 
     expect(detached).toEqual([contribution]);
     expect(sourceRecordRepo.detach).toHaveBeenCalledWith(['record-google']);
-    expect(contribution.model).toBeNull();
+    expect(contribution.product).toBeNull();
     // The identifying source's own record is the product's listing: it stays.
     expect(model.sources).toEqual([own]);
     expect(mergeService.mergeSources).toHaveBeenCalledWith(model);

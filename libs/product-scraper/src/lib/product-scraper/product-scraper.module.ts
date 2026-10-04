@@ -12,6 +12,7 @@ import { ProductSourceSimulationService } from './services/product-source-simula
 import { ProductSourceImportSimulationService } from './services/product-source-import-simulation.service';
 import { SpecPostProcessService } from './services/spec-post-process.service';
 import { ListingModelRefreshService } from './services/listing-model-refresh.service';
+import { ListingColumnsService } from './services/listing-columns.service';
 import { ArukeresoFeedParserService } from '../arukereso/arukereso-feed-parser.service';
 import { ArukeresoProductMapperService } from '../arukereso/arukereso-product-mapper.service';
 import { ArukeresoImportService } from '../arukereso/arukereso-import.service';
@@ -54,6 +55,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     DetailTaskCapService,
     ScrapingImportService,
     SpecPostProcessService,
+    ListingColumnsService,
     ListingModelRefreshService,
     ArukeresoFeedParserService,
     ArukeresoProductMapperService,

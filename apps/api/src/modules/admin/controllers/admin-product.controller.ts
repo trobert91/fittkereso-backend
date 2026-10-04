@@ -386,10 +386,10 @@ export class AdminProductController {
   ): Promise<ProductModel> {
     const source = await this.sourceRecordRepo.findOne({
       where: { id: sourceId },
-      relations: [nameOf<ProductSourceRecord>('model')],
+      relations: [nameOf<ProductSourceRecord>('product')],
     });
 
-    if (!source || source.model?.id !== id) {
+    if (!source || source.product?.id !== id) {
       throw new NotFoundException(
         `Source ${sourceId} not found for product ${id}`,
       );
@@ -407,12 +407,12 @@ export class AdminProductController {
     const modelSource = await this.sourceRecordRepo.findOne({
       where: { id: body.sourceRecordId },
       relations: [
-        nameOf<ProductSourceRecord>('model'),
+        nameOf<ProductSourceRecord>('product'),
         nameOf<ProductSourceRecord>('source'),
       ],
     });
 
-    if (!modelSource || modelSource.model?.id !== productId) {
+    if (!modelSource || modelSource.product?.id !== productId) {
       throw new NotFoundException('Product source not found for product');
     }
 

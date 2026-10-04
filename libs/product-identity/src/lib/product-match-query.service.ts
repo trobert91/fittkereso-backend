@@ -45,7 +45,7 @@ export class ProductMatchQueryService {
     brand: Brand,
   ): ProductMatchQuery {
     const { category } = scrapedProduct;
-    const key = this.normalizedModelOf(scrapedProduct);
+    const key = this.normalizedModelOf(scrapedProduct, brand.name);
     return {
       brandId: brand.id,
       brandName: brand.name,

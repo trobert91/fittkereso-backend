@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { ProductModelRepository } from '@fittkereso-backend/database';
+import { compact, uniq } from 'lodash';
 
 @Injectable()
 export class EntityTools {
@@ -38,6 +39,7 @@ export class EntityTools {
         'aliases',
         'sources',
         'sources.source',
+        'sources.brand',
         'sources.offers',
         'sources.offers.seller',
         'offers',
@@ -55,6 +57,10 @@ export class EntityTools {
     L.push(`- **Model**: ${product.model}`);
     L.push(
       `- **Normalized Name**: ${product.brand?.name ?? '?'} / ${product.normalizedName}`,
+    );
+    const keys = uniq(compact((product.sources ?? []).map((record) => record.normalizedModel)));
+    L.push(
+      `- **Normalized Models**: ${keys.length ? keys.map((key) => `\`${key}\``).join(', ') : '(none)'}`,
     );
     L.push(`- **Enabled**: ${product.enabled}`);
     if (product.slug) L.push(`- **Slug**: ${product.slug}`);
@@ -118,12 +124,10 @@ export class EntityTools {
         if (record.specErrors && Object.keys(record.specErrors).length > 0) {
           L.push(`- **Spec Errors**: ${JSON.stringify(record.specErrors)}`);
         }
-        if (record.normalizedSourceName)
-          L.push(`- **Normalized Source Name**: ${record.normalizedSourceName}`);
-        if (record.scrapedProduct?.model || record.matcherModelKey)
-          L.push(
-            `- **Model**: "${record.scrapedProduct?.model ?? '–'}" → \`${record.matcherModelKey ?? '–'}\``,
-          );
+        L.push(`- **Title**: ${record.originalTitle ?? record.scrapedProduct?.originalName ?? '–'}`);
+        if (record.brand) L.push(`- **Brand**: ${record.brand.name}`);
+        if (record.model || record.normalizedModel)
+          L.push(`- **Model**: "${record.model ?? '–'}" → \`${record.normalizedModel ?? '–'}\``);
 
         // What this source says, before the seller's sources are composed.
         const entries = record.scrapedProduct?.offers ?? [];

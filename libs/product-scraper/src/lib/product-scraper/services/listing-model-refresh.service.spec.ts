@@ -1,4 +1,5 @@
 import type { ProductSourceRecord, ScrapedProduct } from '@fittkereso-backend/database';
+import { productLock } from '@fittkereso-backend/database';
 import { ListingModelRefreshService } from './listing-model-refresh.service';
 
 describe('ListingModelRefreshService', () => {
@@ -10,16 +11,26 @@ describe('ListingModelRefreshService', () => {
     extractIdentity: jest.Mock;
   };
   let matchQuery: { normalizedModelOf: jest.Mock };
+  let listingColumns: { fill: jest.Mock };
+  let productRepo: { findOne: jest.Mock; save: jest.Mock };
+  let mergeService: { mergeSources: jest.Mock };
+  let locks: { withLocks: jest.Mock };
   let service: ListingModelRefreshService;
 
   const source = { id: 'source-1', name: 'akosbike-arukereso', config: {} };
-  const recordOf = (id: string, listing: Partial<ScrapedProduct> = {}): ProductSourceRecord =>
+  const recordOf = (
+    id: string,
+    listing: Partial<ScrapedProduct> = {},
+    productId: string | null = 'product-1',
+  ): ProductSourceRecord =>
     ({
       id,
       url: `https://akosbike.hu/${id}`,
       source,
+      product: productId ? { id: productId } : null,
+      brand: { id: 'brand-cube', name: 'Cube' },
       scrapedProduct: {
-        brand: 'Cube',
+        brand: 'CUBE',
         model: 'Kathmandu Hybrid ONE',
         originalName: 'Cube Kathmandu Hybrid ONE 800 2025 54',
         category: { id: 'cat-1', slug: 'ebikes', name: 'E-bikes' },
@@ -47,12 +58,37 @@ describe('ListingModelRefreshService', () => {
       })),
     };
     matchQuery = {
-      normalizedModelOf: jest.fn((listing: ScrapedProduct) => `key:${listing.model}`),
+      normalizedModelOf: jest.fn(
+        (listing: ScrapedProduct, brandName?: string) => `key:${listing.model}:${brandName}`,
+      ),
     };
+    listingColumns = { fill: jest.fn().mockResolvedValue({ read: 5, changed: 3 }) };
+    productRepo = {
+      findOne: jest.fn(async ({ where }) => ({ id: where.id, sources: [] })),
+      save: jest.fn(async (product) => product),
+    };
+    mergeService = { mergeSources: jest.fn(async (product) => product) };
+    locks = { withLocks: jest.fn(async (_keys, fn: () => Promise<unknown>) => fn()) };
     service = new ListingModelRefreshService(
       sourceRecordRepo as never,
       specPostProcess as never,
       matchQuery as never,
+      listingColumns as never,
+      productRepo as never,
+      mergeService as never,
+      locks as never,
+    );
+  });
+
+  it('fills every listing\x27s record columns first, with the same filters', async () => {
+    const summary = await run({ sourceId: 'source-1', categorySlug: 'ebikes' });
+
+    expect(listingColumns.fill).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: false, sourceId: 'source-1', categorySlug: 'ebikes' }),
+    );
+    expect(summary.columns).toEqual({ read: 5, changed: 3 });
+    expect(sourceRecordRepo.findForModelRefresh).toHaveBeenCalledWith(
+      expect.objectContaining({ named: true, sourceId: 'source-1', categorySlug: 'ebikes' }),
     );
   });
 
@@ -69,11 +105,59 @@ describe('ListingModelRefreshService', () => {
     });
     expect(sourceRecordRepo.setModel).toHaveBeenCalledWith('r1', {
       model: 'Kathmandu Hybrid ONE 800',
-      displayName: 'Cube Kathmandu Hybrid ONE 800',
+      displayName: 'CUBE Kathmandu Hybrid ONE 800',
       contract: CONTRACT,
-      key: 'key:Kathmandu Hybrid ONE 800',
+      // Keyed with the record's resolved brand, as an import keys it.
+      key: 'key:Kathmandu Hybrid ONE 800:Cube',
     });
     expect(summary).toMatchObject({ read: 1, asked: 1, written: 1, failed: 0, more: false });
+  });
+
+  it('names each renamed listing\x27s product again under its lock, once per product', async () => {
+    sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([
+      recordOf('r1', {}, 'product-1'),
+      recordOf('r2', {}, 'product-1'),
+    ]);
+
+    const summary = await run();
+
+    expect(locks.withLocks).toHaveBeenCalledTimes(1);
+    expect(locks.withLocks).toHaveBeenCalledWith([productLock('product-1')], expect.any(Function));
+    expect(productRepo.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'product-1' } }),
+    );
+    expect(mergeService.mergeSources).toHaveBeenCalledWith({ id: 'product-1', sources: [] });
+    expect(productRepo.save).toHaveBeenCalledWith({ id: 'product-1', sources: [] });
+    expect(summary.productsMerged).toBe(1);
+  });
+
+  // Written under the lock: an import holding the product saves its records back.
+  it('writes the listing under its product\x27s lock, before the product is read again', async () => {
+    sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([recordOf('r1')]);
+    const order: string[] = [];
+    locks.withLocks.mockImplementation(async (_keys, fn: () => Promise<unknown>) => {
+      order.push('lock');
+      return fn();
+    });
+    sourceRecordRepo.setModel.mockImplementation(async () => order.push('write'));
+    productRepo.findOne.mockImplementation(async () => {
+      order.push('read');
+      return { id: 'product-1' };
+    });
+
+    await run();
+
+    expect(order).toEqual(['lock', 'write', 'read']);
+  });
+
+  it('writes an unattached listing with no product to name', async () => {
+    sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([recordOf('r1', {}, null)]);
+
+    const summary = await run();
+
+    expect(sourceRecordRepo.setModel).toHaveBeenCalledTimes(1);
+    expect(locks.withLocks).not.toHaveBeenCalled();
+    expect(summary.productsMerged).toBe(0);
   });
 
   it('skips listings under the current contract, stored without a title, or of a source with the extraction off', async () => {
@@ -100,8 +184,9 @@ describe('ListingModelRefreshService', () => {
 
     const summary = await run();
 
-    expect(summary).toMatchObject({ asked: 1, written: 0, failed: 1 });
+    expect(summary).toMatchObject({ asked: 1, written: 0, failed: 1, productsMerged: 0 });
     expect(sourceRecordRepo.setModel).not.toHaveBeenCalled();
+    expect(mergeService.mergeSources).not.toHaveBeenCalled();
   });
 
   it('only counts in a dry run', async () => {
@@ -109,6 +194,7 @@ describe('ListingModelRefreshService', () => {
 
     const summary = await run({ dryRun: true });
 
+    expect(listingColumns.fill).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true }));
     expect(summary).toMatchObject({ read: 2, asked: 2, written: 0 });
     expect(specPostProcess.extractIdentity).not.toHaveBeenCalled();
     expect(sourceRecordRepo.setModel).not.toHaveBeenCalled();

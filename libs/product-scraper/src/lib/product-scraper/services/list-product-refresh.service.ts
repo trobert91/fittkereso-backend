@@ -166,7 +166,7 @@ export class ListProductRefreshService {
     });
     if (now > detailDueAt) return { ...known, detailDueAt, outcome: 'stale' };
 
-    const externalId = record.model ? this.pickExternalId(record, item) : undefined;
+    const externalId = record.product ? this.pickExternalId(record, item) : undefined;
     if (!externalId) return { ...known, detailDueAt, outcome: 'no_offer' };
 
     return { ...known, detailDueAt, externalId, outcome: 'refresh' };
@@ -188,7 +188,7 @@ export class ListProductRefreshService {
     item: ScrapedListProduct,
   ): Promise<ListItemOutcome> {
     const { outcome, record, movedFrom, externalId } = await this.decide(source, item);
-    const modelId = record?.model?.id;
+    const modelId = record?.product?.id;
     // An unattached record has no product lock to move it under: the detail
     // import moves it.
     if (outcome === 'unknown' || !record || !modelId) {

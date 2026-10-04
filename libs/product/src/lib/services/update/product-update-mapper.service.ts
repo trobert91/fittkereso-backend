@@ -171,7 +171,7 @@ export class ProductUpdateMapperService {
     if (existing) return existing;
 
     const record = new ProductSourceRecord();
-    record.model = entity;
+    record.product = entity;
     record.source = null;
     record.scrapedProduct = {};
     record.lastUpdated = new Date();
