@@ -39,9 +39,9 @@ export class ProductDuplicateService {
 
   /**
    * Writes a pair for every candidate of this product scoring NEAR_MISS_SCORE
-   * or above (pairScoreOf: by name, or by spec gates alone when the two share
-   * a matcherModel key) — the bar below which a listing simply becomes a new
-   * product — and
+   * or above (pairScoreOf: by name, or by spec gates alone when a listing of
+   * each has the same normalizedModel) — the bar below which a listing simply
+   * becomes a new product — and
    * for every product sharing one of its identifiers (a GTIN, an MPN, a
    * declared size). Returns the pairs written; already-dismissed pairs aren't
    * reopened and don't count.

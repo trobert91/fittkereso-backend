@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { ProductModel, ProductModelRepository } from '@fittkereso-backend/database';
+import {
+  ProductModel,
+  ProductModelRepository,
+  ProductSourceRecord,
+  ProductSourceRecordRepository,
+} from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 import { TOKEN_IDF_TTL_MS } from './product-identity.constants';
 import { FLAT_IDF, TokenIdf } from './name-similarity';
@@ -16,9 +21,10 @@ interface TokenRow {
 }
 
 /**
- * How often each name-key token occurs among the products of one brand and
+ * How often each key word occurs among the products of one brand and
  * category — the scope recall already searches — turned into the IDF the
- * alignment similarity weighs tokens by.
+ * alignment similarity weighs tokens by. A product's words are those of its
+ * listings' normalizedModels, each counted once per product.
  *
  * Without it every token counts the same, and the brand's own line name
  * (`macina`, in all 58 KTM e-bikes) would carry as much identity as the trim
@@ -32,7 +38,10 @@ interface TokenRow {
 export class TokenIdfService {
   private readonly cache = new Map<string, CachedIdf>();
 
-  constructor(private readonly productRepo: ProductModelRepository) {}
+  constructor(
+    private readonly productRepo: ProductModelRepository,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
+  ) {}
 
   public async forScope(
     brandId: string,
@@ -57,17 +66,20 @@ export class TokenIdfService {
     categoryId: string,
   ): Promise<TokenIdf> {
     const products = `"${this.productRepo.repo.metadata.tableName}"`;
-    const normalizedName = `"${nameOf<ProductModel>('normalizedName')}"`;
+    const records = `"${this.sourceRecordRepo.repo.metadata.tableName}"`;
+    const productId = `"${nameOf<ProductSourceRecord>('product')}Id"`;
+    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
     const brand = `"${nameOf<ProductModel>('brand')}Id"`;
     const category = `"${nameOf<ProductModel>('productCategory')}Id"`;
 
-    const rows: TokenRow[] = await this.productRepo.repo.query(
+    const rows: TokenRow[] = await this.sourceRecordRepo.repo.query(
       `WITH tokens AS (
          SELECT DISTINCT pm.id,
-                unnest(string_to_array(pm.${normalizedName}, ' ')) AS token
-         FROM ${products} AS pm
+                unnest(string_to_array(r.${key}, ' ')) AS token
+         FROM ${records} AS r
+         JOIN ${products} AS pm ON pm.id = r.${productId}
          WHERE pm.${brand} = $1 AND pm.${category} = $2
-           AND pm.${normalizedName} IS NOT NULL AND pm.${normalizedName} <> ''
+           AND r.${key} IS NOT NULL AND r.${key} <> ''
        )
        SELECT token,
               COUNT(*)::int AS df,

@@ -34,20 +34,16 @@ export class ProductModel extends BasePostgresEntity {
   displayName: string;
 
   @Index()
+  // Trigram index for public search. TypeORM can't declare a GIN operator
+  // class, so it's created by hand once per environment (and by the trigram
+  // migration on a fresh database), and `synchronize: false` keeps sync from
+  // dropping it:
+  // CREATE INDEX IF NOT EXISTS product_model_name_trgm_idx
+  //   ON product_model USING gin (model gin_trgm_ops);
+  @Index('product_model_name_trgm_idx', { synchronize: false })
   @Column({ nullable: false })
   @Expose({ groups: [SerializeGroup.list] })
   model: string;
-
-  @Index()
-  // Trigram index for candidate recall. TypeORM can't declare a GIN operator
-  // class, so it's created by hand once per environment, and
-  // `synchronize: false` keeps sync from dropping it:
-  // CREATE INDEX IF NOT EXISTS product_normalized_name_trgm_idx
-  //   ON product_model USING gin ("normalizedName" gin_trgm_ops);
-  @Index('product_normalized_name_trgm_idx', { synchronize: false })
-  @Column({ nullable: false })
-  @Expose({ groups: [SerializeGroup.adminList] })
-  normalizedName: string;
 
   /**
    * Plain text, recomputed from the records by ProductMergeService.mergeSources

@@ -9,7 +9,7 @@ function candidateOf(productId: string): ProductCandidate {
     productId,
     displayName: 'Cube Stereo Hybrid 140',
     score: 70,
-    matchedOn: 'alias',
+    matchedOn: 'trigram',
     matchedValue: 'Stereo Hybrid 140',
     nameSimilarity: { trigram: 0.9, levenshtein: 1 },
     failedGates: [
@@ -31,7 +31,7 @@ describe('pairRowOf', () => {
       productAId: SMALLER,
       productBId: LARGER,
       similarityScore: 70,
-      matchedOn: 'alias',
+      matchedOn: 'trigram',
       matchedValue: 'Stereo Hybrid 140',
       failedGates: [
         {
@@ -43,20 +43,20 @@ describe('pairRowOf', () => {
         },
       ],
       nameSimilarity: { trigram: 0.9, levenshtein: 1 },
-      matcherModelMatch: null,
+      normalizedModelMatch: null,
       detectedBy: 'scan',
     });
   });
 
-  it('scores two products sharing a matcherModel key by their spec gates when the name scores lower', () => {
+  it('scores two products sharing a normalizedModel by their spec gates when the name scores lower', () => {
     const differentlyWorded = { ...candidateOf(LARGER), score: 27, keyScore: 100, failedGates: [] };
 
-    expect(pairScoreOf({ ...differentlyWorded, matcherModelMatch: true })).toBe(100);
-    expect(pairScoreOf({ ...differentlyWorded, matcherModelMatch: false })).toBe(27);
+    expect(pairScoreOf({ ...differentlyWorded, normalizedModelMatch: true })).toBe(100);
+    expect(pairScoreOf({ ...differentlyWorded, normalizedModelMatch: false })).toBe(27);
     expect(pairScoreOf(differentlyWorded)).toBe(27);
-    expect(pairRowOf(SMALLER, { ...differentlyWorded, matcherModelMatch: true }, 'scan')).toMatchObject({
+    expect(pairRowOf(SMALLER, { ...differentlyWorded, normalizedModelMatch: true }, 'scan')).toMatchObject({
       similarityScore: 100,
-      matcherModelMatch: true,
+      normalizedModelMatch: true,
     });
   });
 

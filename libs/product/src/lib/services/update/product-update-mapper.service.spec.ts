@@ -7,8 +7,6 @@ describe('ProductUpdateMapperService', () => {
     {} as never, // brandRepo
     {} as never, // productImageRepo
     {} as never, // embeddingService
-    {} as never, // productNormalizer
-    {} as never, // categoryConfigService
   );
 
   const listing = {

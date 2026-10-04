@@ -11,8 +11,6 @@ import {
 } from '@fittkereso-backend/database';
 import { isUndefined, omit } from 'lodash';
 import { ProductEmbeddingService } from '../product-embedding.service';
-import { ProductNormalizerService } from '../product-normalizer.service';
-import { CategoryConfigService } from '@fittkereso-backend/config';
 
 @Injectable()
 export class ProductUpdateMapperService {
@@ -21,8 +19,6 @@ export class ProductUpdateMapperService {
     private readonly brandRepo: BrandRepository,
     private readonly productImageRepo: ProductImageRepository,
     private readonly embeddingService: ProductEmbeddingService,
-    private readonly productNormalizer: ProductNormalizerService,
-    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async mapDtoToEntity(
@@ -104,15 +100,6 @@ export class ProductUpdateMapperService {
         displayName: entity.displayName,
         category: entity.productCategory?.name,
       });
-    const strategy =
-      this.categoryConfigService.getConfig(entity.productCategory?.slug)
-        ?.normalizationStrategy ?? 'full-sorted';
-    entity.normalizedName = this.productNormalizer.normalizeProduct({
-      brand: entity.brand.name,
-      model: entity.model,
-      displayName: entity.displayName,
-      strategy,
-    });
   }
 
   private mapAliases(entity: ProductModel, aliases: string[]) {

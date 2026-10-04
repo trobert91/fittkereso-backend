@@ -1,15 +1,11 @@
 import { ProductNameMergeService } from './product-name-merge.service';
-import { ProductNormalizerService } from '../product-normalizer.service';
 import type { ProductModel, ProductSourceRecord } from '@fittkereso-backend/database';
 
 describe('ProductNameMergeService.mergeNames', () => {
   let service: ProductNameMergeService;
   let brandResolution: { resolve: jest.Mock };
   let aliasRepo: { save: jest.Mock };
-  let categoryConfigService: { getConfig: jest.Mock };
 
-  const categorySlug = 'ebikes';
-  const cube = { id: 'brand-cube', name: 'Cube' } as any;
 
   function makeSource(
     id: string,
@@ -48,20 +44,14 @@ describe('ProductNameMergeService.mergeNames', () => {
       resolve: jest.fn().mockResolvedValue(undefined),
     };
     aliasRepo = { save: jest.fn().mockResolvedValue(undefined) };
-    categoryConfigService = { getConfig: jest.fn().mockReturnValue(undefined) };
-    service = new ProductNameMergeService(
-      brandResolution as any,
-      aliasRepo as any,
-      new ProductNormalizerService(),
-      categoryConfigService as any,
-    );
+    service = new ProductNameMergeService(brandResolution as any, aliasRepo as any);
   });
 
   it('does nothing when no source has any name field set', async () => {
     const model = makeModel();
     const sources = [makeSource('a', {})];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(model.displayName).toBe('Old Name');
     expect(brandResolution.resolve).not.toHaveBeenCalled();
@@ -79,7 +69,7 @@ describe('ProductNameMergeService.mergeNames', () => {
         makeSource('c', { brand: 'Trek', model: 'Marlin 7' }, { priority: 10 }),
       ];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7');
       expect(model.displayName).toBe('Trek Marlin 7');
@@ -101,7 +91,7 @@ describe('ProductNameMergeService.mergeNames', () => {
         ),
       ];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7 XL');
     });
@@ -122,7 +112,7 @@ describe('ProductNameMergeService.mergeNames', () => {
         ),
       ];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7');
     });
@@ -134,7 +124,7 @@ describe('ProductNameMergeService.mergeNames', () => {
         makeSource('saved', { brand: 'Trek', model: 'Marlin 7' }, { priority: 60 }),
       ];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7');
     });
@@ -148,7 +138,7 @@ describe('ProductNameMergeService.mergeNames', () => {
         makeSource('title', { brand: 'Trek', originalName: 'TREK MARLIN 7 48cm narancs' }, { priority: 100 }),
       ];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7');
     });
@@ -157,7 +147,7 @@ describe('ProductNameMergeService.mergeNames', () => {
       const model = makeModel();
       const sources = [makeSource('title', { brand: 'Trek', originalName: 'TREK MARLIN 7 48cm' })];
 
-      await service.mergeNames(model, sources, categorySlug);
+      await service.mergeNames(model, sources);
 
       expect(model.model).toBe('MARLIN 7 48cm');
       expect(model.displayName).toBe('Trek MARLIN 7 48cm');
@@ -172,7 +162,7 @@ describe('ProductNameMergeService.mergeNames', () => {
       makeSource('a', { brand: 'Trek', model: 'Marlin 7', originalName: 'Trek Marlin 7 M' }),
     ];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(brandResolution.resolve).toHaveBeenCalledWith('Trek', 'Trek Marlin 7 M');
     expect(model.brand).toBe(trekEntity);
@@ -184,19 +174,19 @@ describe('ProductNameMergeService.mergeNames', () => {
     const model = makeModel({ brand: existingBrand });
     const sources = [makeSource('a', { brand: 'Unknown Brand' })];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(model.brand).toBe(existingBrand);
   });
 
   it('unions aliases from all sources without corroboration-gating', async () => {
-    const model = makeModel({ displayName: 'Trek Marlin 7', normalizedName: 'trek marlin 7' });
+    const model = makeModel({ displayName: 'Trek Marlin 7' });
     const sources = [
       makeSource('a', { aliases: ['Marlin 7'] }),
       makeSource('b', { aliases: ['MTB Marlin 7'] }),
     ];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(aliasRepo.save).toHaveBeenCalledTimes(2);
     const savedAliases = aliasRepo.save.mock.calls.map((call) => call[0].alias);
@@ -205,11 +195,11 @@ describe('ProductNameMergeService.mergeNames', () => {
     );
   });
 
-  it('skips creating an alias that duplicates the model displayName/normalizedName', async () => {
-    const model = makeModel({ displayName: 'Trek Marlin 7', normalizedName: 'trek marlin 7' });
-    const sources = [makeSource('a', { aliases: ['Trek Marlin 7'] })];
+  it('skips creating an alias that duplicates the product displayName or model', async () => {
+    const model = makeModel({ displayName: 'Trek Marlin 7', model: 'Marlin 7' });
+    const sources = [makeSource('a', { aliases: ['Trek Marlin 7', 'Marlin 7'] })];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(aliasRepo.save).not.toHaveBeenCalled();
   });
@@ -218,7 +208,7 @@ describe('ProductNameMergeService.mergeNames', () => {
     const model = makeModel({ id: undefined, displayName: 'Trek Marlin 7' });
     const sources = [makeSource('a', { aliases: ['Marlin 7'] })];
 
-    await service.mergeNames(model, sources, categorySlug);
+    await service.mergeNames(model, sources);
 
     expect(aliasRepo.save).not.toHaveBeenCalled();
   });
@@ -228,66 +218,6 @@ describe('ProductNameMergeService.mergeNames', () => {
     const model = makeModel();
     const sources = [makeSource('a', { aliases: ['Marlin 7'] })];
 
-    await expect(service.mergeNames(model, sources, categorySlug)).resolves.not.toThrow();
-  });
-
-  describe('normalizedName', () => {
-    it('rebuilds the key from the picked names with the category strategy', async () => {
-      brandResolution.resolve.mockResolvedValue({ entity: cube, similarity: 1 });
-      categoryConfigService.getConfig.mockReturnValue({ normalizationStrategy: 'full' });
-      const model = makeModel({ normalizedName: 'stale key' });
-      const sources = [makeSource('a', { brand: 'Cube', model: 'Stereo Hybrid 140 HPC' })];
-
-      await service.mergeNames(model, sources, categorySlug);
-
-      expect(categoryConfigService.getConfig).toHaveBeenCalledWith(categorySlug);
-      expect(model.normalizedName).toBe('stereo hybrid 140 hpc');
-    });
-
-    it('strips the resolved brand name, not the scraped brand string', async () => {
-      brandResolution.resolve.mockResolvedValue({ entity: cube, similarity: 0.9 });
-      const model = makeModel({ normalizedName: 'stale key' });
-      const sources = [makeSource('a', { brand: 'CUBE Bikes', model: 'Cube Stereo Hybrid 140' })];
-
-      await service.mergeNames(model, sources, categorySlug);
-
-      // No category strategy → full-sorted.
-      expect(model.normalizedName).toBe('140 hybrid stereo');
-    });
-
-    it('keeps the old key when the product has no brand loaded', async () => {
-      const model = makeModel({ normalizedName: 'old key' });
-      const sources = [makeSource('a', { brand: 'Unknown Brand', model: 'Stereo Hybrid 140' })];
-
-      await service.mergeNames(model, sources, categorySlug);
-
-      expect(model.normalizedName).toBe('old key');
-    });
-
-    it('keeps the old key when there is no name to build it from', async () => {
-      const model = makeModel({ brand: cube, displayName: undefined, normalizedName: 'old key' });
-      const sources = [makeSource('a', {})];
-
-      await service.mergeNames(model, sources, categorySlug);
-
-      expect(model.normalizedName).toBe('old key');
-    });
-
-    it('does not create an alias equal to the rebuilt key', async () => {
-      brandResolution.resolve.mockResolvedValue({ entity: cube, similarity: 1 });
-      const model = makeModel({ normalizedName: 'stale key' });
-      const sources = [
-        makeSource('a', {
-          brand: 'Cube',
-          model: 'Stereo Hybrid 140',
-          aliases: ['140 hybrid stereo', 'Stereo Hybrid 140 2024'],
-        }),
-      ];
-
-      await service.mergeNames(model, sources, categorySlug);
-
-      const savedAliases = aliasRepo.save.mock.calls.map((call) => call[0].alias);
-      expect(savedAliases).toEqual(['Stereo Hybrid 140 2024']);
-    });
+    await expect(service.mergeNames(model, sources)).resolves.not.toThrow();
   });
 });

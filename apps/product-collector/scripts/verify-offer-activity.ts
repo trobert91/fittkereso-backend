@@ -208,7 +208,6 @@ async function createSeed(db: DataSource): Promise<Seed> {
         brand,
         displayName: `${PREFIX} ${name}`,
         model: name,
-        normalizedName: `${PREFIX} ${name}`.toLowerCase(),
         price,
         priceWithoutDiscount: null,
         embedding: Object.assign(new ProductEmbedding(), {

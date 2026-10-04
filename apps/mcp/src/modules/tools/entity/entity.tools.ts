@@ -55,9 +55,6 @@ export class EntityTools {
     L.push(`- **ID**: ${product.id}`);
     L.push(`- **Display Name**: ${product.displayName}`);
     L.push(`- **Model**: ${product.model}`);
-    L.push(
-      `- **Normalized Name**: ${product.brand?.name ?? '?'} / ${product.normalizedName}`,
-    );
     const keys = uniq(compact((product.sources ?? []).map((record) => record.normalizedModel)));
     L.push(
       `- **Normalized Models**: ${keys.length ? keys.map((key) => `\`${key}\``).join(', ') : '(none)'}`,

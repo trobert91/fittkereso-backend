@@ -1,20 +1,10 @@
 import type { IdentityGate } from '@fittkereso-backend/database';
 
-/** Exactly one candidate at or above this attaches a listing without asking the LLM. */
-export const ACCEPT_SCORE = 80;
-
 /**
- * When several candidates reach ACCEPT_SCORE, the best still attaches if it
- * scores at least CLEAR_WINNER_SCORE and leads the runner-up by at least
- * CLEAR_WINNER_LEAD. A perfect name with no failed gate beside a variant at
- * 81–85 ("… 400X" against "… 400X FE") is not a tie worth a new product.
- *
- * Measured on the 2026-10-02 wave-1 test imports: with the LLM off, every such
- * listing became a new product, about 60 rows across five shops, 34 of them
- * with a 100 on top.
+ * What a candidate with the listing's normalizedModel needs from its spec
+ * gates alone (keyScore) to attach the listing without asking the LLM.
  */
-export const CLEAR_WINNER_SCORE = 100;
-export const CLEAR_WINNER_LEAD = 10;
+export const ACCEPT_SCORE = 80;
 
 /**
  * Candidates at or above this are near-misses: a listing sends them to the
@@ -39,21 +29,12 @@ export const GATE_SEVERITY: Record<Exclude<IdentityGate, 'specMissing'>, number>
 };
 
 /**
- * In key mode, the matcher-spec contradictions a candidate with another key
- * may have and still go to the LLM: one shop's weight or gear count can be
- * off, two different numbers rarely are. A primary-spec contradiction always
- * keeps it away.
+ * The matcher-spec contradictions a candidate with another key may have and
+ * still go to the LLM: one shop's weight or gear count can be off, two
+ * different numbers rarely are. A primary-spec contradiction always keeps it
+ * away.
  */
 export const LLM_MAX_MATCHER_SPEC_MISMATCHES = 1;
-
-/** Rows the recall query returns, name and alias rows together. */
-export const NAME_HITS = 20;
-
-/**
- * Products the matcherModel recall returns. Equal keys within one brand are
- * one model, so more than a handful means duplicates already stored.
- */
-export const KEY_HITS = 20;
 
 /**
  * How much a name's alignment similarity counts against trigram and

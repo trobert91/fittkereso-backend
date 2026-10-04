@@ -14,17 +14,20 @@ export type IdentityGate =
   | 'matcherSpecMismatch'
   | 'specMissing';
 
-/** A spec value, or a name key's digit-bearing words for `modelNumberMismatch`. */
+/** A spec value, or a model name's digit-bearing words for `modelNumberMismatch`. */
 export type IdentityGateValue = string | number | boolean | string[];
 
 /**
- * What connects a pair. `name`, `alias` and `matcherModel` are the recall
- * arms that found a candidate: by its name key, one of its aliases, or a
- * listing of it with the same matcherModel key. The rest are identifiers the
- * two products share, found when a listing was imported: a size its shop
- * declared as a sibling, a GTIN, or an MPN within one brand.
+ * What connects a pair. `normalizedModel`: a listing of each has the same key;
+ * `trigram`: their keys are only alike. The rest are identifiers the two
+ * products share, found when a listing was imported: a size its shop
+ * declared as a sibling, a GTIN, or an MPN within one brand. `name`, `alias`
+ * and `matcherModel` are what pairs found before the normalizedModel carry,
+ * until a scan finds them again.
  */
 export type CandidateMatchedOn =
+  | 'normalizedModel'
+  | 'trigram'
   | 'name'
   | 'alias'
   | 'matcherModel'
@@ -70,9 +73,9 @@ export interface DuplicatePairRow {
   failedGates: DuplicatePairFailedGate[];
   nameSimilarity: NameSimilarity | null;
   /**
-   * Whether the two products share a matcherModel key; null when either has
-   * none, or for an identifier pair, which compares no names.
+   * Whether a listing of each has the same normalizedModel; null when either
+   * has none, or for an identifier pair, which compares no names.
    */
-  matcherModelMatch: boolean | null;
+  normalizedModelMatch: boolean | null;
   detectedBy: DuplicateDetectedBy;
 }

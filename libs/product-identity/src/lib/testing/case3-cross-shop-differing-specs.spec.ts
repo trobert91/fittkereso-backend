@@ -64,7 +64,6 @@ function otherShopWith(
 describe('case 3: same bike, different names, specs that do not quite agree', () => {
   describe('a matcher spec disagreeing costs 10 and does not break the merge', () => {
     it.each([
-      [SPEEDBIKE, 'macina master scarp sx', EBIKESHOP, 'di2 macina master scarp sx'],
       [SPEEDBIKE, '8973 kapoho macina', SPEEDBIKE, '8973 kapoho l macina'],
       [SPEEDBIKE, '773 lycan macina', SPEEDBIKE, '773 l lycan macina'],
       [
@@ -99,6 +98,17 @@ describe('case 3: same bike, different names, specs that do not quite agree', ()
         expect(outcomeOf(left, right)).not.toBe('not_found');
       },
     );
+
+    // The key splits letters from digits, so "Di2" is two words, and leaving it
+    // off costs two omissions: with the matcher's 10 on top, this pair falls
+    // out of review. Under the old name key it reached it.
+    it('drops a pair one shop wrote without "Di2" out of review when the gear count differs', () => {
+      const left = listing(SPEEDBIKE, 'macina master scarp sx');
+      const right = otherShopWith(listing(EBIKESHOP, 'di2 macina master scarp sx'), left.specs, 'gearCount');
+
+      expect(scoreOfPair(left, right)).toBe(58);
+      expect(outcomeOf(left, right)).toBe('not_found');
+    });
 
     it('costs exactly ten points and nothing more', () => {
       const left = listing(SPEEDBIKE, '8973 kapoho macina');

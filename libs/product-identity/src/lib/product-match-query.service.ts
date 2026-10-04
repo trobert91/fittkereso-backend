@@ -5,13 +5,9 @@ import type {
   ProductSpecs,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
-import {
-  listingNames,
-  modelExcludedSpecKeys,
-} from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { ProductNormalizerService } from '@fittkereso-backend/product';
-import { flatMap, isArray, isNumber, isString, uniq } from 'lodash';
+import { compact, flatMap, isArray, isNumber, isString, uniq } from 'lodash';
 import type { ProductMatchQuery } from './types';
 
 /**
@@ -26,8 +22,8 @@ function spokenValuesOf(value: ProductSpecs[string]): string[] {
 
 /**
  * Turns what the finder is asked about — a listing that isn't a product yet,
- * or a stored product — into one ProductMatchQuery. The only place a name key
- * is built, so a product and a listing of it get the same key.
+ * or a stored product — into one ProductMatchQuery. The only place a key is
+ * built, so a listing's record and a query of it hold the same key.
  */
 @Injectable()
 export class ProductMatchQueryService {
@@ -38,33 +34,30 @@ export class ProductMatchQueryService {
 
   /**
    * A scraped listing, with the brand already resolved from it. One the
-   * identity extraction did not name is keyed on its title.
+   * identity extraction did not name is searched by its title's words, and
+   * can attach by none.
    */
-  public ofListing(
-    scrapedProduct: ScrapedProduct,
-    brand: Brand,
-  ): ProductMatchQuery {
+  public ofListing(scrapedProduct: ScrapedProduct, brand: Brand): ProductMatchQuery {
     const { category } = scrapedProduct;
     const key = this.normalizedModelOf(scrapedProduct, brand.name);
+    const titleKey = key
+      ? undefined
+      : this.keyOf(scrapedProduct, scrapedProduct.originalName, brand.name);
     return {
       brandId: brand.id,
       brandName: brand.name,
       categoryId: category.id,
       categorySlug: category.slug,
-      nameKey: this.nameKeyOf({
-        brandName: brand.name,
-        ...listingNames(scrapedProduct),
-        categorySlug: category.slug,
-      }),
+      keys: compact([key ?? titleKey]),
+      keyed: !!key,
+      model: scrapedProduct.model ?? scrapedProduct.originalName,
       specs: scrapedProduct.specs,
-      matcherModelKeys: key ? [key] : [],
     };
   }
 
   /**
-   * A stored product, loaded with `brand` and `productCategory`. The key is
-   * rebuilt from its names rather than read from `normalizedName`, which older
-   * rows may have built from a scraped brand string.
+   * A stored product, loaded with `brand` and `productCategory`. Its keys
+   * are its listings', which the finder loads.
    */
   public ofProduct(product: ProductModel): ProductMatchQuery {
     const { brand, productCategory } = product;
@@ -80,12 +73,7 @@ export class ProductMatchQueryService {
       brandName: brand.name,
       categoryId: productCategory.id,
       categorySlug: productCategory.slug,
-      nameKey: this.nameKeyOf({
-        brandName: brand.name,
-        model: product.model,
-        displayName: product.displayName,
-        categorySlug: productCategory.slug,
-      }),
+      model: product.model,
       specs: product.specs,
     };
   }
@@ -95,9 +83,9 @@ export class ProductMatchQueryService {
    * for it) normalized, without the words of its own brand and of
    * `resolvedBrandName`, and without the listing's values of the category's
    * `model.excludeSpecs` (its year, say), in case the extraction kept one.
-   * The only place a key is built, and built from the listing alone, so the
-   * key its record stores and the key a query of it compares are the same.
-   * Undefined without a model, or when nothing is left.
+   * Built from the listing alone, so the key its record stores and the key a
+   * query of it compares are the same. Undefined without a model, or when
+   * nothing is left.
    *
    * The offer-level values (size, colour) are left out by the prompt but not
    * dropped here: a size label doubles as a model word ("Team XL" is a model,
@@ -106,6 +94,23 @@ export class ProductMatchQueryService {
    */
   public normalizedModelOf(
     listing: Pick<ScrapedProduct, 'brand' | 'model' | 'category' | 'specs' | 'offers'>,
+    resolvedBrandName?: string,
+  ): string | undefined {
+    return this.keyOf(listing, listing.model, resolvedBrandName);
+  }
+
+  /**
+   * A key for a name with no listing behind it — a stored product's own
+   * model, when none of its listings was named. Searches and scores; never
+   * attaches.
+   */
+  public keyOfName(name: string | undefined, brandName: string): string | undefined {
+    return this.productNormalizer.normalizeModel({ text: name, brands: [brandName] });
+  }
+
+  private keyOf(
+    listing: Pick<ScrapedProduct, 'brand' | 'category' | 'specs' | 'offers'>,
+    text: string | undefined,
     resolvedBrandName?: string,
   ): string | undefined {
     const excluded =
@@ -120,54 +125,9 @@ export class ProductMatchQueryService {
     );
 
     return this.productNormalizer.normalizeModel({
-      text: listing.model,
+      text,
       brands: [listing.brand, resolvedBrandName],
       dropValues: uniq(dropValues),
-    });
-  }
-
-  /**
-   * Whether the category's name matches need equal keys
-   * (`matchingConfig.model.required`): the rule that acts. The other one
-   * still runs, in shadow.
-   */
-  public requiresMatcherModel(categorySlug: string): boolean {
-    return (
-      this.categoryConfigService.getConfig(categorySlug)?.matchingConfig?.model
-        ?.required === true
-    );
-  }
-
-  /**
-   * The specs a model leaves out, as the extraction prompt names them: the
-   * category's offer-level specs (they describe a listing, not a model) and
-   * its `matchingConfig.model.excludeSpecs`.
-   */
-  public excludedSpecKeysOf(categorySlug: string): string[] {
-    return modelExcludedSpecKeys(this.categoryConfigService.getConfig(categorySlug));
-  }
-
-  /**
-   * The name key rule: the model (else the display name) with the resolved
-   * brand's name stripped, normalized with the category's strategy — the rule
-   * ProductNameMergeService writes `normalizedName` with. Throws when there's
-   * no name at all.
-   */
-  public nameKeyOf(params: {
-    brandName: string;
-    model?: string;
-    displayName?: string;
-    categorySlug: string;
-  }): string {
-    const strategy =
-      this.categoryConfigService.getConfig(params.categorySlug)
-        ?.normalizationStrategy ?? 'full-sorted';
-
-    return this.productNormalizer.normalizeProduct({
-      brand: params.brandName,
-      model: params.model,
-      displayName: params.displayName,
-      strategy,
     });
   }
 }

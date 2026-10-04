@@ -278,7 +278,7 @@ export class CategoryTools {
       ).map(([key, points]) => `${key} −${points}`);
       const modelConfig = matchingConfig.model;
       const modelLine = modelConfig
-        ? `model key ${modelConfig.required ? 'required' : 'shadow'}, model leaves out offer-level specs${
+        ? `model leaves out offer-level specs${
             modelConfig.excludeSpecs?.length
               ? ` + ${modelConfig.excludeSpecs.join(', ')}`
               : ''

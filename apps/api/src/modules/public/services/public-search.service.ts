@@ -66,7 +66,7 @@ export class PublicSearchService {
     const useTrigramSimilarity = q.length >= 3;
     const pattern = `%${q}%`;
 
-    const normalizedNameColumn = `product."${nameOf<ProductModel>('normalizedName')}"`;
+    const modelColumn = `product."${nameOf<ProductModel>('model')}"`;
     const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
     const displayNameColumn = `product."${nameOf<ProductModel>('displayName')}"`;
     const qb = this.productModelRepo.repo
@@ -95,16 +95,16 @@ export class PublicSearchService {
       qb.andWhere(
         `(
           ${displayNameColumn} ILIKE :pattern
-          OR ${normalizedNameColumn} ILIKE :pattern
+          OR ${modelColumn} ILIKE :pattern
           OR ${aliasColumn} ILIKE :pattern
-          OR similarity(${normalizedNameColumn}, :q) > 0.1
+          OR similarity(${modelColumn}, :q) > 0.1
           OR similarity(${aliasColumn}, :q) > 0.1
         )`,
         { q, pattern },
       )
         .addSelect(
           `GREATEST(
-            similarity(${normalizedNameColumn}, :q),
+            similarity(${modelColumn}, :q),
             COALESCE(MAX(similarity(${aliasColumn}, :q)), 0)
           )`,
           'relevance',

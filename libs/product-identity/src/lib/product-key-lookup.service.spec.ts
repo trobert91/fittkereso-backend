@@ -263,7 +263,7 @@ describe('ProductKeyLookupService', () => {
             }),
           ],
           nameSimilarity: null,
-          matcherModelMatch: null,
+          normalizedModelMatch: null,
           detectedBy: 'scrape',
         },
       ]);

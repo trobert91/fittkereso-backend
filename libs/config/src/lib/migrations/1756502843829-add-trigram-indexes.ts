@@ -12,10 +12,6 @@ export class AddTrigramIndexes1735550000000 implements MigrationInterface {
       ON product_model USING gin ("displayName" gin_trgm_ops)
     `);
     await queryRunner.query(`
-      CREATE INDEX product_normalized_name_trgm_idx
-      ON product_model USING gin ("normalizedName" gin_trgm_ops)
-    `);
-    await queryRunner.query(`
       CREATE INDEX product_model_name_trgm_idx
       ON product_model USING gin ("model" gin_trgm_ops)
     `);
@@ -37,9 +33,6 @@ export class AddTrigramIndexes1735550000000 implements MigrationInterface {
       `DROP INDEX IF EXISTS product_display_name_trgm_idx`,
     );
     await queryRunner.query(`DROP INDEX IF EXISTS product_model_name_trgm_idx`);
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS product_normalized_name_trgm_idx`,
-    );
     await queryRunner.query(
       `DROP INDEX IF EXISTS product_alias_alias_trgm_idx`,
     );

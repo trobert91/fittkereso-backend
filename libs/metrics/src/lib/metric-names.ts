@@ -145,14 +145,6 @@ export const IDENTITY_RECHECK_ATTACHED_TOTAL = 'identity_recheck_attached_total'
  */
 export const IDENTITY_EXTRACTION_TOTAL = 'identity_extraction_total';
 /**
- * Name-matched listings with a matcherModel key, by how the rule that didn't
- * act compares with the one that did (ListingMatchAlternative): `agree`,
- * `switch` (another product), `split` (a new product where it attached),
- * `join` (a product where it created one). `mode` is the rule that acted,
- * `shadow` what the other one chose: attach, ask_llm or not_found.
- */
-export const LISTING_MATCH_SHADOW_TOTAL = 'listing_match_shadow_total';
-/**
  * Spec-table rows the source's identityExtraction.specRows let through, per
  * listing. A source whose listings suddenly match none has renamed its labels;
  * the extraction would then see the title alone and fill far fewer specs.

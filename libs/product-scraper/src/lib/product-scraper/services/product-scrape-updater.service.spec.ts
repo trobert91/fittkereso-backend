@@ -26,7 +26,6 @@ import type {
   ProductImageCopyService,
   ProductMergeService,
   ProductModelFactoryService,
-  ProductNormalizerService,
   ProductSourceRecordUpdaterService,
   ScrapedProduct,
 } from '@fittkereso-backend/product';
@@ -76,7 +75,6 @@ function makeExistingModel(): ProductModel {
   model.productCategory = makeCategory();
   model.displayName = 'Logitech MX Keys';
   model.model = 'MX Keys';
-  model.normalizedName = 'mx keys';
   model.slug = 'logitech-mx-keys';
   model.images = [];
   model.sources = [];
@@ -145,7 +143,6 @@ describe('ProductScrapeUpdaterService', () => {
   let mockMergeService: jest.Mocked<ProductMergeService>;
   let mockImageCopyService: jest.Mocked<ProductImageCopyService>;
   let mockMetricsService: jest.Mocked<ProductMetricsService>;
-  let mockProductNormalizer: jest.Mocked<ProductNormalizerService>;
   let mockOfferMatching: jest.Mocked<OfferMatchingService>;
   let mockOfferRepo: jest.Mocked<OfferRepository>;
   let mockCategoryConfigService: jest.Mocked<CategoryConfigService>;
@@ -155,7 +152,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockLocks: { withLocks: jest.Mock };
   let mockOfferComposer: jest.Mocked<OfferComposerService>;
   let mockContributorDetach: jest.Mocked<ContributorDetachService>;
-  let mockMatchQuery: { normalizedModelOf: jest.Mock; requiresMatcherModel: jest.Mock };
+  let mockMatchQuery: { normalizedModelOf: jest.Mock };
   let mockTaskConfig: { maxAttempts: number };
 
   beforeEach(() => {
@@ -237,10 +234,6 @@ describe('ProductScrapeUpdaterService', () => {
       identityRecheckAttached: jest.fn(),
     } as unknown as jest.Mocked<ProductMetricsService>;
 
-    mockProductNormalizer = {
-      normalizeProduct: jest.fn().mockReturnValue('mx keys'),
-    } as unknown as jest.Mocked<ProductNormalizerService>;
-
     mockOfferMatching = {
       findMatch: jest.fn().mockReturnValue(undefined),
     } as unknown as jest.Mocked<OfferMatchingService>;
@@ -312,7 +305,6 @@ describe('ProductScrapeUpdaterService', () => {
 
     mockMatchQuery = {
       normalizedModelOf: jest.fn((listing: ScrapedProduct) => (listing.model ? `key:${listing.model}` : undefined)),
-      requiresMatcherModel: jest.fn().mockReturnValue(false),
     };
     mockTaskConfig = { maxAttempts: 3 };
 
@@ -328,7 +320,6 @@ describe('ProductScrapeUpdaterService', () => {
       mockMergeService,
       mockImageCopyService,
       mockMetricsService,
-      mockProductNormalizer,
       mockOfferMatching,
       mockOfferRepo,
       mockCategoryConfigService,
@@ -499,22 +490,20 @@ describe('ProductScrapeUpdaterService', () => {
     );
   });
 
-  // Where keys are required, a listing the extraction failed on has none, so
-  // the score alone decided it; a near-miss may be the product a key would
-  // have joined.
-  describe('a keyless near-miss where keys are required', () => {
+  // A listing the extraction failed on has no model key, so it was searched by
+  // its title and could attach to nothing; a near-miss may be the product its
+  // key would have joined.
+  describe('a keyless near-miss', () => {
     const nearMiss = () =>
       mockListingMatch.match.mockResolvedValueOnce({
         decision: {
           outcome: 'created',
-          nameKey: 'mx keys',
-          candidates: [{ productId: 'model-near', displayName: 'Near', score: 75, matchedOn: 'name', failedGates: [] }],
+          candidates: [{ productId: 'model-near', displayName: 'Near', score: 75, matchedOn: 'trigram', failedGates: [] }],
         },
       } as never);
     const failedListing = () => makeScrapedProduct({ flags: ['identity_failed'] });
 
     beforeEach(() => {
-      mockMatchQuery.requiresMatcherModel.mockReturnValue(true);
       mockProductRepo.findOne.mockResolvedValue(null);
       mockRandomUUID.mockReturnValue('model-keyless');
     });
@@ -524,11 +513,11 @@ describe('ProductScrapeUpdaterService', () => {
       const task = { ...makeTask(), attempts: 0 } as ProductImportTask;
 
       await expect(service.createOrUpdateProduct(contextFromTask(task), failedListing())).rejects.toThrow(
-        /no matcherModel key, and product model-near scores 75/,
+        /no model key, and product model-near scores 75/,
       );
       expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
         'arukereso',
-        'deferred_no_matcher_model',
+        'deferred_no_model',
       );
       expect(mockMetricsService.scrapeResolutionOutcome).not.toHaveBeenCalledWith('arukereso', 'created');
     });
@@ -554,13 +543,6 @@ describe('ProductScrapeUpdaterService', () => {
     it('creates at once when the extraction gave the listing its key', async () => {
       nearMiss();
       await service.createOrUpdateProduct(firstAttempt(), makeScrapedProduct());
-      expectCreated();
-    });
-
-    it('creates at once where the category does not require keys', async () => {
-      mockMatchQuery.requiresMatcherModel.mockReturnValue(false);
-      nearMiss();
-      await service.createOrUpdateProduct(firstAttempt(), failedListing());
       expectCreated();
     });
   });

@@ -43,36 +43,26 @@ describe('ProductMatchQueryService', () => {
     );
   });
 
-  it('gives a product and a listing of it the same key, stripping the resolved brand name', () => {
+  it('gives a listing and its stored record the same key, stripping the resolved brand name', () => {
     // The listing's brand string doesn't match the brand's name; its model repeats the brand.
-    const listing = service.ofListing(
-      listingOf({ brand: 'CUBE Bikes', model: 'Cube Stereo Hybrid 140' }),
-      cube,
-    );
-    const product = service.ofProduct(productOf());
+    const listing = listingOf({ brand: 'CUBE Bikes', model: 'Cube Stereo Hybrid 140' });
+    const query = service.ofListing(listing, cube);
 
-    expect(listing.nameKey).toBe('140 hybrid stereo');
-    expect(product.nameKey).toBe(listing.nameKey);
+    expect(query.keys).toEqual(['140 hybrid stereo']);
+    expect(query.keys).toEqual([service.normalizedModelOf(listing, cube.name)]);
+    expect(query.keyed).toBe(true);
   });
 
-  it('builds the key with the category strategy', () => {
-    categoryConfigService.getConfig.mockReturnValue({ normalizationStrategy: 'full' });
+  it('keys "Tour CX830" and "Tour CX 830" alike', () => {
+    const glued = service.ofListing(listingOf({ model: 'Macina Tour CX830' }), cube);
+    const spaced = service.ofListing(listingOf({ model: 'Macina Tour CX 830' }), cube);
 
-    expect(service.ofListing(listingOf(), cube).nameKey).toBe('stereo hybrid 140');
-    expect(categoryConfigService.getConfig).toHaveBeenCalledWith('ebikes');
+    expect(glued.keys).toEqual(['830 cx macina tour']);
+    expect(spaced.keys).toEqual(glued.keys);
   });
 
-  it('falls back to the display name when there is no model', () => {
-    const query = service.ofListing(
-      listingOf({ model: undefined, displayName: 'Cube Stereo Hybrid 140 HPC' }),
-      cube,
-    );
-
-    expect(query.nameKey).toBe('140 hpc hybrid stereo');
-  });
-
-  // The identity extraction was off or failed: no model, no display name.
-  it('keys a listing the extraction did not name on its title', () => {
+  // The identity extraction was off or failed: no model.
+  it('searches a listing the extraction did not name by its title, keyed so it attaches nothing', () => {
     const query = service.ofListing(
       listingOf({
         model: undefined,
@@ -82,7 +72,9 @@ describe('ProductMatchQueryService', () => {
       cube,
     );
 
-    expect(query.nameKey).toBe('140 hpc hybrid m méretben stereo');
+    expect(query.keys).toEqual(['140 hpc hybrid m meretben stereo']);
+    expect(query.keyed).toBe(false);
+    expect(query.model).toBe('Cube Stereo Hybrid 140 HPC - M méretben');
   });
 
   it('scopes a listing by brand and category, and a stored product also by its own id', () => {
@@ -91,42 +83,25 @@ describe('ProductMatchQueryService', () => {
       brandName: 'Cube',
       categoryId: 'cat-ebikes',
       categorySlug: 'ebikes',
-      nameKey: '140 hybrid stereo',
+      model: 'Stereo Hybrid 140',
       specs: { modelYear: 2024 },
     };
 
     expect(service.ofListing(listingOf({ specs: { modelYear: 2024 } }), cube)).toEqual({
       ...scope,
-      matcherModelKeys: ['140 hybrid stereo'],
+      keys: ['140 hybrid stereo'],
+      keyed: true,
     });
-    // The finder loads a stored product's keys.
+    // The finder loads a stored product's keys from its listings.
     expect(service.ofProduct(productOf({ specs: { modelYear: 2024 } }))).toEqual({
       productId: 'product-1',
       ...scope,
     });
   });
 
-  it("carries the key of a listing's model, built as its record stores it", () => {
-    const listing = listingOf({ model: 'Stereo Hybrid 140 Pro' });
-
-    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual([
-      service.normalizedModelOf(listing),
-    ]);
-    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual(['140 hybrid pro stereo']);
-  });
-
-  it('carries no key for a listing the extraction did not name', () => {
-    const listing = listingOf({ model: undefined, originalName: 'Cube Stereo Hybrid 140' });
-
-    expect(service.ofListing(listing, cube).matcherModelKeys).toEqual([]);
-  });
-
-  it('requires keys only where the category says so', () => {
-    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { model: { required: true } } });
-    expect(service.requiresMatcherModel('ebikes')).toBe(true);
-
-    categoryConfigService.getConfig.mockReturnValue({ matchingConfig: { model: {} } });
-    expect(service.requiresMatcherModel('ebikes')).toBe(false);
+  it("keys a stored product's own model, for when none of its listings has a key", () => {
+    expect(service.keyOfName('Cube Stereo Hybrid 140', 'Cube')).toBe('140 hybrid stereo');
+    expect(service.keyOfName(undefined, 'Cube')).toBeUndefined();
   });
 
   it('refuses a product loaded without its brand or category', () => {
@@ -195,15 +170,6 @@ describe('ProductMatchQueryService', () => {
 
     it('is undefined without a model', () => {
       expect(service.normalizedModelOf(listingOf({ model: undefined }))).toBeUndefined();
-    });
-
-    it('lists the offer-level and the configured specs as left out', () => {
-      expect(service.excludedSpecKeysOf('ebikes')).toEqual([
-        'frameSizeLabel',
-        'color',
-        'modelYear',
-        'wheelSize',
-      ]);
     });
   });
 });

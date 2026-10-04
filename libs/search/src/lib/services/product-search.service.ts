@@ -167,7 +167,6 @@ export class ProductSearchService {
       -- LIKE for recall
       LOWER(product.${nameOf<ProductModel>('displayName')}) LIKE :likeTerm
       OR LOWER(product.${nameOf<ProductModel>('model')}) LIKE :likeTerm
-      OR LOWER(product.${nameOf<ProductModel>('normalizedName')}) LIKE :likeTerm
 
       -- OR trigram similarity filter
       OR similarity(
@@ -178,10 +177,6 @@ export class ProductSearchService {
           LOWER(product.${nameOf<ProductModel>('model')}),
           :rawTerm
         ) >= :similarityThreshold
-      OR similarity(
-          LOWER(product.${nameOf<ProductModel>('normalizedName')}),
-          :rawTerm
-        ) >= :similarityThreshold
     )`,
         { likeTerm, rawTerm, similarityThreshold },
       );
@@ -190,8 +185,7 @@ export class ProductSearchService {
         `
       GREATEST(
         similarity(LOWER(product.${nameOf<ProductModel>('displayName')}), :rawTerm),
-        similarity(LOWER(product.${nameOf<ProductModel>('model')}), :rawTerm),
-        similarity(LOWER(product.${nameOf<ProductModel>('normalizedName')}), :rawTerm)
+        similarity(LOWER(product.${nameOf<ProductModel>('model')}), :rawTerm)
       )
       `,
         'similarity_score',

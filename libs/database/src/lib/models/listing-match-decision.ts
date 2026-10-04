@@ -12,7 +12,7 @@ import type {
 
 /** How a listing ended up on its product. */
 export type ListingMatchOutcome =
-  /** Exactly one candidate scored high enough on its own. */
+  /** A candidate with the listing's normalizedModel passed its spec gates. */
   | 'identified'
   /** Several candidates were close and the LLM picked one. */
   | 'llm_identified'
@@ -38,36 +38,14 @@ export interface ListingMatchCandidate {
   score: number;
   matchedOn: CandidateMatchedOn;
   failedGates: ListingMatchFailedGate[];
-  /** Whether one of the product's listings has the listing's matcherModel key; absent when either has none. */
-  matcherModelMatch?: boolean;
-  /** 100 minus the spec gates alone: what the key rule attaches on. Absent on decisions stored before it. */
+  /**
+   * Whether one of the product's listings has the listing's normalizedModel;
+   * absent when the listing has none. Decisions stored before it carry
+   * matcherModelMatch instead.
+   */
+  normalizedModelMatch?: boolean;
+  /** 100 minus the spec gates alone: what an equal key attaches on. Absent on decisions stored before it. */
   keyScore?: number;
-}
-
-/**
- * Which rule decides a name match. `score`: the best name score minus every
- * failed gate (the clear-winner rule). `key`: equal matcherModel keys and spec
- * gates at ACCEPT_SCORE, the name score only ranking — on for a category with
- * `matchingConfig.model.required`, for a listing with a key.
- */
-export type ListingMatchMode = 'score' | 'key';
-
-/**
- * How the rule that didn't act compares with the one that did: the same
- * product (or both no product), another product, a separate product where the
- * acting rule attached, or a product where it created one.
- */
-export type ListingMatchComparison = 'agree' | 'switch' | 'split' | 'join';
-
-/** What the other rule would have done (shadow mode). */
-export interface ListingMatchAlternative {
-  mode: ListingMatchMode;
-  kind: 'attach' | 'ask_llm' | 'not_found';
-  /** The product it would have attached to. */
-  productId?: string;
-  /** How many candidates it would have put to the LLM. */
-  llmCandidates?: number;
-  comparison: ListingMatchComparison;
 }
 
 /** What the LLM answered; absent when it was never asked. */
@@ -83,15 +61,14 @@ export interface ListingMatchLlmRecord {
 
 export interface ListingMatchDecision {
   outcome: ListingMatchOutcome;
-  /** The name key recall and scoring ran on; absent when the brand didn't resolve. */
-  nameKey?: string;
   /** The best few candidates, the chosen one first, then best first — not necessarily every one scored. */
   candidates: ListingMatchCandidate[];
   llm?: ListingMatchLlmRecord;
-  /** The rule that acted; absent on decisions stored before there were two. */
-  mode?: ListingMatchMode;
-  /** The listing's matcherModel key, when it has one. */
-  matcherModelKey?: string;
-  /** What the other rule would have done. */
-  alternative?: ListingMatchAlternative;
+  /** The listing's normalizedModel, when it has one. */
+  normalizedModel?: string;
+  /**
+   * The exact-key pass alone decided: a candidate with the listing's key
+   * attached, so no trigram search ran, and `candidates` holds only those.
+   */
+  shortCircuit?: boolean;
 }

@@ -7,40 +7,53 @@ import { ProductMatchQueryService } from './product-match-query.service';
 import type { ProductMatchQuery } from './types';
 
 describe('ProductCandidateFinderService.findCandidates', () => {
-  let recall: { recall: jest.Mock; recallByMatcherModel: jest.Mock };
+  let recall: { exact: jest.Mock; fuzzy: jest.Mock };
   let sourceRecordRepo: { findNormalizedModelsByProductIds: jest.Mock };
   let productRepo: { find: jest.Mock };
   let categoryConfigService: { getConfig: jest.Mock };
   let tokenIdf: { forScope: jest.Mock };
   let finder: ProductCandidateFinderService;
 
-  const query: ProductMatchQuery = {
+  /** A listing's query: one model key. */
+  const listing: ProductMatchQuery = {
+    brandId: 'brand-cube',
+    brandName: 'Cube',
+    categoryId: 'cat-ebikes',
+    categorySlug: 'ebikes',
+    keys: ['140 hybrid stereo'],
+    keyed: true,
+    model: 'Stereo Hybrid 140',
+    specs: { modelYear: 2024 },
+  };
+
+  /** A stored product's query: its keys are loaded from its listings. */
+  const stored: ProductMatchQuery = {
     productId: 'query-product',
     brandId: 'brand-cube',
     brandName: 'Cube',
     categoryId: 'cat-ebikes',
     categorySlug: 'ebikes',
-    nameKey: '140 hybrid stereo',
+    model: 'Stereo Hybrid 140',
     specs: { modelYear: 2024 },
   };
 
-  function row(
-    productId: string,
-    matchedOn: RecallRow['matchedOn'],
-    matchedValue: string,
-    trigram: number,
-  ): RecallRow {
-    return { productId, matchedOn, matchedValue, trigram };
+  function row(productId: string, normalizedModel: string, model: string | null = null): RecallRow {
+    return { productId, normalizedModel, model };
   }
 
-  function product(id: string, specs: ProductSpecs = {}, createdAt = '2026-01-01'): ProductModel {
-    return { id, displayName: `Product ${id}`, createdAt: new Date(createdAt), specs } as ProductModel;
+  function product(
+    id: string,
+    specs: ProductSpecs = {},
+    createdAt = '2026-01-01',
+    model = 'Stereo Hybrid 140',
+  ): ProductModel {
+    return { id, model, createdAt: new Date(createdAt), specs } as ProductModel;
   }
 
   beforeEach(() => {
     recall = {
-      recall: jest.fn().mockResolvedValue([]),
-      recallByMatcherModel: jest.fn().mockResolvedValue([]),
+      exact: jest.fn().mockResolvedValue([]),
+      fuzzy: jest.fn().mockResolvedValue([]),
     };
     sourceRecordRepo = { findNormalizedModelsByProductIds: jest.fn().mockResolvedValue(new Map()) };
     productRepo = { find: jest.fn().mockResolvedValue([]) };
@@ -57,49 +70,86 @@ describe('ProductCandidateFinderService.findCandidates', () => {
   });
 
   it('returns nothing, without loading products, when recall finds nothing', async () => {
-    await expect(finder.findCandidates(query)).resolves.toEqual([]);
+    await expect(finder.findCandidates(listing)).resolves.toEqual([]);
     expect(productRepo.find).not.toHaveBeenCalled();
+  });
+
+  it('recalls by the exact key and by trigram on it', async () => {
+    await finder.findCandidates(listing);
+
+    expect(recall.exact).toHaveBeenCalledWith(listing, ['140 hybrid stereo']);
+    expect(recall.fuzzy).toHaveBeenCalledWith(listing, '140 hybrid stereo');
   });
 
   it('never returns the query product itself', async () => {
-    recall.recall.mockResolvedValue([row('query-product', 'name', '140 hybrid stereo', 1)]);
+    sourceRecordRepo.findNormalizedModelsByProductIds.mockResolvedValue(
+      new Map([['query-product', ['140 hybrid stereo']]]),
+    );
+    recall.fuzzy.mockResolvedValue([row('query-product', '140 hybrid stereo')]);
 
-    await expect(finder.findCandidates(query)).resolves.toEqual([]);
+    await expect(finder.findCandidates(stored)).resolves.toEqual([]);
     expect(productRepo.find).not.toHaveBeenCalled();
   });
 
-  it("keeps each product's best row, scoring an alias on its re-keyed form", async () => {
-    recall.recall.mockResolvedValue([
-      row('p1', 'name', '140 hybrid', 0.6),
-      // Raw alias with the brand in front: re-keyed, it equals the query key.
-      row('p1', 'alias', 'Cube Stereo Hybrid 140', 0.5),
+  it('says which candidates have the key, and names them by brand and model', async () => {
+    recall.exact.mockResolvedValue([row('p-key', '140 hybrid stereo', 'Stereo Hybrid 140')]);
+    recall.fuzzy.mockResolvedValue([
+      row('p-key', '140 hybrid stereo', 'Stereo Hybrid 140'),
+      row('p-near', '140 hpc hybrid stereo', 'Stereo Hybrid 140 HPC'),
     ]);
-    productRepo.find.mockResolvedValue([product('p1')]);
+    productRepo.find.mockResolvedValue([
+      product('p-key'),
+      product('p-near', {}, '2026-01-01', 'Stereo Hybrid 140 HPC'),
+    ]);
 
-    const candidates = await finder.findCandidates(query);
+    const candidates = await finder.findCandidates(listing);
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      productId: 'p1',
-      matchedOn: 'alias',
-      matchedValue: 'Cube Stereo Hybrid 140',
-      // Re-keyed, the alias equals the query key, so all three agree on 1 —
-      // recall's own 0.5 described the raw alias and never reaches the score.
-      nameSimilarity: { trigram: 1, levenshtein: 1, alignment: 1 },
+    expect(candidates.find((c) => c.productId === 'p-key')).toMatchObject({
+      displayName: 'Cube Stereo Hybrid 140',
+      matchedOn: 'normalizedModel',
+      matchedValue: '140 hybrid stereo',
+      normalizedModelMatch: true,
       score: 100,
-      failedGates: [],
+    });
+    expect(candidates.find((c) => c.productId === 'p-near')).toMatchObject({
+      matchedOn: 'trigram',
+      matchedValue: '140 hpc hybrid stereo',
+      normalizedModelMatch: false,
     });
   });
 
+  it("keeps each product's best listing: one with the key first, then the closest", async () => {
+    recall.fuzzy.mockResolvedValue([
+      row('p1', '140 hpc hybrid stereo'),
+      row('p1', '140 hybrid stereo'),
+      row('p1', '140 hybrid'),
+    ]);
+    productRepo.find.mockResolvedValue([product('p1')]);
+
+    const [candidate] = await finder.findCandidates(listing);
+
+    expect(candidate).toMatchObject({ matchedValue: '140 hybrid stereo', normalizedModelMatch: true });
+  });
+
+  it('only recalls equal keys when asked not to search by trigram', async () => {
+    recall.exact.mockResolvedValue([row('p1', '140 hybrid stereo')]);
+    productRepo.find.mockResolvedValue([product('p1')]);
+
+    const candidates = await finder.findCandidates(listing, { fuzzy: false });
+
+    expect(recall.fuzzy).not.toHaveBeenCalled();
+    expect(candidates.map(({ productId }) => productId)).toEqual(['p1']);
+  });
+
   it('loads every candidate in one query', async () => {
-    recall.recall.mockResolvedValue([
-      row('p1', 'name', '140 hybrid stereo', 1),
-      row('p2', 'name', '140 hybrid stereo', 1),
-      row('p1', 'alias', 'Stereo Hybrid 140', 0.9),
+    recall.fuzzy.mockResolvedValue([
+      row('p1', '140 hybrid stereo'),
+      row('p2', '140 hybrid stereo'),
+      row('p1', '140 hybrid'),
     ]);
     productRepo.find.mockResolvedValue([product('p1'), product('p2')]);
 
-    await finder.findCandidates(query);
+    await finder.findCandidates(listing);
 
     expect(productRepo.find).toHaveBeenCalledTimes(1);
     expect(productRepo.find.mock.calls[0][0].where.id.value).toEqual(['p1', 'p2']);
@@ -110,16 +160,16 @@ describe('ProductCandidateFinderService.findCandidates', () => {
       primarySpecs: ['modelYear'],
       matchingConfig: { specTolerances: { modelYear: { absolute: 0 } } },
     });
-    recall.recall.mockResolvedValue([
-      row('older-year', 'name', '140 hybrid stereo', 1),
-      row('same-year', 'name', '140 hybrid stereo', 1),
+    recall.fuzzy.mockResolvedValue([
+      row('older-year', '140 hybrid stereo'),
+      row('same-year', '140 hybrid stereo'),
     ]);
     productRepo.find.mockResolvedValue([
       product('same-year', { modelYear: 2024 }),
       product('older-year', { modelYear: 2023 }),
     ]);
 
-    const candidates = await finder.findCandidates(query);
+    const candidates = await finder.findCandidates(listing);
 
     expect(categoryConfigService.getConfig).toHaveBeenCalledWith('ebikes');
     expect(candidates.map(({ productId, score }) => [productId, score])).toEqual([
@@ -131,96 +181,90 @@ describe('ProductCandidateFinderService.findCandidates', () => {
     ]);
   });
 
+  it('checks model numbers on the names as written, and leaves them out of keyScore', async () => {
+    categoryConfigService.getConfig.mockReturnValue({ primarySpecs: ['modelYear'] });
+    recall.fuzzy.mockResolvedValue([row('p1', '830 cx tour', 'Tour CX830')]);
+    productRepo.find.mockResolvedValue([product('p1', { modelYear: 2024 })]);
+
+    const [candidate] = await finder.findCandidates({
+      ...listing,
+      keys: ['820 cx tour'],
+      model: 'Tour CX 820',
+    });
+
+    expect(candidate.failedGates.map((gate) => gate.gate)).toEqual(['modelNumberMismatch']);
+    expect(candidate.keyScore).toBe(100);
+  });
+
   it('breaks a score tie by the older product first', async () => {
-    recall.recall.mockResolvedValue([
-      row('newer', 'name', '140 hybrid stereo', 1),
-      row('older', 'name', '140 hybrid stereo', 1),
+    recall.fuzzy.mockResolvedValue([
+      row('newer', '140 hybrid stereo'),
+      row('older', '140 hybrid stereo'),
     ]);
     productRepo.find.mockResolvedValue([
       product('newer', {}, '2026-05-01'),
       product('older', {}, '2025-05-01'),
     ]);
 
-    const candidates = await finder.findCandidates(query);
+    const candidates = await finder.findCandidates(listing);
 
     expect(candidates.map(({ productId }) => productId)).toEqual(['older', 'newer']);
   });
 
   it('drops a product deleted between recall and load', async () => {
-    recall.recall.mockResolvedValue([
-      row('p1', 'name', '140 hybrid stereo', 1),
-      row('gone', 'name', '140 hybrid stereo', 1),
-    ]);
+    recall.fuzzy.mockResolvedValue([row('p1', '140 hybrid stereo'), row('gone', '140 hybrid stereo')]);
     productRepo.find.mockResolvedValue([product('p1')]);
 
-    const candidates = await finder.findCandidates(query);
+    const candidates = await finder.findCandidates(listing);
 
     expect(candidates.map(({ productId }) => productId)).toEqual(['p1']);
   });
 
-  describe('matcherModel keys', () => {
-    const listing: ProductMatchQuery = { ...query, productId: undefined, matcherModelKeys: ['810 di 2 macina style'] };
+  describe('a query without a model key', () => {
+    const titled: ProductMatchQuery = { ...listing, keyed: false };
 
-    it("recalls a product by a listing's key however far apart the names are, and says which candidates share it", async () => {
-      recall.recall.mockResolvedValue([row('p-name', 'name', '140 hybrid stereo', 1)]);
-      recall.recallByMatcherModel.mockResolvedValue([row('p-key', 'matcherModel', '140 hybrid', 0.6)]);
-      productRepo.find.mockResolvedValue([product('p-name'), product('p-key')]);
+    it('searches by trigram only, and says nothing about a key match', async () => {
+      recall.fuzzy.mockResolvedValue([row('p1', '140 hybrid stereo')]);
+      productRepo.find.mockResolvedValue([product('p1')]);
+
+      const [candidate] = await finder.findCandidates(titled);
+
+      expect(recall.exact).not.toHaveBeenCalled();
+      expect(candidate.normalizedModelMatch).toBeUndefined();
+      expect(candidate.matchedOn).toBe('trigram');
+    });
+
+    it('recalls nothing when asked for equal keys only', async () => {
+      await expect(finder.findCandidates(titled, { fuzzy: false })).resolves.toEqual([]);
+      expect(recall.exact).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a stored product', () => {
+    it("searches by its listings' keys", async () => {
       sourceRecordRepo.findNormalizedModelsByProductIds.mockResolvedValue(
-        new Map([
-          ['p-name', ['810 macina style']],
-          ['p-key', ['810 di 2 macina style', '810 di 2 macina style xl']],
-        ]),
+        new Map([['query-product', ['140 hybrid stereo', '140 hybrid stereo xl']]]),
       );
-
-      const candidates = await finder.findCandidates(listing);
-
-      expect(recall.recallByMatcherModel).toHaveBeenCalledWith(expect.objectContaining({ matcherModelKeys: listing.matcherModelKeys }));
-      expect(sourceRecordRepo.findNormalizedModelsByProductIds).toHaveBeenCalledWith(['p-name', 'p-key']);
-      expect(candidates.find((c) => c.productId === 'p-name')).toMatchObject({ matchedOn: 'name', matcherModelMatch: false });
-      expect(candidates.find((c) => c.productId === 'p-key')).toMatchObject({ matchedOn: 'matcherModel', matcherModelMatch: true });
-    });
-
-    it('scores the spec gates alone into keyScore, without the model-number gate', async () => {
-      categoryConfigService.getConfig.mockReturnValue({ primarySpecs: ['modelYear'] });
-      recall.recall.mockResolvedValue([row('p1', 'name', '830 cx tour', 0.4)]);
-      productRepo.find.mockResolvedValue([product('p1', { modelYear: 2024 })]);
-      sourceRecordRepo.findNormalizedModelsByProductIds.mockResolvedValue(new Map([['p1', ['810 di 2 macina style']]]));
-
-      const [candidate] = await finder.findCandidates({ ...listing, nameKey: '820 cx tour' });
-
-      expect(candidate.failedGates.map((gate) => gate.gate)).toEqual(['modelNumberMismatch']);
-      expect(candidate.keyScore).toBe(100);
-    });
-
-    it("leaves the match unknown when the product's listings have no key", async () => {
-      recall.recall.mockResolvedValue([row('p1', 'name', '140 hybrid stereo', 1)]);
+      recall.fuzzy.mockResolvedValue([row('p1', '140 hybrid stereo xl')]);
       productRepo.find.mockResolvedValue([product('p1')]);
 
-      const [candidate] = await finder.findCandidates(listing);
+      const [candidate] = await finder.findCandidates(stored);
 
-      expect(candidate.matcherModelMatch).toBeUndefined();
+      expect(sourceRecordRepo.findNormalizedModelsByProductIds).toHaveBeenCalledWith(['query-product']);
+      expect(recall.exact).toHaveBeenCalledWith(stored, ['140 hybrid stereo', '140 hybrid stereo xl']);
+      expect(recall.fuzzy).toHaveBeenCalledTimes(2);
+      expect(candidate).toMatchObject({ normalizedModelMatch: true, score: 100 });
     });
 
-    it("loads a stored product's own keys when the query doesn't carry them", async () => {
-      recall.recall.mockResolvedValue([row('p1', 'name', '140 hybrid stereo', 1)]);
-      productRepo.find.mockResolvedValue([product('p1')]);
-      sourceRecordRepo.findNormalizedModelsByProductIds
-        .mockResolvedValueOnce(new Map([['query-product', ['140 hybrid stereo']]]))
-        .mockResolvedValueOnce(new Map([['p1', ['140 hybrid stereo']]]));
-
-      const [candidate] = await finder.findCandidates(query);
-
-      expect(sourceRecordRepo.findNormalizedModelsByProductIds).toHaveBeenNthCalledWith(1, ['query-product']);
-      expect(candidate.matcherModelMatch).toBe(true);
-    });
-
-    it('never looks keys up for a query without one', async () => {
-      recall.recall.mockResolvedValue([row('p1', 'name', '140 hybrid stereo', 1)]);
+    it("falls back to its own model's words, which match no key, when no listing has one", async () => {
+      recall.fuzzy.mockResolvedValue([row('p1', '140 hybrid stereo')]);
       productRepo.find.mockResolvedValue([product('p1')]);
 
-      await finder.findCandidates({ ...listing, matcherModelKeys: [] });
+      const [candidate] = await finder.findCandidates(stored);
 
-      expect(sourceRecordRepo.findNormalizedModelsByProductIds).not.toHaveBeenCalled();
+      expect(recall.fuzzy).toHaveBeenCalledWith(stored, '140 hybrid stereo');
+      expect(recall.exact).not.toHaveBeenCalled();
+      expect(candidate.normalizedModelMatch).toBeUndefined();
     });
   });
 });

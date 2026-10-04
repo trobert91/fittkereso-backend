@@ -162,7 +162,7 @@ export function alignmentSimilarity(
   return clamp(1 - penalty / 100, 0, 1);
 }
 
-/** Every similarity of two name keys, all three measured on the same pair. */
+/** Every similarity of two keys, all three measured on the same pair. */
 export function nameSimilarity(
   queryKey: string,
   candidateKey: string,

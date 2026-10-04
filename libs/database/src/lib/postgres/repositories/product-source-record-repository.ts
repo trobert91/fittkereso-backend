@@ -475,7 +475,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    */
   /**
    * Every listing a product-identifying source has in this category, with
-   * what a matcherModel key is built from: its stored listing (brand, names,
+   * what a normalizedModel is built from: its stored listing (brand, names,
    * specs, offers — the spec table and description are left out), the
    * product it sits on, and its source and seller. For measuring matching
    * rules; nothing here writes.

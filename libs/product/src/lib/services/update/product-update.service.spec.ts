@@ -40,8 +40,6 @@ describe('ProductUpdateService', () => {
         {} as never, // brandRepo
         {} as never, // productImageRepo
         { createProductEmbedding: jest.fn().mockResolvedValue([0.1]) } as never,
-        { normalizeProduct: jest.fn().mockReturnValue('ktm macina team 2023') } as never,
-        { getConfig: jest.fn().mockReturnValue(undefined) } as never,
       ),
       locks as never,
       new ProductDescriptionService(),

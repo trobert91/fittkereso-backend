@@ -8,8 +8,6 @@ import { ProductSplitService } from './product-split.service';
 import type { ProductMergeService } from './product-merge.service';
 import type { ProductModelFactoryService } from '../product-model-factory.service';
 import type { ProductEmbeddingService } from '../product-embedding.service';
-import { ProductNormalizerService } from '../product-normalizer.service';
-import type { CategoryConfigService } from '@fittkereso-backend/config';
 
 function makeQueryBuilder() {
   const builder: any = {
@@ -89,10 +87,6 @@ describe('ProductSplitService', () => {
       modelFactory as unknown as ProductModelFactoryService,
       { createProductEmbedding: jest.fn() } as unknown as ProductEmbeddingService,
       locks as never,
-      new ProductNormalizerService(),
-      {
-        getConfig: jest.fn().mockReturnValue({ normalizationStrategy: 'full-sorted' }),
-      } as unknown as CategoryConfigService,
     );
   });
 
@@ -237,7 +231,6 @@ describe('ProductSplitService', () => {
       expect.objectContaining({
         model: 'Talon E+',
         displayName: 'GIANT Talon E+',
-        normalizedName: 'e+ talon',
       }),
     );
   });
@@ -260,7 +253,6 @@ describe('ProductSplitService', () => {
       expect.objectContaining({
         model: 'GIANT Talon E+ - M méretben',
         displayName: 'GIANT Talon E+ - M méretben',
-        normalizedName: 'e+ m méretben talon',
       }),
     );
   });

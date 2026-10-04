@@ -10,8 +10,8 @@ const SECOND_ID = '22222222-2222-2222-2222-222222222222';
 const QUERY: ListingMatchLlmQuery = {
   brandName: 'KTM',
   model: 'Macina Kapoho Master',
-  displayName: 'KTM Macina Kapoho Master 2024',
-  nameKey: 'kapoho macina master',
+  title: 'KTM Macina Kapoho Master 2024 M/43',
+  normalizedModel: 'kapoho macina master',
   specs: { modelYear: 2024, batteryCapacity: 750 },
 };
 
@@ -23,7 +23,7 @@ function candidateOf(
     productId,
     displayName: 'KTM Macina Kapoho Master',
     score: 70,
-    matchedOn: 'name',
+    matchedOn: 'trigram',
     matchedValue: 'kapoho macina master',
     nameSimilarity: { trigram: 1, levenshtein: 1 },
     failedGates: [],
@@ -129,7 +129,8 @@ describe('ListingMatchLlmService', () => {
       }),
     );
     const userMessage = request.messages[1].content;
-    expect(userMessage).toContain('Matched on name key: "kapoho macina master"');
+    expect(userMessage).toContain('Listing title: KTM Macina Kapoho Master 2024 M/43');
+    expect(userMessage).toContain('Matched on model key: "kapoho macina master"');
     expect(userMessage).toContain(
       'id=c1: KTM Macina Kapoho Master | batteryCapacity=750 | score 70 | -30 modelYear: 2024 vs 2023',
     );

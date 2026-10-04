@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { In } from 'typeorm';
-import { compact, groupBy, intersection, isEmpty, keyBy, orderBy } from 'lodash';
+import { compact, flatten, groupBy, isEmpty, keyBy, maxBy, orderBy } from 'lodash';
 import {
   NameSimilarity,
   ProductModelRepository,
   ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
+import { productDisplayName } from '@fittkereso-backend/utils';
 import { applyGates, keyScoreOf, scoreOf } from './gates';
 import { TokenIdf, baseScore, nameSimilarity } from './name-similarity';
 import { CandidateRecallService, RecallRow } from './candidate-recall.service';
@@ -16,9 +17,24 @@ import type { ProductCandidate, ProductMatchQuery } from './types';
 
 interface ScoredRow {
   row: RecallRow;
-  candidateKey: string;
+  /** The row's key equals one of the query's model keys. */
+  keyMatch: boolean;
   similarity: NameSimilarity;
   base: number;
+}
+
+/** The keys a query is searched by, and whether they are model keys. */
+interface QueryKeys {
+  keys: string[];
+  keyed: boolean;
+}
+
+export interface FindCandidatesOptions {
+  /**
+   * False: only candidates whose key equals one of the query's model keys —
+   * the ones an equal key attaches, scored as the full search scores them.
+   */
+  fuzzy?: boolean;
 }
 
 /**
@@ -27,9 +43,12 @@ interface ScoredRow {
  * are the callers' (listing match, duplicate detection), so a low score stays
  * visible. Only reads.
  *
- * Recall runs by name and, when the query has a matcherModel key, by key. Each
- * candidate also says whether it shares a key with the query and what its spec
- * gates alone leave (`keyScore`), for the key rule.
+ * Recall reads the listings' normalizedModels: equal to a query key, or
+ * trigram-similar to one. Each candidate is scored on its best listing's key
+ * against the query's (name similarity, weighted by how rare each word is in
+ * the brand), minus its failed gates; it also says whether a listing of it
+ * has the query's key, and what its spec gates alone leave (`keyScore`), for
+ * the attach rule.
  */
 @Injectable()
 export class ProductCandidateFinderService {
@@ -44,75 +63,56 @@ export class ProductCandidateFinderService {
 
   public async findCandidates(
     query: ProductMatchQuery,
+    { fuzzy = true }: FindCandidatesOptions = {},
   ): Promise<ProductCandidate[]> {
-    // A stored product's keys are its listings'.
-    const queryKeys =
-      query.matcherModelKeys ??
-      (query.productId
-        ? ((await this.sourceRecordRepo.findNormalizedModelsByProductIds([query.productId])).get(
-            query.productId,
-          ) ?? [])
-        : []);
-    const keyedQuery = { ...query, matcherModelKeys: queryKeys };
+    const { keys, keyed } = await this.keysOf(query);
+    if (isEmpty(keys) || (!fuzzy && !keyed)) return [];
 
-    const [nameRows, keyRows] = await Promise.all([
-      this.recall.recall(keyedQuery),
-      this.recall.recallByMatcherModel(keyedQuery),
-    ]);
-    const rows = [...nameRows, ...keyRows].filter(
-      (row) => row.productId !== query.productId,
-    );
+    const rows = [
+      ...(keyed ? await this.recall.exact(query, keys) : []),
+      ...(fuzzy
+        ? flatten(await Promise.all(keys.map((key) => this.recall.fuzzy(query, key))))
+        : []),
+    ].filter((row) => row.productId !== query.productId);
     if (isEmpty(rows)) return [];
 
     // Only worth a query once something was recalled to score.
     const idf = await this.tokenIdf.forScope(query.brandId, query.categoryId);
-    const bestRows = this.bestRowPerProduct(query, rows, idf);
-    if (isEmpty(bestRows)) return [];
+    const bestRows = this.bestRowPerProduct(keys, keyed, rows, idf);
 
-    const productIds = bestRows.map(({ row }) => row.productId);
-    const [loaded, productKeys] = await Promise.all([
-      this.productRepo.find({
-        where: { id: In(productIds) },
-        select: { id: true, displayName: true, createdAt: true, specs: true },
-      }),
-      isEmpty(queryKeys)
-        ? new Map<string, string[]>()
-        : this.sourceRecordRepo.findNormalizedModelsByProductIds(productIds),
-    ]);
+    const loaded = await this.productRepo.find({
+      where: { id: In(bestRows.map(({ row }) => row.productId)) },
+      select: { id: true, model: true, createdAt: true, specs: true },
+    });
     const products = keyBy(loaded, (product) => product.id);
-    const categoryConfig = this.categoryConfigService.getConfig(
-      query.categorySlug,
-    );
+    const categoryConfig = this.categoryConfigService.getConfig(query.categorySlug);
 
     const candidates = compact(
-      bestRows.map(({ row, candidateKey, similarity, base }) => {
+      bestRows.map(({ row, keyMatch, similarity, base }) => {
         // Missing when the product was deleted between recall and load.
         const product = products[row.productId];
         if (!product) return undefined;
 
         const failedGates = applyGates({
-          queryKey: query.nameKey,
-          candidateKey,
+          queryModel: query.model,
+          candidateModel: row.model ?? product.model,
           querySpecs: query.specs,
           candidateSpecs: product.specs,
           categoryConfig,
         });
 
-        const keys = productKeys.get(product.id) ?? [];
         return {
           productId: product.id,
-          displayName: product.displayName,
+          // Every candidate is of the query's brand.
+          displayName: productDisplayName(query.brandName, product.model),
           createdAt: product.createdAt,
           score: scoreOf(base, failedGates),
-          matchedOn: row.matchedOn,
-          matchedValue: row.matchedValue,
+          matchedOn: keyMatch ? ('normalizedModel' as const) : ('trigram' as const),
+          matchedValue: row.normalizedModel,
           nameSimilarity: similarity,
           failedGates,
           specs: product.specs,
-          matcherModelMatch:
-            isEmpty(queryKeys) || isEmpty(keys)
-              ? undefined
-              : !isEmpty(intersection(queryKeys, keys)),
+          normalizedModelMatch: keyed ? keyMatch : undefined,
           keyScore: keyScoreOf(failedGates),
         };
       }),
@@ -126,37 +126,52 @@ export class ProductCandidateFinderService {
   }
 
   /**
-   * Scores each row on its name and keeps each product's best, preferring its
-   * name row on a tie (a matcherModel row carries the same name key, so it
-   * stays only for a product the name arm didn't recall). Aliases are stored
-   * raw or keyed by another rule, so they're re-keyed the way the query key
-   * was built before Levenshtein.
+   * A listing's query carries its key; a stored product's keys are its
+   * listings'. A product none of whose listings has a key is searched by its
+   * own model's words, which attach nothing.
+   */
+  private async keysOf(query: ProductMatchQuery): Promise<QueryKeys> {
+    if (query.keys) return { keys: query.keys, keyed: query.keyed ?? false };
+
+    const stored = query.productId
+      ? ((await this.sourceRecordRepo.findNormalizedModelsByProductIds([query.productId])).get(
+          query.productId,
+        ) ?? [])
+      : [];
+    if (!isEmpty(stored)) return { keys: stored, keyed: true };
+    return {
+      keys: compact([this.queryService.keyOfName(query.model, query.brandName)]),
+      keyed: false,
+    };
+  }
+
+  /**
+   * Scores each row against the query key it is most like, and keeps each
+   * product's best: a listing with the query's key first, then the highest
+   * score.
    */
   private bestRowPerProduct(
-    query: ProductMatchQuery,
+    keys: string[],
+    keyed: boolean,
     rows: RecallRow[],
     idf: TokenIdf,
   ): ScoredRow[] {
     const scored = rows.map((row): ScoredRow => {
-      const candidateKey =
-        row.matchedOn === 'alias'
-          ? this.queryService.nameKeyOf({
-              brandName: query.brandName,
-              model: row.matchedValue,
-              categorySlug: query.categorySlug,
-            })
-          : row.matchedValue;
-      const similarity = nameSimilarity(query.nameKey, candidateKey, idf);
-      return { row, candidateKey, similarity, base: baseScore(similarity) };
+      const similarity = maxBy(
+        keys.map((key) => nameSimilarity(key, row.normalizedModel, idf)),
+        baseScore,
+      ) as NameSimilarity;
+      return {
+        row,
+        keyMatch: keyed && keys.includes(row.normalizedModel),
+        similarity,
+        base: baseScore(similarity),
+      };
     });
 
     return Object.values(groupBy(scored, ({ row }) => row.productId)).map(
       (group) =>
-        orderBy(
-          group,
-          [({ base }) => base, ({ row }) => row.matchedOn === 'name'],
-          ['desc', 'desc'],
-        )[0],
+        orderBy(group, [({ keyMatch }) => keyMatch, ({ base }) => base], ['desc', 'desc'])[0],
     );
   }
 }

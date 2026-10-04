@@ -5,6 +5,7 @@ import {
   CATALOG,
   allScoredPairs,
   candidateOf,
+  keyOf,
   oneByKey,
   pairByKey,
   scoreBetween,
@@ -123,7 +124,7 @@ describe('scoring the real KTM catalog', () => {
       // different bikes off ACCEPT_SCORE on the strength of one digit.
       const a = oneByKey('771 di2 glorious lycan macina');
       const b = oneByKey('772 di2 glorious lycan macina');
-      const similarity = nameSimilarity(a.nameKey, b.nameKey, CATALOG_IDF);
+      const similarity = nameSimilarity(keyOf(a.nameKey), keyOf(b.nameKey), CATALOG_IDF);
 
       expect(similarity.trigram).toBeCloseTo(trigramBetween(a, b), 6);
       expect(similarity.levenshtein).toBeGreaterThan(similarity.trigram);
@@ -146,7 +147,9 @@ describe('scoring the real KTM catalog', () => {
     it('recalls widely and scores narrowly', () => {
       const pairs = allScoredPairs();
 
-      expect(pairs).toHaveLength(334);
+      // Was 334 on the old name key: splitting letters from digits ("di2",
+      // "prime0") moves three pairs under the recall threshold.
+      expect(pairs).toHaveLength(331);
       // Was 9 before frameType became a primary spec on 2026-09-16.
       expect(pairs.filter((pair) => pair.score >= ACCEPT_SCORE)).toHaveLength(5);
       // Was 10 before baseScore became a blend: the review band is where a
@@ -171,9 +174,10 @@ describe('scoring the real KTM catalog', () => {
      * of "8973 kapoho macina", which the reviewer confirmed is one bike in two
      * sizes. So this remaining entry is a correct merge, not a defect — but it
      * is pinned all the same, because nothing in the score distinguishes a
-     * size token from a shape token.
+     * size token from a shape token. Only an equal key attaches, so it now
+     * goes to review rather than merging on the score.
      */
-    it('pins the different-key pairs that would auto-attach today', () => {
+    it('pins the different-key pairs that clear ACCEPT_SCORE', () => {
       const risky = allScoredPairs()
         .filter(
           (pair) =>

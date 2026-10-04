@@ -68,7 +68,7 @@ export class ProductDuplicatePair extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList] })
   matchedOn: CandidateMatchedOn;
 
-  /** The name key or alias recall matched on. */
+  /** The key (a listing's normalizedModel) or identifier the pair was found by. */
   @Column({ type: 'text' })
   @Expose({ groups: [SerializeGroup.adminList] })
   matchedValue: string;
@@ -83,10 +83,10 @@ export class ProductDuplicatePair extends BasePostgresEntity {
   @Transform(transfromExposeAll())
   nameSimilarity?: NameSimilarity | null;
 
-  /** Whether the two products share a matcherModel key; null when either has none. */
+  /** Whether a listing of each has the same normalizedModel; null when either has none. */
   @Column({ type: 'boolean', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList] })
-  matcherModelMatch?: boolean | null;
+  normalizedModelMatch?: boolean | null;
 
   @Column({ type: 'varchar' })
   @Expose({ groups: [SerializeGroup.adminList] })

@@ -6,6 +6,7 @@ import {
   byKey,
   candidateOf,
   candidatesFor,
+  keyOf,
   pairByKey,
   scoreBetween,
   sharedKeyGroups,
@@ -120,8 +121,8 @@ describe('duplicate detection on the real KTM catalog', () => {
       expect(row.productAId < row.productBId).toBe(true);
       expect([row.productAId, row.productBId].sort()).toEqual([a.id, b.id].sort());
       expect(row.detectedBy).toBe('scrape');
-      expect(row.matchedOn).toBe('name');
-      expect(row.matchedValue).toBe(b.nameKey);
+      expect(row.matchedOn).toBe('normalizedModel');
+      expect(row.matchedValue).toBe(keyOf(b.nameKey));
 
       const [gate] = row.failedGates;
       expect(gate.productAValue).toBe(

@@ -255,7 +255,7 @@ export class AdminProductController {
   }
 
   // Recomputes this product's specs and name fields (brand/model/
-  // displayName/aliases/normalizedName) from its current ProductSourceRecords —
+  // displayName/aliases) from its current ProductSourceRecords —
   // the same idempotent recompute every scrape/manual-edit/product-merge
   // already triggers, exposed as a standalone on-demand action.
   @Post(':id/merge-sources')

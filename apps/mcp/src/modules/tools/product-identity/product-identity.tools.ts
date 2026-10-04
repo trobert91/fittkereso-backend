@@ -20,7 +20,6 @@ import {
   ProductMatchQuery,
   ProductMatchQueryService,
 } from '@fittkereso-backend/product-identity';
-import type { ListingMatchMode } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
 
 interface MatchSubject {
@@ -41,7 +40,7 @@ export class ProductIdentityTools {
   @Tool({
     name: 'find_product_candidates',
     description:
-      'Explains product matching. Pass productId to see a stored product\'s duplicate candidates, or sourceRecordId to replay that listing as if it were scraped now (the brand is the attached product\'s). Returns the name key and matcherModel key, every recalled candidate (by name, alias or matcherModel key) with trigram and Levenshtein similarity, base score, failed gates with both values, final score, whether it shares the matcherModel key and its key score (spec gates alone), plus what would happen: the duplicate pairs (70+ by name, or by key score when the keys match) for a product, or the listing match outcome (attach / ask the LLM / create) under both the score rule and the key rule for a listing, marking the one the category acts on. Read-only; never calls the LLM.',
+      'Explains product matching. Pass productId to see a stored product\'s duplicate candidates, or sourceRecordId to replay that listing as if it were scraped now (the brand is the attached product\'s). Returns the keys searched by (normalizedModel, or a title\'s words when there is no model), every recalled candidate (by an equal key, or a trigram-similar one) with trigram, Levenshtein and alignment similarity, base score, failed gates with both values, final score, whether it has the same key and its key score (spec gates alone), plus what would happen: the duplicate pairs (70+ by name, or by key score when the keys match) for a product, or the listing match outcome (attach / ask the LLM / create) for a listing, and whether the exact-key pass alone decides it. Read-only; never calls the LLM.',
     parameters: z.object({
       productId: z
         .string()
@@ -110,8 +109,8 @@ export class ProductIdentityTools {
     if (!product?.brand || !product.productCategory) {
       return `Source record ${sourceRecordId} has no product with a brand and category.`;
     }
-    // An unidentified listing is keyed on its title, as the scraper keys it.
-    if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) {
+    // An unidentified listing is searched by its title, as the scraper searches it.
+    if (!scraped?.model && !scraped?.originalName) {
       return `Source record ${sourceRecordId} has no scraped name or title to match on.`;
     }
 
@@ -137,19 +136,19 @@ export class ProductIdentityTools {
 
     const { kind, title, query } = subject;
     const candidates = await this.finder.findCandidates(query);
-    const keys = query.matcherModelKeys;
+    const keys = query.keys;
     const keyText =
       keys === undefined
-        ? "its listings' (the finder loads them)"
+        ? "its listings' normalizedModels (the finder loads them)"
         : keys.length
-          ? keys.map((key) => `\`${key}\``).join(', ')
+          ? `${keys.map((key) => `\`${key}\``).join(', ')}${query.keyed ? '' : ' (from the title: attaches nothing)'}`
           : 'none';
 
     const L: string[] = [];
     L.push(`# Product candidates for ${title}`);
     L.push('');
     L.push(
-      `Name key: \`${query.nameKey}\` · matcherModel key: ${keyText} · brand ${query.brandName} · category ${query.categorySlug}`,
+      `Keys: ${keyText} · model \`${query.model}\` · brand ${query.brandName} · category ${query.categorySlug}`,
     );
     L.push('');
 
@@ -174,47 +173,34 @@ export class ProductIdentityTools {
     L.push('');
     L.push(
       kind === 'listing'
-        ? this.describeListingMatch(candidates, query)
+        ? await this.describeListingMatch(candidates, query)
         : this.describePairs(candidates),
     );
     return L.join('\n');
   }
 
-  /** Both rules; the category's `model.required` picks the one that acts. */
-  private describeListingMatch(
+  /** The listing match outcome, and whether the exact-key pass alone reaches it. */
+  private async describeListingMatch(
     candidates: ProductCandidate[],
     query: ProductMatchQuery,
-  ): string {
-    const [key] = query.matcherModelKeys ?? [];
-    const acting: ListingMatchMode =
-      key && this.queryService.requiresMatcherModel(query.categorySlug)
-        ? 'key'
-        : 'score';
-    const lines = [this.describeRule('score', candidates, acting)];
-    lines.push(
-      key
-        ? this.describeRule('key', candidates, acting, key.split(' ').length < 2)
-        : '- Key rule: the listing has no matcherModel key, so the score rule decides.',
-    );
-    return ['Listing match:', ...lines].join('\n');
-  }
-
-  private describeRule(
-    mode: ListingMatchMode,
-    candidates: ProductCandidate[],
-    acting: ListingMatchMode,
-    shortKey = false,
-  ): string {
-    const rule = mode === 'key' ? 'Key rule' : 'Score rule';
-    const label = `- ${rule} (${mode === acting ? 'acts' : 'shadow'}):`;
-    const outcome = decideListingMatch(candidates, { mode, shortKey });
+  ): Promise<string> {
+    const outcome = decideListingMatch(candidates);
+    const shortCircuit =
+      query.keyed &&
+      decideListingMatch(await this.finder.findCandidates(query, { fuzzy: false })).kind ===
+        'attach';
+    const decided = shortCircuit
+      ? ' The exact-key pass alone decides it: no trigram search runs.'
+      : '';
     if (outcome.kind === 'attach') {
-      return `${label} attach to ${outcome.candidate.displayName} (${outcome.candidate.productId}).`;
+      return `Listing match: attach to ${outcome.candidate.displayName} (${outcome.candidate.productId}).${decided}`;
     }
     if (outcome.kind === 'ask_llm') {
-      return `${label} ask the LLM about ${outcome.candidates.length} candidate(s): ${outcome.candidates.map((candidate) => candidate.productId).join(', ')}.`;
+      return `Listing match: ask the LLM about ${outcome.candidates.length} candidate(s): ${outcome.candidates.map((candidate) => candidate.productId).join(', ')}.`;
     }
-    return `${label} create a new product.`;
+    return query.keyed
+      ? 'Listing match: create a new product.'
+      : 'Listing match: create a new product (no model key, so nothing attaches by name).';
   }
 
   private describePairs(candidates: ProductCandidate[]): string {
@@ -228,8 +214,8 @@ export class ProductIdentityTools {
   }
 
   private formatKeyMatch(candidate: ProductCandidate): string {
-    if (candidate.matcherModelMatch === undefined) return '—';
-    return candidate.matcherModelMatch ? 'same' : 'other';
+    if (candidate.normalizedModelMatch === undefined) return '—';
+    return candidate.normalizedModelMatch ? 'same' : 'other';
   }
 
   private formatGates(gates: FailedGate[]): string {

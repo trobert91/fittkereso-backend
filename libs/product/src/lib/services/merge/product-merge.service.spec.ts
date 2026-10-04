@@ -471,7 +471,7 @@ describe('ProductMergeService.mergeSources', () => {
     expect(nameMergeService.mergeNames).not.toHaveBeenCalled();
   });
 
-  it('merges specs, strips offer-level keys, and calls the name merge with the same latest-per-source set and category slug', async () => {
+  it('merges specs, strips offer-level keys, and calls the name merge with the same latest-per-source set', async () => {
     categoryConfigService.getConfig.mockReturnValue({
       offerLevelSpecs: ['frameSize'],
     });
@@ -493,11 +493,7 @@ describe('ProductMergeService.mergeSources', () => {
     );
     // frameSize is offer-level for this category — stripped from model.specs
     expect(model.specs).toEqual({ weight: 22 });
-    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(
-      model,
-      [sourceA],
-      'ebikes',
-    );
+    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [sourceA]);
   });
 
   // The name merge picks among them itself: the brand by each source's latest,
@@ -525,7 +521,7 @@ describe('ProductMergeService.mergeSources', () => {
 
     await service.mergeSources(model);
 
-    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [stale, fresh], 'ebikes');
+    expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [stale, fresh]);
   });
 
   // A manual record, or one stored before years were normalised, never went
@@ -607,11 +603,7 @@ describe('ProductMergeService.mergeSources', () => {
 
       await service.mergeSources(model);
 
-      expect(nameMergeService.mergeNames).toHaveBeenCalledWith(
-        model,
-        [arukereso, otherShop],
-        'ebikes',
-      );
+      expect(nameMergeService.mergeNames).toHaveBeenCalledWith(model, [arukereso, otherShop]);
     });
 
     it('keeps the admin record in both', async () => {

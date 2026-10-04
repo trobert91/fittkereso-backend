@@ -16,9 +16,10 @@ import { AppModule } from '../app.module';
 /**
  * Freezes a scraped catalog into the single fixture the product-identity specs
  * run against. Every value here is real: the products and listings are rows,
- * the name keys come from ProductMatchQueryService (the rule production uses —
- * the stored `normalizedSourceName` column is never read, two different rules
- * wrote it), and every trigram is Postgres' own `similarity()`.
+ * the keys come from ProductMatchQueryService (the rule production uses: a
+ * listing's normalizedModel, else its title's words; a product's own model's
+ * words), and every trigram is Postgres' own `similarity()`. The fixture
+ * field keeps the name `nameKey`, which the specs read.
  *
  * Listings are the point. A product's specs are already merged from all its
  * shops, so product-to-product pairs can only ever show what the old matcher
@@ -52,7 +53,7 @@ interface FixtureListing {
   /** The shop's ProductSource name: "speedbike" or "ebikeshop". */
   shop: string;
   url?: string;
-  /** Built by ProductMatchQueryService.ofListing, exactly as a scrape would. */
+  /** The key ProductMatchQueryService.ofListing builds, exactly as a scrape would. */
   nameKey: string;
   brand: string;
   model?: string;
@@ -100,7 +101,7 @@ async function bootstrap() {
           model: product.model ?? null,
           brand: product.brand.name,
           categorySlug: product.productCategory.slug,
-          nameKey: queryService.ofProduct(product).nameKey,
+          nameKey: queryService.keyOfName(product.model, product.brand.name) ?? '',
           specs: specsOrUndefined(product.specs),
           listings: records.length,
           sources: shops.sort(),
@@ -163,7 +164,7 @@ async function bootstrap() {
 /**
  * One listing, keyed the way a scrape of it would be. `category` falls back to
  * the product's: manual and older rows don't always carry one, and ofListing
- * needs it to pick the category's normalization strategy.
+ * needs it for the category's left-out specs.
  */
 function listingOf(
   record: ProductSourceRecord,
@@ -171,7 +172,7 @@ function listingOf(
   queryService: ProductMatchQueryService,
 ): FixtureListing | undefined {
   const scraped = record.scrapedProduct;
-  if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) return undefined;
+  if (!scraped?.model && !scraped?.originalName) return undefined;
 
   const { productCategory } = product;
   const category = scraped.category ?? {
@@ -184,10 +185,9 @@ function listingOf(
     id: record.id,
     shop: record.source?.name ?? 'unknown',
     url: record.url ?? undefined,
-    nameKey: queryService.ofListing(
-      { ...scraped, category } as ScrapedProduct,
-      product.brand,
-    ).nameKey,
+    nameKey:
+      queryService.ofListing({ ...scraped, category } as ScrapedProduct, product.brand)
+        .keys?.[0] ?? '',
     brand: scraped.brand ?? product.brand.name,
     model: scraped.model,
     displayName: scraped.displayName,

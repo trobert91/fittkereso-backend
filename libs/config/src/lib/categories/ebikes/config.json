@@ -304,7 +304,6 @@
     },
     "model": {
       "excludeSpecs": ["modelYear", "gender", "wheelSize"],
-      "required": false,
       "examples": [
         { "title": "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl", "model": "MACINA STYLE 810 Di2" },
         { "title": "Cube Kathmandu Hybrid ONE 800 smaragdgrey'n'black 2025 Trapeze 54", "model": "Kathmandu Hybrid ONE 800 Trapeze" },
@@ -319,7 +318,6 @@
       ]
     }
   },
-  "normalizationStrategy": "full-sorted",
   "offerLevelSpecs": [
     "frameSize",
     "frameSizeLabel",

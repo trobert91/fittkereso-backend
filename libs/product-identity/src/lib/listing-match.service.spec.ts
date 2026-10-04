@@ -1,63 +1,81 @@
 import type { ScrapedProduct } from '@fittkereso-backend/database';
 import { ListingMatchService } from './listing-match.service';
 import { LISTING_DECISION_CANDIDATES } from './product-identity.constants';
-import type { ProductCandidate } from './types';
+import type { ProductCandidate, ProductMatchQuery } from './types';
 
 const BRAND = { id: 'brand-1', name: 'KTM' };
 const MATCH_ID = '11111111-1111-1111-1111-111111111111';
 const OTHER_ID = '22222222-2222-2222-2222-222222222222';
+const KEY = 'kapoho macina master';
 
 const SCRAPED = {
   brand: 'KTM',
   model: 'Macina Kapoho Master',
-  displayName: 'KTM Macina Kapoho Master 2024',
+  displayName: 'KTM Macina Kapoho Master',
   originalName: 'KTM Macina Kapoho Master 2024 M/43',
   category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },
   specs: { modelYear: 2024 },
 } as ScrapedProduct;
 
-const QUERY = {
+const QUERY: ProductMatchQuery = {
   brandId: BRAND.id,
   brandName: BRAND.name,
   categoryId: 'category-1',
   categorySlug: 'ebikes',
-  nameKey: 'kapoho macina master',
+  keys: [KEY],
+  keyed: true,
+  model: 'Macina Kapoho Master',
   specs: { modelYear: 2024 },
 };
 
+/** A candidate with the listing's key unless told otherwise. */
 function candidateOf(
   productId: string,
   score: number,
-  keyed: Pick<ProductCandidate, 'matcherModelMatch'> & Partial<ProductCandidate> = {},
+  overrides: Partial<ProductCandidate> = {},
 ): ProductCandidate {
   return {
     productId,
     displayName: 'KTM Macina Kapoho Master',
     score,
-    matchedOn: 'name',
-    matchedValue: 'kapoho macina master',
-    nameSimilarity: { trigram: 1, levenshtein: 1 },
+    matchedOn: 'normalizedModel',
+    matchedValue: KEY,
+    nameSimilarity: { trigram: 1, levenshtein: 1, alignment: 1 },
     failedGates: [],
+    normalizedModelMatch: true,
     keyScore: 100,
-    ...keyed,
+    ...overrides,
   };
+}
+
+/** A candidate a trigram search found: another key. */
+function nearOf(productId: string, score: number): ProductCandidate {
+  return candidateOf(productId, score, {
+    matchedOn: 'trigram',
+    matchedValue: 'kapoho macina prestige',
+    normalizedModelMatch: false,
+  });
 }
 
 describe('ListingMatchService', () => {
   let brandResolution: { resolve: jest.Mock };
-  let queryService: { ofListing: jest.Mock; requiresMatcherModel: jest.Mock };
+  let queryService: { ofListing: jest.Mock };
   let finder: { findCandidates: jest.Mock };
   let llmService: { pick: jest.Mock };
   let service: ListingMatchService;
+
+  /** What the exact-key pass returns, then the full search. */
+  function found(exact: ProductCandidate[], full: ProductCandidate[] = exact) {
+    finder.findCandidates.mockImplementation(async (_query, options) =>
+      options?.fuzzy === false ? exact : full,
+    );
+  }
 
   beforeEach(() => {
     brandResolution = {
       resolve: jest.fn().mockResolvedValue({ entity: BRAND, similarity: 1 }),
     };
-    queryService = {
-      ofListing: jest.fn().mockReturnValue(QUERY),
-      requiresMatcherModel: jest.fn().mockReturnValue(false),
-    };
+    queryService = { ofListing: jest.fn().mockReturnValue(QUERY) };
     finder = { findCandidates: jest.fn().mockResolvedValue([]) };
     llmService = { pick: jest.fn() };
     service = new ListingMatchService(
@@ -92,36 +110,73 @@ describe('ListingMatchService', () => {
     expect(queryService.ofListing).toHaveBeenCalledWith(titleOnly, BRAND);
   });
 
-  it('attaches to a single candidate above the accept score without asking the LLM', async () => {
-    finder.findCandidates.mockResolvedValue([
-      candidateOf(MATCH_ID, 92),
-      candidateOf(OTHER_ID, 64),
-    ]);
+  it('attaches on an equal key from the exact pass alone, without the trigram search', async () => {
+    found([candidateOf(MATCH_ID, 100)]);
 
     await expect(service.match(SCRAPED)).resolves.toEqual({
       productId: MATCH_ID,
       decision: {
         outcome: 'identified',
-        nameKey: QUERY.nameKey,
-        candidates: [
-          expect.objectContaining({ productId: MATCH_ID, score: 92 }),
-          expect.objectContaining({ productId: OTHER_ID, score: 64 }),
-        ],
-        mode: 'score',
+        candidates: [expect.objectContaining({ productId: MATCH_ID, normalizedModelMatch: true })],
+        normalizedModel: KEY,
+        shortCircuit: true,
       },
     });
+    expect(finder.findCandidates).toHaveBeenCalledTimes(1);
+    expect(finder.findCandidates).toHaveBeenCalledWith(QUERY, { fuzzy: false });
     expect(llmService.pick).not.toHaveBeenCalled();
   });
 
-  it('creates without asking the LLM when nothing is a near-miss', async () => {
-    finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 69)]);
+  // Same key, another year: the gates make it another product.
+  it('runs the full search when no equal-key candidate passes its gates', async () => {
+    const otherYear = candidateOf(MATCH_ID, 50, { keyScore: 50 });
+    found([otherYear], [otherYear, nearOf(OTHER_ID, 75)]);
+
+    const result = await service.match(SCRAPED);
+
+    expect(finder.findCandidates).toHaveBeenCalledTimes(2);
+    expect(finder.findCandidates).toHaveBeenLastCalledWith(QUERY);
+    expect(result.productId).toBeUndefined();
+    expect(result.decision.outcome).toBe('created');
+    expect(result.decision.shortCircuit).toBeUndefined();
+  });
+
+  // However close the name, another key never attaches.
+  it('creates a near-miss with another key, the LLM check being off', async () => {
+    found([], [nearOf(MATCH_ID, 95)]);
 
     const result = await service.match(SCRAPED);
 
     expect(result.productId).toBeUndefined();
     expect(result.decision.outcome).toBe('created');
-    expect(result.decision.llm).toBeUndefined();
+    expect(result.decision.candidates).toEqual([
+      expect.objectContaining({ productId: MATCH_ID, normalizedModelMatch: false }),
+    ]);
     expect(llmService.pick).not.toHaveBeenCalled();
+  });
+
+  it('skips the exact pass, and attaches nothing, for a listing without a model key', async () => {
+    queryService.ofListing.mockReturnValue({ ...QUERY, keyed: false });
+    found([], [candidateOf(MATCH_ID, 100, { normalizedModelMatch: undefined, matchedOn: 'trigram' })]);
+
+    const result = await service.match(SCRAPED);
+
+    expect(finder.findCandidates).toHaveBeenCalledTimes(1);
+    expect(finder.findCandidates).toHaveBeenCalledWith({ ...QUERY, keyed: false });
+    expect(result.productId).toBeUndefined();
+    expect(result.decision.normalizedModel).toBeUndefined();
+  });
+
+  it('keeps only the best few candidates on the decision, the chosen one first', async () => {
+    const full = Array.from({ length: LISTING_DECISION_CANDIDATES + 2 }, (_, index) =>
+      nearOf(`product-${index}`, 60 - index),
+    );
+    found([], full);
+
+    const result = await service.match(SCRAPED);
+
+    expect(result.decision.candidates).toHaveLength(LISTING_DECISION_CANDIDATES);
+    expect(result.decision.candidates[0].productId).toBe('product-0');
   });
 
   // Off since 2026-09-23 (near misses go to a person); the path is kept, so
@@ -133,8 +188,7 @@ describe('ListingMatchService', () => {
         ...jest.requireActual('./product-identity.constants'),
         LLM_ENABLED: true,
       }));
-      const { ListingMatchService: WithLlm } =
-        await import('./listing-match.service');
+      const { ListingMatchService: WithLlm } = await import('./listing-match.service');
       return new WithLlm(
         brandResolution as never,
         queryService as never,
@@ -144,19 +198,14 @@ describe('ListingMatchService', () => {
     };
 
     it('attaches to the LLM pick and records what it answered', async () => {
-      finder.findCandidates.mockResolvedValue([
-        candidateOf(MATCH_ID, 78),
-        candidateOf(OTHER_ID, 71),
-      ]);
+      found([], [nearOf(MATCH_ID, 78), nearOf(OTHER_ID, 71)]);
       llmService.pick.mockResolvedValue({
         productId: OTHER_ID,
         confidence: 88,
         reason: 'same battery',
       });
 
-      const result = await (
-        await withLlm()
-      ).match(SCRAPED, { taskId: 'task-1' });
+      const result = await (await withLlm()).match(SCRAPED, { taskId: 'task-1' });
 
       expect(result.productId).toBe(OTHER_ID);
       expect(result.decision.outcome).toBe('llm_identified');
@@ -166,14 +215,15 @@ describe('ListingMatchService', () => {
         reason: 'same battery',
       });
       // Only the near-misses are adjudicated, best first, with the listing's own
-      // names — which the query key alone doesn't carry.
+      // model and title beside its key.
       expect(llmService.pick).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           brandName: BRAND.name,
           model: SCRAPED.model,
-          displayName: SCRAPED.displayName,
-          nameKey: QUERY.nameKey,
-        }),
+          title: SCRAPED.originalName,
+          normalizedModel: KEY,
+          specs: QUERY.specs,
+        },
         [
           expect.objectContaining({ productId: MATCH_ID }),
           expect.objectContaining({ productId: OTHER_ID }),
@@ -183,122 +233,24 @@ describe('ListingMatchService', () => {
     });
 
     it('creates when the LLM declines, keeping its answer on the decision', async () => {
-      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 70)]);
-      llmService.pick.mockResolvedValue({
-        confidence: 40,
-        reason: 'different year',
-      });
+      found([], [nearOf(MATCH_ID, 70)]);
+      llmService.pick.mockResolvedValue({ confidence: 40, reason: 'different year' });
 
       const result = await (await withLlm()).match(SCRAPED);
 
       expect(result.productId).toBeUndefined();
       expect(result.decision.outcome).toBe('created');
-      expect(result.decision.llm).toEqual({
-        confidence: 40,
-        reason: 'different year',
-      });
+      expect(result.decision.llm).toEqual({ confidence: 40, reason: 'different year' });
     });
 
     it('never asks when the caller turns the LLM off', async () => {
-      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 75)]);
+      found([], [nearOf(MATCH_ID, 75)]);
 
-      const result = await (
-        await withLlm()
-      ).match(SCRAPED, {}, { llm: false });
+      const result = await (await withLlm()).match(SCRAPED, {}, { llm: false });
 
       expect(result.productId).toBeUndefined();
       expect(result.decision.outcome).toBe('created');
       expect(llmService.pick).not.toHaveBeenCalled();
-    });
-  });
-
-  it('keeps only the best few candidates on the decision', async () => {
-    finder.findCandidates.mockResolvedValue(
-      Array.from({ length: LISTING_DECISION_CANDIDATES + 2 }, (_, index) =>
-        candidateOf(`product-${index}`, 60 - index),
-      ),
-    );
-
-    const result = await service.match(SCRAPED);
-
-    expect(result.decision.candidates).toHaveLength(
-      LISTING_DECISION_CANDIDATES,
-    );
-    expect(result.decision.candidates[0].productId).toBe('product-0');
-  });
-
-  // The default: a near miss becomes a new product, and duplicate detection
-  // pairs it with the candidate for a person to decide.
-  it('creates near-misses without a call, as the LLM check is off', async () => {
-    finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 75)]);
-
-    const result = await service.match(SCRAPED);
-
-    expect(result.productId).toBeUndefined();
-    expect(result.decision.outcome).toBe('created');
-    expect(llmService.pick).not.toHaveBeenCalled();
-  });
-
-  describe('matcherModel keys', () => {
-    const KEY = 'kapoho macina master';
-    beforeEach(() => {
-      queryService.ofListing.mockReturnValue({ ...QUERY, matcherModelKeys: [KEY] });
-    });
-
-    it('acts on the score and records what the key rule would have done', async () => {
-      finder.findCandidates.mockResolvedValue([
-        candidateOf(MATCH_ID, 92, { matcherModelMatch: false }),
-        candidateOf(OTHER_ID, 64, { matcherModelMatch: true }),
-      ]);
-
-      const { productId, decision } = await service.match(SCRAPED);
-
-      expect(productId).toBe(MATCH_ID);
-      expect(decision).toMatchObject({
-        mode: 'score',
-        matcherModelKey: KEY,
-        alternative: { mode: 'key', kind: 'attach', productId: OTHER_ID, comparison: 'switch' },
-      });
-      expect(decision.candidates[1]).toMatchObject({ matcherModelMatch: true, keyScore: 100 });
-    });
-
-    it('records a split when the key rule would keep the listing off the product the score chose', async () => {
-      // "Style 810" against "Style 810 Di2": a perfect name, another key.
-      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 100, { matcherModelMatch: false })]);
-
-      const { productId, decision } = await service.match(SCRAPED);
-
-      expect(productId).toBe(MATCH_ID);
-      expect(decision.alternative).toMatchObject({ kind: 'ask_llm', llmCandidates: 1, comparison: 'split' });
-    });
-
-    it('acts on equal keys where the category requires them, the chosen product first', async () => {
-      queryService.requiresMatcherModel.mockReturnValue(true);
-      finder.findCandidates.mockResolvedValue([
-        candidateOf(MATCH_ID, 92, { matcherModelMatch: false }),
-        candidateOf(OTHER_ID, 64, { matcherModelMatch: true }),
-      ]);
-
-      const { productId, decision } = await service.match(SCRAPED);
-
-      expect(queryService.requiresMatcherModel).toHaveBeenCalledWith('ebikes');
-      expect(productId).toBe(OTHER_ID);
-      expect(decision.mode).toBe('key');
-      expect(decision.candidates.map((candidate) => candidate.productId)).toEqual([OTHER_ID, MATCH_ID]);
-      expect(decision.alternative).toMatchObject({ mode: 'score', productId: MATCH_ID, comparison: 'switch' });
-    });
-
-    it('goes by the score, with nothing to compare, for a listing without a key', async () => {
-      queryService.requiresMatcherModel.mockReturnValue(true);
-      queryService.ofListing.mockReturnValue({ ...QUERY, matcherModelKeys: [] });
-      finder.findCandidates.mockResolvedValue([candidateOf(MATCH_ID, 92)]);
-
-      const { productId, decision } = await service.match(SCRAPED);
-
-      expect(productId).toBe(MATCH_ID);
-      expect(decision.mode).toBe('score');
-      expect(decision.alternative).toBeUndefined();
-      expect(decision.matcherModelKey).toBeUndefined();
     });
   });
 });

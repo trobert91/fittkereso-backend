@@ -38,7 +38,7 @@ describe('case 1: different bikes from the same shop stay different products', (
 
     it('fires the gate on names similar enough to attach without it', () => {
       // 771 against 772 is one character in twenty-nine. On the name alone
-      // these would attach outright; only the model-number gate stops them.
+      // these would clear ACCEPT_SCORE; only the model-number gate stops them.
       const left = listing(SPEEDBIKE, '771 di2 glorious lycan macina');
       const right = listing(SPEEDBIKE, '772 di2 glorious lycan macina');
       const nameOnly = { ...asProduct(right), specs: undefined };
@@ -158,8 +158,9 @@ describe('case 1: different bikes from the same shop stay different products', (
   });
 
   /**
-   * The two pairs from one shop that attach outright on different name keys:
-   * no gate, no LLM call, no duplicate pair, nobody asked.
+   * The two pairs from one shop that clear ACCEPT_SCORE on different name keys,
+   * with no gate. They used to attach outright, nobody asked; only an equal key
+   * attaches now, so they reach review instead.
    *
    * It was five until 2026-09-16, when extracting the frame shapes ebikeshop
    * publishes (Magas / Trapéz) and making frameType primary cleared three. The
@@ -174,12 +175,14 @@ describe('case 1: different bikes from the same shop stay different products', (
    * luck of which token it is, and if the list changes it must change
    * deliberately.
    */
-  describe('differently-named pairs that attach within one shop', () => {
+  describe('differently-named pairs that clear ACCEPT_SCORE within one shop', () => {
     it.each([
       [SPEEDBIKE, '8973 kapoho l macina', '8973 kapoho macina', 84],
       [EBIKESHOP, '810 belt city macina', '810 belt city macina tr', 86],
     ])(
-      '%s attaches %s to %s at %i, which the reviewer confirmed is one bike',
+      // Only an equal key attaches: the two keys differ, so the pair goes to
+      // review rather than merging on the score.
+      '%s sends %s and %s to review at %i — one bike, as the reviewer confirmed',
       (shop, leftKey, rightKey, score) => {
         const left = listing(shop, leftKey);
         const right = listing(shop, rightKey);
@@ -187,11 +190,11 @@ describe('case 1: different bikes from the same shop stay different products', (
         expect(left.productId).not.toBe(right.productId);
         expect(gatesOf(left, right)).toEqual([]);
         expect(scoreOfPair(left, asProduct(right))).toBe(score);
-        expect(outcomeOf(left, asProduct(right))).toBe('attach');
+        expect(outcomeOf(left, asProduct(right))).toBe('ask_llm');
       },
     );
 
-    it('is the complete list of differently-named pairs that would auto-attach', () => {
+    it('is the complete list of differently-named pairs that clear ACCEPT_SCORE', () => {
       const attaching = [SPEEDBIKE, EBIKESHOP].flatMap((shop) =>
         sameShopPairs(shop)
           .filter(

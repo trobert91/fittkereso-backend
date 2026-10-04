@@ -1,112 +1,75 @@
 import { Injectable } from '@nestjs/common';
 import { isEmpty } from 'lodash';
 import {
-  CandidateMatchedOn,
-  ProductAlias,
-  ProductAliasRepository,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { nameOf } from '@fittkereso-backend/utils';
-import { KEY_HITS, NAME_HITS } from './product-identity.constants';
 import type { ProductMatchQuery } from './types';
 
-/** One recall hit: a product's name key or one of its aliases, with its trigram similarity. */
+/** One recall hit: a listing of a product, by its key. */
 export interface RecallRow {
   productId: string;
-  matchedOn: CandidateMatchedOn;
-  /** The stored name key or the raw alias; for a matcherModel hit, the product's name key. */
-  matchedValue: string;
-  trigram: number;
+  /** The listing's normalizedModel. */
+  normalizedModel: string;
+  /** The listing's model as written: what the model-number check reads. */
+  model: string | null;
 }
 
 /**
- * The finder's one SQL read: products of the query's brand and category whose
- * name key or an alias is trigram-similar to the query key.
+ * The finder's SQL reads: listings of the query's brand and category whose
+ * normalizedModel equals one of the query's keys (exact), or is
+ * trigram-similar to one (fuzzy). Listings of a source that does not
+ * identify products carry no key, so only identifying listings are found.
  *
- * Filters with `%`, which the GIN trigram indexes serve (`similarity() > x`
- * can't use them); its cut-off is `pg_trgm.similarity_threshold`, default 0.3.
- * `similarity()` only orders. Brand and category sit inside each half of the
- * union, and the limit counts rows, so one product can take several — the
- * finder keeps its best.
+ * Neither has a row limit: a brand's products in one category are few
+ * enough to score every product the trigram cut-off lets through
+ * (`pg_trgm.similarity_threshold`, 0.3), and a limit was measured to drop a
+ * same-bike product behind its neighbours — trigram ranks "730 abs macina
+ * style" above "730 easy entry macina style". The finder ranks by its own
+ * score.
  */
 @Injectable()
 export class CandidateRecallService {
   constructor(
     private readonly productRepo: ProductModelRepository,
-    private readonly aliasRepo: ProductAliasRepository,
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
   ) {}
 
-  public async recall(query: ProductMatchQuery): Promise<RecallRow[]> {
-    const products = `"${this.productRepo.repo.metadata.tableName}"`;
-    const aliases = `"${this.aliasRepo.repo.metadata.tableName}"`;
-    const normalizedName = `"${nameOf<ProductModel>('normalizedName')}"`;
-    const brandId = `"${nameOf<ProductModel>('brand')}Id"`;
-    const categoryId = `"${nameOf<ProductModel>('productCategory')}Id"`;
-    const alias = `"${nameOf<ProductAlias>('alias')}"`;
-    const modelId = `"${nameOf<ProductAlias>('model')}Id"`;
-    const scope = `pm.${brandId} = $2 AND pm.${categoryId} = $3 AND pm.id IS DISTINCT FROM $4::uuid`;
-
-    const rows: (Omit<RecallRow, 'trigram'> & { trigram: number | string })[] =
-      await this.productRepo.repo.query(
-        `SELECT pm.id AS "productId", 'name' AS "matchedOn", pm.${normalizedName} AS "matchedValue",
-                similarity(pm.${normalizedName}, $1) AS trigram
-         FROM ${products} AS pm
-         WHERE pm.${normalizedName} % $1 AND ${scope}
-         UNION ALL
-         SELECT pm.id, 'alias', pa.${alias}, similarity(pa.${alias}, $1)
-         FROM ${aliases} AS pa
-         JOIN ${products} AS pm ON pm.id = pa.${modelId}
-         WHERE pa.${alias} % $1 AND ${scope}
-         ORDER BY trigram DESC
-         LIMIT $5`,
-        [
-          query.nameKey,
-          query.brandId,
-          query.categoryId,
-          query.productId ?? null,
-          NAME_HITS,
-        ],
-      );
-
-    return rows.map((row) => ({ ...row, trigram: Number(row.trigram) }));
+  /** Listings whose key equals one of `keys`. */
+  public async exact(query: ProductMatchQuery, keys: string[]): Promise<RecallRow[]> {
+    if (isEmpty(keys)) return [];
+    return this.read(query, `= ANY($1::text[])`, keys);
   }
 
-  /**
-   * Products of the query's brand and category with a listing keyed like the
-   * query (`normalizedModel`), however far apart the names are: "Tour CX 830"
-   * and "Macina Tour CX830" key alike and may not reach the trigram cut-off.
-   * Each row carries the product's name key, so the finder scores it like a
-   * name row. Its own limit, since the name arm's rows are capped at NAME_HITS.
-   */
-  public async recallByMatcherModel(query: ProductMatchQuery): Promise<RecallRow[]> {
-    const keys = query.matcherModelKeys ?? [];
-    if (isEmpty(keys)) return [];
+  /** Listings whose key is trigram-similar to `key`, equal ones included. */
+  public async fuzzy(query: ProductMatchQuery, key: string): Promise<RecallRow[]> {
+    return this.read(query, `% $1`, key);
+  }
 
-    const products = `"${this.productRepo.repo.metadata.tableName}"`;
+  private async read(
+    query: ProductMatchQuery,
+    condition: string,
+    value: string | string[],
+  ): Promise<RecallRow[]> {
     const records = `"${this.sourceRecordRepo.repo.metadata.tableName}"`;
-    const normalizedName = `"${nameOf<ProductModel>('normalizedName')}"`;
+    const products = `"${this.productRepo.repo.metadata.tableName}"`;
+    const productId = `"${nameOf<ProductSourceRecord>('product')}Id"`;
+    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
+    const model = `"${nameOf<ProductSourceRecord>('model')}"`;
     const brandId = `"${nameOf<ProductModel>('brand')}Id"`;
     const categoryId = `"${nameOf<ProductModel>('productCategory')}Id"`;
-    const modelId = `"${nameOf<ProductSourceRecord>('product')}Id"`;
-    const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
 
-    const rows: (Omit<RecallRow, 'trigram'> & { trigram: number | string })[] =
-      await this.productRepo.repo.query(
-        `SELECT DISTINCT pm.id AS "productId", 'matcherModel' AS "matchedOn", pm.${normalizedName} AS "matchedValue",
-                similarity(pm.${normalizedName}, $1) AS trigram
+    return this.sourceRecordRepo.repo.query(
+      `SELECT DISTINCT r.${productId} AS "productId", r.${key} AS "normalizedModel", r.${model} AS model
          FROM ${records} AS r
-         JOIN ${products} AS pm ON pm.id = r.${modelId}
-         WHERE r.${key} = ANY($2::text[])
-           AND pm.${brandId} = $3 AND pm.${categoryId} = $4 AND pm.id IS DISTINCT FROM $5::uuid
-         ORDER BY trigram DESC
-         LIMIT $6`,
-        [query.nameKey, keys, query.brandId, query.categoryId, query.productId ?? null, KEY_HITS],
-      );
-
-    return rows.map((row) => ({ ...row, trigram: Number(row.trigram) }));
+         JOIN ${products} AS pm ON pm.id = r.${productId}
+        WHERE r.${key} ${condition}
+          AND pm.${brandId} = $2 AND pm.${categoryId} = $3 AND pm.id IS DISTINCT FROM $4::uuid
+        ORDER BY "productId", "normalizedModel", model`,
+      [value, query.brandId, query.categoryId, query.productId ?? null],
+    );
   }
 }

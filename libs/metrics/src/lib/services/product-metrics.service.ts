@@ -3,7 +3,6 @@ import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
   IDENTITY_EXTRACTION_TOTAL,
-  LISTING_MATCH_SHADOW_TOTAL,
   IDENTITY_KEY_CONFLICT_TOTAL,
   IDENTITY_KEY_DISAGREEMENT_TOTAL,
   IDENTITY_RECHECK_ATTACHED_TOTAL,
@@ -59,10 +58,10 @@ export type ScrapeResolutionOutcome =
   /** A source that does not identify products found no offer of its seller
    *  to join: its listing waits unattached until one is written. */
   | 'unattached'
-  /** Path 4, where the category requires matcherModel keys: the extraction
-   *  failed, so the listing has no key, and a candidate scored a near-miss.
-   *  The task fails to be retried rather than create a likely duplicate. */
-  | 'deferred_no_matcher_model';
+  /** Path 4: the extraction failed, so the listing has no model key, and a
+   *  candidate scored a near-miss by its title. The task fails to be retried
+   *  rather than create a likely duplicate. */
+  | 'deferred_no_model';
 
 /**
  * How two things came to claim one offer identity.
@@ -126,7 +125,6 @@ export class ProductMetricsService {
   private readonly identityKeyDisagreementCounter: client.Counter<string>;
   private readonly identityRecheckAttachedCounter: client.Counter<string>;
   private readonly identityExtractionCounter: client.Counter<string>;
-  private readonly listingMatchShadowCounter: client.Counter<string>;
   private readonly identitySpecRowsHistogram: client.Histogram<string>;
   private readonly specUnificationCounter: client.Counter<string>;
   private readonly sourceRecordUrlChangedCounter: client.Counter<string>;
@@ -228,12 +226,6 @@ export class ProductMetricsService {
       labelNames: ['source', 'result'],
       registers: [this.prometheusService.register],
     });
-    this.listingMatchShadowCounter = new client.Counter({
-      name: LISTING_MATCH_SHADOW_TOTAL,
-      help: 'Name-matched listings by how the shadow rule compares with the acting one',
-      labelNames: ['source', 'mode', 'comparison', 'shadow'],
-      registers: [this.prometheusService.register],
-    });
     this.identitySpecRowsHistogram = new client.Histogram({
       name: IDENTITY_SPEC_ROWS_MATCHED,
       help: 'Spec-table rows the identity extraction received per listing, for sources with a row list',
@@ -332,16 +324,6 @@ export class ProductMetricsService {
 
   identityExtraction(source: string, result: IdentityExtractionResult): void {
     this.identityExtractionCounter.inc({ source, result });
-  }
-
-  /** One name-matched listing's shadow comparison (LISTING_MATCH_SHADOW_TOTAL). */
-  listingMatchShadow(
-    source: string,
-    mode: string,
-    comparison: string,
-    shadow: string,
-  ): void {
-    this.listingMatchShadowCounter.inc({ source, mode, comparison, shadow });
   }
 
   identitySpecRowsMatched(source: string, rows: number): void {

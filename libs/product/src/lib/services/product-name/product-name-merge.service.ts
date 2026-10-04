@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ProductAlias, ProductAliasSource, ProductModel, ProductSource, ProductSourceRecord } from '@fittkereso-backend/database';
-import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { orderBy } from 'lodash';
 import { productDisplayName } from '@fittkereso-backend/utils';
 import { BrandResolutionService } from '../brand/brand-resolution.service';
 import { getLatestSourcePerSource } from '../product-spec/get-latest-source-per-source';
-import { ProductNormalizerService } from '../product-normalizer.service';
 import { EntityManager } from 'typeorm';
 import { ProductAliasRepository } from '@fittkereso-backend/database';
 
@@ -24,9 +22,8 @@ interface ValueGroup {
 }
 
 /**
- * Recomputes ProductModel's name fields (brand/model/displayName/aliases,
- * plus the normalizedName key built from them) from its identifying
- * ProductSourceRecords — the name-field counterpart to
+ * Recomputes ProductModel's name fields (brand/model/displayName/aliases)
+ * from its identifying ProductSourceRecords — the name-field counterpart to
  * ProductSpecMergeService, called from ProductMergeService.mergeSources
  * alongside the spec merge.
  *
@@ -42,15 +39,12 @@ export class ProductNameMergeService {
   constructor(
     private readonly brandResolution: BrandResolutionService,
     private readonly aliasRepo: ProductAliasRepository,
-    private readonly productNormalizer: ProductNormalizerService,
-    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   /** `records`: the product's records of sources that identify products. */
   public async mergeNames(
     model: ProductModel,
     records: ProductSourceRecord[],
-    categorySlug: string | undefined,
     manager?: EntityManager,
   ): Promise<void> {
     const latestPerSource = getLatestSourcePerSource(records);
@@ -75,8 +69,6 @@ export class ProductNameMergeService {
       model.displayName = productDisplayName(model.brand?.name, name);
     }
 
-    // Before the alias merge, which skips aliases equal to the key.
-    this.recomputeNormalizedName(model, categorySlug);
     await this.mergeAliases(model, latestPerSource, manager);
   }
 
@@ -182,41 +174,6 @@ export class ProductNameMergeService {
     return orderBy(group.candidates, ['lastUpdated', 'priority'], ['desc', 'desc'])[0];
   }
 
-  // ─── normalizedName: the trigram key, rebuilt from the picked names ─────
-
-  /**
-   * Keeps the key in step with the names picked above; before this it only
-   * changed on creation, admin edits, splits and the backfill script. Strips
-   * the resolved brand's name rather than a source's scraped brand string, so
-   * the key doesn't depend on how one shop spells the brand. Products the
-   * scraper loads carry no brand relation, so when no brand was resolved
-   * above the old key stays — as it does when there's no name to build from.
-   */
-  private recomputeNormalizedName(
-    model: ProductModel,
-    categorySlug: string | undefined,
-  ): void {
-    const brandName = model.brand?.name;
-    if (!brandName) return;
-
-    const strategy =
-      this.categoryConfigService.getConfig(categorySlug)
-        ?.normalizationStrategy ?? 'full-sorted';
-    try {
-      model.normalizedName = this.productNormalizer.normalizeProduct({
-        brand: brandName,
-        model: model.model,
-        displayName: model.displayName,
-        strategy,
-      });
-    } catch (error: unknown) {
-      this.logger.warn('Kept the old normalizedName', {
-        modelId: model.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
   // ─── Aliases: union, not corroboration-gated ────────────────────────────
 
   private async mergeAliases(
@@ -240,7 +197,7 @@ export class ProductNameMergeService {
     const existing = model.aliases ?? [];
     const existingTexts = new Set([
       model.displayName,
-      model.normalizedName,
+      model.model,
       ...existing.map((a) => a.alias),
     ]);
 

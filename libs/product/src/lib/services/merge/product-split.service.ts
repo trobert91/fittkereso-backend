@@ -16,14 +16,12 @@ import {
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { CategoryConfigService } from '@fittkereso-backend/config';
 import { nameOf } from '@fittkereso-backend/utils';
 import { EntityManager } from 'typeorm';
 import { compact, isEmpty, uniq } from 'lodash';
 import { ProductMergeService } from './product-merge.service';
 import { ProductModelFactoryService } from '../product-model-factory.service';
 import { ProductEmbeddingService } from '../product-embedding.service';
-import { ProductNormalizerService } from '../product-normalizer.service';
 
 export interface SplitIntoNewProductParams {
   /** The listings to carve out. All must currently belong to the same product. */
@@ -55,8 +53,6 @@ export class ProductSplitService {
     private readonly modelFactory: ProductModelFactoryService,
     private readonly embeddingService: ProductEmbeddingService,
     private readonly locks: AdvisoryLockService,
-    private readonly productNormalizer: ProductNormalizerService,
-    private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
   public async splitIntoNewProduct(
@@ -194,7 +190,6 @@ export class ProductSplitService {
     }
     const model = scraped?.model ?? scraped?.originalName ?? newest.product?.model ?? displayName;
     const brandName = scraped?.brand ?? newest.product?.brand?.name;
-    const categorySlug = scraped?.category?.slug ?? newest.product?.productCategory?.slug;
 
     return this.modelFactory.createShell({
       brandName,
@@ -202,16 +197,6 @@ export class ProductSplitService {
       model,
       categoryId,
       categoryName: scraped?.category?.name,
-      // Built from the names just picked, not read off the record: a record
-      // of a source that does not identify products stores no key.
-      normalizedName: this.productNormalizer.normalizeProduct({
-        brand: brandName ?? '',
-        model,
-        displayName,
-        strategy:
-          this.categoryConfigService.getConfig(categorySlug)?.normalizationStrategy ??
-          'full-sorted',
-      }),
     });
   }
 

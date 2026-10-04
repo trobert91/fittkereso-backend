@@ -17,8 +17,6 @@ export interface NewProductModelParams {
   model: string;
   categoryId: string;
   categoryName?: string;
-  /** Identity key derived from brand/model/displayName at scrape time. */
-  normalizedName: string;
 }
 
 /**
@@ -58,7 +56,6 @@ export class ProductModelFactoryService {
     model.brand = brand.entity;
     model.displayName = params.displayName;
     model.model = params.model;
-    model.normalizedName = params.normalizedName;
     model.enabled = true;
 
     model.embedding = new ProductEmbedding();

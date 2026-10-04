@@ -17,7 +17,7 @@ function makeRow(overrides: Partial<DuplicatePairRow> = {}): DuplicatePairRow {
     matchedValue: '140 hybrid stereo',
     failedGates: [],
     nameSimilarity: { trigram: 0.8, levenshtein: 0.75 },
-    matcherModelMatch: null,
+    normalizedModelMatch: null,
     detectedBy: 'scan',
     ...overrides,
   };
@@ -111,7 +111,7 @@ describe('ProductDuplicatePairRepository.upsertPairs', () => {
     await repository.upsertPairs(
       [
         makeRow({ productAId: ID_2, productBId: ID_3 }),
-        makeRow({ productAId: ID_1, productBId: ID_2, failedGates: gates, matcherModelMatch: true }),
+        makeRow({ productAId: ID_1, productBId: ID_2, failedGates: gates, normalizedModelMatch: true }),
       ],
       manager as never,
     );

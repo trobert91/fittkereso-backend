@@ -25,8 +25,8 @@ const KEY = '140 hybrid stereo';
 
 function specGates(querySpecs: ProductSpecs, candidateSpecs: ProductSpecs) {
   return applyGates({
-    queryKey: KEY,
-    candidateKey: KEY,
+    queryModel: KEY,
+    candidateModel: KEY,
     querySpecs,
     candidateSpecs,
     categoryConfig: ebikes,
@@ -61,7 +61,7 @@ describe('applyGates', () => {
   it('skips a spec missing on either side', () => {
     expect(specGates({ modelYear: 2023 }, { batteryCapacity: 750 })).toEqual([]);
     expect(specGates({}, { modelYear: 2024 })).toEqual([]);
-    expect(applyGates({ queryKey: KEY, candidateKey: KEY, categoryConfig: ebikes })).toEqual([]);
+    expect(applyGates({ queryModel: KEY, candidateModel: KEY, categoryConfig: ebikes })).toEqual([]);
   });
 
   it('uses the category tolerances and compatible values', () => {
@@ -90,8 +90,8 @@ describe('applyGates', () => {
   it('has no spec gates for a category without spec lists', () => {
     expect(
       applyGates({
-        queryKey: KEY,
-        candidateKey: KEY,
+        queryModel: KEY,
+        candidateModel: KEY,
         querySpecs: { modelYear: 2023 },
         candidateSpecs: { modelYear: 2024 },
         categoryConfig: {},
@@ -101,7 +101,7 @@ describe('applyGates', () => {
 
   describe('model numbers', () => {
     it("fails when neither key's numbers contain the other's", () => {
-      expect(applyGates({ queryKey: '720 cross macina', candidateKey: '725 cross macina' })).toEqual([
+      expect(applyGates({ queryModel: '720 cross macina', candidateModel: '725 cross macina' })).toEqual([
         {
           gate: 'modelNumberMismatch',
           severity: 30,
@@ -112,11 +112,37 @@ describe('applyGates', () => {
     });
 
     it("passes when one key's numbers are a subset of the other's", () => {
-      expect(applyGates({ queryKey: '2024 720 cross macina', candidateKey: '720 cross macina' })).toEqual([]);
+      expect(applyGates({ queryModel: '2024 720 cross macina', candidateModel: '720 cross macina' })).toEqual([]);
     });
 
     it('skips when either key has no number', () => {
-      expect(applyGates({ queryKey: 'cross macina', candidateKey: '725 cross macina' })).toEqual([]);
+      expect(applyGates({ queryModel: 'cross macina', candidateModel: '725 cross macina' })).toEqual([]);
+    });
+
+    // #9 issue 5: bikelife writes "CX830", the other shops "CX 830".
+    it('reads a model number written apart as the same number', () => {
+      expect(
+        applyGates({ queryModel: 'Macina Tour CX830', candidateModel: 'Macina Tour CX 830' }),
+      ).toEqual([]);
+      expect(
+        applyGates({ queryModel: 'Macina Tour CX 830', candidateModel: 'Macina Tour CX830' }),
+      ).toEqual([]);
+    });
+
+    // KTM's A510, P510 and CX510 differ only in their glued letters.
+    it.each([
+      ['Macina Central A510', 'Macina Central P510'],
+      ['Macina Tour CX510', 'Macina Tour P510'],
+    ])('tells %s from %s by the letters glued to the number', (queryModel, candidateModel) => {
+      expect(applyGates({ queryModel, candidateModel })).toEqual([
+        expect.objectContaining({ gate: 'modelNumberMismatch' }),
+      ]);
+    });
+
+    it('passes one name printing more of the model, as written', () => {
+      expect(
+        applyGates({ queryModel: 'Macina Style 810 Di2', candidateModel: 'Macina Style 810' }),
+      ).toEqual([]);
     });
   });
 });
@@ -134,7 +160,7 @@ describe('missing specs', () => {
     candidateSpecs: ProductSpecs | undefined,
     categoryConfig = withYearPenalty,
   ) =>
-    applyGates({ queryKey: KEY, candidateKey: KEY, querySpecs, candidateSpecs, categoryConfig });
+    applyGates({ queryModel: KEY, candidateModel: KEY, querySpecs, candidateSpecs, categoryConfig });
 
   it('charges the configured points when only one side states the spec, with null on the silent side', () => {
     expect(gatesFor({ batteryCapacity: 625 }, { modelYear: 2025 })).toEqual([
@@ -190,7 +216,7 @@ describe('per-spec mismatch penalties', () => {
     candidateSpecs: ProductSpecs,
     categoryConfig: ProductCategoryConfig,
   ) =>
-    applyGates({ queryKey: KEY, candidateKey: KEY, querySpecs, candidateSpecs, categoryConfig });
+    applyGates({ queryModel: KEY, candidateModel: KEY, querySpecs, candidateSpecs, categoryConfig });
 
   it('charges a primary spec its own points', () => {
     expect(
@@ -362,6 +388,6 @@ describe('scoreOf', () => {
   ])('scores "%s" against "%s" at %i', (queryKey, candidateKey, expected) => {
     const base = baseScore(nameSimilarity(queryKey, candidateKey));
 
-    expect(scoreOf(base, applyGates({ queryKey, candidateKey }))).toBe(expected);
+    expect(scoreOf(base, applyGates({ queryModel: queryKey, candidateModel: candidateKey }))).toBe(expected);
   });
 });

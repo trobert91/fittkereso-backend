@@ -37,19 +37,18 @@ export function keyPairRowOf(
       productBValue: ownIsA ? candidateValue : queryValue,
     })),
     nameSimilarity: null,
-    matcherModelMatch: null,
+    normalizedModelMatch: null,
     detectedBy,
   };
 }
 
 /**
- * How strongly a candidate is a duplicate: its name score, or — when the two
- * products share a matcherModel key — its spec gates alone, whichever is
- * higher. Two shops wording one model differently ("Tour CX 830", "Macina Tour
- * CX830") can score low on the name and still be the same bike.
+ * How strongly a candidate is a duplicate: its name score, or — when a
+ * listing of each has the same normalizedModel — its spec gates alone,
+ * whichever is higher: equal keys already say the names agree.
  */
 export function pairScoreOf(candidate: ProductCandidate): number {
-  return candidate.matcherModelMatch
+  return candidate.normalizedModelMatch
     ? Math.max(candidate.score, candidate.keyScore)
     : candidate.score;
 }
@@ -83,7 +82,7 @@ export function pairRowOf(
       }),
     ),
     nameSimilarity: candidate.nameSimilarity,
-    matcherModelMatch: candidate.matcherModelMatch ?? null,
+    normalizedModelMatch: candidate.normalizedModelMatch ?? null,
     detectedBy,
   };
 }

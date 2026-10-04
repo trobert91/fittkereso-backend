@@ -1,17 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { take } from 'lodash';
 import type {
-  ListingMatchAlternative,
   ListingMatchCandidate,
   ListingMatchDecision,
   ListingMatchLlmRecord,
-  ListingMatchMode,
   ListingMatchOutcome,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
 import { listingNames } from '@fittkereso-backend/database';
 import { BrandResolutionService } from '@fittkereso-backend/product';
-import { ListingMatchChoice, decideListingMatch } from './listing-match-decision';
+import { decideListingMatch } from './listing-match-decision';
 import { ListingMatchLlmService } from './listing-match-llm.service';
 import {
   LISTING_DECISION_CANDIDATES,
@@ -37,11 +35,12 @@ export interface ListingMatchOptions {
  * LLM about the near-misses, or leave it to be created. Writes nothing — the
  * scraper persists, and stores the decision on its task.
  *
- * Two rules decide (decideListingMatch): the name score, and equal
- * matcherModel keys. The category's `matchingConfig.model.required`
- * picks the one that acts; the other runs in shadow and the decision records
- * what it would have done (`alternative`). A listing without a key always goes
- * by the score.
+ * Only a product with the listing's normalizedModel can attach it, on its spec
+ * gates (decideListingMatch). Those are exactly the candidates the exact-key
+ * pass recalls, scored as the full search scores them, so when one attaches
+ * the trigram search is skipped; otherwise it runs, for the near-misses the
+ * LLM may be asked about. A listing without a model has no key: it is searched
+ * by its title, and never attached by name.
  */
 @Injectable()
 export class ListingMatchService {
@@ -73,22 +72,27 @@ export class ListingMatchService {
     }
 
     const query = this.queryService.ofListing(scrapedProduct, brand.entity);
+    if (query.keyed) {
+      const exact = await this.finder.findCandidates(query, { fuzzy: false });
+      const choice = decideListingMatch(exact);
+      if (choice.kind === 'attach') {
+        return this.resultOf({
+          outcome: 'identified',
+          query,
+          candidates: exact,
+          productId: choice.candidate.productId,
+          shortCircuit: true,
+        });
+      }
+    }
+
     const candidates = await this.finder.findCandidates(query);
-    const [key] = query.matcherModelKeys ?? [];
-    const required = this.queryService.requiresMatcherModel(query.categorySlug);
-    const mode: ListingMatchMode = required && key ? 'key' : 'score';
-    const decide = (rule: ListingMatchMode) =>
-      decideListingMatch(candidates, { mode: rule, shortKey: wordsOf(key) < 2 });
-
-    const choice = decide(mode);
-    // Only a listing with a key has another rule to compare.
-    const shadow = key ? decide(mode === 'key' ? 'score' : 'key') : undefined;
-    const base = { query, candidates, mode, choice, shadow };
-
+    const choice = decideListingMatch(candidates);
     if (choice.kind === 'attach') {
       return this.resultOf({
-        ...base,
         outcome: 'identified',
+        query,
+        candidates,
         productId: choice.candidate.productId,
       });
     }
@@ -96,15 +100,15 @@ export class ListingMatchService {
     // Nothing close enough to be worth a call, or the check is turned off: a
     // new product either way, which is what the LLM declining would give.
     if (choice.kind === 'not_found' || !LLM_ENABLED || options.llm === false) {
-      return this.resultOf({ ...base, outcome: 'created' });
+      return this.resultOf({ outcome: 'created', query, candidates });
     }
 
     const llm = await this.llmService.pick(
       {
         brandName: query.brandName,
         model: scrapedProduct.model,
-        displayName: names.displayName,
-        nameKey: query.nameKey,
+        title: scrapedProduct.originalName,
+        normalizedModel: query.keyed ? query.keys?.[0] : undefined,
         specs: query.specs,
       },
       choice.candidates,
@@ -112,8 +116,9 @@ export class ListingMatchService {
     );
 
     return this.resultOf({
-      ...base,
       outcome: llm.productId ? 'llm_identified' : 'created',
+      query,
+      candidates,
       productId: llm.productId,
       llm,
     });
@@ -123,17 +128,14 @@ export class ListingMatchService {
     outcome: ListingMatchOutcome;
     query: ProductMatchQuery;
     candidates: ProductCandidate[];
-    mode: ListingMatchMode;
-    choice: ListingMatchChoice<ProductCandidate>;
-    shadow?: ListingMatchChoice<ProductCandidate>;
     productId?: string;
     llm?: ListingMatchLlmRecord;
+    shortCircuit?: boolean;
   }): ListingMatchResult {
-    const { outcome, query, candidates, mode, shadow, productId, llm } = params;
-    const [key] = query.matcherModelKeys ?? [];
-    // The chosen product first, whichever rule chose it; then best first, as
-    // the finder ranked them. Only the top few are worth storing on every
-    // import task.
+    const { outcome, query, candidates, productId, llm, shortCircuit } = params;
+    const [key] = query.keyed ? (query.keys ?? []) : [];
+    // The chosen product first, then best first, as the finder ranked them.
+    // Only the top few are worth storing on every import task.
     const chosen = candidates.find((candidate) => candidate.productId === productId);
     const ranked = chosen
       ? [chosen, ...candidates.filter((candidate) => candidate !== chosen)]
@@ -143,44 +145,13 @@ export class ListingMatchService {
       productId,
       decision: {
         outcome,
-        nameKey: query.nameKey,
         candidates: take(ranked, LISTING_DECISION_CANDIDATES).map(snapshotOf),
-        mode,
-        ...(key ? { matcherModelKey: key } : {}),
-        ...(shadow ? { alternative: alternativeOf(mode, shadow, productId) } : {}),
+        ...(key ? { normalizedModel: key } : {}),
+        ...(shortCircuit ? { shortCircuit } : {}),
         ...(llm ? { llm } : {}),
       },
     };
   }
-}
-
-/** What the rule that didn't act would have done, against what was done. */
-function alternativeOf(
-  acting: ListingMatchMode,
-  shadow: ListingMatchChoice<ProductCandidate>,
-  productId: string | undefined,
-): ListingMatchAlternative {
-  const shadowProductId = shadow.kind === 'attach' ? shadow.candidate.productId : undefined;
-  const comparison =
-    shadowProductId === productId
-      ? 'agree'
-      : !shadowProductId
-        ? 'split'
-        : !productId
-          ? 'join'
-          : 'switch';
-
-  return {
-    mode: acting === 'key' ? 'score' : 'key',
-    kind: shadow.kind,
-    ...(shadowProductId ? { productId: shadowProductId } : {}),
-    ...(shadow.kind === 'ask_llm' ? { llmCandidates: shadow.candidates.length } : {}),
-    comparison,
-  };
-}
-
-function wordsOf(key: string | undefined): number {
-  return key ? key.split(' ').length : 0;
 }
 
 function snapshotOf(candidate: ProductCandidate): ListingMatchCandidate {
@@ -190,8 +161,8 @@ function snapshotOf(candidate: ProductCandidate): ListingMatchCandidate {
     score: candidate.score,
     matchedOn: candidate.matchedOn,
     failedGates: candidate.failedGates,
-    ...(candidate.matcherModelMatch !== undefined
-      ? { matcherModelMatch: candidate.matcherModelMatch }
+    ...(candidate.normalizedModelMatch !== undefined
+      ? { normalizedModelMatch: candidate.normalizedModelMatch }
       : {}),
     keyScore: candidate.keyScore,
   };

@@ -19,9 +19,10 @@ const MAX_SPECS_RENDERED = 8;
 export interface ListingMatchLlmQuery {
   brandName: string;
   model?: string;
-  displayName?: string;
-  /** The key recall and scoring ran on. */
-  nameKey: string;
+  /** The title as the shop publishes it. */
+  title?: string;
+  /** The listing's normalizedModel; absent for a listing without a model. */
+  normalizedModel?: string;
   specs?: ProductSpecs;
 }
 
@@ -169,8 +170,8 @@ function buildUserMessage(
     `Brand: ${query.brandName}`,
     `Model: ${query.model ?? 'unknown'}`,
   ];
-  if (query.displayName) lines.push(`Listing title: ${query.displayName}`);
-  lines.push(`Matched on name key: "${query.nameKey}"`);
+  if (query.title) lines.push(`Listing title: ${query.title}`);
+  if (query.normalizedModel) lines.push(`Matched on model key: "${query.normalizedModel}"`);
   const specs = renderSpecs(query.specs);
   if (specs) lines.push(`Specs: ${specs}`);
 

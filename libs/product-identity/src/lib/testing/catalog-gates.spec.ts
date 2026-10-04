@@ -162,8 +162,8 @@ describe('gates on the real KTM catalog', () => {
       // costs is the model year the category will not match without.
       for (const other of CATALOG) {
         const specGates = applyGates({
-          queryKey: other.nameKey,
-          candidateKey: other.nameKey,
+          queryModel: other.nameKey,
+          candidateModel: other.nameKey,
           querySpecs: undefined,
           candidateSpecs: other.specs,
           categoryConfig: EBIKES,
@@ -222,8 +222,8 @@ describe('gates on the real KTM catalog', () => {
       // The catalog carries both "MTB" and "Összteleszkópos MTB"; the ebikes
       // compatible values say the latter is a kind of the former.
       const gates = applyGates({
-        queryKey: 'same key',
-        candidateKey: 'same key',
+        queryModel: 'same key',
+        candidateModel: 'same key',
         querySpecs: { usageType: 'MTB' },
         candidateSpecs: { usageType: 'Összteleszkópos MTB' },
         categoryConfig: EBIKES,
@@ -235,8 +235,8 @@ describe('gates on the real KTM catalog', () => {
     it('prices a men\'s against a women\'s frame as a matcher spec, and lets Uniszex through', () => {
       const gatesOf = (queryGender: string, candidateGender: string) =>
         applyGates({
-          queryKey: '720 macina style',
-          candidateKey: '720 macina style',
+          queryModel: '720 macina style',
+          candidateModel: '720 macina style',
           querySpecs: { gender: queryGender },
           candidateSpecs: { gender: candidateGender },
           categoryConfig: EBIKES,
@@ -253,8 +253,8 @@ describe('gates on the real KTM catalog', () => {
     it('lets Unisex through in either spelling and any case', () => {
       const gatesOf = (queryGender: string, candidateGender: string) =>
         applyGates({
-          queryKey: '720 macina style',
-          candidateKey: '720 macina style',
+          queryModel: '720 macina style',
+          candidateModel: '720 macina style',
           querySpecs: { gender: queryGender },
           candidateSpecs: { gender: candidateGender },
           categoryConfig: EBIKES,
@@ -283,8 +283,8 @@ describe('gates on the real KTM catalog', () => {
 
     it('holds model year and battery capacity to an exact match', () => {
       const gates = applyGates({
-        queryKey: 'same key',
-        candidateKey: 'same key',
+        queryModel: 'same key',
+        candidateModel: 'same key',
         querySpecs: { modelYear: 2025, batteryCapacity: 750 },
         candidateSpecs: { modelYear: 2026, batteryCapacity: 800 },
         categoryConfig: EBIKES,

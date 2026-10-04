@@ -9,7 +9,6 @@ import { AdminBrandController } from './controllers/admin-brand.controller';
 import { TaskModule } from '@fittkereso-backend/task';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { AdminTaskController } from './controllers/admin-task.controller';
-import { AdminTestController } from './controllers/admin-test.controller';
 import { AdminProductSourceController } from './controllers/admin-product-source.controller';
 import { AdminProductDuplicateController } from './controllers/admin-product-duplicate.controller';
 import { AdminProductImportTaskController } from './controllers/admin-product-import-task.controller';
@@ -38,7 +37,6 @@ import { UserModule } from '@fittkereso-backend/user';
     AdminProductImportTaskController,
     AdminSellerController,
     AdminTaskController,
-    AdminTestController,
     AdminUserController,
   ],
 })

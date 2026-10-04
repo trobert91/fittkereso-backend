@@ -9,8 +9,10 @@ import { compareSpecValue, type SpecValue } from './spec-values';
 import type { FailedGate } from './types';
 
 export interface GateInput {
-  queryKey: string;
-  candidateKey: string;
+  /** The query's model as written (else its title), for the model-number check. */
+  queryModel: string;
+  /** The candidate listing's model as written. */
+  candidateModel: string;
   querySpecs?: ProductSpecs;
   candidateSpecs?: ProductSpecs;
   /** Supplies the spec lists, compatible values and tolerances. */
@@ -39,7 +41,7 @@ export function applyGates(input: GateInput): FailedGate[] {
   return compact([
     ...primarySpecs.map((key) => specGate('primarySpecMismatch', key, input)),
     ...missingSpecGates(input),
-    modelNumberGate(input.queryKey, input.candidateKey),
+    modelNumberGate(input.queryModel, input.candidateModel),
     ...matcherSpecs.map((key) => specGate('matcherSpecMismatch', key, input)),
   ]);
 }
@@ -52,7 +54,7 @@ export function applyGates(input: GateInput): FailedGate[] {
  * as a different model.
  */
 export function primarySpecMismatches(
-  input: Omit<GateInput, 'queryKey' | 'candidateKey'>,
+  input: Omit<GateInput, 'queryModel' | 'candidateModel'>,
 ): FailedGate[] {
   return compact(
     uniq(input.categoryConfig?.primarySpecs ?? []).map((key) =>
@@ -68,7 +70,7 @@ export function scoreOf(baseScore: number, failedGates: FailedGate[]): number {
 
 /**
  * 100 minus the spec gates alone — primary, missing and matcher specs — for a
- * candidate whose matcherModel key equals the query's. The name is not in
+ * candidate whose normalizedModel equals the query's. The name is not in
  * question there, and equal keys already carry equal model numbers, so the
  * model-number gate would only read a size one shop wrote into its title.
  */
@@ -139,7 +141,7 @@ function specGate(
     querySpecs,
     candidateSpecs,
     categoryConfig,
-  }: Omit<GateInput, 'queryKey' | 'candidateKey'>,
+  }: Omit<GateInput, 'queryModel' | 'candidateModel'>,
 ): FailedGate | undefined {
   const severity = mismatchSeverity(gate, key, categoryConfig);
   if (severity <= 0) return undefined;
@@ -182,25 +184,31 @@ function mismatchSeverity(
 }
 
 /**
- * Fires when both keys carry model numbers (words containing a digit) and
- * neither set contains the other: "720 cross macina" vs "725 cross macina".
- * A subset passes — "2024 720 cross macina" vs "720 cross macina" is one shop
- * printing more of the name. Name similarity alone scores that 720/725 pair
- * 94, which would auto-attach.
+ * Fires when both names carry model numbers (words with a digit) and neither
+ * name has all of the other's: "Macina Cross 720" vs "Macina Cross 725".
+ * One name having all of the other's passes — "Macina Style 810 Di2" vs
+ * "Macina Style 810" is one shop printing more of the name. Name similarity
+ * alone scores that 720/725 pair 94.
+ *
+ * Reads the names as written, with letters glued to their digits, because
+ * those letters tell models apart: KTM's A510, P510 and CX510 differ only
+ * there, and a split key reads all three as "510". A number counts as there
+ * when the other name writes it whole or as its letter and digit runs, so
+ * "CX830" and "CX 830" agree.
  */
 function modelNumberGate(
-  queryKey: string,
-  candidateKey: string,
+  queryModel: string,
+  candidateModel: string,
 ): FailedGate | undefined {
-  const queryNumbers = modelNumbersOf(queryKey);
-  const candidateNumbers = modelNumbersOf(candidateKey);
+  const queryNumbers = modelNumbersOf(queryModel);
+  const candidateNumbers = modelNumbersOf(candidateModel);
   if (isEmpty(queryNumbers) || isEmpty(candidateNumbers)) return undefined;
 
-  const isSubset = (small: string[], large: string[]) =>
-    small.every((word) => large.includes(word));
+  const queryWords = new Set(writtenWords(queryModel));
+  const candidateWords = new Set(writtenWords(candidateModel));
   if (
-    isSubset(queryNumbers, candidateNumbers) ||
-    isSubset(candidateNumbers, queryNumbers)
+    queryNumbers.every((number) => isWrittenIn(number, candidateWords)) ||
+    candidateNumbers.every((number) => isWrittenIn(number, queryWords))
   ) {
     return undefined;
   }
@@ -213,6 +221,23 @@ function modelNumberGate(
   };
 }
 
-function modelNumbersOf(key: string): string[] {
-  return uniq(key.split(/\s+/).filter((word) => /\d/.test(word))).sort();
+/** A name's words as written: lowercased, split on spaces and punctuation, letters and digits kept together. */
+function writtenWords(name: string): string[] {
+  return name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}+]+/u)
+    .filter(Boolean);
+}
+
+function modelNumbersOf(name: string): string[] {
+  return uniq(writtenWords(name).filter((word) => /\d/.test(word))).sort();
+}
+
+/** Whether a model number is in a name's words: whole, or as each of its letter and digit runs. */
+function isWrittenIn(number: string, words: Set<string>): boolean {
+  if (words.has(number)) return true;
+  const runs = number.match(/\p{L}+|\p{N}+/gu) ?? [];
+  return runs.length > 0 && runs.every((run) => words.has(run));
 }

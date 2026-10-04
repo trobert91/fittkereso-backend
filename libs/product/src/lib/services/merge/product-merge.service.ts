@@ -178,7 +178,6 @@ export class ProductMergeService {
     await this.nameMergeService.mergeNames(
       model,
       model.sources.filter((record) => record.source?.identifiesProducts !== false),
-      categorySlug,
     );
 
     model.description = this.descriptionService.pick(model.sources);
@@ -491,14 +490,9 @@ export class ProductMergeService {
     source: ProductModel,
     target: ProductModel,
   ): Promise<void> {
-    const namesToAlias = [
-      source.displayName,
-      source.normalizedName,
-      source.model,
-    ];
+    const namesToAlias = [source.displayName, source.model];
     const uniqueNames = [...new Set(namesToAlias)].filter(
-      (name) =>
-        name && name !== target.displayName && name !== target.normalizedName,
+      (name) => name && name !== target.displayName && name !== target.model,
     );
 
     for (const name of uniqueNames) {

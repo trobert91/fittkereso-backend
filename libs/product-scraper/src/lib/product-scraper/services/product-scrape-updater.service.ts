@@ -56,7 +56,6 @@ import {
   ProductImageCopyService,
   ProductMergeService,
   ProductModelFactoryService,
-  ProductNormalizerService,
   ProductSourceRecordUpdaterService,
 } from '@fittkereso-backend/product';
 import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
@@ -168,7 +167,6 @@ export class ProductScrapeUpdaterService {
     private readonly mergeService: ProductMergeService,
     private readonly imageCopyService: ProductImageCopyService,
     private readonly productMetricsService: ProductMetricsService,
-    private readonly productNormalizer: ProductNormalizerService,
     private readonly offerMatching: OfferMatchingService,
     private readonly offerRepo: OfferRepository,
     private readonly categoryConfigService: CategoryConfigService,
@@ -292,20 +290,6 @@ export class ProductScrapeUpdaterService {
     }
   }
 
-  // One canonical name for this scrape, stored on the new ProductSourceRecord
-  // row and used as a new product's first normalizedName (mergeSources then
-  // rebuilds it from the resolved brand). From the title when the listing was
-  // not identified, as name matching does.
-  private buildNormalizedSourceName(scrapedProduct: ScrapedProduct): string {
-    const strategy =
-      this.categoryConfigService.getConfig(scrapedProduct.category?.slug)
-        ?.normalizationStrategy ?? 'full-sorted';
-    return this.productNormalizer.normalizeProduct({
-      brand: scrapedProduct.brand,
-      ...listingNames(scrapedProduct),
-      strategy,
-    });
-  }
 
   /**
    * A listing of a source that does not identify products — a shop's Google
@@ -719,14 +703,6 @@ export class ProductScrapeUpdaterService {
       // empty taskId in the logs would read as a lost one.
       context.task ? { taskId: context.task.id } : {},
     );
-    if (decision.mode && decision.alternative) {
-      this.productMetricsService.listingMatchShadow(
-        context.source.name,
-        decision.mode,
-        decision.alternative.comparison,
-        decision.alternative.kind,
-      );
-    }
 
     if (productId) {
       const model = await this.productRepo.findOneOrFail({
@@ -764,10 +740,10 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
-   * Where a category requires matcherModel keys, a listing whose identity
-   * extraction failed has no key, so the score rule alone decided it. When a
+   * A listing whose identity extraction failed has no model, so no key: it
+   * was searched by its title, and can attach to nothing by name. When a
    * candidate was close enough to be the same product, a new one may be a
-   * duplicate the key would have prevented: the task fails, to be retried on
+   * duplicate its key would have prevented: the task fails, to be retried on
    * the manager's backoff, until its last attempt creates the product. An LLM
    * error is usually gone by then. A source with the extraction off has no
    * key to wait for.
@@ -783,21 +759,16 @@ export class ProductScrapeUpdaterService {
     const nearMiss = decision.candidates.find(
       (candidate) => candidate.score >= NEAR_MISS_SCORE,
     );
-    if (
-      lastAttempt ||
-      !nearMiss ||
-      !scrapedProduct.flags?.includes('identity_failed') ||
-      !this.matchQuery.requiresMatcherModel(scrapedProduct.category.slug)
-    ) {
+    if (lastAttempt || !nearMiss || !scrapedProduct.flags?.includes('identity_failed')) {
       return;
     }
 
     this.productMetricsService.scrapeResolutionOutcome(
       context.source.name,
-      'deferred_no_matcher_model',
+      'deferred_no_model',
     );
     throw new Error(
-      `Deferred: the identity extraction failed, so this listing has no matcherModel key, and product ${nearMiss.productId} scores ${nearMiss.score} by name. Retrying before creating a product it may duplicate (attempt ${task.attempts + 1} of ${maxAttempts}).`,
+      `Deferred: the identity extraction failed, so this listing has no model key, and product ${nearMiss.productId} scores ${nearMiss.score} by its title. Retrying before creating a product it may duplicate (attempt ${task.attempts + 1} of ${maxAttempts}).`,
     );
   }
 
@@ -1770,7 +1741,6 @@ export class ProductScrapeUpdaterService {
         model: names.model,
         categoryId: scrapedProduct.category.id,
         categoryName: scrapedProduct.category.name,
-        normalizedName: this.buildNormalizedSourceName(scrapedProduct),
       });
     } catch (error: unknown) {
       if (error instanceof Error && error.message === BRAND_NOT_IDENTIFIED) {

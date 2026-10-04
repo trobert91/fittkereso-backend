@@ -21,9 +21,9 @@ describe('near misses the score correctly rejects', () => {
     const lycan771 = oneByKey('771 di2 glorious lycan macina');
     const lycan772 = oneByKey('772 di2 glorious lycan macina');
 
-    // Trigram 0.875 and Levenshtein higher still — only the model-number gate
+    // Trigram 0.879 and Levenshtein higher still — only the model-number gate
     // stands between these two, and it is the whole reason that gate exists.
-    expect(trigramBetween(lycan771, lycan772)).toBeCloseTo(0.875, 3);
+    expect(trigramBetween(lycan771, lycan772)).toBeCloseTo(0.879, 3);
     expect(gatesBetween(lycan771, lycan772)).toEqual([
       expect.objectContaining({ gate: 'modelNumberMismatch', severity: 30 }),
     ]);
@@ -42,7 +42,7 @@ describe('near misses the score correctly rejects', () => {
     const di2 = oneByKey('di2 macina master scarp sx');
     const mechanical = oneByKey('macina master scarp sx');
 
-    expect(trigramBetween(di2, mechanical)).toBeGreaterThan(0.8);
+    expect(trigramBetween(di2, mechanical)).toBeGreaterThanOrEqual(0.8);
     expect(scoreBetween(di2, mechanical)).toBeLessThan(NEAR_MISS_SCORE);
   });
 
@@ -82,7 +82,7 @@ describe('near misses the score correctly rejects', () => {
  * (c005). Pinned all the same: nothing in the score tells a size token from a
  * shape token, so this list holding is luck, not design.
  */
-describe('frame-token pairs that still attach', () => {
+describe('frame-token pairs that reach review', () => {
   /**
    * Picks one product precisely. Two of these name keys are held by more than
    * one product a model year apart, and only the same-year combination is the
@@ -96,8 +96,10 @@ describe('frame-token pairs that still attach', () => {
     return found;
   }
 
+  // Nothing contradicts and the names score high, but the keys differ: only
+  // an equal key attaches, so a person (or the LLM) decides.
   it.each([['8973 kapoho l macina', '8973 kapoho macina', 2026, 84]])(
-    'attaches %s to %s (%i) at %i with no gate to stop it',
+    'sends %s and %s (%i) to review at %i, with no gate against it',
     (leftKey, rightKey, modelYear, score) => {
       const left = productOf(leftKey, modelYear);
       const right = productOf(rightKey, modelYear);
@@ -105,8 +107,8 @@ describe('frame-token pairs that still attach', () => {
       expect(gatesBetween(left, right)).toEqual([]);
       expect(scoreBetween(left, right)).toBe(score);
       expect(decideListingMatch([candidateOf(left, right)])).toEqual({
-        kind: 'attach',
-        candidate: expect.objectContaining({ productId: right.id }),
+        kind: 'ask_llm',
+        candidates: [expect.objectContaining({ productId: right.id })],
       });
     },
   );
@@ -180,13 +182,16 @@ describe('what a scraped listing would do against this catalog', () => {
     expect(decideListingMatch(candidates).kind).toBe('not_found');
   });
 
-  it('asks the LLM rather than guessing when two products tie at the top', () => {
+  // Products already sharing a key are duplicates of each other; the listing
+  // joins one (by keyScore, then the oldest) rather than becoming a third.
+  it('attaches to one of two products sharing the key rather than blocking on the tie', () => {
     const trio = byKey('771 di2 glorious lycan macina');
     const candidates = trio.slice(1).map((other) => candidateOf(trio[0], other));
 
     expect(candidates).toHaveLength(2);
+    expect(candidates.every((candidate) => candidate.normalizedModelMatch)).toBe(true);
     expect(candidates.every((candidate) => candidate.score >= ACCEPT_SCORE)).toBe(true);
-    expect(decideListingMatch(candidates).kind).toBe('ask_llm');
+    expect(decideListingMatch(candidates)).toEqual({ kind: 'attach', candidate: candidates[0] });
   });
 
   it('creates a new product for most of the catalog, which has no near neighbour', () => {

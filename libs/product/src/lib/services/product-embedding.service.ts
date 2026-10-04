@@ -16,11 +16,10 @@ export class ProductEmbeddingService {
   /**
    * Build a brand-rich embedding input string and embed it.
    *
-   * The embedding input is intentionally different from the pg_trgm key
-   * (ProductNormalizerService.normalizeProduct) — we want brand and category
-   * context in the embedding so products of the same brand/category cluster
-   * together in vector space, but we want the trigram key brand-less so
-   * brand-less comment mentions match cleanly.
+   * The embedding input is intentionally different from the matching key
+   * (a listing's normalizedModel) — we want brand and category context in the
+   * embedding so products of the same brand/category cluster together in
+   * vector space, but the key brand-less so it compares model words alone.
    */
   public createProductEmbedding(
     input: ProductEmbeddingInput,

@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { mkdirSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import { In } from 'typeorm';
-import { isEmpty, keyBy, uniq } from 'lodash';
+import { compact, isEmpty, keyBy, maxBy, uniq } from 'lodash';
 import {
   CandidateMatchedOn,
   ProductAlias,
@@ -10,6 +10,7 @@ import {
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
+  ProductSourceRecordRepository,
   ProductSpecs,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
@@ -18,6 +19,7 @@ import {
   ProductMatchQuery,
   ProductMatchQueryService,
   RecallRow,
+  trigramSimilarity,
 } from '@fittkereso-backend/product-identity';
 import { nameOf } from '@fittkereso-backend/utils';
 import { AppModule } from '../app.module';
@@ -28,10 +30,10 @@ import { AppModule } from '../app.module';
  * looking for duplicates — with the neighbourhood recall returns for it.
  * A person labels the cases afterwards; this script only reads.
  *
- * Keys and trigram values come from the lib's own ProductMatchQueryService and
- * CandidateRecallService, so they are exactly what production computes. The
- * stored `normalizedSourceName` column is never read — two different rules
- * wrote it, so it can't be trusted.
+ * Keys come from the lib's own ProductMatchQueryService and recall from its
+ * CandidateRecallService, so they are exactly what production computes; each
+ * neighbour's trigram is measured against its listing key that is most like
+ * the query's (trigramSimilarity, which matches pg_trgm).
  *
  * Run from the repo root:
  *   API_CONFIG_PATH=apps/api/src/config/config.yaml npx ts-node \
@@ -47,6 +49,7 @@ const PAIR_TRIGRAM_MIN = 0.6;
 interface RawNeighbour {
   productId: string;
   matchedOn: CandidateMatchedOn;
+  /** The neighbour's listing key most like the query's. */
   matchedValue: string;
   trigram: number;
   /** False for the attached product when recall didn't return it — a recall miss. */
@@ -63,7 +66,10 @@ interface RawCase {
   createdAt?: string;
   brandName: string;
   categorySlug: string;
-  nameKey: string;
+  /** The keys recall ran on: the listing's, or the product's listings'. */
+  keys: string[];
+  /** False when the keys come from a title (no model): they attach nothing. */
+  keyed: boolean;
   displayName?: string;
   model?: string;
   specs?: ProductSpecs;
@@ -73,9 +79,14 @@ interface RawCase {
 interface NeighbourDetail extends RawNeighbour {
   displayName?: string;
   model?: string;
-  normalizedName?: string;
   aliases: string[];
   specs?: ProductSpecs;
+}
+
+interface Services {
+  queryService: ProductMatchQueryService;
+  recall: CandidateRecallService;
+  sourceRecordRepo: ProductSourceRecordRepository;
 }
 
 async function bootstrap() {
@@ -83,8 +94,11 @@ async function bootstrap() {
 
   const productRepo = app.get(ProductModelRepository);
   const aliasRepo = app.get(ProductAliasRepository);
-  const queryService = app.get(ProductMatchQueryService);
-  const recall = app.get(CandidateRecallService);
+  const services: Services = {
+    queryService: app.get(ProductMatchQueryService),
+    recall: app.get(CandidateRecallService),
+    sourceRecordRepo: app.get(ProductSourceRecordRepository),
+  };
 
   const cases: RawCase[] = [];
   let products = 0;
@@ -107,7 +121,7 @@ async function bootstrap() {
     for (const product of page) {
       products++;
       try {
-        cases.push(await productCase(product, queryService, recall));
+        cases.push(await productCase(product, services));
       } catch (error: unknown) {
         skipped++;
         console.warn(`  skip product ${product.id}: ${message(error)}`);
@@ -115,13 +129,7 @@ async function bootstrap() {
 
       for (const record of listingRecordsOf(product)) {
         try {
-          const listing = await listingCase(
-            record,
-            product,
-            queryService,
-            recall,
-            productRepo,
-          );
+          const listing = await listingCase(record, product, services);
           if (listing) cases.push(listing);
         } catch (error: unknown) {
           skipped++;
@@ -166,7 +174,7 @@ async function bootstrap() {
     `  recall misses: ${payload.summary.recallMisses} (listings whose own product recall did not return)`,
   );
   for (const miss of recallMisses) {
-    console.log(`    ${miss.id} → ${miss.productId} (key "${miss.nameKey}")`);
+    console.log(`    ${miss.id} → ${miss.productId} (keys ${miss.keys.join(', ')})`);
   }
 
   await app.close();
@@ -193,14 +201,12 @@ function listingRecordsOf(product: ProductModel): ProductSourceRecord[] {
 async function listingCase(
   record: ProductSourceRecord,
   product: ProductModel,
-  queryService: ProductMatchQueryService,
-  recall: CandidateRecallService,
-  productRepo: ProductModelRepository,
+  services: Services,
 ): Promise<RawCase | undefined> {
   const scraped = record.scrapedProduct;
   // Manual rows carry specs only, and a listing with no name or title can't be
-  // matched. One the extraction did not name is keyed on its title.
-  if (!scraped?.model && !scraped?.displayName && !scraped?.originalName) return undefined;
+  // matched. One the extraction did not name is searched by its title.
+  if (!scraped?.model && !scraped?.originalName) return undefined;
 
   const { productCategory } = product;
   const category = scraped.category ?? {
@@ -208,16 +214,17 @@ async function listingCase(
     slug: productCategory?.slug ?? '',
     name: productCategory?.name ?? '',
   };
-  const query = queryService.ofListing(
+  const query = services.queryService.ofListing(
     { ...scraped, category } as ScrapedProduct,
     product.brand,
   );
+  const keys = query.keys ?? [];
 
-  const neighbours = neighboursOf(await recall.recall(query));
+  const neighbours = await neighboursOf(query, keys, services);
   // The product this listing ended up on is the answer we're labelling
   // against, so it belongs in every case — including when recall missed it.
   if (!neighbours.some((neighbour) => neighbour.productId === product.id)) {
-    neighbours.push(await missedNeighbour(query, product.id, productRepo));
+    neighbours.push(await missedNeighbour(keys, product.id, services));
   }
 
   return {
@@ -228,7 +235,8 @@ async function listingCase(
     createdAt: record.createdAt?.toISOString(),
     brandName: query.brandName,
     categorySlug: query.categorySlug,
-    nameKey: query.nameKey,
+    keys,
+    keyed: query.keyed ?? false,
     displayName: scraped.displayName,
     model: scraped.model,
     specs: scraped.specs,
@@ -236,13 +244,16 @@ async function listingCase(
   };
 }
 
-async function productCase(
-  product: ProductModel,
-  queryService: ProductMatchQueryService,
-  recall: CandidateRecallService,
-): Promise<RawCase> {
-  const query = queryService.ofProduct(product);
-  const neighbours = neighboursOf(await recall.recall(query)).filter(
+async function productCase(product: ProductModel, services: Services): Promise<RawCase> {
+  const query = services.queryService.ofProduct(product);
+  const stored =
+    (await services.sourceRecordRepo.findNormalizedModelsByProductIds([product.id])).get(
+      product.id,
+    ) ?? [];
+  const keys = isEmpty(stored)
+    ? compact([services.queryService.keyOfName(product.model, query.brandName)])
+    : stored;
+  const neighbours = (await neighboursOf(query, keys, services)).filter(
     (neighbour) => neighbour.trigram >= PAIR_TRIGRAM_MIN,
   );
 
@@ -253,7 +264,8 @@ async function productCase(
     createdAt: product.createdAt?.toISOString(),
     brandName: query.brandName,
     categorySlug: query.categorySlug,
-    nameKey: query.nameKey,
+    keys,
+    keyed: !isEmpty(stored),
     displayName: product.displayName,
     model: product.model,
     specs: product.specs,
@@ -261,41 +273,60 @@ async function productCase(
   };
 }
 
-/** The best row per product, most similar first. */
-function neighboursOf(rows: RecallRow[]): RawNeighbour[] {
-  const best = new Map<string, RecallRow>();
-  for (const row of rows) {
-    const current = best.get(row.productId);
-    if (!current || row.trigram > current.trigram) {
-      best.set(row.productId, row);
-    }
+/** Every product recall returns for any of the keys, by its most similar listing key, most similar first. */
+async function neighboursOf(
+  query: ProductMatchQuery,
+  keys: string[],
+  services: Services,
+): Promise<RawNeighbour[]> {
+  const rows: RecallRow[] = (
+    await Promise.all(keys.map((key) => services.recall.fuzzy(query, key)))
+  ).flat();
+  const scored = rows.map((row) => ({
+    row,
+    trigram: Math.max(...keys.map((key) => trigramSimilarity(key, row.normalizedModel))),
+  }));
+
+  const best = new Map<string, (typeof scored)[number]>();
+  for (const entry of scored) {
+    const current = best.get(entry.row.productId);
+    if (!current || entry.trigram > current.trigram) best.set(entry.row.productId, entry);
   }
 
   return [...best.values()]
     .sort((a, b) => b.trigram - a.trigram)
-    .map((row) => ({ ...row, foundByRecall: true }));
+    .map(({ row, trigram }) => ({
+      productId: row.productId,
+      matchedOn: keys.includes(row.normalizedModel) ? 'normalizedModel' : 'trigram',
+      matchedValue: row.normalizedModel,
+      trigram,
+      foundByRecall: true,
+    }));
 }
 
-/** The similarity of a product recall didn't return, asked for directly. */
+/** How similar a product recall didn't return is, by its listing key most like the query's. */
 async function missedNeighbour(
-  query: ProductMatchQuery,
+  keys: string[],
   productId: string,
-  productRepo: ProductModelRepository,
+  services: Services,
 ): Promise<RawNeighbour> {
-  const normalizedName = `"${nameOf<ProductModel>('normalizedName')}"`;
-  const rows: { matchedValue: string; trigram: number | string }[] =
-    await productRepo.repo.query(
-      `SELECT pm.${normalizedName} AS "matchedValue", similarity(pm.${normalizedName}, $1) AS trigram
-       FROM "${productRepo.repo.metadata.tableName}" AS pm
-       WHERE pm.id = $2::uuid`,
-      [query.nameKey, productId],
-    );
+  const own =
+    (await services.sourceRecordRepo.findNormalizedModelsByProductIds([productId])).get(
+      productId,
+    ) ?? [];
+  const best = maxBy(
+    own.map((value) => ({
+      value,
+      trigram: Math.max(0, ...keys.map((key) => trigramSimilarity(key, value))),
+    })),
+    (entry) => entry.trigram,
+  );
 
   return {
     productId,
-    matchedOn: 'name',
-    matchedValue: rows[0]?.matchedValue ?? '',
-    trigram: Number(rows[0]?.trigram ?? 0),
+    matchedOn: 'trigram',
+    matchedValue: best?.value ?? '',
+    trigram: best?.trigram ?? 0,
     foundByRecall: false,
   };
 }
@@ -322,7 +353,6 @@ async function withNeighbourDetails(
         id: true,
         displayName: true,
         model: true,
-        normalizedName: true,
         specs: true,
       },
     }),
@@ -347,7 +377,6 @@ async function withNeighbourDetails(
         ...neighbour,
         displayName: product?.displayName,
         model: product?.model,
-        normalizedName: product?.normalizedName,
         aliases: aliasesByProduct.get(neighbour.productId) ?? [],
         specs: product?.specs,
       };
