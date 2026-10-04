@@ -448,6 +448,37 @@ describe('SpecPostProcessService', () => {
           expect(metrics.identityExtraction).not.toHaveBeenCalledWith('speedbike-arukereso', 'reused');
         });
 
+        // A word the old model kept (a frame word, say) is compared as its
+        // spec value once the new rule leaves it out, so it is not lost.
+        it('takes the values of the specs the model now leaves out, where the stored listing has none', async () => {
+          categoryConfigService.getConfig.mockReturnValue({
+            primarySpecs: ['modelYear', 'batteryCapacity'],
+            matcherSpecs: ['weight'],
+            offerLevelSpecs: ['frameSize', 'color'],
+            matchingConfig: { model: { excludeSpecs: ['modelYear', 'batteryCapacity'] } },
+          });
+          const ownRecord = await storedUnder('old');
+          const { batteryCapacity, weight, ...storedSpecs } = ownRecord.scrapedProduct?.specs ?? {};
+          expect([batteryCapacity, weight]).toEqual([750, 24]);
+          ownRecord.scrapedProduct = { ...ownRecord.scrapedProduct, specs: storedSpecs } as ScrapedProduct;
+          postProcess.extractIdentity.mockResolvedValueOnce({
+            model: 'MACINA SCARP SX PRESTIGE Di2',
+            specs: { modelYear: 2027, batteryCapacity: 625, weight: 30, frameSize: 46 },
+          });
+
+          const result = await service.extractIdentity({
+            context: context(),
+            scrapedProduct: listing(),
+            ownRecord,
+          });
+
+          // The stored year wins; a spec the model keeps, or an offer-level
+          // one, is not taken.
+          expect(result.specs).toMatchObject({ modelYear: 2026, batteryCapacity: 625, tubeless: true });
+          expect(result.specs).not.toHaveProperty('weight');
+          expect(result.specs).not.toHaveProperty('frameSize');
+        });
+
         // Stored before models had contracts.
         it('asks again for a model stored without a contract', async () => {
           const ownRecord = await storedUnder(undefined);

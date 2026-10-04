@@ -17,9 +17,10 @@ import { identityWords } from '../product-normalizer.service';
  * model's contract (ScrapedProduct.modelContract): bump it when the rule
  * changes, and the next import of each listing re-extracts its model alone.
  * 4 is the first under which the model is also the matching key (it was
- * the matcherModel's rule, versions 1–3).
+ * the matcherModel's rule, versions 1–3); 5 shows each example's left-out
+ * spec values after its model.
  */
-export const MODEL_PROMPT_VERSION = 4;
+export const MODEL_PROMPT_VERSION = 5;
 
 /** What the identity extraction is told about the model name. */
 export interface ModelRuleRequest {
@@ -483,8 +484,8 @@ export class ProductSourcePostProcessService {
       ? ` the words that only state a value of ${excludedTitles.join(', ')} — those are compared separately;`
       : '';
     const examples = request.examples?.length
-      ? `  Examples (rawModel → model):\n${request.examples
-          .map((example) => `  - "${example.title}" → "${example.model}"`)
+      ? `  Examples (rawModel → model, then the "specs" values of the left-out words):\n${request.examples
+          .map((example) => `  - "${example.title}" → "${example.model}"${this.exampleSpecs(example)}`)
           .join('\n')}\n`
       : '';
     return (
@@ -499,6 +500,14 @@ export class ProductSourcePostProcessService {
       ` Two listings of the same model from different shops must get the same model, and two different models never may: when unsure whether a word tells two models apart, keep it. Never invent a model name that isn't derivable from the input.\n` +
       examples
     );
+  }
+
+  /** ` (frameType: Alacsony, modelYear: 2026)`, or nothing. */
+  private exampleSpecs(example: CategoryModelExample): string {
+    const entries = Object.entries(example.specs ?? {});
+    return entries.length
+      ? ` (${entries.map(([key, value]) => `${key}: ${value}`).join(', ')})`
+      : '';
   }
 
   private buildIdentitySystemPrompt(

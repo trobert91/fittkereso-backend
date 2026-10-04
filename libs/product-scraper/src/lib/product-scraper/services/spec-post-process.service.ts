@@ -31,7 +31,7 @@ import {
 } from '@fittkereso-backend/metrics';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { filterDefinedSpecs } from '@fittkereso-backend/utils';
-import { isEmpty, omit, pick, uniq } from 'lodash';
+import { difference, isEmpty, isNil, omit, omitBy, pick, uniq } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 
 /**
@@ -201,7 +201,7 @@ export class SpecPostProcessService {
         return withNormalizedYears(reused, schema);
       }
       return withNormalizedYears(
-        await this.refreshModel(reused, callIdentity, modelContract, context),
+        await this.refreshModel(reused, callIdentity, modelContract, context, scopes),
         schema,
       );
     }
@@ -343,15 +343,20 @@ export class SpecPostProcessService {
   /**
    * A reused extraction whose model was asked under another contract (other
    * left-out specs, examples or prompt version): asks the LLM again and takes
-   * only the model from it, so the listing is renamed under the current rule
-   * while its specs stay as stored. A call that names nothing keeps the
-   * stored model under its old contract, to be asked on its next import.
+   * the model from it, so the listing is renamed under the current rule while
+   * its specs stay as stored. A call that names nothing keeps the stored
+   * model under its old contract, to be asked on its next import.
+   *
+   * The specs a new rule leaves out of the model are taken too, where the
+   * stored listing has none: a word the old model kept (a frame word, say)
+   * is then compared as its spec value instead of lost. A stored value wins.
    */
   private async refreshModel(
     reused: ScrapedProduct,
     callIdentity: () => Promise<IdentityContribution | undefined>,
     contract: string,
     context: ProductImportContext,
+    scopes: CategorySpecScopes,
   ): Promise<ScrapedProduct> {
     this.logger.debug('Refreshing the model of a reused extraction', logContextOf(context));
     const identity = await callIdentity();
@@ -361,10 +366,16 @@ export class SpecPostProcessService {
     }
 
     this.productMetrics.identityExtraction(context.source.name, 'refreshed');
+    const leftOut = difference(scopes.modelRule.excludedKeys, scopes.offerLevelKeys);
+    const gained = omitBy(
+      pick(identity.specs ?? {}, leftOut),
+      (value, key) => isNil(value) || !isNil(reused.specs?.[key]),
+    );
     return {
       ...reused,
       model: identity.model,
       modelContract: contract,
+      specs: isEmpty(gained) ? reused.specs : { ...reused.specs, ...gained },
     };
   }
 

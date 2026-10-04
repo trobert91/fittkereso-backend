@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { chunk, compact, groupBy, last } from 'lodash';
+import { chunk, compact, groupBy, isEmpty, isNil, last, pickBy } from 'lodash';
 import {
   AdvisoryLockService,
   ProductModel,
   ProductModelRepository,
   ProductSourceRecord,
   ProductSourceRecordRepository,
+  ProductSpecs,
   ScrapedProduct,
   productLock,
 } from '@fittkereso-backend/database';
@@ -61,6 +62,8 @@ interface Renamed {
   model: string;
   contract: string;
   key: string | null;
+  /** Spec values the call read that the stored listing lacked (see refreshModel). */
+  specs?: ProductSpecs;
 }
 
 /**
@@ -72,10 +75,11 @@ interface Renamed {
  * 2. Every identifying listing whose model was asked under an older contract
  *    (other left-out specs, examples or prompt version) is asked again, as
  *    its own last import — its stored listing as both the input and the
- *    record — so the reuse path asks for the model alone. Only the model, its
- *    contract and its key are written back, its specs and offers untouched;
- *    then its product is named again (ProductMergeService.mergeSources), under
- *    the product's lock.
+ *    record — so the reuse path asks for the model alone. The model, its
+ *    contract and its key are written back, plus any value of a spec the
+ *    model leaves out that the stored listing lacked; its other specs and its
+ *    offers stay untouched. Then its product is named and its specs merged
+ *    again (ProductMergeService.mergeSources), under the product's lock.
  *
  * Feed runs skip unchanged rows, so without this a listing whose shop never
  * changes it would keep a model asked under an older rule.
@@ -191,12 +195,14 @@ export class ListingModelRefreshService {
       const contract = contractOf(stored.category.slug);
       if (!extracted.model || !contract || extracted.modelContract !== contract) return undefined;
 
+      const gained = pickBy(extracted.specs, (_value, key) => isNil(stored.specs?.[key]));
       return {
         record,
         model: extracted.model,
         contract,
         // As the column pass built it: with the record's resolved brand.
         key: this.matchQuery.normalizedModelOf(extracted, record.brand?.name) ?? null,
+        ...(isEmpty(gained) ? {} : { specs: gained }),
       };
     } catch (error) {
       this.logger.warn('Listing model refresh failed for a listing', {

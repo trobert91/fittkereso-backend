@@ -34,6 +34,7 @@ describe('ListingModelRefreshService', () => {
         model: 'Kathmandu Hybrid ONE',
         originalName: 'Cube Kathmandu Hybrid ONE 800 2025 54',
         category: { id: 'cat-1', slug: 'ebikes', name: 'E-bikes' },
+        specs: { modelYear: 2025 },
         ...listing,
       },
     }) as unknown as ProductSourceRecord;
@@ -53,7 +54,7 @@ describe('ListingModelRefreshService', () => {
         ...scrapedProduct,
         model: 'Kathmandu Hybrid ONE 800',
         modelContract: CONTRACT,
-        // Whatever the call says about the specs, only the model is written.
+        // A value the stored listing has is never written over.
         specs: { modelYear: 2030 },
       })),
     };
@@ -119,6 +120,27 @@ describe('ListingModelRefreshService', () => {
       key: 'key:Kathmandu Hybrid ONE 800:Cube',
     });
     expect(summary).toMatchObject({ read: 1, asked: 1, written: 1, failed: 0, more: false });
+  });
+
+  // A frame word a new rule leaves out of the model is kept as its spec value
+  // (SpecPostProcessService.refreshModel); the write carries it.
+  it('also writes the spec values the call read that the stored listing lacked', async () => {
+    sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([recordOf('r1')]);
+    specPostProcess.extractIdentity.mockImplementationOnce(async ({ scrapedProduct }) => ({
+      ...scrapedProduct,
+      model: 'Kathmandu Hybrid ONE 800',
+      modelContract: CONTRACT,
+      specs: { modelYear: 2025, frameType: 'Trapéz' },
+    }));
+
+    await run();
+
+    expect(sourceRecordRepo.setModel).toHaveBeenCalledWith('r1', {
+      model: 'Kathmandu Hybrid ONE 800',
+      contract: CONTRACT,
+      key: 'key:Kathmandu Hybrid ONE 800:Cube',
+      specs: { frameType: 'Trapéz' },
+    });
   });
 
   it('names each renamed listing\x27s product again under its lock, once per product', async () => {

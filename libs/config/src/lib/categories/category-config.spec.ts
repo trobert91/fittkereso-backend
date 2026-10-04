@@ -16,7 +16,7 @@ interface CategoryConfig {
     compatibleValues?: Record<string, Record<string, string[]>>;
     model?: {
       excludeSpecs?: string[];
-      examples?: { title: string; model: string }[];
+      examples?: { title: string; model: string; specs?: Record<string, string | number> }[];
     };
   };
   brandIdentifierSpecs?: Record<
@@ -78,6 +78,45 @@ describe.each(categories)('the %s category config', (slug) => {
       expect(at).toBeGreaterThanOrEqual(from);
       from = at + 1;
     }
+  });
+
+  // A left-out word's value is compared by the gates, or nothing compares it.
+  it.each(keyExcludes)('compares %s, left out of the model, in the spec gates', (key) => {
+    expect(gated).toContain(key);
+  });
+
+  // An example's specs show where the words the model leaves out go: only
+  // specs the model excludes, each a value its field can hold.
+  const leftOut = [...(config.offerLevelSpecs ?? []), ...keyExcludes];
+  it.each(
+    (config.matchingConfig?.model?.examples ?? []).flatMap((example) =>
+      Object.entries(example.specs ?? {}).map(
+        ([key, value]) => [`${key}: ${value}`, example.model, key, value] as const,
+      ),
+    ),
+  )("shows %s for the model %s, a left-out spec's allowed value", (_name, _model, key, value) => {
+    expect(leftOut).toContain(key);
+    const property = properties[key];
+    expect(typeof value).toBe(property.type === 'number' ? 'number' : 'string');
+    if (property.enum) expect(property.enum).toContain(value);
+  });
+
+  // A free-text listing value (a colour) is the shop's own name for it, copied
+  // as written, never translated or re-cased (getVerbatimSpecKeys); an
+  // example that rewrites one teaches the extraction to. Spacing aside: a
+  // title may separate its words with non-breaking spaces.
+  const verbatimKeys = (config.offerLevelSpecs ?? []).filter(
+    (key) => properties[key]?.type === 'string' && !properties[key]?.enum?.length,
+  );
+  const spaced = (text: string) => text.replace(/\s+/g, ' ');
+  it.each(
+    (config.matchingConfig?.model?.examples ?? []).flatMap((example) =>
+      verbatimKeys
+        .filter((key) => example.specs?.[key] !== undefined)
+        .map((key) => [String(example.specs?.[key]), example.title] as const),
+    ),
+  )('shows the value %s as its title writes it', (value, title) => {
+    expect(spaced(title)).toContain(spaced(value));
   });
 
   it.each(penalties)('prices a mismatch on %s, a spec the gates compare', (key) => {

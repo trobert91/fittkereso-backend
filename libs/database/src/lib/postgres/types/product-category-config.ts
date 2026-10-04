@@ -67,6 +67,10 @@ export interface CategoryModelExample {
   title: string;
   /** The model for it: only words of `title`, in their order. */
   model: string;
+  /** Where words the model leaves out go: the title's values of the specs
+   *  it excludes (e.g. `{ frameType: "Alacsony" }` for "Easy Entry"). Shown
+   *  after the model, so the examples carry the category's vocabulary. */
+  specs?: Record<string, string | number>;
 }
 
 /**

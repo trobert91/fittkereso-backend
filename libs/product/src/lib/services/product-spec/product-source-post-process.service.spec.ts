@@ -953,6 +953,11 @@ describe('ProductSourcePostProcessService', () => {
             excludedKeys: ['frameSize', 'modelYear'],
             examples: [
               { title: 'Cube Reaction Hybrid Pro 750 27.5" M', model: 'Reaction Hybrid Pro 750' },
+              {
+                title: 'KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl',
+                model: 'MACINA STYLE 810 Di2',
+                specs: { modelYear: 2026, frameSize: 46 },
+              },
             ],
           },
         });
@@ -964,8 +969,16 @@ describe('ProductSourcePostProcessService', () => {
 
         expect(systemPrompt()).toContain('- "model": the part of rawModel that tells this model apart');
         expect(systemPrompt()).toContain('a value of Frame size, Model year');
-        expect(systemPrompt()).toContain('Examples (rawModel → model):');
-        expect(systemPrompt()).toContain('"Cube Reaction Hybrid Pro 750 27.5" M" → "Reaction Hybrid Pro 750"');
+        expect(systemPrompt()).toContain('Examples (rawModel → model, then the "specs" values of the left-out words):');
+        expect(systemPrompt()).toContain('- "Cube Reaction Hybrid Pro 750 27.5" M" → "Reaction Hybrid Pro 750"\n');
+      });
+
+      it("shows where an example's left-out words go, after its model", async () => {
+        await extract('Macina Style 810 Di2');
+
+        expect(systemPrompt()).toContain(
+          '- "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl" → "MACINA STYLE 810 Di2" (modelYear: 2026, frameSize: 46)\n',
+        );
       });
 
       it('asks for no second name', async () => {

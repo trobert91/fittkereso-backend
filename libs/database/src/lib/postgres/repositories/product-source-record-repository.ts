@@ -559,27 +559,31 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Writes a listing's model alone — the name and its contract into the
-   * stored listing, the name and key into their columns. A
-   * plain UPDATE rather than an entity save: `lastUpdated` stays, and an
-   * import writing the record meanwhile keeps its offers.
+   * Writes a listing's model — the name and its contract into the stored
+   * listing, the name and key into their columns — and `specs`, the values
+   * the call read that the stored listing lacked: merged into its specs, a
+   * stored value winning. A plain UPDATE rather than an entity save:
+   * `lastUpdated` stays, and an import writing the record meanwhile keeps its
+   * offers.
    */
   async setModel(
     id: string,
-    values: { model: string; contract: string; key: string | null },
+    values: { model: string; contract: string; key: string | null; specs?: ProductSpecs },
   ): Promise<void> {
     const scraped = `"${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
     const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
     const model = `"${nameOf<ProductSourceRecord>('model')}"`;
+    const specs = nameOf<ScrapedProduct>('specs');
     await this.repo.query(
       `UPDATE ${this.repo.metadata.tableName}
           SET ${key} = $1,
               ${model} = $2::text,
               ${scraped} = COALESCE(${scraped}, '{}'::jsonb) || jsonb_build_object(
                 '${nameOf<ScrapedProduct>('model')}', $2::text,
-                '${nameOf<ScrapedProduct>('modelContract')}', $3::text)
-        WHERE id = $4`,
-      [values.key, values.model, values.contract, id],
+                '${nameOf<ScrapedProduct>('modelContract')}', $3::text,
+                '${specs}', $4::jsonb || COALESCE(${scraped}->'${specs}', '{}'::jsonb))
+        WHERE id = $5`,
+      [values.key, values.model, values.contract, JSON.stringify(values.specs ?? {}), id],
     );
   }
 
