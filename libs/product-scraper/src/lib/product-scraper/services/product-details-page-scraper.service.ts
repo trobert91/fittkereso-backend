@@ -23,7 +23,11 @@ import {
   SpecTranslationSelectorService,
   getVerbatimSpecKeys,
 } from '@fittkereso-backend/product';
-import { foldReleaseYear, splitDeterministicSpecs } from './deterministic-specs';
+import {
+  foldBrandIdentifierSpecs,
+  foldReleaseYear,
+  splitDeterministicSpecs,
+} from './deterministic-specs';
 import { toScrapedOffers } from './scraped-offers';
 import { DetailPageResult } from '@fittkereso-backend/scrape-interpreter';
 import { TranslationService } from '@fittkereso-backend/translation';
@@ -323,9 +327,8 @@ export class ProductDetailsPageScraperService {
       return null;
     }
 
-    const offerLevelKeys =
-      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ??
-      [];
+    const categoryConfig = this.categoryConfigService.getConfig(category.slug);
+    const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
     const sourceConfig = config.detailPage.specMapping[category.slug];
     const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
 
@@ -349,6 +352,13 @@ export class ProductDetailsPageScraperService {
         })
       : {};
     foldReleaseYear(deterministicSpecs, detail.releaseYear);
+    const offers = toScrapedOffers(detail.rawOffers);
+    foldBrandIdentifierSpecs(
+      deterministicSpecs,
+      { brand: detail.brand, offers },
+      categoryConfig?.brandIdentifierSpecs,
+      jsonSchema,
+    );
     // Split and hashed by the shared helper, which every importer uses — see
     // splitDeterministicSpecs for why the filtering and the hashing have to
     // happen in exactly one place. The two hashes are passed through on
@@ -385,7 +395,7 @@ export class ProductDetailsPageScraperService {
         siblingExternalIds: detail.siblingIds,
         aliases: detail.aliases,
         images: this.toScrapedImages(detail.imageUrls),
-        offers: toScrapedOffers(detail.rawOffers),
+        offers,
       },
       offerLinks: detail.offerLinks,
     };

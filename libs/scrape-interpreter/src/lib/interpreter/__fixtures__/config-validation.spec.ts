@@ -13,7 +13,6 @@ import {
   ProductSpecNormalizationService,
   SpecExtractionService,
 } from '@fittkereso-backend/product';
-import { normalizeYear } from '@fittkereso-backend/utils';
 import { castArray, isArray, isEmpty, isNil, isString, pick } from 'lodash';
 import { ScrapeInterpreterService } from '../scrape-interpreter.service';
 import { ScrapePipelineRunnerService } from '../services/scrape-pipeline-runner.service';
@@ -289,12 +288,18 @@ describe('hand-authored source configs', () => {
     });
 
     // The sku is the manufacturer's article number, sometimes with an "MX"
-    // prefix on KTM rows (60 of 737) that no other shop uses.
-    it('reads the MPN from sku, without the shop\'s MX prefix', () => {
-      expect(config.mapping['mpn']).toEqual({
-        field: 'sku',
-        pipeline: [{ op: 'stripPattern', pattern: '^MX' }],
-      });
+    // prefix on KTM rows (60 of 737) that no other shop uses. Most KTM rows
+    // of 2026-10 leave the sku empty and carry the article number as the
+    // shop's own id instead; only a bare 10-digit one is an article number —
+    // an id with a year suffix or placeholder digits is not.
+    it.each([
+      ['MX1260040108', '1250040108', '1260040108'],
+      ['804200', '1260132506', '804200'],
+      ['', '1260132506', '1260132506'],
+      ['', 'KTM-12501571XX-2025', undefined],
+      ['', 'KTM-0223532xx-2022-F', undefined],
+    ])('reads the MPN from sku %j, else from the id %j: %j', async (sku, identifier, mpn) => {
+      expect(await readText(config, 'mpn', { sku, identifier })).toBe(mpn);
     });
 
     // Measured on the 2026-09-23 feed: with this list every e-bike row still
@@ -486,21 +491,10 @@ describe('hand-authored source configs', () => {
       ).toBe(mpn);
     });
 
-    // Only KTM's 10-digit `1YYxxxxxxx` article number carries a year, and the
-    // pattern is brand-blind, so Giant's and ZEG's codes must not match it.
-    // The pipeline yields two digits, which the importer reads as 20YY.
-    it.each([
-      ['1260167141', 2026],
-      ['2303308105', undefined],
-      ['5060021105', undefined],
-      ['525702440855', undefined],
-      ['112110-54', undefined],
-    ])('reads the model year of article number %j as %j', async (partNumber, year) => {
-      const releaseYear = await readText(config, 'releaseYear', {
-        manufacturer_partnumber: partNumber,
-      });
-
-      expect(normalizeYear(releaseYear)).toBe(year);
+    // KTM's year is read off the MPN by the ebikes brand rule
+    // (brandIdentifierSpecs), which only a KTM listing's MPN reaches.
+    it('reads no year of its own', () => {
+      expect(config.mapping['releaseYear']).toBeUndefined();
     });
 
     it('trims "Bike" off the BULLS brand label', async () => {
@@ -574,15 +568,13 @@ describe('hand-authored source configs', () => {
       ).toBe(mpn);
     });
 
-    it.each([
-      ['1260149146', 2026],
-      ['8585053831129', undefined],
-    ])('reads the model year of article number %j as %j', async (partNumber, year) => {
-      const releaseYear = await readText(config, 'releaseYear', {
-        manufacturer_partnumber: partNumber,
-      });
-
-      expect(normalizeYear(releaseYear)).toBe(year);
+    // KTM's 10- and 9-digit article numbers are MPNs; the ebikes brand rule
+    // reads the year off them.
+    it('reads no year of its own, and keeps KTM\'s 9-digit article number as the MPN', async () => {
+      expect(config.mapping['releaseYear']).toBeUndefined();
+      expect(await readText(config, 'mpn', { manufacturer_partnumber: '025163108' })).toBe(
+        '025163108',
+      );
     });
 
     // `SzállításiIdő` is 1 or 5 days on every row, never "NO".
@@ -628,16 +620,17 @@ describe('hand-authored source configs', () => {
     });
 
     // The image folder is the size-level SKU; only KTM's (`KT-` plus the
-    // 10-digit article number) is a manufacturer code, and its `1YY` prefix
-    // is the model year.
+    // 10-digit article number) is a manufacturer code. The ebikes brand rule
+    // reads the model year off it.
     it.each([
-      ['KT-1260152106', '1260152106', 2026],
-      ['VB-1107672-L', undefined, undefined],
-    ])('reads the MPN and model year off the image folder %j', async (sku, mpn, year) => {
-      const fields = { image_url: imageOf(sku) };
+      ['KT-1260152106', '1260152106'],
+      ['VB-1107672-L', undefined],
+    ])('reads the MPN off the image folder %j', async (sku, mpn) => {
+      expect(await readText(config, 'mpn', { image_url: imageOf(sku) })).toBe(mpn);
+    });
 
-      expect(await readText(config, 'mpn', fields)).toBe(mpn);
-      expect(normalizeYear(await readText(config, 'releaseYear', fields))).toBe(year);
+    it('reads no year of its own', () => {
+      expect(config.mapping['releaseYear']).toBeUndefined();
     });
 
     it('blanks the shop placeholder image', async () => {

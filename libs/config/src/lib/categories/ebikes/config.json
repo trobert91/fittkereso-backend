@@ -318,6 +318,12 @@
       ]
     }
   },
+  "brandIdentifierSpecs": {
+    "KTM": [
+      { "spec": "modelYear", "identifier": "mpn", "pattern": "^1(2\\d)\\d{7}$", "prefix": "20" },
+      { "spec": "modelYear", "identifier": "mpn", "pattern": "^0(2\\d)\\d{6}$", "prefix": "20" }
+    ]
+  },
   "offerLevelSpecs": [
     "frameSize",
     "frameSizeLabel",

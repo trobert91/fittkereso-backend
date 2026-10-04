@@ -29,7 +29,11 @@ import {
 import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
 import { isEqual, omitBy, pick } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
-import { foldReleaseYear, splitDeterministicSpecs } from './deterministic-specs';
+import {
+  foldBrandIdentifierSpecs,
+  foldReleaseYear,
+  splitDeterministicSpecs,
+} from './deterministic-specs';
 import { SpecPostProcessService } from './spec-post-process.service';
 import { toScrapedOffers } from './scraped-offers';
 import {
@@ -224,8 +228,8 @@ export class ProductSourceSimulationService {
       );
     }
 
-    const offerLevelKeys =
-      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
+    const categoryConfig = this.categoryConfigService.getConfig(category.slug);
+    const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
     const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
     const translator = await this.buildTranslator(
       config,
@@ -247,6 +251,13 @@ export class ProductSourceSimulationService {
     // As ProductDetailsPageScraperService does, so this preview matches what
     // the real pipeline would persist to specs.
     foldReleaseYear(deterministicSpecs, detail.releaseYear);
+    const offers = toScrapedOffers(detail.rawOffers);
+    foldBrandIdentifierSpecs(
+      deterministicSpecs,
+      { brand: detail.brand, offers },
+      categoryConfig?.brandIdentifierSpecs,
+      jsonSchema,
+    );
 
     const split = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
     // The same deterministic listing ProductDetailsPageScraperService hands
@@ -263,7 +274,7 @@ export class ProductSourceSimulationService {
       externalId: detail.externalId,
       siblingExternalIds: detail.siblingIds,
       aliases: detail.aliases,
-      offers: toScrapedOffers(detail.rawOffers),
+      offers,
     };
 
     // Both calls a real import makes for a page that creates a product, run

@@ -718,3 +718,116 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
     expect(conditions).toEqual(Array(6).fill(OfferCondition.new));
   });
 });
+
+// The ebikes brand rules (brandIdentifierSpecs) through the real ops, the
+// shops' fixture configs and the category's own config and schema.
+describe("ArukeresoProductMapperService reading a year off a brand's article number", () => {
+  const read = (file: string) => JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8'));
+  const fixture = (shop: string) =>
+    read(
+      `../../../../scrape-interpreter/src/lib/interpreter/__fixtures__/${shop}-arukereso.config.json`,
+    ) as ArukeresoSourceConfig;
+  const ebikes = (file: string) => read(`../../../../config/src/lib/categories/ebikes/${file}`);
+  let mapper: ArukeresoProductMapperService;
+
+  beforeAll(() => {
+    const registry = new ScrapeOpRegistryService();
+    const runner = new ScrapePipelineRunnerService(registry);
+    new ScrapeInterpreterModule(registry, runner, new ProductValueMapperService()).onModuleInit();
+    const runtime = {
+      getCategoryBySlug: jest.fn().mockResolvedValue({ id: 'cat-1', slug: 'ebikes', name: 'Ebikes' }),
+    };
+    mapper = new ArukeresoProductMapperService(
+      new ScrapeInterpreterService(runner, runtime as never),
+      runtime as never,
+      { getConfig: () => ebikes('config.json'), getJsonSchema: () => ebikes('jsonSchema.json') } as never,
+      { extractSpecs: () => ({}) } as never,
+    );
+  });
+
+  const map = async (shop: string, fields: Record<string, string>) => {
+    const mapped = await mapper.map({ config: fixture(shop), item: { fields, attributes: [] } });
+    if (mapped.status !== 'mapped') throw new Error(`skipped: ${mapped.reason}`);
+    return { year: mapped.scrapedProduct.specs?.['modelYear'], mpn: mapped.scrapedProduct.offers?.[0].mpn };
+  };
+  const speedbike = (fields: Record<string, string>) =>
+    map('speedbike', {
+      manufacturer: 'KTM',
+      name: 'KTM MACINA GRAN 820  US 46 Unisex elektromos trekking- túra kerékpár GREEN PURPLE FLIP MATT színben',
+      producturl: 'https://speedbike.hu/ktm-macina-gran-820',
+      price: '1 999 000',
+      category: 'Termékkategóriák > E-BIKE > Trekking',
+      sku: '',
+      ...fields,
+    });
+
+  // No shop config reads KTM's year itself: each says where its article
+  // number is, and the category rule reads the year off it.
+  it.each([
+    ['ambringa', 'KTM', { manufacturerpartnumber: '1260167141' }, 2026],
+    ['ambringa', 'Giant', { manufacturerpartnumber: '2303308105' }, undefined],
+    ['bikelife', 'KTM', { manufacturerpartnumber: '1260149146' }, 2026],
+    [
+      'mangobike',
+      'KTM',
+      { imageurl: 'https://www.mangobike.hu/_upload/images/catalog/KT-1260152106/KT-1260152106_bike.png' },
+      2026,
+    ],
+  ])("reads %s's %s article number's year as %j", async (shop, brand, fields, year) => {
+    const category = {
+      ambringa: 'Elektromos kerékpár',
+      bikelife: 'Pedelec kerékpárok',
+      mangobike: 'Elektromos Kerékpárok > Elektromos Túra Kerékpárok',
+    }[shop] as string;
+    const mapped = await map(shop, {
+      manufacturer: brand,
+      name: `${brand} e-bike`,
+      producturl: `https://${shop}.hu/bike`,
+      price: '1 299 000',
+      category,
+      ...fields,
+    });
+    expect(mapped.year).toBe(year);
+  });
+
+  it("reads the year off KTM's 9-digit article number", async () => {
+    expect(
+      await map('bikelife', {
+        manufacturer: 'KTM',
+        name: 'KTM Macina Sport 610',
+        producturl: 'https://bikelife.hu/ktm-macina-sport-610',
+        price: '1 299 000',
+        category: 'Pedelec kerékpárok',
+        manufacturerpartnumber: '025163108',
+      }),
+    ).toEqual({ year: 2025, mpn: '025163108' });
+  });
+
+  // speedbike leaves most KTM sku empty and writes the article number as its
+  // own id; its config reads that id as the MPN only when it is a bare one.
+  it("takes speedbike's bare article-number id as the MPN, and the year from it", async () => {
+    expect(await speedbike({ identifier: '1260132506' })).toEqual({ year: 2026, mpn: '1260132506' });
+  });
+
+  it.each([['KTM-12501571XX-2025'], ['KTM-0223532xx-2022-F']])(
+    "reads no MPN off speedbike's id %s, which is not an article number",
+    async (identifier) => {
+      expect(await speedbike({ identifier })).toEqual({ year: undefined, mpn: null });
+    },
+  );
+
+  it("keeps speedbike's sku first", async () => {
+    expect(await speedbike({ identifier: '1250167106', sku: 'MX1260167150' })).toEqual({
+      year: 2026,
+      mpn: '1260167150',
+    });
+  });
+
+  // Cube's cargo article numbers fit KTM's 10-digit form.
+  it("reads no year off another brand's article number", async () => {
+    expect(await speedbike({ manufacturer: 'Cube', identifier: '1244000767' })).toEqual({
+      year: undefined,
+      mpn: '1244000767',
+    });
+  });
+});

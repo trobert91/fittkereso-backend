@@ -93,20 +93,6 @@
         "field": "category"
       }
     ],
-    "releaseYear": {
-      "field": "image_url",
-      "pipeline": [
-        {
-          "op": "regexCapture",
-          "pattern": "/catalog/KT-1(\\d{2})\\d{7}/",
-          "group": 1
-        },
-        {
-          "op": "prependPrefix",
-          "prefix": "20"
-        }
-      ]
-    },
     "mpn": {
       "field": "image_url",
       "pipeline": [

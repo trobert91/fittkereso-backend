@@ -112,20 +112,6 @@
           "group": 1
         }
       ]
-    },
-    "releaseYear": {
-      "field": "manufacturer_partnumber",
-      "pipeline": [
-        {
-          "op": "regexCapture",
-          "pattern": "^1(2\\d)\\d{7}$",
-          "group": 1
-        },
-        {
-          "op": "prependPrefix",
-          "prefix": "20"
-        }
-      ]
     }
   }
 }

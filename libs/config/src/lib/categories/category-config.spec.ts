@@ -19,6 +19,10 @@ interface CategoryConfig {
       examples?: { title: string; model: string }[];
     };
   };
+  brandIdentifierSpecs?: Record<
+    string,
+    { spec: string; identifier: string; pattern: string; prefix?: string }[]
+  >;
 }
 
 // Every category directory holding both files. Read from disk rather than
@@ -99,6 +103,22 @@ describe.each(categories)('the %s category config', (slug) => {
     for (const compatibles of Object.values(entries)) {
       for (const compatible of compatibles) expect(allowed).toContain(compatible.toLowerCase());
     }
+  });
+
+  const brandRules = Object.entries(config.brandIdentifierSpecs ?? {}).flatMap(([brand, rules]) =>
+    rules.map((rule) => [`${brand} ${rule.spec} ${rule.pattern}`, rule] as const),
+  );
+
+  it.each(brandRules)('fills a field of the schema from a brand identifier: %s', (_name, rule) => {
+    expect(Object.keys(properties)).toContain(rule.spec);
+    expect(['mpn', 'gtin']).toContain(rule.identifier);
+  });
+
+  // The value is the first group; a pattern with none (or a second one)
+  // reads nothing or the wrong digits, silently.
+  it.each(brandRules)('reads one capture group off a brand identifier: %s', (_name, rule) => {
+    const groups = new RegExp(`${rule.pattern}|`).exec('')?.length ?? 0;
+    expect(groups - 1).toBe(1);
   });
 
   it.each(

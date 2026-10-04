@@ -1,10 +1,15 @@
-import { ProductSpecs } from '@fittkereso-backend/database';
+import {
+  BrandIdentifierSpec,
+  ProductSpecs,
+  SpecDefinitionJsonSchema,
+  SpecDefinitionProperty,
+} from '@fittkereso-backend/database';
 import {
   filterDefinedSpecs,
   hashSpecs,
   normalizeYear,
 } from '@fittkereso-backend/utils';
-import { omit, pick } from 'lodash';
+import { compact, isNil, omit, pick, toLower, trim } from 'lodash';
 
 /**
  * Folds a source's dedicated `releaseYear` value into `modelYear` when the
@@ -20,6 +25,71 @@ export function foldReleaseYear(specs: ProductSpecs, releaseYear: unknown): void
   if (specs['modelYear'] !== undefined) return;
   const year = normalizeYear(releaseYear);
   if (year !== undefined) specs['modelYear'] = year;
+}
+
+/** What a brand identifier rule reads off a listing. */
+export interface BrandIdentifiedListing {
+  /** The listing's brand as the source wrote it. */
+  brand: string | undefined;
+  /** Its offers' manufacturer identifiers; a shop's own ids are never read. */
+  offers: { mpn?: string | null; gtin?: string | null }[] | undefined;
+}
+
+/**
+ * Folds in the spec values the listing's brand writes into its own article
+ * numbers or barcodes (ProductCategoryConfig.brandIdentifierSpecs) — KTM's
+ * model year, say, which every shop's MPN carries whether or not its spec
+ * table states the year.
+ *
+ * Runs after the spec mapping and `foldReleaseYear` and only fills what they
+ * left empty: a value the shop states is its own reading of the listing. Per
+ * spec, the first rule that matches one of the listing's identifiers wins. The
+ * value is typed as the schema field reads (a year through `normalizeYear`);
+ * one the field can't hold is left out.
+ */
+export function foldBrandIdentifierSpecs(
+  specs: ProductSpecs,
+  listing: BrandIdentifiedListing,
+  rulesByBrand: Record<string, BrandIdentifierSpec[]> | undefined,
+  schema: SpecDefinitionJsonSchema,
+): void {
+  const brand = toLower(trim(listing.brand));
+  const rules = Object.entries(rulesByBrand ?? {}).find(
+    ([name]) => toLower(trim(name)) === brand,
+  )?.[1];
+  if (!brand || !rules?.length) return;
+
+  const identifiers = {
+    mpn: compact((listing.offers ?? []).map((offer) => trim(offer.mpn ?? ''))),
+    gtin: compact((listing.offers ?? []).map((offer) => trim(offer.gtin ?? ''))),
+  };
+  for (const rule of rules) {
+    if (!isNil(specs[rule.spec])) continue;
+    const pattern = new RegExp(rule.pattern);
+    for (const identifier of identifiers[rule.identifier]) {
+      const captured = identifier.match(pattern)?.[1];
+      if (captured === undefined) continue;
+      const value = toSpecValue(`${rule.prefix ?? ''}${captured}`, schema.properties[rule.spec]);
+      if (value === undefined) continue;
+      specs[rule.spec] = value;
+      break;
+    }
+  }
+}
+
+/** Text as a value of the schema field: a number, a year, or an allowed string. */
+function toSpecValue(
+  text: string,
+  property: SpecDefinitionProperty | undefined,
+): number | string | undefined {
+  if (property?.type === 'number') {
+    if (property.meta?.format === 'year') return normalizeYear(text);
+    const number = Number(text);
+    return Number.isFinite(number) ? number : undefined;
+  }
+  if (property?.type !== 'string') return undefined;
+  if (!property.enum?.length) return text;
+  return property.enum.find((value) => toLower(value) === toLower(text));
 }
 
 /**

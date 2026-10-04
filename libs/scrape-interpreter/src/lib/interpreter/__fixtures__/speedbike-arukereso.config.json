@@ -122,15 +122,27 @@
     "gtin": {
       "field": "ean_code"
     },
-    "mpn": {
-      "field": "sku",
-      "pipeline": [
-        {
-          "op": "stripPattern",
-          "pattern": "^MX"
-        }
-      ]
-    }
+    "mpn": [
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "^MX"
+          }
+        ]
+      },
+      {
+        "field": "identifier",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\d{10})$",
+            "group": 1
+          }
+        ]
+      }
+    ]
   },
   "specMapping": {
     "ebikes": {

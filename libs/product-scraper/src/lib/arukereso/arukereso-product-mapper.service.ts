@@ -21,6 +21,7 @@ import {
   normalizeFieldName,
 } from './arukereso-feed-item';
 import {
+  foldBrandIdentifierSpecs,
   foldReleaseYear,
   splitDeterministicSpecs,
 } from '../product-scraper/services/deterministic-specs';
@@ -118,8 +119,8 @@ export class ArukeresoProductMapperService {
       await this.resolveTarget(config, item, 'description'),
     );
 
-    const offerLevelKeys =
-      this.categoryConfigService.getConfig(category.slug)?.offerLevelSpecs ?? [];
+    const categoryConfig = this.categoryConfigService.getConfig(category.slug);
+    const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
     const sourceSpecConfig = config.specMapping?.[category.slug];
 
     const rawSpecs = this.toRawSpecs(item);
@@ -135,6 +136,13 @@ export class ArukeresoProductMapperService {
       deterministicSpecs,
       await this.resolveTarget(config, item, 'releaseYear'),
     );
+    const offerFields = await this.resolveOfferFields(config, item, url, price);
+    foldBrandIdentifierSpecs(
+      deterministicSpecs,
+      { brand, offers: [offerFields] },
+      categoryConfig?.brandIdentifierSpecs,
+      jsonSchema,
+    );
 
     const {
       offerLevelDeterministicSpecs,
@@ -142,8 +150,6 @@ export class ArukeresoProductMapperService {
       offerSpecsHash,
       productSpecsHash,
     } = splitDeterministicSpecs(deterministicSpecs, offerLevelKeys);
-
-    const offerFields = await this.resolveOfferFields(config, item, url, price);
 
     return {
       status: 'mapped',

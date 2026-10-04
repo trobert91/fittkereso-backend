@@ -82,6 +82,21 @@ export function modelExcludedSpecKeys(config: ProductCategoryConfig | undefined)
   ];
 }
 
+/** One spec value a brand writes into its own article numbers or barcodes —
+ *  e.g. KTM's 10-digit article number `1260040108`, whose digits 2–3 are the
+ *  model year. A manufacturer's fact, so it holds at every shop; a shop's own
+ *  id format belongs in that shop's source config instead. */
+export interface BrandIdentifierSpec {
+  /** The spec key the value fills (a field of the category schema). */
+  spec: string;
+  /** Which of the listing's identifiers the pattern reads. */
+  identifier: 'mpn' | 'gtin';
+  /** Matches the whole identifier, with one capture group: the value. */
+  pattern: string;
+  /** Written before the captured value — `20` turns KTM's `26` into `2026`. */
+  prefix?: string;
+}
+
 /** How far apart two numeric values may be and still count as the same.
  *
  *  Exactly one of the two applies — `absolute` when set, otherwise `percent`.
@@ -181,6 +196,11 @@ export interface FilterSpecConfig {
 export interface ProductCategoryConfig {
   keywordIdentifiers?: string[];
   matchingConfig?: CategoryMatchingConfig;
+  /** Spec values a brand's article numbers or barcodes state, keyed by brand
+   *  name (matched against the listing's brand, ignoring case). They fill only
+   *  what the listing's spec table and `releaseYear` left empty; per spec, the
+   *  first rule that matches one of the listing's identifiers wins. */
+  brandIdentifierSpecs?: Record<string, BrandIdentifierSpec[]>;
   promptConfig?: CategoryPromptConfig;
   /** Ordered list of spec keys to use for product context and scoring (e.g. ["screenSize", "resolution", "refreshRate"]). */
   primarySpecs?: string[];
