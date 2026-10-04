@@ -46,6 +46,7 @@ export class ListingColumnsService {
     dryRun: boolean;
     sourceId?: string;
     categorySlug?: string;
+    recordIds?: string[];
   }): Promise<ListingColumnsFillSummary> {
     const summary: ListingColumnsFillSummary = { read: 0, changed: 0 };
     const brands = new Map<string, Promise<Brand | undefined>>();
@@ -65,6 +66,7 @@ export class ListingColumnsService {
       const page = await this.sourceRecordRepo.findForModelRefresh({
         sourceId: params.sourceId,
         categorySlug: params.categorySlug,
+        recordIds: params.recordIds,
         afterId,
         limit: PAGE_SIZE,
         named: false,

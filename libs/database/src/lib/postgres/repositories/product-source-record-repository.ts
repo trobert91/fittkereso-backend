@@ -526,6 +526,8 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   async findForModelRefresh(params: {
     sourceId?: string;
     categorySlug?: string;
+    /** Only these records. */
+    recordIds?: string[];
     afterId?: string;
     limit: number;
     named: boolean;
@@ -546,6 +548,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         .andWhere(`${scraped}->>'${nameOf<ScrapedProduct>('model')}' IS NOT NULL`);
     }
     if (params.sourceId) query.andWhere('source.id = :sourceId', { sourceId: params.sourceId });
+    if (params.recordIds) query.andWhere('record.id IN (:...recordIds)', { recordIds: params.recordIds });
     if (params.categorySlug) {
       query.andWhere(`${scraped}->'${nameOf<ScrapedProduct>('category')}'->>'slug' = :categorySlug`, {
         categorySlug: params.categorySlug,
@@ -556,8 +559,8 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Writes a listing's model alone — the name, its display name and its
-   * contract into the stored listing, the name and key into their columns. A
+   * Writes a listing's model alone — the name and its contract into the
+   * stored listing, the name and key into their columns. A
    * plain UPDATE rather than an entity save: `lastUpdated` stays, and an
    * import writing the record meanwhile keeps its offers.
    */
@@ -571,7 +574,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     await this.repo.query(
       `UPDATE ${this.repo.metadata.tableName}
           SET ${key} = $1,
-              ${model} = $2,
+              ${model} = $2::text,
               ${scraped} = COALESCE(${scraped}, '{}'::jsonb) || jsonb_build_object(
                 '${nameOf<ScrapedProduct>('model')}', $2::text,
                 '${nameOf<ScrapedProduct>('modelContract')}', $3::text)

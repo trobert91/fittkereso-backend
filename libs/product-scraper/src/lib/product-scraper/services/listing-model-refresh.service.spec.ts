@@ -92,6 +92,15 @@ describe('ListingModelRefreshService', () => {
     );
   });
 
+  it('reads only the listings it is given, in both passes', async () => {
+    await run({ recordIds: ['r1', 'r2'] });
+
+    expect(listingColumns.fill).toHaveBeenCalledWith(expect.objectContaining({ recordIds: ['r1', 'r2'] }));
+    expect(sourceRecordRepo.findForModelRefresh).toHaveBeenCalledWith(
+      expect.objectContaining({ named: true, recordIds: ['r1', 'r2'] }),
+    );
+  });
+
   it('asks each due listing as its own last import, and writes only its model, contract and key', async () => {
     const record = recordOf('r1');
     sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([record]);

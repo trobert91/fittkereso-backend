@@ -24,6 +24,8 @@ export interface ListingModelRefreshParams {
   dryRun: boolean;
   sourceId?: string;
   categorySlug?: string;
+  /** Only these listings (ProductSourceRecord ids), for both passes. */
+  recordIds?: string[];
   /** At most this many listings asked in one run. */
   limit: number;
   /** Extractions in flight at once. */
@@ -116,6 +118,7 @@ export class ListingModelRefreshService {
       const page = await this.sourceRecordRepo.findForModelRefresh({
         sourceId: params.sourceId,
         categorySlug: params.categorySlug,
+        recordIds: params.recordIds,
         afterId,
         limit: PAGE_SIZE,
         named: true,

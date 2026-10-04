@@ -19,11 +19,17 @@ export class ListingModelRefreshTools {
   @Tool({
     name: 'refresh_listing_models',
     description:
-      "Brings stored listings in line with the current model rule, without re-importing them, in two passes. First, every listing's record columns (resolved brand, model, title, normalizedModel) are filled from its stored listing — no LLM. Then each identifying listing whose model was asked under an older contract (the category's left-out specs, examples or prompt version) goes through the identity extraction once more; only its model, display name, contract and key are written — no spec or offer changes — and its product is named again (mergeSources, under the product's lock). Skips listings already under the current contract, listings stored without a raw title, and sources with the identity extraction off. Costs one LLM call per listing asked (about $0.0003); `limit` counts those calls. dryRun (default) only counts.",
+      "Brings stored listings in line with the current model rule, without re-importing them, in two passes. First, every listing's record columns (resolved brand, model, title, normalizedModel) are filled from its stored listing — no LLM. Then each identifying listing whose model was asked under an older contract (the category's left-out specs, examples or prompt version) goes through the identity extraction once more; only its model, contract and key are written — no spec or offer changes — and its product is named again (mergeSources, under the product's lock). Skips listings already under the current contract, listings stored without a raw title, and sources with the identity extraction off. Costs one LLM call per listing asked (about $0.0003); `limit` counts those calls. dryRun (default) only counts.",
     parameters: z.object({
       dryRun: z.boolean().default(true).describe('Count only; nothing called or written'),
       sourceId: z.string().optional().describe('Only this ProductSource'),
       categorySlug: z.string().optional(),
+      recordIds: z
+        .array(z.string().uuid())
+        .min(1)
+        .max(5000)
+        .optional()
+        .describe('Only these listings (ProductSourceRecord ids), in both passes'),
       limit: z.number().int().min(1).max(5000).default(200).describe('At most this many listings asked'),
       concurrency: z.number().int().min(1).max(8).default(4),
     }),
@@ -32,6 +38,7 @@ export class ListingModelRefreshTools {
     dryRun: boolean;
     sourceId?: string;
     categorySlug?: string;
+    recordIds?: string[];
     limit: number;
     concurrency: number;
   }): Promise<string> {
