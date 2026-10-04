@@ -4,7 +4,6 @@ import {
   ProductCategory,
   ProductSource,
   ProductSourceFetchMode,
-  listingNames,
   ScrapedProduct,
   ScrapedProductFlag,
   ScrapingSourceConfig,
@@ -49,7 +48,6 @@ export interface SimulatedProductPreview {
   brand: string;
   /** Absent when the identity extraction gave no name (see `flags`). */
   model?: string;
-  displayName?: string;
   /** The model normalized: what name matching keys this listing on. */
   normalizedModel?: string;
   originalName?: string;
@@ -304,10 +302,7 @@ export class ProductSourceSimulationService {
       merged: mergedSpecs,
     };
 
-    const brandMatch = await this.brandResolution.resolve(
-      identified.brand,
-      listingNames(identified).displayName,
-    );
+    const brandMatch = await this.brandResolution.resolve(identified.brand, identified.originalName);
     result.brandResolution = {
       queriedName: identified.brand,
       matched: !!brandMatch?.entity,
@@ -323,7 +318,6 @@ export class ProductSourceSimulationService {
     result.productPreview = {
       brand: identified.brand,
       model: identified.model,
-      displayName: identified.displayName,
       normalizedModel: this.matchQuery.normalizedModelOf(identified),
       originalName: detail.model,
       flags: identified.flags,

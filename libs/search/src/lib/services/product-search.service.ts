@@ -11,10 +11,21 @@ import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import { ProductSearchParams } from '../models/product-search-params';
 import { ProductSearchResult } from '../models/product-search-result';
 import { SelectQueryBuilder } from 'typeorm';
-import { nameOf, normalizeGtin, normalizeMpn } from '@fittkereso-backend/utils';
+import {
+  nameOf,
+  normalizeGtin,
+  normalizeMpn,
+  productDisplayNameSql,
+} from '@fittkereso-backend/utils';
 import { isEmpty, isArray } from 'lodash';
 
 const DEFAULT_PAGE_SIZE = 100;
+
+/** The product's shown name: its brand, then its model. */
+const PRODUCT_NAME = productDisplayNameSql(
+  `brand.${nameOf<Brand>('name')}`,
+  `product.${nameOf<ProductModel>('model')}`,
+);
 
 /** A value matched literally inside LIKE, with backslash as the escape character. */
 function escapeLike(value: string): string {
@@ -165,12 +176,12 @@ export class ProductSearchService {
       query = query.andWhere(
         `(
       -- LIKE for recall
-      LOWER(product.${nameOf<ProductModel>('displayName')}) LIKE :likeTerm
+      LOWER(${PRODUCT_NAME}) LIKE :likeTerm
       OR LOWER(product.${nameOf<ProductModel>('model')}) LIKE :likeTerm
 
       -- OR trigram similarity filter
       OR similarity(
-          LOWER(product.${nameOf<ProductModel>('displayName')}),
+          LOWER(${PRODUCT_NAME}),
           :rawTerm
         ) >= :similarityThreshold
       OR similarity(
@@ -184,7 +195,7 @@ export class ProductSearchService {
       query.addSelect(
         `
       GREATEST(
-        similarity(LOWER(product.${nameOf<ProductModel>('displayName')}), :rawTerm),
+        similarity(LOWER(${PRODUCT_NAME}), :rawTerm),
         similarity(LOWER(product.${nameOf<ProductModel>('model')}), :rawTerm)
       )
       `,
@@ -194,7 +205,13 @@ export class ProductSearchService {
       query = query.orderBy('similarity_score', 'DESC');
     } else {
       // --- Ordering ---
-      query = query.orderBy(`product.${params.sort}`, params.order);
+      if (params.sort === 'name') {
+        query = query
+          .addSelect(`LOWER(${PRODUCT_NAME})`, 'product_name')
+          .orderBy('product_name', params.order);
+      } else {
+        query = query.orderBy(`product.${params.sort}`, params.order);
+      }
     }
 
     // --- Pagination ---

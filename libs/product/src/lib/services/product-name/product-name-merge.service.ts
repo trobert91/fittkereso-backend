@@ -22,7 +22,7 @@ interface ValueGroup {
 }
 
 /**
- * Recomputes ProductModel's name fields (brand/model/displayName/aliases)
+ * Recomputes ProductModel's name fields (brand/model/aliases)
  * from its identifying ProductSourceRecords — the name-field counterpart to
  * ProductSpecMergeService, called from ProductMergeService.mergeSources
  * alongside the spec merge.
@@ -66,7 +66,6 @@ export class ProductNameMergeService {
     const name = naming ? this.nameOf(naming, model.brand?.name) : undefined;
     if (name) {
       model.model = name;
-      model.displayName = productDisplayName(model.brand?.name, name);
     }
 
     await this.mergeAliases(model, latestPerSource, manager);
@@ -196,7 +195,7 @@ export class ProductNameMergeService {
 
     const existing = model.aliases ?? [];
     const existingTexts = new Set([
-      model.displayName,
+      productDisplayName(model.brand?.name, model.model ?? ''),
       model.model,
       ...existing.map((a) => a.alias),
     ]);

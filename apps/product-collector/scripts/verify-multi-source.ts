@@ -121,7 +121,7 @@ interface Feeds {
 interface Snapshot {
   products: Record<
     string,
-    { displayName: string; listings: string[]; specs: unknown; description: string | null }
+    { model: string; listings: string[]; specs: unknown; description: string | null }
   >;
   offers: Record<
     string,
@@ -639,14 +639,14 @@ async function snapshotOf(
   );
 
   const products: Snapshot['products'] = {};
-  const models: { id: string; displayName: string; specs: unknown; description: string | null }[] =
+  const models: { id: string; model: string; specs: unknown; description: string | null }[] =
     await db.query(
-      `SELECT id, "displayName", specs, description FROM product_model WHERE id = ANY($1)`,
+      `SELECT id, model, specs, description FROM product_model WHERE id = ANY($1)`,
       [[...listingsOf.keys()]],
     );
   for (const model of models) {
     products[keyOf.get(model.id) as string] = {
-      displayName: model.displayName,
+      model: model.model,
       listings: (listingsOf.get(model.id) ?? []).sort(),
       specs: model.specs,
       description: model.description,

@@ -302,7 +302,7 @@ describe('ProductMergeService.mergeProducts', () => {
     const manager = {
       findOne: jest.fn(async (_entity: unknown, { where }: { where: { id: string } }) => ({
         id: where.id,
-        displayName: where.id,
+        model: where.id,
       })),
     };
     const productRepo = {
@@ -400,7 +400,7 @@ describe('ProductMergeService.mergeProducts', () => {
     }
     jest
       .spyOn(service as any, 'loadProductForMerge')
-      .mockImplementation(async (_manager, id) => ({ id }));
+      .mockImplementation(async (_manager, id) => ({ id, model: id }));
     jest.spyOn(service as any, 'postMergeUpdates').mockImplementation(async () => {
       order.push('recompute');
     });
@@ -563,7 +563,7 @@ describe('ProductMergeService.mergeSources', () => {
       ({
         id,
         source,
-        scrapedProduct: { specs, displayName: id },
+        scrapedProduct: { specs, originalName: id },
         lastUpdated: new Date('2026-09-20'),
       }) as any;
 

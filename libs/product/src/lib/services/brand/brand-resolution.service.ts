@@ -15,13 +15,14 @@ export class BrandResolutionService {
     private readonly brandAliasRepo: BrandAliasRepository,
   ) {}
 
+  /** `title`: the listing's title, searched by its first words when the brand string resolves nothing. */
   public async resolve(
     brandName: string | undefined,
-    displayName: string | undefined,
+    title: string | undefined,
   ): Promise<WithSimilarity<Brand> | undefined> {
     let brand = await this.resolveFromBrandName(brandName);
     if (!brand?.entity) {
-      brand = await this.resolveFromDisplayName(displayName);
+      brand = await this.resolveFromTitle(title);
     }
 
     return brand;
@@ -69,16 +70,16 @@ export class BrandResolutionService {
     return undefined;
   }
 
-  private async resolveFromDisplayName(
-    displayName: string | undefined,
+  private async resolveFromTitle(
+    title: string | undefined,
   ): Promise<WithSimilarity<Brand> | undefined> {
-    if (!displayName) return undefined;
+    if (!title) return undefined;
 
     // search by first word, then by first two words
-    let brands = await this.searchSimilarBrandByName(displayName.split(' ')[0]);
+    let brands = await this.searchSimilarBrandByName(title.split(' ')[0]);
     if (isEmpty(brands)) {
       brands = await this.searchSimilarBrandByName(
-        displayName.split(' ').slice(0, 2).join(' '),
+        title.split(' ').slice(0, 2).join(' '),
       );
     }
 

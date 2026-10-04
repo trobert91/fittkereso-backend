@@ -10,7 +10,7 @@ import {
   ScrapedProduct,
 } from '@fittkereso-backend/database';
 import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 import { AppModule } from '../app.module';
 
 /**
@@ -97,7 +97,7 @@ async function bootstrap() {
       try {
         products.push({
           id: product.id,
-          displayName: product.displayName,
+          displayName: productDisplayName(product.brand.name, product.model),
           model: product.model ?? null,
           brand: product.brand.name,
           categorySlug: product.productCategory.slug,
@@ -190,7 +190,7 @@ function listingOf(
         .keys?.[0] ?? '',
     brand: scraped.brand ?? product.brand.name,
     model: scraped.model,
-    displayName: scraped.displayName,
+    displayName: scraped.model ? productDisplayName(scraped.brand, scraped.model) : undefined,
     originalName: scraped.originalName,
     specs: specsOrUndefined(scraped.specs),
     productId: product.id,

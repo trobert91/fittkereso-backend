@@ -6,7 +6,7 @@ import { OfferCondition } from '../postgres/types/offer-condition';
  * The complete result of scraping one product listing from one source,
  * before persistence. Stored verbatim on ProductSourceRecord.scrapedProduct
  * (see that entity) as the pre-resolution source claim, so
- * brand/model/displayName/aliases/images/offers/specs/
+ * brand/model/aliases/images/offers/specs/
  * rawSpecs can all be reprocessed without a re-scrape. Lives in
  * @fittkereso-backend/database (not @fittkereso-backend/product, which
  * re-exports it) for the same reason as ScrapedProductSpec: database cannot
@@ -29,11 +29,9 @@ export interface ScrapedProduct {
    * normalized (ProductMatchQueryService.normalizedModelOf), what its listings
    * are matched on. Set only when that call returned one (now, or on an
    * earlier import whose result was reused); otherwise absent, and `flags`
-   * says why. A reader that needs some name either way takes listingNames().
+   * says why. A reader that needs some name either way takes listingModel().
    */
   model?: string;
-  /** `${brand} ${model}`, set exactly when `model` is. */
-  displayName?: string;
   /**
    * Digest of what `model` was asked under: the category's left-out specs,
    * its examples and the prompt's version. A stored model under another
@@ -148,17 +146,11 @@ export const SCRAPED_PRODUCT_FLAGS = ['identity_off', 'identity_failed'] as cons
 export type ScrapedProductFlag = (typeof SCRAPED_PRODUCT_FLAGS)[number];
 
 /**
- * The names to use where some name is needed whether or not the listing was
- * identified — a match key, a new product's shell, brand resolution's
- * fallback text: the identified ones, else the shop's title.
+ * The name to use where some name is needed whether or not the listing was
+ * identified — a new product's shell, say: the model, else the shop's title.
  */
-export function listingNames(
-  scrapedProduct: Pick<ScrapedProduct, 'model' | 'displayName' | 'originalName'>,
-): { model: string; displayName: string } {
-  return {
-    model: scrapedProduct.model ?? scrapedProduct.originalName,
-    displayName: scrapedProduct.displayName ?? scrapedProduct.originalName,
-  };
+export function listingModel(scrapedProduct: Pick<ScrapedProduct, 'model' | 'originalName'>): string {
+  return scrapedProduct.model ?? scrapedProduct.originalName;
 }
 
 // A single scraped image URL with its position in the source listing's

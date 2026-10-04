@@ -31,7 +31,7 @@ function makeRecord(
     scrapedProduct: {
       brand: 'Cube',
       model: 'Reaction Hybrid',
-      displayName: 'Cube Reaction Hybrid 625',
+      originalName: 'Cube Reaction Hybrid 625',
       category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
     },
     ...overrides,
@@ -73,7 +73,7 @@ describe('ProductSplitService', () => {
       recomputePrice: jest.fn(),
     };
     modelFactory = {
-      createShell: jest.fn().mockResolvedValue({ displayName: 'Cube' }),
+      createShell: jest.fn().mockResolvedValue({ model: 'Cube' }),
     };
 
     locks = {
@@ -169,7 +169,6 @@ describe('ProductSplitService', () => {
         scrapedProduct: {
           brand: 'Cube',
           model: 'Old Name',
-          displayName: 'Old Name',
           category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
         } as any,
       }),
@@ -179,7 +178,6 @@ describe('ProductSplitService', () => {
         scrapedProduct: {
           brand: 'Cube',
           model: 'New Name',
-          displayName: 'New Name',
           category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
         } as any,
       }),
@@ -191,13 +189,13 @@ describe('ProductSplitService', () => {
     });
 
     expect(modelFactory.createShell).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'New Name', displayName: 'New Name' }),
+      expect.objectContaining({ model: 'New Name' }),
     );
   });
 
   // A Google record joined later is newer, but only the Árukereső one was
   // named by the identity extraction.
-  it('names the new product from an identified record over a newer title-only one, and builds its key', async () => {
+  it('names the new product from an identified record over a newer title-only one', async () => {
     sourceRecordRepo.find.mockResolvedValue([
       makeRecord({
         id: 'record-arukereso',
@@ -205,7 +203,6 @@ describe('ProductSplitService', () => {
         scrapedProduct: {
           brand: 'GIANT',
           model: 'Talon E+',
-          displayName: 'GIANT Talon E+',
           originalName: 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben',
           category: { id: 'category-1', name: 'E-bikes', slug: 'e-bikes' },
         } as any,
@@ -230,7 +227,7 @@ describe('ProductSplitService', () => {
     expect(modelFactory.createShell).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'Talon E+',
-        displayName: 'GIANT Talon E+',
+        title: 'GIANT Talon E+ férfi MTB elektromos kerékpár - M méretben',
       }),
     );
   });
@@ -252,7 +249,7 @@ describe('ProductSplitService', () => {
     expect(modelFactory.createShell).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'GIANT Talon E+ - M méretben',
-        displayName: 'GIANT Talon E+ - M méretben',
+        title: 'GIANT Talon E+ - M méretben',
       }),
     );
   });

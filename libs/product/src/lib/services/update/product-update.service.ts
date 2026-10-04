@@ -48,11 +48,7 @@ export class ProductUpdateService {
     const brandName =
       entity.brand?.name ??
       (await this.brandRepo.findByIdOrFail(entity.brand?.id)).name;
-    let slug = generateSlug(
-      entity.id,
-      brandName,
-      entity.model || entity.displayName,
-    );
+    let slug = generateSlug(entity.id, brandName, entity.model);
     const existing = await this.productRepo.findOne({
       where: { slug },
       select: ['id'],

@@ -180,20 +180,18 @@ export class ProductSplitService {
     }
 
     // A manual/admin-entered record carries only specs, so fall back through
-    // the record's own names and title before the product it is leaving.
-    const displayName =
-      scraped?.displayName ?? scraped?.originalName ?? newest.product?.displayName;
-    if (!displayName) {
+    // the record's own model and title before the product it is leaving.
+    const model = scraped?.model ?? scraped?.originalName ?? newest.product?.model;
+    if (!model) {
       throw new BadRequestException(
         'Cannot split: source record has no name to build a product from',
       );
     }
-    const model = scraped?.model ?? scraped?.originalName ?? newest.product?.model ?? displayName;
     const brandName = scraped?.brand ?? newest.product?.brand?.name;
 
     return this.modelFactory.createShell({
       brandName,
-      displayName,
+      title: scraped?.originalName,
       model,
       categoryId,
       categoryName: scraped?.category?.name,
@@ -306,7 +304,6 @@ export class ProductSplitService {
       const embedding = await this.embeddingService.createProductEmbedding({
         brand: product.brand?.name,
         model: product.model,
-        displayName: product.displayName,
         category: product.productCategory?.name,
       });
       if (product.embedding) {

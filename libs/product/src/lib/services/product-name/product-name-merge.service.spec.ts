@@ -33,7 +33,7 @@ describe('ProductNameMergeService.mergeNames', () => {
   function makeModel(overrides: Partial<ProductModel> = {}): ProductModel {
     return {
       id: 'model-1',
-      displayName: 'Old Name',
+      model: 'Old Name',
       aliases: [],
       ...overrides,
     } as ProductModel;
@@ -53,7 +53,7 @@ describe('ProductNameMergeService.mergeNames', () => {
 
     await service.mergeNames(model, sources);
 
-    expect(model.displayName).toBe('Old Name');
+    expect(model.model).toBe('Old Name');
     expect(brandResolution.resolve).not.toHaveBeenCalled();
   });
 
@@ -72,7 +72,6 @@ describe('ProductNameMergeService.mergeNames', () => {
       await service.mergeNames(model, sources);
 
       expect(model.model).toBe('Marlin 7');
-      expect(model.displayName).toBe('Trek Marlin 7');
     });
 
     // #9 issue 6: a joining shop renamed the product.
@@ -150,7 +149,6 @@ describe('ProductNameMergeService.mergeNames', () => {
       await service.mergeNames(model, sources);
 
       expect(model.model).toBe('MARLIN 7 48cm');
-      expect(model.displayName).toBe('Trek MARLIN 7 48cm');
     });
   });
 
@@ -180,7 +178,7 @@ describe('ProductNameMergeService.mergeNames', () => {
   });
 
   it('unions aliases from all sources without corroboration-gating', async () => {
-    const model = makeModel({ displayName: 'Trek Marlin 7' });
+    const model = makeModel();
     const sources = [
       makeSource('a', { aliases: ['Marlin 7'] }),
       makeSource('b', { aliases: ['MTB Marlin 7'] }),
@@ -195,8 +193,8 @@ describe('ProductNameMergeService.mergeNames', () => {
     );
   });
 
-  it('skips creating an alias that duplicates the product displayName or model', async () => {
-    const model = makeModel({ displayName: 'Trek Marlin 7', model: 'Marlin 7' });
+  it('skips creating an alias that duplicates the product name or model', async () => {
+    const model = makeModel({ brand: { name: 'Trek' } as never, model: 'Marlin 7' });
     const sources = [makeSource('a', { aliases: ['Trek Marlin 7', 'Marlin 7'] })];
 
     await service.mergeNames(model, sources);
@@ -205,7 +203,7 @@ describe('ProductNameMergeService.mergeNames', () => {
   });
 
   it('creates no alias for a product that is not inserted yet', async () => {
-    const model = makeModel({ id: undefined, displayName: 'Trek Marlin 7' });
+    const model = makeModel({ id: undefined, model: 'Marlin 7' });
     const sources = [makeSource('a', { aliases: ['Marlin 7'] })];
 
     await service.mergeNames(model, sources);

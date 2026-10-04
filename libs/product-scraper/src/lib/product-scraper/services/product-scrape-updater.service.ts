@@ -5,7 +5,7 @@ import {
   AdvisoryLockService,
   Brand,
   brandLock,
-  listingNames,
+  listingModel,
   offerKeyLock,
   productLock,
   Offer,
@@ -635,10 +635,7 @@ export class ProductScrapeUpdaterService {
     identifiers: OfferIdentifiers[],
     history: HistoryHit | undefined,
   ): Promise<{ identity: ResolvedIdentity; brand?: Brand }> {
-    const brand = await this.brandResolution.resolve(
-      scrapedProduct.brand,
-      listingNames(scrapedProduct).displayName,
-    );
+    const brand = await this.brandResolution.resolve(scrapedProduct.brand, scrapedProduct.originalName);
     const brandId = brand?.entity?.id;
     const resolved = brand?.entity ?? undefined;
     const { keyMatches, verdict, keyGates } = await this.lookupKeys(
@@ -1712,11 +1709,7 @@ export class ProductScrapeUpdaterService {
 
   private async generateProductSlug(entity: ProductModel): Promise<void> {
     const brandName = entity.brand?.name ?? '';
-    let slug = generateSlug(
-      entity.id,
-      brandName,
-      entity.model || entity.displayName,
-    );
+    let slug = generateSlug(entity.id, brandName, entity.model);
     const existing = await this.productRepo.findOne({
       where: { slug },
       select: ['id'],
@@ -1733,12 +1726,12 @@ export class ProductScrapeUpdaterService {
   ): Promise<ProductModel> {
     // A listing the extraction did not name starts its product off its title;
     // the name merge replaces it once a source names the product.
-    const names = listingNames(scrapedProduct);
+    const model = listingModel(scrapedProduct);
     try {
       return await this.modelFactory.createShell({
         brandName: scrapedProduct.brand,
-        displayName: names.displayName,
-        model: names.model,
+        title: scrapedProduct.originalName,
+        model,
         categoryId: scrapedProduct.category.id,
         categoryName: scrapedProduct.category.name,
       });
@@ -1749,7 +1742,7 @@ export class ProductScrapeUpdaterService {
           {
             taskId: context.task?.id,
             url: context.url,
-            displayName: names.displayName,
+            model,
           },
         );
       }

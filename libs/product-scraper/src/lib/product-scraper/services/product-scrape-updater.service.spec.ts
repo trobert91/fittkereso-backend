@@ -73,7 +73,6 @@ function makeExistingModel(): ProductModel {
   model.id = 'model-1';
   model.brand = makeBrand();
   model.productCategory = makeCategory();
-  model.displayName = 'Logitech MX Keys';
   model.model = 'MX Keys';
   model.slug = 'logitech-mx-keys';
   model.images = [];
@@ -98,7 +97,6 @@ function makeScrapedProduct(
 ): ScrapedProduct {
   return {
     brand: 'Logitech',
-    displayName: 'Logitech MX Keys',
     model: 'MX Keys',
     originalName: 'Logitech MX Keys Wireless UK',
     category: makeCategory(),
@@ -367,7 +365,6 @@ describe('ProductScrapeUpdaterService', () => {
   it('attaches to the product listing matching picked by score', async () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
-      displayName: 'LG 39GS95QE-W',
       model: '39GS95QE-W',
       brand: 'LG',
     });
@@ -379,7 +376,6 @@ describe('ProductScrapeUpdaterService', () => {
       productId: otherVariant.id,
       decision: {
         outcome: 'identified',
-        nameKey: '39gs95qe-w lg',
         candidates: [
           {
             productId: otherVariant.id,
@@ -778,7 +774,6 @@ describe('ProductScrapeUpdaterService', () => {
     const cleaned = (scrapedProduct: ScrapedProduct): ScrapedProduct => ({
       ...scrapedProduct,
       model: 'Macina Scarp SX',
-      displayName: 'KTM Macina Scarp SX',
       specs: { modelYear: 2026 },
     });
 
@@ -868,9 +863,10 @@ describe('ProductScrapeUpdaterService', () => {
         expect.objectContaining({ model: 'Macina Scarp SX' }),
         expect.anything(),
       );
+      // A brand string that resolves nothing falls back to the title's words.
       expect(mockBrandResolution.resolve).toHaveBeenCalledWith(
         'Logitech',
-        'KTM Macina Scarp SX',
+        'Logitech MX Keys Wireless UK',
       );
     });
 
@@ -996,7 +992,7 @@ describe('ProductScrapeUpdaterService', () => {
       await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
 
       expect(mockModelFactory.createShell).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'Macina Scarp SX', displayName: 'KTM Macina Scarp SX' }),
+        expect.objectContaining({ model: 'Macina Scarp SX', title: 'Logitech MX Keys Wireless UK' }),
       );
     });
   });
@@ -1133,7 +1129,6 @@ describe('ProductScrapeUpdaterService', () => {
     const task = makeTask();
     const scrapedProduct = makeScrapedProduct({
       brand: 'MSI',
-      displayName: 'MSI MPG 341CQPX',
       model: 'MPG 341CQPX',
       category: makeCategory({
         id: 'category-monitors',
@@ -1628,7 +1623,6 @@ describe('ProductScrapeUpdaterService', () => {
         { source: googleSource as never, url, feedRowHash: 'hash-1' },
         makeScrapedProduct({
           model: undefined,
-          displayName: undefined,
           originalName: 'HAIBIKE SDURO raw title',
           externalId: 'HAIBIKE-1',
           offers: [{ price: 1499990, priceWithoutDiscount: 2269000, externalId: 'HAIBIKE-1' }] as never,
@@ -1673,7 +1667,7 @@ describe('ProductScrapeUpdaterService', () => {
       expect(mockBrandResolution.resolve).toHaveBeenCalledTimes(1);
       expect(mockBrandResolution.resolve).toHaveBeenCalledWith('Logitech', 'HAIBIKE SDURO raw title');
       // The product's names are its identifying sources'.
-      expect(model.displayName).toBe('Logitech MX Keys');
+      expect(model.model).toBe('MX Keys');
       expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           model,

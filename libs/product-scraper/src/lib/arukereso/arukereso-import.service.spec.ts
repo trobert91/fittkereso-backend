@@ -18,7 +18,7 @@ import {
 const urlOf = (id: string | number) => `https://speedbike.hu/p/${id}`;
 const productOf = (id: string | number, price = 100) =>
   ({
-    displayName: `Bike ${id}`,
+    originalName: `Bike ${id}`,
     externalId: `sku-${id}`,
     offers: [{ externalId: `sku-${id}`, price, currency: 'HUF' }],
   }) as never;

@@ -36,7 +36,7 @@
 import { NestFactory } from '@nestjs/core';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { DataSource, In, Like } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import {
   Brand,
   Offer,
@@ -206,7 +206,6 @@ async function createSeed(db: DataSource): Promise<Seed> {
     products[name] = await db.getRepository(ProductModel).save(
       Object.assign(new ProductModel(), {
         brand,
-        displayName: `${PREFIX} ${name}`,
         model: name,
         price,
         priceWithoutDiscount: null,
@@ -263,7 +262,7 @@ async function createSeed(db: DataSource): Promise<Seed> {
 /** Deleting a product deletes its offers (onDelete CASCADE); the seeded offers are all on seeded products. */
 async function removeSeed(db: DataSource): Promise<void> {
   const products = await db.getRepository(ProductModel).find({
-    where: { displayName: Like(`${PREFIX} %`) },
+    where: { brand: { name: `${PREFIX}-brand` } },
     relations: { embedding: true },
   });
   if (products.length > 0) {

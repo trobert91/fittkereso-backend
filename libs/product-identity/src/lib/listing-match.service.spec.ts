@@ -11,7 +11,6 @@ const KEY = 'kapoho macina master';
 const SCRAPED = {
   brand: 'KTM',
   model: 'Macina Kapoho Master',
-  displayName: 'KTM Macina Kapoho Master',
   originalName: 'KTM Macina Kapoho Master 2024 M/43',
   category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },
   specs: { modelYear: 2024 },

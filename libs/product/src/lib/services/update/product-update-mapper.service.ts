@@ -30,13 +30,6 @@ export class ProductUpdateMapperService {
     // Simple primitive fields
     // -------------------------------------
 
-    if (!isUndefined(dto.displayName)) {
-      if (entity.displayName !== dto.displayName) {
-        hasNameChanged = true;
-      }
-      entity.displayName = dto.displayName;
-    }
-
     if (!isUndefined(dto.model)) {
       if (entity.model !== dto.model) {
         hasNameChanged = true;
@@ -97,7 +90,6 @@ export class ProductUpdateMapperService {
       await this.embeddingService.createProductEmbedding({
         brand: entity.brand.name,
         model: entity.model,
-        displayName: entity.displayName,
         category: entity.productCategory?.name,
       });
   }

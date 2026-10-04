@@ -78,8 +78,7 @@ async function bootstrap() {
         continue;
       }
       const brandName = model.brand?.name ?? '';
-      const modelName = model.model || model.displayName;
-      let slug = generateSlug(model.id, brandName, modelName);
+      let slug = generateSlug(model.id, brandName, model.model);
       if (existingModelSlugs.has(slug)) {
         slug = `${slug}-${model.id.slice(-6)}`;
       }

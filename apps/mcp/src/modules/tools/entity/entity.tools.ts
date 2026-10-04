@@ -3,6 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { ProductModelRepository } from '@fittkereso-backend/database';
 import { compact, uniq } from 'lodash';
+import { productDisplayName } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class EntityTools {
@@ -53,7 +54,7 @@ export class EntityTools {
     // Header
     L.push(`# Product Detail`);
     L.push(`- **ID**: ${product.id}`);
-    L.push(`- **Display Name**: ${product.displayName}`);
+    L.push(`- **Name**: ${productDisplayName(product.brand?.name, product.model)}`);
     L.push(`- **Model**: ${product.model}`);
     const keys = uniq(compact((product.sources ?? []).map((record) => record.normalizedModel)));
     L.push(

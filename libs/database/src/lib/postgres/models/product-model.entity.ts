@@ -28,11 +28,10 @@ export class ProductModel extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   brand: Brand;
 
-  @Index()
-  @Column({ nullable: false })
-  @Expose({ groups: [SerializeGroup.list] })
-  displayName: string;
-
+  /**
+   * The model of the product's highest-priority identifying listing. The
+   * shown name is productDisplayName(brand.name, model).
+   */
   @Index()
   // Trigram index for public search. TypeORM can't declare a GIN operator
   // class, so it's created by hand once per environment (and by the trigram

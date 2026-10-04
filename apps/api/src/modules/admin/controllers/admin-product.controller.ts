@@ -254,8 +254,8 @@ export class AdminProductController {
     return this.duplicateService.mergeProducts(sourceId, body.targetProductId);
   }
 
-  // Recomputes this product's specs and name fields (brand/model/
-  // displayName/aliases) from its current ProductSourceRecords —
+  // Recomputes this product's specs and name fields (brand/model/aliases)
+  // from its current ProductSourceRecords —
   // the same idempotent recompute every scrape/manual-edit/product-merge
   // already triggers, exposed as a standalone on-demand action.
   @Post(':id/merge-sources')

@@ -8,7 +8,7 @@ import {
   ProductModelRepository,
   ProductModel,
 } from '@fittkereso-backend/database';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName, productDisplayNameSql } from '@fittkereso-backend/utils';
 import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
 import type {
   FilterBucket,
@@ -201,7 +201,7 @@ export class PublicCategoriesService {
 
     if (name) {
       qb.andWhere(
-        `(product."${nameOf<ProductModel>('displayName')}" ILIKE :namePattern OR brand.${nameOf<Brand>('name')} ILIKE :namePattern)`,
+        `(${productDisplayNameSql(`brand.${nameOf<Brand>('name')}`, `product."${nameOf<ProductModel>('model')}"`)} ILIKE :namePattern OR brand.${nameOf<Brand>('name')} ILIKE :namePattern)`,
         { namePattern: `%${name}%` },
       );
     }
@@ -443,7 +443,7 @@ export class PublicCategoriesService {
 
     if (query.name) {
       conditions.push(
-        `(product."displayName" ILIKE $${paramIdx} OR EXISTS (SELECT 1 FROM brand b WHERE b.id = product."brandId" AND b.name ILIKE $${paramIdx}))`,
+        `EXISTS (SELECT 1 FROM brand b WHERE b.id = product."brandId" AND (b.name ILIKE $${paramIdx} OR ${productDisplayNameSql('b.name', 'product."model"')} ILIKE $${paramIdx}))`,
       );
       params.push(`%${query.name}%`);
       paramIdx++;
@@ -965,7 +965,7 @@ export class PublicCategoriesService {
     const dto = new ProductListDto();
     dto.id = product.id;
     dto.slug = product.slug ?? '';
-    dto.displayName = product.displayName;
+    dto.displayName = productDisplayName(product.brand?.name, product.model);
     dto.model = product.model;
     dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
     dto.orderedSpecs = this.productSpecSortService.sortSpecsForList(

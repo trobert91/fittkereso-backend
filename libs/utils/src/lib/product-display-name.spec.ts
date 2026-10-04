@@ -1,4 +1,4 @@
-import { productDisplayName } from './product-display-name';
+import { productDisplayName, productDisplayNameSql } from './product-display-name';
 
 describe('productDisplayName', () => {
   it('puts the brand before the model', () => {
@@ -18,5 +18,14 @@ describe('productDisplayName', () => {
 
   it('shows the model alone without a brand', () => {
     expect(productDisplayName(undefined, 'Macina Tour CX830')).toBe('Macina Tour CX830');
+  });
+});
+
+describe('productDisplayNameSql', () => {
+  it('builds the same rule over the two columns', () => {
+    const sql = productDisplayNameSql('brand.name', 'product.model');
+
+    expect(sql).toContain("LOWER(LEFT(BTRIM(product.model), LENGTH(BTRIM(brand.name)) + 1)) = LOWER(BTRIM(brand.name)) || ' '");
+    expect(sql).toContain("ELSE BTRIM(brand.name) || ' ' || BTRIM(product.model)");
   });
 });

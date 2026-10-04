@@ -10,10 +10,11 @@ import {
   ProductImportTaskKind,
   ProductImportTask,
   ProductImportTaskRepository,
+  ProductModel,
   TaskStatus,
 } from '@fittkereso-backend/database';
 import { ProductImportTaskCreatorService } from '@fittkereso-backend/task';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 
 // Manual scrape-run tooling: enqueue a single ProductImportTask outside the normal
 // cron/scheduler flow and inspect its result. The collector (a separate
@@ -95,7 +96,11 @@ export class ScrapeRunTools {
   async getImportTask(args: { taskId: string }): Promise<string> {
     const task = await this.importTaskRepo.findOneOrFail({
       where: { id: args.taskId },
-      relations: [nameOf<ProductImportTask>('source'), nameOf<ProductImportTask>('product')],
+      relations: [
+        nameOf<ProductImportTask>('source'),
+        nameOf<ProductImportTask>('product'),
+        `${nameOf<ProductImportTask>('product')}.${nameOf<ProductModel>('brand')}`,
+      ],
     });
 
     const L: string[] = [];
@@ -122,7 +127,7 @@ export class ScrapeRunTools {
     if (task.status === TaskStatus.DONE && task.product) {
       L.push('');
       L.push('## Resulting Product');
-      L.push(`- ${task.product.displayName ?? task.product.id} (${task.product.id})`);
+      L.push(`- ${productDisplayName(task.product.brand?.name, task.product.model)} (${task.product.id})`);
 
       const sourceRow = await this.sourceRecordRepo.findOne({
         where: { product: { id: task.product.id }, source: { id: task.source.id } },

@@ -7,7 +7,6 @@ import type {
   ListingMatchOutcome,
   ScrapedProduct,
 } from '@fittkereso-backend/database';
-import { listingNames } from '@fittkereso-backend/database';
 import { BrandResolutionService } from '@fittkereso-backend/product';
 import { decideListingMatch } from './listing-match-decision';
 import { ListingMatchLlmService } from './listing-match-llm.service';
@@ -62,9 +61,7 @@ export class ListingMatchService {
     logContext?: Record<string, string>,
     options: ListingMatchOptions = {},
   ): Promise<ListingMatchResult> {
-    // A listing the extraction did not name goes by its title.
-    const names = listingNames(scrapedProduct);
-    const brand = await this.brandResolution.resolve(scrapedProduct.brand, names.displayName);
+    const brand = await this.brandResolution.resolve(scrapedProduct.brand, scrapedProduct.originalName);
     // Recall is scoped by brand, so an unresolved one has nothing to search —
     // the same create path this listing has always taken.
     if (!brand?.entity) {

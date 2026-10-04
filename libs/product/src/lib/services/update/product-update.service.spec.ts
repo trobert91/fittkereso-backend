@@ -14,7 +14,6 @@ describe('ProductUpdateService', () => {
   beforeEach(() => {
     product = {
       id: 'product-1',
-      displayName: 'KTM Macina Team',
       model: 'Macina Team',
       brand: { id: 'brand-ktm', name: 'KTM' },
       description: sourceText,
@@ -72,11 +71,11 @@ describe('ProductUpdateService', () => {
   // mergeSources would recompute the names from the sources too.
   it('leaves a name edit in the same save alone', async () => {
     const saved = await service.updateProduct('product-1', {
-      displayName: 'KTM Macina Team 2023',
+      model: 'Macina Team 2023',
       description: 'Az admin szövege.',
     });
 
-    expect(saved.displayName).toBe('KTM Macina Team 2023');
+    expect(saved.model).toBe('Macina Team 2023');
   });
 
   it('leaves the description alone when the edit does not touch it', async () => {

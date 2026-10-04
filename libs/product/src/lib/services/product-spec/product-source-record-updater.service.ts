@@ -170,7 +170,7 @@ export class ProductSourceRecordUpdaterService {
     });
 
     this.logger.debug(
-      `Upserted source record for product model ${model.id ?? model.displayName} (${sourceLabel}). Valid: ${validation.isValid}`,
+      `Upserted source record for product model ${model.id ?? model.model} (${sourceLabel}). Valid: ${validation.isValid}`,
     );
 
     return source;

@@ -87,7 +87,7 @@ export class ProductSpecMergeService {
     for (const record of sourceSpecs) {
       const priority = record.source?.priority ?? 0;
       const sourceLabel =
-        record.source?.name ?? record.scrapedProduct?.displayName ?? record.id;
+        record.source?.name ?? record.scrapedProduct?.originalName ?? record.id;
 
       for (const [key, value] of Object.entries(
         record.scrapedProduct?.specs ?? {},

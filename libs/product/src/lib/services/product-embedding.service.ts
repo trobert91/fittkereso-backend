@@ -5,7 +5,6 @@ import { compact } from 'lodash';
 export interface ProductEmbeddingInput {
   brand: string | undefined;
   model: string | undefined;
-  displayName: string | undefined;
   category: string | undefined;
 }
 
@@ -26,7 +25,7 @@ export class ProductEmbeddingService {
   ): Promise<number[]> {
     const text = compact([
       input.brand,
-      input.model ?? input.displayName,
+      input.model,
       input.category,
     ])
       .join(' ')

@@ -9,7 +9,7 @@ import {
   ProductImageDtoService,
   ProductSpecSortService,
 } from '@fittkereso-backend/product';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 
 import { ProductListDto } from '../dto/product-list.dto';
 import {
@@ -83,7 +83,7 @@ export class PublicProductsService {
     const dto = new ProductDetailDto();
     dto.id = product.id;
     dto.slug = product.slug ?? '';
-    dto.displayName = product.displayName;
+    dto.displayName = productDisplayName(product.brand?.name, product.model);
     dto.model = product.model;
     dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
     dto.description = product.description;
@@ -184,7 +184,7 @@ export class PublicProductsService {
     const dto = new ProductListDto();
     dto.id = product.id;
     dto.slug = product.slug ?? '';
-    dto.displayName = product.displayName;
+    dto.displayName = productDisplayName(product.brand?.name, product.model);
     dto.model = product.model;
     dto.releaseYear = product.specs?.['modelYear'] as number | undefined;
     dto.orderedSpecs = this.productSpecSortService.sortSpecsForList(

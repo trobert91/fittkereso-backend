@@ -23,10 +23,12 @@ UPDATE product_category
 SET slug = slugify(name)
 WHERE slug IS NULL OR slug = '';
 
--- Products (keyed on "displayName")
+-- Products (keyed on brand and model)
 UPDATE product_model
-SET slug = slugify("displayName")
-WHERE slug IS NULL OR slug = '';
+SET slug = slugify(brand.name || ' ' || product_model.model)
+FROM brand
+WHERE brand.id = product_model."brandId"
+  AND (product_model.slug IS NULL OR product_model.slug = '');
 
 -- Brands (keyed on "name")
 UPDATE brand

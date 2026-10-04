@@ -14,7 +14,7 @@ import {
   AutocompleteCategoryDto,
 } from '../dto/search.dto';
 import { ProductImageDtoService } from '@fittkereso-backend/product';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName, productDisplayNameSql } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class PublicAutocompleteService {
@@ -65,7 +65,7 @@ export class PublicAutocompleteService {
     const pattern = `%${q}%`;
     const modelColumn = `product."${nameOf<ProductModel>('model')}"`;
     const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
-    const displayNameColumn = `product."${nameOf<ProductModel>('displayName')}"`;
+    const nameColumn = productDisplayNameSql(`brand.${nameOf<Brand>('name')}`, modelColumn);
     const products = await this.productModelRepo.repo
       .createQueryBuilder('product')
       .leftJoin(`product.${nameOf<ProductModel>('brand')}`, 'brand')
@@ -78,7 +78,7 @@ export class PublicAutocompleteService {
       .select([
         `product.${nameOf<ProductModel>('id')}`,
         `product.${nameOf<ProductModel>('slug')}`,
-        `product.${nameOf<ProductModel>('displayName')}`,
+        `product.${nameOf<ProductModel>('model')}`,
         `brand.${nameOf<Brand>('name')}`,
         `category.${nameOf<ProductCategory>('slug')}`,
         `mainImage.${nameOf<ProductImage>('url')}`,
@@ -96,7 +96,7 @@ export class PublicAutocompleteService {
       })
       .andWhere(
         `(
-          ${displayNameColumn} ILIKE :pattern
+          ${nameColumn} ILIKE :pattern
           OR ${modelColumn} ILIKE :pattern
           OR ${aliasColumn} ILIKE :pattern
           OR similarity(${modelColumn}, :q) > 0.1
@@ -117,7 +117,7 @@ export class PublicAutocompleteService {
       .map((p) => {
         const dto = new AutocompleteProductDto();
         dto.slug = p.slug;
-        dto.displayName = p.displayName;
+        dto.displayName = productDisplayName(p.brand?.name, p.model);
         dto.categorySlug = p.productCategory?.slug ?? undefined;
         dto.brandName = p.brand?.name;
         dto.mainImageUrl = p.mainImage?.url ?? null;

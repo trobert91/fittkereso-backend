@@ -11,6 +11,7 @@ import {
 } from '@fittkereso-backend/search';
 import { OfferCondition, ProductCategoryRepository } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
+import { productDisplayName } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class SearchTools {
@@ -89,14 +90,14 @@ export class SearchTools {
       `# Product Search Results (${items.length} of ${result.totalItems ?? items.length})`,
     );
     L.push('');
-    L.push('| ID | Display Name | Brand | Model | Category | Enabled |');
-    L.push('|----|-------------|-------|-------|----------|---------|');
+    L.push('| ID | Name | Brand | Model | Category | Enabled |');
+    L.push('|----|------|-------|-------|----------|---------|');
 
     for (const p of items) {
       const brand = p.brand?.name ?? '—';
       const category = p.productCategory?.name ?? '—';
       L.push(
-        `| ${p.id} | ${p.displayName} | ${brand} | ${p.model} | ${category} | ${p.enabled} |`,
+        `| ${p.id} | ${productDisplayName(p.brand?.name, p.model)} | ${brand} | ${p.model} | ${category} | ${p.enabled} |`,
       );
     }
 

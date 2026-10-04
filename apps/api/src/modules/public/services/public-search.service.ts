@@ -14,7 +14,7 @@ import {
   SearchCategoryDto,
 } from '../dto/search.dto';
 import { ProductImageDtoService } from '@fittkereso-backend/product';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName, productDisplayNameSql } from '@fittkereso-backend/utils';
 
 @Injectable()
 export class PublicSearchService {
@@ -68,7 +68,7 @@ export class PublicSearchService {
 
     const modelColumn = `product."${nameOf<ProductModel>('model')}"`;
     const aliasColumn = `alias.${nameOf<ProductAlias>('alias')}`;
-    const displayNameColumn = `product."${nameOf<ProductModel>('displayName')}"`;
+    const nameColumn = productDisplayNameSql(`brand.${nameOf<Brand>('name')}`, modelColumn);
     const qb = this.productModelRepo.repo
       .createQueryBuilder('product')
       .leftJoin(`product.${nameOf<ProductModel>('brand')}`, 'brand')
@@ -81,7 +81,7 @@ export class PublicSearchService {
       .select([
         `product.${nameOf<ProductModel>('id')}`,
         `product.${nameOf<ProductModel>('slug')}`,
-        `product.${nameOf<ProductModel>('displayName')}`,
+        `product.${nameOf<ProductModel>('model')}`,
         `brand.${nameOf<Brand>('name')}`,
         `category.${nameOf<ProductCategory>('slug')}`,
         `mainImage.${nameOf<ProductImage>('url')}`,
@@ -94,7 +94,7 @@ export class PublicSearchService {
     if (useTrigramSimilarity) {
       qb.andWhere(
         `(
-          ${displayNameColumn} ILIKE :pattern
+          ${nameColumn} ILIKE :pattern
           OR ${modelColumn} ILIKE :pattern
           OR ${aliasColumn} ILIKE :pattern
           OR similarity(${modelColumn}, :q) > 0.1
@@ -115,9 +115,11 @@ export class PublicSearchService {
         .orderBy('relevance', 'DESC');
     } else {
       qb.andWhere(
-        `(${displayNameColumn} ILIKE :pattern OR brand.${nameOf<Brand>('name')} ILIKE :pattern)`,
+        `(${nameColumn} ILIKE :pattern OR brand.${nameOf<Brand>('name')} ILIKE :pattern)`,
         { pattern },
-      ).orderBy(displayNameColumn, 'ASC');
+      )
+        .addSelect(nameColumn, 'product_name')
+        .orderBy('product_name', 'ASC');
     }
 
     qb.skip(offset).take(limit);
@@ -128,7 +130,7 @@ export class PublicSearchService {
     const data = products.map((p) => {
       const dto = new SearchProductDto();
       dto.slug = p.slug ?? '';
-      dto.displayName = p.displayName;
+      dto.displayName = productDisplayName(p.brand?.name, p.model);
       dto.brandName = p.brand?.name;
       dto.categorySlug = p.productCategory?.slug ?? undefined;
       dto.mainImageUrl = p.mainImage?.url ?? null;

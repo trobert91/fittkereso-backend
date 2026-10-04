@@ -18,10 +18,6 @@ export class ProductModelUpdateDto {
 
   @IsOptional()
   @IsString()
-  displayName?: string;
-
-  @IsOptional()
-  @IsString()
   model?: string;
 
   @IsOptional()

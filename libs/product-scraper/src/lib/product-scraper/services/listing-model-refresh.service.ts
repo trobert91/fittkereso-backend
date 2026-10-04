@@ -57,7 +57,6 @@ export interface ListingModelRefreshSummary {
 interface Renamed {
   record: ProductSourceRecord;
   model: string;
-  displayName: string;
   contract: string;
   key: string | null;
 }
@@ -192,7 +191,6 @@ export class ListingModelRefreshService {
       return {
         record,
         model: extracted.model,
-        displayName: `${extracted.brand} ${extracted.model}`,
         contract,
         // As the column pass built it: with the record's resolved brand.
         key: this.matchQuery.normalizedModelOf(extracted, record.brand?.name) ?? null,

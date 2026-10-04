@@ -92,7 +92,7 @@ describe('ListingModelRefreshService', () => {
     );
   });
 
-  it('asks each due listing as its own last import, and writes only its model, display name, contract and key', async () => {
+  it('asks each due listing as its own last import, and writes only its model, contract and key', async () => {
     const record = recordOf('r1');
     sourceRecordRepo.findForModelRefresh.mockResolvedValueOnce([record]);
 
@@ -105,7 +105,6 @@ describe('ListingModelRefreshService', () => {
     });
     expect(sourceRecordRepo.setModel).toHaveBeenCalledWith('r1', {
       model: 'Kathmandu Hybrid ONE 800',
-      displayName: 'CUBE Kathmandu Hybrid ONE 800',
       contract: CONTRACT,
       // Keyed with the record's resolved brand, as an import keys it.
       key: 'key:Kathmandu Hybrid ONE 800:Cube',

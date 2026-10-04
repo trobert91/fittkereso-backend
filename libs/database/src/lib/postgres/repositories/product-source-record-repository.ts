@@ -8,10 +8,11 @@ import { ProductSourceRecord } from '../models/product-source-record.entity';
 import { ProductSource } from '../models/product-source.entity';
 import type { ProductModel } from '../models/product-model.entity';
 import type { Seller } from '../models/seller.entity';
+import type { Brand } from '../models/brand.entity';
 import type { Offer } from '../models/offer.entity';
 import type { ScrapedOffer, ScrapedProduct } from '../../models/scraped-product';
 import type { ProductSpecs } from '../../models/product-spec';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayNameSql } from '@fittkereso-backend/utils';
 
 /** What a feed run knows about one of its listings before deciding on a row. */
 export interface FeedRowState {
@@ -84,7 +85,8 @@ export interface ProductSourceRecordRow {
   externalId: string | null;
   /** The externalIds its offers are stored under. */
   offerExternalIds: string[];
-  title: string | null;
+  /** The listing's model, as the identity extraction named it. */
+  model: string | null;
   /** The title exactly as the shop showed it; null on a record stored before it was kept. */
   originalName: string | null;
   brand: string | null;
@@ -311,7 +313,6 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   ): Promise<{ items: ProductSourceRecordRow[]; total: number }> {
     const record = (column: keyof ProductSourceRecord) => `record."${nameOf<ProductSourceRecord>(column)}"`;
     const scraped = record('scrapedProduct');
-    const displayName: keyof ScrapedProduct = 'displayName';
     const originalName: keyof ScrapedProduct = 'originalName';
     const brand: keyof ScrapedProduct = 'brand';
     const category: keyof ScrapedProduct = 'category';
@@ -321,13 +322,16 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
     const seenAt = `COALESCE(${record('lastSeenAt')}, ${record('lastUpdated')})`;
     // What the list shows as the listing's title: its column, else the stored
     // listing's (a row written before the column existed).
-    const shownTitle = `COALESCE(${record('originalTitle')}, ${scraped} ->> '${originalName}', ${scraped} ->> '${displayName}')`;
+    const shownTitle = `COALESCE(${record('originalTitle')}, ${scraped} ->> '${originalName}')`;
     const offerExternalIds = `jsonb_path_query_array(${scraped}, '$.${offers}[*].resolvedExternalId')`;
     const entries = `jsonb_array_elements(COALESCE(${scraped} -> '${offers}', '[]'::jsonb))`;
     // The entry a listing is priced by: its cheapest size or colour.
     const cheapest = `(SELECT entry FROM ${entries} AS entry ORDER BY (entry ->> '${price}')::numeric ASC NULLS LAST LIMIT 1)`;
     const cheapestField = (field: keyof ScrapedOffer) => `${cheapest} ->> '${field}'`;
-    const productName = `model."${nameOf<ProductModel>('displayName')}"`;
+    const productName = productDisplayNameSql(
+      `productBrand.${nameOf<Brand>('name')}`,
+      `model."${nameOf<ProductModel>('model')}"`,
+    );
 
     const sortExpressions: Record<ProductSourceRecordSort, string> = {
       title: `LOWER(${shownTitle})`,
@@ -345,7 +349,8 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .createQueryBuilder('record')
       .innerJoin(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
       .leftJoin(`source.${nameOf<ProductSource>('seller')}`, 'seller')
-      .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model');
+      .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model')
+      .leftJoin(`model.${nameOf<ProductModel>('brand')}`, 'productBrand');
     if (params.productSourceId) {
       query.andWhere('source.id = :sourceId', { sourceId: params.productSourceId });
     }
@@ -372,7 +377,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
           where
             .where(`record.${nameOf<ProductSourceRecord>('url')} ILIKE :search`)
             .orWhere(`${record('externalId')} ILIKE :search`)
-            .orWhere(`${scraped} ->> '${displayName}' ILIKE :search`)
+            .orWhere(`${record('model')} ILIKE :search`)
             .orWhere(`${shownTitle} ILIKE :search`)
             .orWhere(`${offerExternalIds}::text ILIKE :search`),
         ),
@@ -419,7 +424,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
       .addSelect(`record.${nameOf<ProductSourceRecord>('url')}`, 'url')
       .addSelect(record('externalId'), 'externalId')
       .addSelect(offerExternalIds, 'offerExternalIds')
-      .addSelect(`${scraped} ->> '${displayName}'`, 'title')
+      .addSelect(record('model'), 'model')
       .addSelect(shownTitle, 'originalName')
       .addSelect(`${scraped} ->> '${brand}'`, 'brand')
       .addSelect(`${scraped} -> '${category}' ->> 'name'`, 'categoryName')
@@ -558,7 +563,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    */
   async setModel(
     id: string,
-    values: { model: string; displayName: string; contract: string; key: string | null },
+    values: { model: string; contract: string; key: string | null },
   ): Promise<void> {
     const scraped = `"${nameOf<ProductSourceRecord>('scrapedProduct')}"`;
     const key = `"${nameOf<ProductSourceRecord>('normalizedModel')}"`;
@@ -569,10 +574,9 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
               ${model} = $2,
               ${scraped} = COALESCE(${scraped}, '{}'::jsonb) || jsonb_build_object(
                 '${nameOf<ScrapedProduct>('model')}', $2::text,
-                '${nameOf<ScrapedProduct>('displayName')}', $3::text,
-                '${nameOf<ScrapedProduct>('modelContract')}', $4::text)
-        WHERE id = $5`,
-      [values.key, values.model, values.displayName, values.contract, id],
+                '${nameOf<ScrapedProduct>('modelContract')}', $3::text)
+        WHERE id = $4`,
+      [values.key, values.model, values.contract, id],
     );
   }
 

@@ -162,7 +162,6 @@ describe('SpecPostProcessService', () => {
 
       expect(result).toMatchObject({
         model: 'Macina Scarp SX Prestige Di2',
-        displayName: 'KTM Macina Scarp SX Prestige Di2',
         originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE",
         specs: { modelYear: 2026, batteryCapacity: 750, weight: 24, forkTravel: 150 },
         offers: [{ price: 1, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
@@ -210,7 +209,6 @@ describe('SpecPostProcessService', () => {
       });
 
       expect(result.model).toBeUndefined();
-      expect(result.displayName).toBeUndefined();
       expect(result.originalName).toBe("KTM MACINA SCARP SX PRESTIGE Di2 M/43 '26 OLIVE");
       expect(result.flags).toEqual(['identity_failed']);
       expect(result.specs).toEqual({ weight: 24, forkTravel: 150 });
@@ -238,7 +236,6 @@ describe('SpecPostProcessService', () => {
 
       expect(postProcess.extractIdentity).not.toHaveBeenCalled();
       expect(result.model).toBeUndefined();
-      expect(result.displayName).toBeUndefined();
       expect(result.flags).toEqual(['identity_off']);
       expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'disabled');
     });
@@ -335,7 +332,6 @@ describe('SpecPostProcessService', () => {
         expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'reused');
         expect(result).toMatchObject({
           model: 'Macina Scarp SX Prestige Di2',
-          displayName: 'KTM Macina Scarp SX Prestige Di2',
           specs: expect.objectContaining({ modelYear: 2026, tubeless: true }),
           // Today's price, the stored listing-level specs.
           offers: [{ price: 2, externalId: 'sku-43', specs: { frameSize: 43, color: 'Olíva' } }],
@@ -446,7 +442,6 @@ describe('SpecPostProcessService', () => {
 
           expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
           expect(result.model).toBe('MACINA SCARP SX PRESTIGE Di2');
-          expect(result.displayName).toBe('KTM MACINA SCARP SX PRESTIGE Di2');
           expect(result.modelContract).toBe(service.modelContractOf('ebikes'));
           expect(result.specs).toMatchObject({ modelYear: 2026, batteryCapacity: 750, tubeless: true });
           expect(metrics.identityExtraction).toHaveBeenCalledWith('speedbike-arukereso', 'refreshed');

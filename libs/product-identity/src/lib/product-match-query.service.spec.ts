@@ -19,7 +19,6 @@ describe('ProductMatchQueryService', () => {
       category,
       brand: 'Cube',
       model: 'Stereo Hybrid 140',
-      displayName: 'Cube Stereo Hybrid 140',
       ...fields,
     } as ScrapedProduct;
   }
@@ -30,7 +29,6 @@ describe('ProductMatchQueryService', () => {
       brand: cube,
       productCategory: { id: category.id, slug: category.slug },
       model: 'Stereo Hybrid 140',
-      displayName: 'Cube Stereo Hybrid 140',
       ...fields,
     } as ProductModel;
   }
@@ -66,7 +64,6 @@ describe('ProductMatchQueryService', () => {
     const query = service.ofListing(
       listingOf({
         model: undefined,
-        displayName: undefined,
         originalName: 'Cube Stereo Hybrid 140 HPC - M méretben',
       }),
       cube,

@@ -588,7 +588,6 @@ describe('ArukeresoProductMapperService', () => {
         'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
       );
       expect(result.scrapedProduct).not.toHaveProperty('model');
-      expect(result.scrapedProduct).not.toHaveProperty('displayName');
       expect(result.scrapedProduct).not.toHaveProperty('flags');
     });
 

@@ -242,7 +242,6 @@ export class SpecPostProcessService {
         // Only a name the call returned: without one the listing keeps its
         // title alone, and its flags say why.
         model: merged.model,
-        displayName: merged.model ? `${merged.brand} ${merged.model}` : undefined,
         modelContract: merged.model ? modelContract : undefined,
         specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
         flags: withIdentityFlag(
@@ -365,7 +364,6 @@ export class SpecPostProcessService {
     return {
       ...reused,
       model: identity.model,
-      displayName: `${reused.brand} ${identity.model}`,
       modelContract: contract,
     };
   }
@@ -388,7 +386,6 @@ export class SpecPostProcessService {
       ...scrapedProduct,
       brand: stored.brand ?? scrapedProduct.brand,
       model: stored.model,
-      displayName: stored.displayName,
       modelContract: stored.modelContract,
       specs: stored.specs ?? scrapedProduct.specs,
       flags: withIdentityFlag(scrapedProduct.flags, undefined),

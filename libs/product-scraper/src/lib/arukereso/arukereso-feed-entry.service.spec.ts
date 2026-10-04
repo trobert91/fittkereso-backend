@@ -10,7 +10,7 @@ describe('ArukeresoFeedEntryService', () => {
   let metrics: { feedEntrySkippedAt: jest.Mock };
 
   const item = { fields: { identifier: '1260040108' }, attributes: [] };
-  const scrapedProduct = { displayName: 'KTM MACINA SCARP SX', offers: [] };
+  const scrapedProduct = { originalName: 'KTM MACINA SCARP SX', offers: [] };
 
   const task = {
     id: 'task-1',

@@ -20,7 +20,7 @@ import {
   ProductMatchQuery,
   ProductMatchQueryService,
 } from '@fittkereso-backend/product-identity';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 
 interface MatchSubject {
   kind: 'product' | 'listing';
@@ -85,7 +85,7 @@ export class ProductIdentityTools {
 
     return {
       kind: 'product',
-      title: `${product.displayName} (${product.id})`,
+      title: `${productDisplayName(product.brand.name, product.model)} (${product.id})`,
       query: this.queryService.ofProduct(product),
     };
   }
@@ -123,7 +123,7 @@ export class ProductIdentityTools {
 
     return {
       kind: 'listing',
-      title: `listing ${record.id}, attached to ${product.displayName} (${product.id})`,
+      title: `listing ${record.id}, attached to ${productDisplayName(product.brand.name, product.model)} (${product.id})`,
       query: this.queryService.ofListing(
         { ...scraped, category } as ScrapedProduct,
         product.brand,

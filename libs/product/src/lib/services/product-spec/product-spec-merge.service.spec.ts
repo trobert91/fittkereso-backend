@@ -38,7 +38,7 @@ describe('ProductSpecMergeService', () => {
     return {
       id,
       source: { id, priority: priorities[id] ?? 0 } as any,
-      scrapedProduct: { specs, displayName: opts.sourceName ?? id },
+      scrapedProduct: { specs, originalName: opts.sourceName ?? id },
       lastUpdated: new Date(opts.lastUpdated ?? '2026-01-01T00:00:00Z'),
     } as unknown as ProductSourceRecord;
   }

@@ -1,3 +1,4 @@
+import { productDisplayNameSql } from '@fittkereso-backend/utils';
 import { ProductSourceRecordRepository } from './product-source-record-repository';
 
 /** A query builder that records its calls and answers with the given results. */
@@ -164,7 +165,7 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
           url: 'https://shop/a',
           externalId: 'HAIBIKE-1',
           offerExternalIds: ['HAIBIKE-1', null],
-          title: 'HAIBIKE SDURO',
+          model: 'SDURO',
           price: '1499990',
           productId: null,
           productName: null,
@@ -219,7 +220,8 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     const where = clauses(builder);
     expect(where).toContain('source.id IN (:...sourceIds)');
     expect(where).toContain('record."specValid" IS FALSE');
-    expect(where).toContain('model."displayName" ILIKE :productName');
+    // The product's shown name: its brand, then its model.
+    expect(where).toContain(`${productDisplayNameSql('productBrand.name', 'model."model"')} ILIKE :productName`);
     expect(where).toContain(`record."scrapedProduct" ->> 'brand' ILIKE :brand`);
     expect(where).toContain(`record."scrapedProduct" -> 'category' ->> 'id' IN (:...categoryIds)`);
     expect(builder['andWhere']).toHaveBeenCalledWith(expect.any(String), {
@@ -248,7 +250,11 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
 
     const byProduct = makeQueryBuilder({});
     await repositoryWith(byProduct).searchRecords({ sort: 'productName', order: 'ASC' });
-    expect(byProduct['orderBy']).toHaveBeenCalledWith('LOWER(model."displayName")', 'ASC', 'NULLS LAST');
+    expect(byProduct['orderBy']).toHaveBeenCalledWith(
+      `LOWER(${productDisplayNameSql('productBrand.name', 'model."model"')})`,
+      'ASC',
+      'NULLS LAST',
+    );
     expect(byProduct['addOrderBy']).toHaveBeenCalledWith('record.id', 'ASC');
   });
 
@@ -256,7 +262,7 @@ describe('ProductSourceRecordRepository.searchRecords', () => {
     const builder = makeQueryBuilder({});
     await repositoryWith(builder).searchRecords({ sort: 'title', order: 'ASC' });
     expect(builder['orderBy']).toHaveBeenCalledWith(
-      `LOWER(COALESCE(record."originalTitle", record."scrapedProduct" ->> 'originalName', record."scrapedProduct" ->> 'displayName'))`,
+      `LOWER(COALESCE(record."originalTitle", record."scrapedProduct" ->> 'originalName'))`,
       'ASC',
       'NULLS LAST',
     );

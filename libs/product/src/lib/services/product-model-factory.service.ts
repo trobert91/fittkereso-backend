@@ -13,7 +13,8 @@ export const BRAND_NOT_IDENTIFIED = 'Brand could not be identified';
 
 export interface NewProductModelParams {
   brandName?: string;
-  displayName: string;
+  /** The listing's title: brand resolution's fallback text. */
+  title?: string;
   model: string;
   categoryId: string;
   categoryName?: string;
@@ -44,7 +45,7 @@ export class ProductModelFactoryService {
   ): Promise<ProductModel> {
     const brand = await this.brandResolution.resolve(
       params.brandName,
-      params.displayName,
+      params.title,
     );
 
     if (!brand?.entity) {
@@ -54,7 +55,6 @@ export class ProductModelFactoryService {
     const model = new ProductModel();
     model.productCategory = { id: params.categoryId } as ProductCategory;
     model.brand = brand.entity;
-    model.displayName = params.displayName;
     model.model = params.model;
     model.enabled = true;
 
@@ -63,7 +63,6 @@ export class ProductModelFactoryService {
       await this.embeddingService.createProductEmbedding({
         brand: model.brand.name,
         model: model.model,
-        displayName: model.displayName,
         category: params.categoryName,
       });
 

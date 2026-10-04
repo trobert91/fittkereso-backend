@@ -70,7 +70,7 @@ export interface ProductSourcePostProcessConfig {
   /**
    * Whether each listing gets the identity extraction: its model name, and
    * the identity and listing-level specs (size, colour) read off its title.
-   * On by default. Off, a listing has no `model`/`displayName`, only its
+   * On by default. Off, a listing has no `model`, only its
    * title, and matching uses the title. On a source that does not identify
    * products it still decides nothing: it only names the listing and fills
    * the offer's listing-level specs the seller's higher sources lack.

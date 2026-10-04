@@ -252,7 +252,7 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
   it('skips extraction when scrapedProduct is defined but specs is undefined (both hashes unchanged rescrape) and a matching source row already exists', async () => {
     // Mirrors ProductDetailsPageScraperService.extractProduct's
     // both-hashes-unchanged branch: it returns a full ScrapedProduct
-    // (brand/model/displayName/offers/...) but omits specs/rawSpecs — it must
+    // (brand/model/offers/...) but omits specs/rawSpecs — it must
     // not be treated as "new data to write", or it wipes the existing row's
     // specs with {}.
     const existingSource: Partial<ProductSourceRecord> = {
@@ -272,7 +272,6 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
       scrapedProduct: {
         brand: 'KTM',
         model: 'Macina Scarp',
-        displayName: 'KTM Macina Scarp',
       } as any,
       externalId: 'product-1',
       sourceUrl: 'https://speedbike.hu/product-1',
@@ -461,7 +460,6 @@ describe('ProductSourceRecordUpdaterService.upsertUnattached', () => {
   const google = { id: 'source-google', name: 'speedbike-googleshop' } as any;
   const haibike = { id: 'brand-haibike', name: 'Haibike' } as any;
   const listing = {
-    displayName: 'HAIBIKE SDURO',
     model: 'SDURO',
     originalName: 'HAIBIKE SDURO 2026 M',
     category: { id: 'category-1', slug: 'ebikes', name: 'E-bikes' },

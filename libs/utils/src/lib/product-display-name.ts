@@ -11,3 +11,19 @@ export function productDisplayName(brandName: string | undefined, model: string)
     ? name
     : `${brand} ${name}`;
 }
+
+/**
+ * productDisplayName in SQL, over two column expressions — for a query that
+ * searches, sorts or selects by the shown name.
+ */
+export function productDisplayNameSql(brandColumn: string, modelColumn: string): string {
+  const name = `BTRIM(${modelColumn})`;
+  const brand = `BTRIM(${brandColumn})`;
+  return `CASE
+    WHEN ${brand} IS NULL OR ${brand} = ''
+      OR LOWER(${name}) = LOWER(${brand})
+      OR LOWER(LEFT(${name}, LENGTH(${brand}) + 1)) = LOWER(${brand}) || ' '
+    THEN ${name}
+    ELSE ${brand} || ' ' || ${name}
+  END`;
+}

@@ -21,7 +21,7 @@ import {
   productLock,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 import { EntityManager, In } from 'typeorm';
 import { isEmpty, keyBy, uniq } from 'lodash';
 import { ProductSpecMergeService } from '../product-spec/product-spec-merge.service';
@@ -258,8 +258,8 @@ export class ProductMergeService {
         this.logger.log('Starting product merge', {
           sourceId,
           targetId,
-          sourceDisplayName: source.displayName,
-          targetDisplayName: target.displayName,
+          sourceName: productDisplayName(source.brand?.name, source.model),
+          targetName: productDisplayName(target.brand?.name, target.model),
         });
 
         movedSourceRecordIds = await this.moveProductSourceRecords(
@@ -490,9 +490,10 @@ export class ProductMergeService {
     source: ProductModel,
     target: ProductModel,
   ): Promise<void> {
-    const namesToAlias = [source.displayName, source.model];
+    const targetName = productDisplayName(target.brand?.name, target.model);
+    const namesToAlias = [productDisplayName(source.brand?.name, source.model), source.model];
     const uniqueNames = [...new Set(namesToAlias)].filter(
-      (name) => name && name !== target.displayName && name !== target.model,
+      (name) => name && name !== targetName && name !== target.model,
     );
 
     for (const name of uniqueNames) {
@@ -639,7 +640,6 @@ export class ProductMergeService {
       const embedding = await this.embeddingService.createProductEmbedding({
         brand: target.brand?.name,
         model: target.model,
-        displayName: target.displayName,
         category: target.productCategory?.name,
       });
 

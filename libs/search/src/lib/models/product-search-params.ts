@@ -91,8 +91,9 @@ export class ProductSearchParams {
   pageSize?: number;
 
   @IsOptional()
-  @IsIn(['model', 'displayName', 'createdAt', 'updatedAt'])
-  sort?: 'model' | 'displayName' | 'createdAt' | 'updatedAt';
+  /** `name`: the shown name, brand then model. */
+  @IsIn(['model', 'name', 'createdAt', 'updatedAt'])
+  sort?: 'model' | 'name' | 'createdAt' | 'updatedAt';
 
   @IsOptional()
   @IsIn(['ASC', 'DESC'])

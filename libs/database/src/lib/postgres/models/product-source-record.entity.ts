@@ -67,7 +67,7 @@ export class ProductSourceRecord extends BasePostgresEntity {
    * provenance/replay copy, including this source's specs/rawSpecs (read
    * via scrapedProduct.specs/scrapedProduct.rawSpecs — there are no
    * separate top-level columns for those, to avoid two divergent copies of
-   * "what did this source actually say"), brand/model/displayName/aliases/
+   * "what did this source actually say"), brand/model/aliases/
    * images/offers. ProductModel/ProductImage/Offer hold the
    * resolved, deduped, cross-source-merged results (brand FK lookup,
    * CDN-uploaded images, offers keyed by (seller, externalId)); this

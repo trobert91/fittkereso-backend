@@ -21,7 +21,7 @@ import {
   RecallRow,
   trigramSimilarity,
 } from '@fittkereso-backend/product-identity';
-import { nameOf } from '@fittkereso-backend/utils';
+import { nameOf, productDisplayName } from '@fittkereso-backend/utils';
 import { AppModule } from '../app.module';
 
 /**
@@ -237,7 +237,7 @@ async function listingCase(
     categorySlug: query.categorySlug,
     keys,
     keyed: query.keyed ?? false,
-    displayName: scraped.displayName,
+    displayName: scraped.model ? productDisplayName(scraped.brand, scraped.model) : undefined,
     model: scraped.model,
     specs: scraped.specs,
     neighbours,
@@ -266,7 +266,7 @@ async function productCase(product: ProductModel, services: Services): Promise<R
     categorySlug: query.categorySlug,
     keys,
     keyed: !isEmpty(stored),
-    displayName: product.displayName,
+    displayName: productDisplayName(query.brandName, product.model),
     model: product.model,
     specs: product.specs,
     neighbours,
@@ -351,10 +351,11 @@ async function withNeighbourDetails(
       where: { id: In(ids) },
       select: {
         id: true,
-        displayName: true,
         model: true,
         specs: true,
+        brand: { id: true, name: true },
       },
+      relations: { brand: true },
     }),
     (product) => product.id,
   );
@@ -375,7 +376,7 @@ async function withNeighbourDetails(
       const product = products[neighbour.productId];
       return {
         ...neighbour,
-        displayName: product?.displayName,
+        displayName: product && productDisplayName(product.brand?.name, product.model),
         model: product?.model,
         aliases: aliasesByProduct.get(neighbour.productId) ?? [],
         specs: product?.specs,

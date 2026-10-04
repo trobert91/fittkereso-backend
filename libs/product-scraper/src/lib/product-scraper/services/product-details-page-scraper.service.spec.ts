@@ -98,7 +98,6 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
       externalId: 'sku-1',
     });
     expect(result.scrapedProduct).not.toHaveProperty('model');
-    expect(result.scrapedProduct).not.toHaveProperty('displayName');
   });
 
   it('carries the deterministic specs, split by the category\'s offer-level keys, and both hashes', async () => {

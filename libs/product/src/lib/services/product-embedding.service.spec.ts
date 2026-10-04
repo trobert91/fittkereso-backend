@@ -35,27 +35,15 @@ describe('ProductEmbeddingService', () => {
     await service.createProductEmbedding({
       brand: 'LG',
       model: '34GN850',
-      displayName: 'LG UltraGear 34GN850',
       category: 'Monitors',
     });
     expect(embedMock).toHaveBeenCalledWith('LG 34GN850 Monitors');
-  });
-
-  it('falls back to displayName when model is missing', async () => {
-    await service.createProductEmbedding({
-      brand: 'LG',
-      model: undefined,
-      displayName: 'LG UltraGear 34GN850',
-      category: 'Monitors',
-    });
-    expect(embedMock).toHaveBeenCalledWith('LG LG UltraGear 34GN850 Monitors');
   });
 
   it('omits category when not provided', async () => {
     await service.createProductEmbedding({
       brand: 'LG',
       model: '34GN850',
-      displayName: undefined,
       category: undefined,
     });
     expect(embedMock).toHaveBeenCalledWith('LG 34GN850');
@@ -65,7 +53,6 @@ describe('ProductEmbeddingService', () => {
     await service.createProductEmbedding({
       brand: undefined,
       model: '34GN850',
-      displayName: undefined,
       category: 'Monitors',
     });
     expect(embedMock).toHaveBeenCalledWith('34GN850 Monitors');
