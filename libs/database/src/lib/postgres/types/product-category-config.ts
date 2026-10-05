@@ -166,7 +166,7 @@ export type SpecExtractMode =
   | 'mmToCmAndInchList'
   | 'standardRatio'
   | 'shuffledList'
-  /** The product of an `AxB` term ("2X12" → 24, "3x8 SHIMANO" → 24), else the first number. */
+  /** The product of an `AxB` term ("2X12" → 24, "3x8 SHIMANO" → 24), else a leading number ("24 gears"). */
   | 'multiply';
 
 export interface SourceSpecMapping {

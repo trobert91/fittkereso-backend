@@ -463,13 +463,12 @@ export class ProductSourceImportSimulationService {
         if (!externalId) itemsWithoutExternalId += 1;
         else externalIds.set(externalId, (externalIds.get(externalId) ?? 0) + 1);
 
-        identifiers.add({
+        const identity = {
           category: classified.slug,
           brand: await this.previewTarget(config, item, 'brand'),
           gtin: await this.previewTarget(config, item, 'gtin'),
           mpn: await this.previewTarget(config, item, 'mpn'),
-          rawSpecs: toRawSpecs(item),
-        });
+        };
 
         // Every eligible row is mapped — deterministic and free — so the
         // triage below covers the whole feed, exactly as a run would.
@@ -481,6 +480,7 @@ export class ProductSourceImportSimulationService {
             requestedSlugs: options.categorySlugs,
           });
         } catch (error: unknown) {
+          identifiers.add({ ...identity, rawSpecs: toRawSpecs(item) });
           mappingFailures += 1;
           if (mappingFailures === 1) {
             result.warnings.push(
@@ -489,6 +489,12 @@ export class ProductSourceImportSimulationService {
           }
           return;
         }
+        // The rows the identity extraction picks from: the feed's own, plus
+        // the section's extraSpecRows the mapper appends.
+        const rawSpecs =
+          (mapped.status === 'mapped' ? mapped.scrapedProduct.rawSpecs : undefined) ??
+          toRawSpecs(item);
+        identifiers.add({ ...identity, rawSpecs });
         if (mapped.status === 'mapped') {
           const row = toFeedRow(mapped, item);
           const firstUrl = listingUrls.get(row.listingId);
@@ -526,7 +532,7 @@ export class ProductSourceImportSimulationService {
                 externalId: offer?.externalId,
                 gtin: offer?.gtin,
                 mpn: offer?.mpn,
-                rawSpecs: toRawSpecs(item),
+                rawSpecs,
                 specRows: categorySectionOf(config, classified.slug)
                   ?.identitySpecRows,
               }),

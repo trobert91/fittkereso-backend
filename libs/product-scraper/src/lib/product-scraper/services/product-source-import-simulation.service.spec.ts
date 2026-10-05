@@ -400,6 +400,37 @@ describe('ProductSourceImportSimulationService', () => {
         expect(result.warnings.join(' ')).toMatch(/1 eligible items match none/);
       });
 
+      // A section's extraSpecRows reach the identity extraction too: the
+      // count reads the mapped product's rows, not only the feed's.
+      it('counts the extra rows the mapper appends', async () => {
+        givenFeed(identifierFeed);
+        mapper.map.mockImplementation(async ({ item }: { item: { attributes: { name: string; value: string }[] } }) => ({
+          status: 'mapped',
+          url: 'u',
+          scrapedProduct: {
+            rawSpecs: [
+              ...item.attributes.map(({ name, value }) => ({ name, values: [value] })),
+              { name: 'Webshop kategória', values: ['E-BIKE > Trekking'] },
+            ],
+          },
+        }));
+        const withExtraRow = {
+          ...identifierSource,
+          config: {
+            ...identifierSource.config,
+            categories: { ebikes: { enabled: true, identitySpecRows: ['Motor', 'Webshop kategória'] } },
+          },
+        } as unknown as ProductSource;
+
+        const result = await service.simulate(withExtraRow, { limit: 1 });
+
+        expect(result.feed?.identifiers.specRows.byLabel).toEqual([
+          { category: 'ebikes', label: 'Motor', listings: 2 },
+          { category: 'ebikes', label: 'Webshop kategória', listings: 3 },
+        ]);
+        expect(result.feed?.identifiers.specRows.listingsWithNoRowSent).toBe(0);
+      });
+
       it('previews each fully mapped item\'s identifiers as they would be stored', async () => {
         givenFeed(identifierFeed);
         mapper.map.mockResolvedValueOnce({

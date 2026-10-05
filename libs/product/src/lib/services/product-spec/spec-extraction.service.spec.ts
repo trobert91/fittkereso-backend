@@ -661,6 +661,22 @@ describe('SpecExtractionService', () => {
 
       expect(result['widthWithStand']).toEqual(['184.2 cm']);
     });
+
+    it.each([
+      ['Schwalbe Land Cruiser, Active, 50-622', '(\\d{2}-\\d{3})', '50-622'],
+      ['118  - 136 cm (átlépési magasság : 52 - 63 cm)', '^(\\d{2,3}\\s*-\\s*\\d{2,3}\\s*cm)', '118  - 136 cm'],
+      ['Maxxis Rekon 29x2.4", EXO', '(\\d{2}x\\d\\.\\d)', '29x2.4'],
+    ])('keeps a size or range from %j whole, not its first number', (raw, pattern, expected) => {
+      const result = service.extractSpecs({
+        scrapedSpecs: [{ name: 'Gumi', values: [raw] }],
+        schema: dimensionSchema,
+        sourceConfig: {
+          mappings: [{ key: 'widthWithStand', labels: ['Gumi'], extract: 'regexpList', extractPatterns: [pattern] }],
+        },
+      });
+
+      expect(result['widthWithStand']).toEqual([expected]);
+    });
   });
 
   // ─── cmToInchList ─────────────────────────────────────────────────────────
@@ -1008,6 +1024,7 @@ describe('SpecExtractionService', () => {
       ['3x8', 24],
       ['1X11 SHIMANO CUES', 11],
       ['2 × 10', 20],
+      ['1*10', 10],
       ['21', 21],
       ['24 gears', 24],
     ])('reads %j as %j', (raw, expected) => {
@@ -1018,6 +1035,50 @@ describe('SpecExtractionService', () => {
           sourceConfig: gears,
         }),
       ).toEqual({ refreshRate: expected });
+    });
+
+    it('reads no count from a model number further in', () => {
+      expect(
+        service.extractSpecs({
+          scrapedSpecs: [{ name: 'Fokozatok', values: ['SHIMANO 105 DI2'] }],
+          schema,
+          sourceConfig: gears,
+        }),
+      ).toEqual({});
+    });
+  });
+
+  // ─── several mappings for one key ─────────────────────────────────────────
+
+  describe('several mappings for one key', () => {
+    const gears: SourceSpecConfig = {
+      mappings: [
+        {
+          key: 'refreshRate',
+          labels: ['Hátsó váltó'],
+          extract: 'regexpList',
+          extractPatterns: ['(\\d{1,2})-Speed'],
+        },
+        { key: 'refreshRate', labels: ['Hajtásrendszer'], extract: 'multiply' },
+      ],
+    };
+    const extract = (rows: Record<string, string>) =>
+      service.extractSpecs({
+        scrapedSpecs: Object.entries(rows).map(([name, value]) => ({ name, values: [value] })),
+        schema,
+        sourceConfig: gears,
+      });
+
+    it('lets the later mapping win when it yields a value', () => {
+      expect(extract({ 'Hátsó váltó': 'Shimano 105, 12-Speed', Hajtásrendszer: '2X12 SHIMANO 105' })).toEqual({
+        refreshRate: 24,
+      });
+    });
+
+    it("keeps the earlier value when the later mapping's row yields nothing", () => {
+      expect(extract({ 'Hátsó váltó': 'Shimano 105, 12-Speed', Hajtásrendszer: 'SHIMANO 105' })).toEqual({
+        refreshRate: 12,
+      });
     });
   });
 });

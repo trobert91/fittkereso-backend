@@ -145,7 +145,7 @@ export const IDENTITY_RECHECK_ATTACHED_TOTAL = 'identity_recheck_attached_total'
  */
 export const IDENTITY_EXTRACTION_TOTAL = 'identity_extraction_total';
 /**
- * Spec-table rows the source's identityExtraction.specRows let through, per
+ * Spec-table rows the category section's identitySpecRows let through, per
  * listing. A source whose listings suddenly match none has renamed its labels;
  * the extraction would then see the title alone and fill far fewer specs.
  */

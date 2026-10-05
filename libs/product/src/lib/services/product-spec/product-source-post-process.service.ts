@@ -178,9 +178,9 @@ export class ProductSourcePostProcessService {
 
   /**
    * The identity extraction. `data.specs` is expected to be the deterministic
-   * values of `outputKeys` only, and `rawSpecs` the rows the source's
-   * `identityExtraction.specRows` selected (the whole table when it names
-   * none) — this method sends what it is given.
+   * values of `outputKeys` only, and `rawSpecs` the rows the listing's
+   * category section's `identitySpecRows` selected (the whole table when it
+   * names none) — this method sends what it is given.
    */
   async extractIdentity(params: {
     data: Pick<DeterministicProductData, 'brand' | 'model'> & {

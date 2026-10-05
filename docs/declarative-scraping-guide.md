@@ -47,8 +47,19 @@ categories?: Record<string, {
   rules?: CategoryMatchRule[];    // which listings are in it: { when, unless? }
   specMapping?: SourceSpecConfig; // how its spec rows map onto the category's schema
   identitySpecRows?: string[];    // the rows the identity extraction reads; omitted = every row
+  extraSpecRows?: { label: string; field?: string; pipeline?: ScrapeOperation[] }[]; // feeds only
 }>;
 ```
+
+- **`extraSpecRows` (feed sources) turn feed fields into spec rows**: each entry is resolved like a `mapping` target (a field, then an op pipeline), and a non-empty value is appended as the row `{ name: label, values: [value] }` once the listing's category is known. The gate never sees them. `specMapping`, `identitySpecRows` and spec unification read them like any other row. Examples: the shop's category path (`Webshop kategória`), a bike type named by a sku prefix (`regexCapture` + `mapValue`), one line of a description's component table (`regexCapture`).
+- **A `specMapping` entry turns one row into one spec**:
+  1. the first of its `labels` present (case-insensitive);
+  2. `skipValues`;
+  3. then either `valuePatterns` (case-insensitive regexes tried in order; the first match's `value` is the canonical value, and no match gives nothing), or `valueMap` → translation → `trimSuffixes` → `replacePatterns`;
+  4. finally the `extract` mode.
+
+  `valuePatterns` read enums and booleans named in free text: `Aluminium Superlite…` → `Alumínium`, a named rack → `Alapfelszereltség`, `nincs` → `Nincs`. `extract: 'multiply'` reads a gear count as chainrings × sprockets (`2X12 SHIMANO` → 24, `1*10` → 10, `24 gears` → 24, `SHIMANO 105` → nothing).
+- **Several mappings may share a key; a later one wins only when it yields a value.** Put the general row first (a frame's free text) and the specific one after (a material row), so the specific one decides when present and the general one still fills in when it is missing.
 
 - **A listing is in a category when any of that section's rules matches** (`when` holds and `unless` does not). The rules test the label the source reads (`detailPage.category.breadcrumbOrSource` or a feed's `category.labelFrom`) and the listing's raw spec rows (`specValueIncludes`).
 - **A listing that two sections claim is skipped as `category_ambiguous`**, so no rule order between categories decides and adding a category can never silently take another's listings. A disabled section still claims its listings; they are skipped as `category_not_enabled`.

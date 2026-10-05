@@ -2,8 +2,8 @@ import { ScrapedProductSpec } from '@fittkereso-backend/database';
 
 /**
  * The spec-table rows the LLM identity extraction gets from one listing: those
- * whose label is on the source's `identityExtraction.specRows` allowlist, or
- * every row when the source lists none.
+ * whose label is on the category section's `identitySpecRows` allowlist, or
+ * every row when the section lists none.
  *
  * Labels compare the way specMapping labels do — ignoring case — and also
  * ignore surrounding and repeated whitespace, which shops are not consistent

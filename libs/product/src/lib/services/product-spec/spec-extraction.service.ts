@@ -76,34 +76,41 @@ export class SpecExtractionService {
       if (this.shouldSkipValue(rawValue, mapping.skipValues)) continue;
 
       // A value by pattern is already canonical: no valueMap, no translation.
+      let value: ProductSpecs[string];
       if (mapping.valuePatterns?.length) {
         const matched = this.applyValuePatterns(rawValue, mapping.valuePatterns);
         if (matched === undefined) continue;
-        result[mapping.key] = this.applyExtractMode(
+        value = this.applyExtractMode(
           matched,
           mapping.extract,
           mapping.extractPatterns,
         );
-        continue;
+      } else {
+        const remapped = this.applyValueMap(rawValue, mapping.valueMap);
+        const translated =
+          remapped !== undefined
+            ? remapped
+            : untranslatedKeys.has(mapping.key)
+              ? rawValue
+              : this.translateValue(rawValue, translator);
+        const trimmed = this.applyTrimSuffixes(
+          translated,
+          mapping.trimSuffixes,
+        );
+        const replaced = this.applyReplacePatterns(
+          trimmed,
+          mapping.replacePatterns,
+        );
+        value = this.applyExtractMode(
+          replaced,
+          mapping.extract,
+          mapping.extractPatterns,
+        );
       }
 
-      const remapped = this.applyValueMap(rawValue, mapping.valueMap);
-      const translated =
-        remapped !== undefined
-          ? remapped
-          : untranslatedKeys.has(mapping.key)
-            ? rawValue
-            : this.translateValue(rawValue, translator);
-      const trimmed = this.applyTrimSuffixes(translated, mapping.trimSuffixes);
-      const replaced = this.applyReplacePatterns(
-        trimmed,
-        mapping.replacePatterns,
-      );
-      result[mapping.key] = this.applyExtractMode(
-        replaced,
-        mapping.extract,
-        mapping.extractPatterns,
-      );
+      // A later mapping for the same key wins only with a value: one whose
+      // label is there but yields nothing keeps the earlier mapping's.
+      if (value !== undefined) result[mapping.key] = value;
     }
 
     return result;
@@ -383,6 +390,10 @@ export class SpecExtractionService {
   }
 
   private roundIfNumeric(value: string): string {
+    // A tyre size, a range or a pair ("45-622", "118 - 136 cm", "29x2.35",
+    // "180/160") is not the number it starts with.
+    if (/^\s*-?\d+(?:[.,]\d+)?\s*[-–x×/]\s*\d/i.test(value)) return value;
+
     const number = parseFloat(value);
     if (!Number.isFinite(number)) return value;
 
@@ -480,13 +491,15 @@ export class SpecExtractionService {
 
   /**
    * A gear count written as chainrings × sprockets: the product of the first
-   * "AxB" term ("2X12 SHIMANO GRX" → 24, "1x11" → 11), else the first number
-   * ("24 gears" → 24).
+   * "AxB" term ("2X12 SHIMANO GRX" → 24, "1x11", "1*11" → 11), else a number the
+   * value starts with ("24 gears" → 24). A number further in is a model
+   * ("SHIMANO 105"), not a count: nothing.
    */
   private extractProduct(value: string): number | undefined {
-    const term = value.match(/(\d+)\s*[x×]\s*(\d+)/i);
+    const term = value.match(/(\d+)\s*[x×*]\s*(\d+)/i);
     if (term) return Number(term[1]) * Number(term[2]);
-    return this.extractFirstNumber(value);
+    const leading = value.match(/^\s*(\d+)\b/);
+    return leading ? Number(leading[1]) : undefined;
   }
 
   private extractSecondNumber(value: string): number | undefined {
