@@ -13,6 +13,9 @@
           }
         }
       ]
+    },
+    "bikes": {
+      "enabled": false
     }
   },
   "category": {

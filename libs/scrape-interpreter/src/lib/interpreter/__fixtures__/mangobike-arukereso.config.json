@@ -11,6 +11,33 @@
             "equalsIgnoreCase": "Elektromos Kerékpárok"
           }
         }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category",
+          "pipeline": [
+            {
+              "op": "stripPattern",
+              "pattern": "^[^>]*start_nav[^>]*>\\s*"
+            }
+          ]
+        }
+      ]
+    },
+    "bikes": {
+      "enabled": false,
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category",
+          "pipeline": [
+            {
+              "op": "stripPattern",
+              "pattern": "^[^>]*start_nav[^>]*>\\s*"
+            }
+          ]
+        }
       ]
     }
   },

@@ -12,6 +12,43 @@
           }
         }
       ]
+    },
+    "bikes": {
+      "enabled": false,
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "sku",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^(01\\d\\d)\\d{8}$",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "0100": "Futóbicikli",
+                "0101": "Futóbicikli",
+                "0102": "Gyerek",
+                "0103": "BMX",
+                "0104": "MTB 26\"",
+                "0105": "Trekking",
+                "0106": "Cross Trekking",
+                "0107": "Fitness",
+                "0108": "Országúti",
+                "0109": "City",
+                "0110": "Cruiser",
+                "0112": "Tandem",
+                "0120": "MTB 29\"",
+                "0130": "MTB 27.5\"",
+                "0140": "Cyclocross",
+                "0150": "Gravel"
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "mapping": {

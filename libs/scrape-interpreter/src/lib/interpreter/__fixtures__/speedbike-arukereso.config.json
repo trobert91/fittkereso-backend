@@ -28,18 +28,36 @@
             "key": "frameType",
             "labels": [
               "Váztípus"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "gender",
             "labels": [
               "Váztípus"
-            ]
-          },
-          {
-            "key": "usageType",
-            "labels": [
-              "Felhasználás módja"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
@@ -47,18 +65,54 @@
             "labels": [
               "Akku elhelyezkedése",
               "Akkumulátor elhelyezkedése"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "drivetrain",
             "labels": [
               "Erőátvitel"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "suspension",
             "labels": [
               "Rugózás"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
@@ -66,43 +120,51 @@
             "labels": [
               "Fékfajta",
               "Féktípus"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "gearType",
             "labels": [
               "Váltó típusa"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "batteryCapacity",
             "labels": [
-              "wattora",
+              "Akkumulátor kapacitása",
               "Akku kapacitás",
-              "Akkumulátor kapacitása"
+              "wattora",
+              "Akkumulátor",
+              "battery"
             ],
-            "extract": "number"
-          },
-          {
-            "key": "torque",
-            "labels": [
-              "Nyomaték",
-              "Motor nyomaték"
-            ],
-            "extract": "number"
-          },
-          {
-            "key": "motorPosition",
-            "labels": [
-              "Motor elhelyezkedése"
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\s)([2-9]\\d{2}|1[0-6]\\d{2})\\s*(?:Wh)?(?:\\s|,|$)"
             ]
-          },
-          {
-            "key": "motorPower",
-            "labels": [
-              "Motor teljesítménye"
-            ],
-            "extract": "number"
           },
           {
             "key": "topSpeed",
@@ -114,291 +176,1077 @@
             "extract": "number"
           },
           {
-            "key": "range",
+            "key": "weight",
             "labels": [
-              "Hatótávolság"
+              "Súly",
+              "NETTÓ TÖMEG",
+              "Tömeg",
+              "weight"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
             ],
             "extract": "number"
           },
           {
-            "key": "chargingTime",
+            "key": "maxTotalWeight",
             "labels": [
-              "Töltési idő"
+              "Max. összsúly",
+              "LEGNAGYOBB MEGENGEDETT ÖSSZTÖMEG",
+              "MAX. ÖSSZTERHELÉS",
+              "MEGENGEDETT ÖSSZTÖMEG",
+              "Rendszer súly"
             ],
-            "extract": "number"
-          },
-          {
-            "key": "display",
-            "labels": [
-              "Kijelző",
-              "Kijelzővel rendelkezik"
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{2,3})\\s*(?:kg)?\\s*$"
             ]
           },
           {
             "key": "maxLoad",
             "labels": [
-              "Maximális terhelhetőség"
+              "Utas max. súly"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
             ],
             "extract": "number"
-          },
-          {
-            "key": "weight",
-            "labels": [
-              "Tömeg",
-              "Súly"
-            ],
-            "extract": "number"
-          },
-          {
-            "key": "waterResistance",
-            "labels": [
-              "Védettségi szint",
-              "Vízállóság"
-            ]
-          },
-          {
-            "key": "smartConnectivity",
-            "labels": [
-              "Applikáció",
-              "GPS követés"
-            ]
           },
           {
             "key": "gpsModule",
             "labels": [
               "GPS modul"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
             ]
           },
           {
             "key": "abs",
             "labels": [
               "ABS"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "frameModel",
             "labels": [
-              "Váz"
+              "Váz",
+              "frame"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": [
+              "Váz",
+              "frame"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "carbon|karbon|composite|uhlík|\\bC:6\\d",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "titan",
+                "value": "Titán"
+              },
+              {
+                "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly",
+                "value": "Acél"
+              }
             ]
           },
           {
             "key": "forkModel",
             "labels": [
-              "Villa"
+              "Villa",
+              "fork"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "rearShockModel",
             "labels": [
-              "Lengéscsillapító"
+              "Lengéscsillapító",
+              "HÁTSÓ RUGÓSTAG",
+              "Dampener"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "ebikeSystem",
             "labels": [
-              "E-System"
+              "E-System",
+              "E-RENDSZER",
+              "Operating System"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "motorModel",
             "labels": [
-              "Motor"
+              "Motor",
+              "engine"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "torque",
+            "labels": [
+              "Motor",
+              "engine"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{2,3})\\s*Nm"
             ]
           },
           {
             "key": "batteryModel",
             "labels": [
-              "Akkumulátor"
+              "Akkumulátor",
+              "battery"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "batteryLock",
             "labels": [
-              "Akku zár"
+              "Akku zár",
+              "AKKUMULÁTORZÁR",
+              "Zár"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "chargerModel",
             "labels": [
-              "Töltő"
+              "Töltő",
+              "charger"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "displayModel",
+            "labels": [
+              "Kijelző",
+              "display"
+            ],
+            "skipValues": [
+              "-",
+              "n/a",
+              "nincs",
+              "–",
+              "na",
+              "no",
+              "none",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "display",
+            "labels": [
+              "Kijelző",
+              "display"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "display",
+            "labels": [
+              "Távvezérlő",
+              "Vezérlők",
+              "remote"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "display|kijelző",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "controlUnit",
+            "labels": [
+              "Távvezérlő",
+              "Vezérlők",
+              "remote"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "smartConnectivity",
+            "labels": [
+              "Connectivity"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "\\bapp\\b|bluetooth|ant\\+",
+                "value": "true"
+              }
             ]
           },
           {
             "key": "rearDerailleur",
             "labels": [
-              "Hátsó váltó"
+              "Hátsó váltó",
+              "rear derailleur"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "frontDerailleur",
             "labels": [
               "Első váltó"
+            ],
+            "skipValues": [
+              "-",
+              "n/a",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "Hátsó váltó",
+              "rear derailleur",
+              "Váltó"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{1,2})[- ]?speed"
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "HAJTÁSRENDSZER"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "multiply"
           },
           {
             "key": "shifter",
             "labels": [
               "Váltókar jobb",
-              "Váltókar bal"
+              "Váltókar bal",
+              "JOBB VÁLTÓKAR",
+              "Gear Shift",
+              "Váltókar",
+              "shifters",
+              "Váltókarok"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd",
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0"
             ]
           },
           {
             "key": "crankset",
             "labels": [
-              "Hajtókar"
+              "Hajtókar",
+              "Hajtókar jobb",
+              "JOBB HAJTÓKAR",
+              "HAJTÓMŰ",
+              "Hajtás",
+              "crankset"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankLength",
+            "labels": [
+              "Hajtókar jobb",
+              "JOBB HAJTÓKAR",
+              "Hajtókar",
+              "HAJTÓMŰ",
+              "crankset",
+              "Hajtás"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(1[5-8]\\d(?:[.,]5)?)\\s*mm"
             ]
           },
           {
             "key": "bottomBracket",
             "labels": [
-              "Középcsapágy"
+              "Középcsapágy",
+              "bottom bracket"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "chainring",
             "labels": [
-              "Lánckerék"
+              "Lánckerék",
+              "LÁNCTÁNYÉR"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "chainringTeeth",
+            "labels": [
+              "Lánckerék",
+              "LÁNCTÁNYÉR",
+              "Hajtás",
+              "crankset"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*//)(?:.*?[\\s,])?(\\d{2})T\\b"
             ]
           },
           {
             "key": "cassette",
             "labels": [
-              "Fogaskoszorú"
+              "Fogaskoszorú",
+              "cassette"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "chain",
             "labels": [
-              "Lánc"
+              "Lánc",
+              "chain"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "brakeModel",
             "labels": [
               "Első fék",
-              "Hátsó fék"
+              "Hátsó fék",
+              "Fék",
+              "Fékek",
+              "brake"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": [
+              "Fék",
+              "brake"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\((\\d{3})\\s*/\\s*\\d{3}\\)"
+            ]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": [
+              "Fék",
+              "brake"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\(\\d{3}\\s*/\\s*(\\d{3})\\)"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": [
+              "Első féktárcsa"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"
+            ]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": [
+              "Hátsó féktárcsa"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"
             ]
           },
           {
             "key": "rotorModel",
             "labels": [
               "Első féktárcsa",
-              "Hátsó féktárcsa"
+              "Hátsó féktárcsa",
+              "ROTOR"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "wheelset",
             "labels": [
               "Első kerék",
-              "Hátsó kerék"
+              "Hátsó kerék",
+              "Kerék"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "rimModel",
             "labels": [
               "Első felni",
-              "Hátsó felni"
+              "Hátsó felni",
+              "Felnik",
+              "rims"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "hubModel",
             "labels": [
               "Első agy",
-              "Hátsó agy"
+              "Hátsó agy",
+              "Agy",
+              "ELSŐ KERÉKAGY",
+              "front hub"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "spokes",
             "labels": [
               "Első küllők",
-              "Hátsó küllők"
+              "Hátsó küllők",
+              "ELSŐ KÜLLŐ",
+              "HÁTSÓ KÜLLŐ",
+              "Küllők"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "tireModel",
             "labels": [
               "Első gumi",
-              "Hátsó gumi"
+              "Hátsó gumi",
+              "ELSŐ GUMIABRONCS",
+              "HÁTSÓ GUMIABRONCS",
+              "ELSŐ GUMIKÖPENY",
+              "Gumi",
+              "Külsők",
+              "tire"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "tireSize",
+            "labels": [
+              "Első gumi",
+              "ELSŐ GUMIABRONCS",
+              "ELSŐ GUMIKÖPENY",
+              "Gumi",
+              "Külsők",
+              "tire"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\b(\\d{2}-[1-9]\\d{2})\\b"
             ]
           },
           {
             "key": "grips",
             "labels": [
-              "Markolat"
+              "Markolat",
+              "grips"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "handlebar",
             "labels": [
-              "Kormány"
+              "Kormány",
+              "handlebar"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "stem",
             "labels": [
-              "Kormányszár"
+              "Kormányszár",
+              "STUCNI",
+              "stem"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "headset",
             "labels": [
-              "Kormánycsapágy"
+              "Kormánycsapágy",
+              "headset"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "saddle",
             "labels": [
-              "Nyereg"
+              "Nyereg",
+              "saddle"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "seatpost",
             "labels": [
-              "Nyeregcső"
+              "Nyeregcső",
+              "seat post"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "seatClamp",
             "labels": [
               "Nyeregbilincs"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "pedals",
             "labels": [
-              "Pedál"
+              "Pedál",
+              "pedals",
+              "Pedálok"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
             "key": "rack",
             "labels": [
-              "Hordozó"
+              "Hordozó",
+              "CSOMAGTARTÓ",
+              "carrier"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
             ]
           },
           {
             "key": "lighting",
             "labels": [
               "Első lámpa",
-              "Hátsó lámpa"
+              "Hátsó lámpa",
+              "Világítás",
+              "front light",
+              "back light"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
             ]
           },
           {
             "key": "fenders",
             "labels": [
               "Első sárvédő",
-              "Hátsó sárvédő"
+              "Hátsó sárvédő",
+              "SÁRVÉDŐ",
+              "Sárhányó",
+              "mudguard"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
             ]
           },
           {
             "key": "chainGuard",
             "labels": [
               "Láncvédő"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
             ]
           },
           {
             "key": "kickstand",
             "labels": [
-              "Kitámasztó"
+              "Kitámasztó",
+              "kickstand"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "color",
+            "labels": [
+              "Szín",
+              "Szin",
+              "color"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
             ]
           },
           {
@@ -409,7 +1257,7 @@
             ],
             "extract": "regexpList",
             "extractPatterns": [
-              "(\\d+(?:[.,]\\d+)?)\\s*cm"
+              "(?<![\\d-])(\\d+(?:[.,]\\d+)?)\\s*cm"
             ]
           },
           {
@@ -468,7 +1316,1081 @@
         "Weight",
         "Modellév",
         "Model Year",
-        "Évjárat"
+        "Évjárat",
+        "Webshop kategória",
+        "Szín",
+        "Szin",
+        "color",
+        "Méret",
+        "size",
+        "HAJTÁSRENDSZER",
+        "NETTÓ TÖMEG"
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category",
+          "pipeline": [
+            {
+              "op": "stripPattern",
+              "pattern": "^Termékkategóriák > "
+            }
+          ]
+        }
+      ]
+    },
+    "bikes": {
+      "enabled": false,
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": [
+              "Modellév",
+              "Model Year",
+              "Évjárat"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "frameType",
+            "labels": [
+              "Váztípus"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": [
+              "Váztípus"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "drivetrain",
+            "labels": [
+              "Erőátvitel"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": [
+              "Rugózás"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakeType",
+            "labels": [
+              "Fékfajta",
+              "Féktípus"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "gearType",
+            "labels": [
+              "Váltó típusa"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "weight",
+            "labels": [
+              "Súly",
+              "NETTÓ TÖMEG",
+              "Tömeg",
+              "weight"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "maxTotalWeight",
+            "labels": [
+              "Max. összsúly",
+              "LEGNAGYOBB MEGENGEDETT ÖSSZTÖMEG",
+              "MAX. ÖSSZTERHELÉS",
+              "MEGENGEDETT ÖSSZTÖMEG",
+              "Rendszer súly"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{2,3})\\s*(?:kg)?\\s*$"
+            ]
+          },
+          {
+            "key": "maxLoad",
+            "labels": [
+              "Utas max. súly"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "frameModel",
+            "labels": [
+              "Váz",
+              "frame"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": [
+              "Váz",
+              "frame"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "carbon|karbon|composite|uhlík|\\bC:6\\d",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "titan",
+                "value": "Titán"
+              },
+              {
+                "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly",
+                "value": "Acél"
+              }
+            ]
+          },
+          {
+            "key": "forkModel",
+            "labels": [
+              "Villa",
+              "fork"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rearShockModel",
+            "labels": [
+              "Lengéscsillapító",
+              "HÁTSÓ RUGÓSTAG",
+              "Dampener"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": [
+              "Hátsó váltó",
+              "rear derailleur"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frontDerailleur",
+            "labels": [
+              "Első váltó"
+            ],
+            "skipValues": [
+              "-",
+              "n/a",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "Hátsó váltó",
+              "rear derailleur",
+              "Váltó"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{1,2})[- ]?speed"
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "HAJTÁSRENDSZER"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "multiply"
+          },
+          {
+            "key": "shifter",
+            "labels": [
+              "Váltókar jobb",
+              "Váltókar bal",
+              "JOBB VÁLTÓKAR",
+              "Gear Shift",
+              "Váltókar",
+              "shifters",
+              "Váltókarok"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd",
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0"
+            ]
+          },
+          {
+            "key": "crankset",
+            "labels": [
+              "Hajtókar",
+              "Hajtókar jobb",
+              "JOBB HAJTÓKAR",
+              "HAJTÓMŰ",
+              "Hajtás",
+              "crankset"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankLength",
+            "labels": [
+              "Hajtókar jobb",
+              "JOBB HAJTÓKAR",
+              "Hajtókar",
+              "HAJTÓMŰ",
+              "crankset",
+              "Hajtás"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(1[5-8]\\d(?:[.,]5)?)\\s*mm"
+            ]
+          },
+          {
+            "key": "bottomBracket",
+            "labels": [
+              "Középcsapágy",
+              "bottom bracket"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "chainring",
+            "labels": [
+              "Lánckerék",
+              "LÁNCTÁNYÉR"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "chainringTeeth",
+            "labels": [
+              "Lánckerék",
+              "LÁNCTÁNYÉR",
+              "Hajtás",
+              "crankset"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*//)(?:.*?[\\s,])?(\\d{2})T\\b"
+            ]
+          },
+          {
+            "key": "cassette",
+            "labels": [
+              "Fogaskoszorú",
+              "cassette"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "chain",
+            "labels": [
+              "Lánc",
+              "chain"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakeModel",
+            "labels": [
+              "Első fék",
+              "Hátsó fék",
+              "Fék",
+              "Fékek",
+              "brake"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": [
+              "Fék",
+              "brake"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\((\\d{3})\\s*/\\s*\\d{3}\\)"
+            ]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": [
+              "Fék",
+              "brake"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\(\\d{3}\\s*/\\s*(\\d{3})\\)"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": [
+              "Első féktárcsa"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"
+            ]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": [
+              "Hátsó féktárcsa"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"
+            ]
+          },
+          {
+            "key": "rotorModel",
+            "labels": [
+              "Első féktárcsa",
+              "Hátsó féktárcsa",
+              "ROTOR"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "wheelset",
+            "labels": [
+              "Első kerék",
+              "Hátsó kerék",
+              "Kerék"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rimModel",
+            "labels": [
+              "Első felni",
+              "Hátsó felni",
+              "Felnik",
+              "rims"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "hubModel",
+            "labels": [
+              "Első agy",
+              "Hátsó agy",
+              "Agy",
+              "ELSŐ KERÉKAGY",
+              "front hub"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "spokes",
+            "labels": [
+              "Első küllők",
+              "Hátsó küllők",
+              "ELSŐ KÜLLŐ",
+              "HÁTSÓ KÜLLŐ",
+              "Küllők"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "tireModel",
+            "labels": [
+              "Első gumi",
+              "Hátsó gumi",
+              "ELSŐ GUMIABRONCS",
+              "HÁTSÓ GUMIABRONCS",
+              "ELSŐ GUMIKÖPENY",
+              "Gumi",
+              "Külsők",
+              "tire"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "tireSize",
+            "labels": [
+              "Első gumi",
+              "ELSŐ GUMIABRONCS",
+              "ELSŐ GUMIKÖPENY",
+              "Gumi",
+              "Külsők",
+              "tire"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "\\b(\\d{2}-[1-9]\\d{2})\\b"
+            ]
+          },
+          {
+            "key": "grips",
+            "labels": [
+              "Markolat",
+              "grips"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "handlebar",
+            "labels": [
+              "Kormány",
+              "handlebar"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "stem",
+            "labels": [
+              "Kormányszár",
+              "STUCNI",
+              "stem"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "headset",
+            "labels": [
+              "Kormánycsapágy",
+              "headset"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "saddle",
+            "labels": [
+              "Nyereg",
+              "saddle"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatpost",
+            "labels": [
+              "Nyeregcső",
+              "seat post"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatClamp",
+            "labels": [
+              "Nyeregbilincs"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "pedals",
+            "labels": [
+              "Pedál",
+              "pedals",
+              "Pedálok"
+            ],
+            "skipValues": [
+              "n/a",
+              "-",
+              "–",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rack",
+            "labels": [
+              "Hordozó",
+              "CSOMAGTARTÓ",
+              "carrier"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "lighting",
+            "labels": [
+              "Első lámpa",
+              "Hátsó lámpa",
+              "Világítás",
+              "front light",
+              "back light"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "fenders",
+            "labels": [
+              "Első sárvédő",
+              "Hátsó sárvédő",
+              "SÁRVÉDŐ",
+              "Sárhányó",
+              "mudguard"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "chainGuard",
+            "labels": [
+              "Láncvédő"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "kickstand",
+            "labels": [
+              "Kitámasztó",
+              "kickstand"
+            ],
+            "skipValues": [
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "color",
+            "labels": [
+              "Szín",
+              "Szin",
+              "color"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": [
+              "Méret",
+              "size"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?<![\\d-])(\\d+(?:[.,]\\d+)?)\\s*cm"
+            ]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": [
+              "Méret",
+              "size"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:^|\\s)(XXL|XL|XS|S|M|L)$"
+            ]
+          }
+        ]
+      },
+      "identitySpecRows": [
+        "Váz",
+        "Frame",
+        "Villa",
+        "Fork",
+        "Lengéscsillapító",
+        "Dampener",
+        "Motor",
+        "E-System",
+        "Operating System",
+        "Akkumulátor",
+        "Battery",
+        "Kerék",
+        "Kerékméret",
+        "Max kerék méret",
+        "Első kerék",
+        "Hátsó kerék",
+        "Felnik",
+        "Gumi",
+        "Külsők",
+        "Tire",
+        "Első gumi",
+        "Hátsó gumi",
+        "Gumiabroncs",
+        "Gumiabroncsok",
+        "Első gumiabroncs",
+        "Hátsó gumiabroncs",
+        "Gumiköpeny",
+        "Első gumiköpeny",
+        "Hátsó gumiköpeny",
+        "Hátsó váltó",
+        "Fogaskoszorú",
+        "Cassette",
+        "Váltó",
+        "Váltókar",
+        "Váltókarok",
+        "Shifters",
+        "Gear Shift",
+        "Váltórendszer",
+        "Súly",
+        "Weight",
+        "Modellév",
+        "Model Year",
+        "Évjárat",
+        "Webshop kategória",
+        "Szín",
+        "Szin",
+        "color",
+        "Méret",
+        "size",
+        "HAJTÁSRENDSZER",
+        "NETTÓ TÖMEG"
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category",
+          "pipeline": [
+            {
+              "op": "stripPattern",
+              "pattern": "^Termékkategóriák > "
+            }
+          ]
+        }
       ]
     }
   },

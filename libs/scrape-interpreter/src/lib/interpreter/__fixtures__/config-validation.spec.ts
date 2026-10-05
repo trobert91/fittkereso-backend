@@ -7,7 +7,6 @@ import {
   ScrapeOperation,
   ScrapingSourceConfig,
   ProductSourceConfigValidatorService,
-  SourceSpecMapping,
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import {
@@ -136,6 +135,33 @@ describe('hand-authored source configs', () => {
     const resolution = interpreter.resolveCategory(config.categories, label, attributes);
     if (resolution.status === 'ambiguous') return `ambiguous: ${resolution.slugs.join(', ')}`;
     return resolution.status === 'resolved' ? resolution.slug : undefined;
+  }
+
+  /** A category section's specs for some spec rows, against that category's real schema. */
+  function specsOf(config: ArukeresoSourceConfig, slug: 'bikes' | 'ebikes', rows: Record<string, string>) {
+    const mapping = config.categories?.[slug]?.specMapping;
+    if (!mapping) throw new Error(`The fixture has no ${slug} specMapping`);
+    return new SpecExtractionService(new ProductSpecNormalizationService()).extractSpecs({
+      scrapedSpecs: Object.entries(rows).map(([name, value]) => ({ name, values: [value] })),
+      schema: (slug === 'bikes' ? bikesJsonSchema : ebikesJsonSchema) as unknown as SpecDefinitionJsonSchema,
+      sourceConfig: mapping,
+    });
+  }
+
+  /** One extraSpecRows entry's value for a feed row, read as a mapping target is. */
+  async function extraRowOf(
+    config: ArukeresoSourceConfig,
+    slug: string,
+    label: string,
+    fields: Record<string, string>,
+  ): Promise<string | undefined> {
+    const row = config.categories?.[slug]?.extraSpecRows?.find((entry) => entry.label === label);
+    if (!row) throw new Error(`The ${slug} section has no ${label} row`);
+    const raw = row.field ? fields[row.field] : undefined;
+    const value = isEmpty(row.pipeline)
+      ? raw
+      : await interpreter.runValuePipeline(row.pipeline ?? [], raw, { baseUrl: config.baseUrl });
+    return asText(value);
   }
 
   it('validates the ebikeshop config against the config schema', () => {
@@ -356,22 +382,44 @@ describe('hand-authored source configs', () => {
       );
     });
 
-    // The feed's attribute_name values are the same labels the shop's own spec
-    // table uses, which is what makes a feed source cheap to add for a shop
-    // that was already scraped. The size is the one addition: a page shows it
-    // in its size selector rather than its spec table, while the feed carries
-    // it as a `Méret` (or `size`) attribute on about half of its e-bike rows.
-    it('reuses the scraping source spec mappings, plus the frame size', () => {
-      const scraping = (speedbikeConfig as unknown as ScrapingSourceConfig).categories?.[
-        'ebikes'
-      ]?.specMapping;
-      const feed = config.categories?.['ebikes']?.specMapping;
-      const isSize = (mapping: SourceSpecMapping) => SIZE_KEYS.includes(mapping.key);
+    // The mapping began as a copy of the page scraper's, but the feed labels
+    // its rows its own way: on the 2026-10-05 feed 9 of those 61 mappings
+    // never fired, batteryCapacity and torque among them (0% where the
+    // Akkumulátor and Motor rows state them on 99% and 56%). It reads the
+    // feed's labels now.
+    it.each([
+      ['Akkumulátor', 'Bosch PowerTUBE 800Wh horizontal', 'batteryCapacity', 800],
+      ['Akkumulátor', 'Bosch PowerTube 625, Smart System', 'batteryCapacity', 625],
+      ['Akku kapacitás', '625 Wh', 'batteryCapacity', 625],
+      ['Motor', 'Bosch Drive Unit Performance Line 75Nm (BDU34)', 'torque', 75],
+      ['Motor', 'Bosch PERFORMANCE CX BDU3840', 'torque', undefined],
+      ['Súly', '27,2 kg', 'weight', 27.2],
+      ['NETTÓ TÖMEG', 'TBD', 'weight', undefined],
+      ['HAJTÁSRENDSZER', '2X12 SHIMANO GRX', 'gearCount', 24],
+      ['Hátsó váltó', 'Shimano XT RD-M8200-SGS, ShadowPlus, 12-Speed', 'gearCount', 12],
+      ['Váz', 'Aluminium Superlite, Gravity Casting Technology', 'frameMaterial', 'Alumínium'],
+      ['VÁZ', 'Macina Trekking PREMIUM CARBON|CPT400 Bosch SX BDU31/T4100', 'frameMaterial', 'Karbon'],
+      ['Kijelző', 'Bosch Kiox 500', 'display', true],
+      ['Távvezérlő', 'Bosch Purion 200 with Integrated Display', 'display', true],
+      ['CSOMAGTARTÓ', 'KTM tour snap-it 2.0/monkeyload', 'rack', 'Alapfelszereltség'],
+      ['Csomagtartó', '-', 'rack', 'Nincs'],
+      ['KITÁMASZTÓ', 'KTM 28" adjustable MY2025', 'kickstand', true],
+      ['LEGNAGYOBB MEGENGEDETT ÖSSZTÖMEG', '146', 'maxTotalWeight', 146],
+      ['Rendszer súly', 'Type 3, 150kg', 'maxTotalWeight', 150],
+      ['Fék', 'Shimano BR-MT200, Hydr. Disc Brake (180/160)', 'rotorSizeRear', 160],
+      ['ELSŐ GUMIABRONCS', 'Schwalbe G-One Overland Eco 45-622', 'tireSize', '45-622'],
+      ['Szin', 'slabgrey´n´chrome', 'color', 'slabgrey´n´chrome'],
+      ['Lengéscsillapító', 'n/a', 'rearShockModel', undefined],
+    ])('reads the %s row %j as %s %j', (name, value, key, expected) => {
+      expect(specsOf(config, 'ebikes', { [name]: value })[key]).toEqual(expected);
+    });
 
-      expect({ ...feed, mappings: feed?.mappings.filter((m) => !isSize(m)) }).toEqual(
-        scraping,
-      );
-      expect(feed?.mappings.filter(isSize).map((m) => m.key)).toEqual(SIZE_KEYS);
+    it('sends the shop category path, without its root, as a spec row', async () => {
+      expect(
+        await extraRowOf(config, 'bikes', 'Webshop kategória', {
+          category: 'Termékkategóriák > KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"',
+        }),
+      ).toBe('KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"');
     });
 
     // The distinct shapes of the 2026-09-24 feed's size values: centimetres
@@ -389,6 +437,8 @@ describe('hand-authored source configs', () => {
       ['size', '62 cm', { frameSize: 62 }],
       ['Méret', '24" / 20": ONE SIZE', {}],
       ['Méret', '26": ONE SIZE', {}],
+      // A rider-height range, not a 150 cm frame.
+      ['Méret', 'One size 130-150 cm', {}],
     ])('reads the %s attribute %j', (name, value, expected) => {
       const ebikes = config.categories?.['ebikes']?.specMapping;
       if (!ebikes) throw new Error('The fixture has no ebikes specMapping');
@@ -811,6 +861,149 @@ describe('hand-authored source configs', () => {
           product_url: `${page}?utm_source=arukereso&utm_medium=cpp&utm_campaign=direct_link`,
         }),
       ).toBe(page);
+    });
+  });
+
+  // Plan vivid-skipping-hopper.md, Phase 4: each feed shop's category sections.
+  describe.each([
+    ['speedbike-arukereso', speedbikeArukeresoConfig],
+    ['speedbike-googleshop', speedbikeGoogleshopConfig],
+    ['ambringa-arukereso', ambringaArukeresoConfig],
+    ['akosbike-arukereso', akosbikeArukeresoConfig],
+    ['bikelife-arukereso', bikelifeArukeresoConfig],
+    ['mangobike-arukereso', mangobikeArukeresoConfig],
+    ['bringaboard-arukereso', bringaboardArukeresoConfig],
+  ])('category sections of %s', (name, json) => {
+    const config = asFeedConfig(json);
+    const schemaKeys: Record<string, Set<string>> = {
+      bikes: new Set(Object.keys(bikesJsonSchema.properties)),
+      ebikes: new Set(Object.keys(ebikesJsonSchema.properties)),
+    };
+
+    // Bikes get their rules, and are switched on, with the next plan.
+    // ambringa sells e-bikes only.
+    it('keeps bikes off, with no rules yet', () => {
+      const bikes = config.categories?.['bikes'];
+      if (name === 'ambringa-arukereso') expect(bikes).toBeUndefined();
+      else expect(pick(bikes, ['enabled', 'rules'])).toEqual({ enabled: false });
+    });
+
+    it('maps only specs its category has', () => {
+      for (const [slug, section] of Object.entries(config.categories ?? {})) {
+        const keys = (section.specMapping?.mappings ?? []).map((mapping) => mapping.key);
+        expect(keys.filter((key) => !schemaKeys[slug].has(key))).toEqual([]);
+      }
+    });
+
+    // One list per shop: a row both categories read is read the same way.
+    it('maps a spec both categories have the same way in both', () => {
+      const ebikes = config.categories?.['ebikes']?.specMapping?.mappings ?? [];
+      const bikes = config.categories?.['bikes']?.specMapping?.mappings ?? [];
+      if (!bikes.length) return;
+      expect(bikes.filter((mapping) => schemaKeys['ebikes'].has(mapping.key))).toEqual(
+        ebikes.filter((mapping) => schemaKeys['bikes'].has(mapping.key)),
+      );
+    });
+
+    // An extra row exists for the identity call; a list that leaves it out
+    // would drop it there.
+    it('sends its extra rows to the identity extraction', () => {
+      for (const section of Object.values(config.categories ?? {})) {
+        if (!section.identitySpecRows || !section.extraSpecRows) continue;
+        expect(section.identitySpecRows).toEqual(
+          expect.arrayContaining(section.extraSpecRows.map((row) => row.label)),
+        );
+      }
+    });
+  });
+
+  describe("akosbike's spec rows", () => {
+    const config = asFeedConfig(akosbikeArukeresoConfig);
+
+    it.each([
+      ['bikes', 'Váz kialakítás', 'Trapéz', 'frameType', 'Trapéz'],
+      ['bikes', 'Váz', 'C:62® Advanced Twin Mold Technology', 'frameMaterial', 'Karbon'],
+      ['bikes', 'Ajánlott gyártói magasság', '118  - 136 cm (átlépési magasság : 52 - 63 cm)', 'recommendedRiderHeight', '118  - 136 cm'],
+      ['bikes', 'Ajánlott gyártói magasság', '118  - 136 cm (átlépési magasság : 52 - 63 cm)', 'standoverHeight', '52 - 63 cm'],
+      ['bikes', 'Ajánlott magasság', 'kb. 115-130 cm (6-8 éves korosztály)', 'recommendedAge', '6-8 év'],
+      ['bikes', 'Első váltó', 'nincs', 'frontDerailleur', undefined],
+      ['ebikes', 'Csomagtartó', 'ACID SIC 2.1 RILink', 'rack', 'Alapfelszereltség'],
+      ['ebikes', 'Első lámpa', 'nincs', 'lighting', 'Nincs'],
+      ['ebikes', 'Kezelőszerv', 'Bosch Purion 200 with Integrated Display', 'display', true],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+  });
+
+  describe("bringaboard's spec rows", () => {
+    const config = asFeedConfig(bringaboardArukeresoConfig);
+
+    it.each([
+      // Chainrings × sprockets.
+      ['bikes', 'Sebességek száma', '2x10', 'gearCount', 20],
+      ['ebikes', 'Sebesség', '1*10', 'gearCount', 10],
+      ['bikes', 'DRIVE', '24 gears', 'gearCount', 24],
+      ['bikes', 'Anyag', 'alu', 'frameMaterial', 'Alumínium'],
+      ['bikes', 'Anyag', 'Hliník', 'frameMaterial', 'Alumínium'],
+      ['bikes', 'VÁZ', 'HI-TEN ACÉL/STEEL', 'frameMaterial', 'Acél'],
+      ['bikes', 'EXTRÁK', 'VILÁGÍTÁS, SÁRVÉDŐ, CSOMAGTARTÓ/LIGHTING, MUDGUARDS, CARRIER', 'rack', 'Alapfelszereltség'],
+      ['bikes', 'EXTRÁK', '-', 'rack', undefined],
+      ['bikes', 'Méret', '130-150 cm', 'frameSize', undefined],
+      ['bikes', 'Pedálok', 'N/A', 'pedals', undefined],
+      ['ebikes', 'Kitámasztó', 'ÁLLÍTHATÓ', 'kickstand', true],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+  });
+
+  describe("bikelife's bike type", () => {
+    const config = asFeedConfig(bikelifeArukeresoConfig);
+
+    // Its category is flat; the sku's first four digits name the bike type.
+    it.each([
+      ['010612345678', 'Cross Trekking'],
+      ['012012345678', 'MTB 29"'],
+      // Trailers and adult tricycles: no bike type.
+      ['011112345678', undefined],
+      ['020012345678', undefined],
+    ])('reads sku %s as %j', async (sku, row) => {
+      expect(await extraRowOf(config, 'bikes', 'Webshop kategória', { sku })).toBe(row);
+    });
+  });
+
+  describe("ambringa's spec rows", () => {
+    const config = asFeedConfig(ambringaArukeresoConfig);
+
+    // The sku's suffix: the frame, or a full-suspension or folding bike.
+    it.each([
+      ['LEVIT-MUAN-MX3_df', 'Váz kialakítás', 'Magas'],
+      ['KTM-MACINA-SPORT_tf', 'Váz kialakítás', 'Trapéz'],
+      ['CUBE-NURIDE_cf', 'Váz kialakítás', 'Alacsony'],
+      ['CUBE-STEREO_fs', 'Webshop kategória', 'Összteleszkópos MTB'],
+      ['CUBE-STEREO_fs', 'Váz kialakítás', undefined],
+    ])('reads sku %s as %s %j', async (sku, label, row) => {
+      expect(await extraRowOf(config, 'ebikes', label, { sku })).toBe(row);
+    });
+
+    it("reads the description's motor lines, never a weight or the capacity", async () => {
+      const description =
+        '<em>Működési elv:</em> Nyomatékszenzor<br />\n\t\t<em>Csúcsnyomatéka:</em> 85Nm<br />\n\t\t<em>Tömege:</em> 2,9 kg</span>';
+
+      expect(await extraRowOf(config, 'ebikes', 'Motor csúcsnyomatéka', { description })).toBe('85Nm');
+      expect(await extraRowOf(config, 'ebikes', 'Motor működési elve', { description })).toBe('Nyomatékszenzor');
+      expect(JSON.stringify(config.categories?.['ebikes']?.extraSpecRows)).not.toMatch(/Kapacitás|Tömeg/);
+    });
+  });
+
+  describe("mangobike's category path", () => {
+    const config = asFeedConfig(mangobikeArukeresoConfig);
+
+    it('drops the menu marker its path starts with', async () => {
+      expect(
+        await extraRowOf(config, 'bikes', 'Webshop kategória', {
+          category: '-&nbsp;-&nbsp;start_nav&nbsp;-&nbsp;-  > Kerékpárok > Országúti és Gravel Kerékpárok > Országúti Kerékpár',
+        }),
+      ).toBe('Kerékpárok > Országúti és Gravel Kerékpárok > Országúti Kerékpár');
     });
   });
 });

@@ -16,6 +16,122 @@
             "equalsIgnoreCase": "Akciók és ajánlatok > Akciós ebike modellek"
           }
         }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Váz kialakítás",
+          "field": "sku",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "_(df|tf|cf)$",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "df": "Magas",
+                "tf": "Trapéz",
+                "cf": "Alacsony"
+              }
+            }
+          ]
+        },
+        {
+          "label": "Webshop kategória",
+          "field": "sku",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "_(fs|fo)$",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "fs": "Összteleszkópos MTB",
+                "fo": "Összecsukható"
+              }
+            }
+          ]
+        },
+        {
+          "label": "Motor csúcsnyomatéka",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Csúcsnyomatéka:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Motor névleges teljesítménye",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Nominális motor teljesítmény:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Rásegítés sebességhatára",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Elektromos rásegítés sebesség-limitje:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Motor működési elve",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Működési elv:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor elhelyezése",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Elhelyezés a kerékpáron:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor technológiája",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Technológia:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor levehető",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "<em>Levehető az ebike-ról:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        }
       ]
     }
   },

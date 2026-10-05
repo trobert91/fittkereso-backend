@@ -992,12 +992,24 @@ describe('ArukeresoProductMapperService reading bike years from the feed', () =>
   });
 
   // A year in an image file name is not read (the user's call, 2026-10-05).
+  // Orbea's folder holds no article number of a shape any shop shares.
   it('reads no year off a mangobike image file name', async () => {
     expect(
       await yearOf('mangobike', {
-        manufacturer: 'Merida',
-        imageurl: 'https://www.mangobike.hu/_upload/images/catalog/BF-2600216/BF-2600216_Merida-Silex-700-2026-piros-S.jpg',
+        manufacturer: 'Orbea',
+        imageurl: 'https://www.mangobike.hu/_upload/images/catalog/OR-S11053AJ/OR-S11053AJ_Orbea-Rise-2026-fekete-M.jpg',
       }),
     ).toBeUndefined();
+  });
+
+  // Merida's article number in the folder starts with the model year: the
+  // manufacturer's number dates it, not the file name.
+  it("reads the year off Merida's article number in mangobike's image folder", async () => {
+    expect(
+      await yearOf('mangobike', {
+        manufacturer: 'Merida',
+        imageurl: 'https://www.mangobike.hu/_upload/images/catalog/BF-2600216/BF-2600216_1.jpg',
+      }),
+    ).toBe(2026);
   });
 });
