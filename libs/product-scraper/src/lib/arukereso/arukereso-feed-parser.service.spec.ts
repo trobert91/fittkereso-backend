@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { Readable } from 'stream';
 import { ArukeresoFeedParserService } from './arukereso-feed-parser.service';
 import { ArukeresoFeedItem, feedField } from './arukereso-feed-item';
 
@@ -18,6 +19,24 @@ describe('ArukeresoFeedParserService', () => {
 
   beforeEach(() => {
     parser = new ArukeresoFeedParserService();
+  });
+
+  // A network delivers a feed in chunks of any size, so a letter's two
+  // bytes can arrive in two of them.
+  it('keeps a letter whole when its bytes arrive in two chunks', async () => {
+    const xml = Buffer.from(
+      '<?xml version="1.0"?><products><product><name>Országúti kerékpár</name></product></products>',
+    );
+    const split = xml.indexOf(Buffer.from('á')) + 1;
+    const items: ArukeresoFeedItem[] = [];
+
+    await parser.parseStream(
+      Readable.from([xml.subarray(0, split), xml.subarray(split)]),
+      async (item) => void items.push(item),
+      { format: 'xml' },
+    );
+
+    expect(feedField(items[0], 'name')).toBe('Országúti kerékpár');
   });
 
   // The claim this whole service exists to make good on.

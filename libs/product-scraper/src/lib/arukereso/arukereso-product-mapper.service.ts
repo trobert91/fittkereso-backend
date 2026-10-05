@@ -3,6 +3,7 @@ import {
   ArukeresoFieldMapping,
   ArukeresoMappingTarget,
   ArukeresoSourceConfig,
+  CategoryExtraSpecRow,
   categorySectionOf,
   OfferAvailability,
   OfferCondition,
@@ -124,9 +125,13 @@ export class ArukeresoProductMapperService {
 
     const categoryConfig = this.categoryConfigService.getConfig(category.slug);
     const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
-    const sourceSpecConfig = categorySectionOf(config, category.slug)?.specMapping;
+    const section = categorySectionOf(config, category.slug);
+    const sourceSpecConfig = section?.specMapping;
 
-    const rawSpecs = this.toRawSpecs(item);
+    const rawSpecs = [
+      ...this.toRawSpecs(item),
+      ...(await this.extraSpecRows(config, item, section?.extraSpecRows)),
+    ];
     const deterministicSpecs = sourceSpecConfig
       ? this.specExtraction.extractSpecs({
           scrapedSpecs: rawSpecs,
@@ -221,6 +226,27 @@ export class ArukeresoProductMapperService {
     return this.interpreter.runValuePipeline(mapping.pipeline, raw, {
       baseUrl: config.baseUrl,
     });
+  }
+
+  /**
+   * The category section's extra rows, read off the feed's fields like a
+   * mapping target. One that comes out empty adds no row; a list becomes one
+   * row with several values.
+   */
+  private async extraSpecRows(
+    config: ArukeresoSourceConfig,
+    item: ArukeresoFeedItem,
+    rows: CategoryExtraSpecRow[] | undefined,
+  ): Promise<ScrapedProductSpec[]> {
+    const specs: ScrapedProductSpec[] = [];
+    for (const { label, field, pipeline } of rows ?? []) {
+      const value = await this.resolveMapping(config, item, { field, pipeline });
+      const values = (Array.isArray(value) ? value : [value])
+        .map((entry) => this.asString(entry))
+        .filter((entry): entry is string => !!entry);
+      if (values.length) specs.push({ name: label, values });
+    }
+    return specs;
   }
 
   /**

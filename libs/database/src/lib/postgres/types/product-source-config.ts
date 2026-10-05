@@ -41,6 +41,27 @@ export interface ProductSourceCategoryConfig {
    * unification always gets the whole table regardless.
    */
   identitySpecRows?: string[];
+  /**
+   * Feed sources only: feed fields that become spec rows of this category's
+   * listings, `{ name: label, values: [value] }` beside the feed's own
+   * attributes — the category path, a code in the SKU, a line cut from the
+   * description. Each is resolved like a `mapping` target, and an empty one
+   * adds no row. From there the usual readers take them: `specMapping`, the
+   * identity extraction (through `identitySpecRows`, or every row) and spec
+   * unification. Added once the category is known, so the rules never see
+   * them. A scraping source builds its rows in `detailPage.rawSpecs`.
+   */
+  extraSpecRows?: CategoryExtraSpecRow[];
+}
+
+/** One extra spec row of a feed source's category section. */
+export interface CategoryExtraSpecRow {
+  /** The row's label, as specMapping labels and identitySpecRows name it. */
+  label: string;
+  /** Feed field seeding the pipeline, matched as `mapping` fields are. */
+  field?: string;
+  /** Optional transform, using the same op vocabulary as `mapping`. */
+  pipeline?: ScrapeOperation[];
 }
 
 export interface ProductSourcePaginationConfig {

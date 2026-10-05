@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Parser } from 'htmlparser2';
 import { Readable } from 'stream';
+import { StringDecoder } from 'string_decoder';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import {
   ArukeresoFeedItem,
@@ -220,11 +221,17 @@ export class ArukeresoFeedParserService {
       { xmlMode: true, decodeEntities: true, recognizeCDATA: true },
     );
 
+    // One decoder for the whole stream: a two-byte letter split across two
+    // network chunks is held back until its second byte arrives, where
+    // decoding each chunk on its own turned it into two replacement
+    // characters (129 of 24,011 bike and e-bike rows on 2026-10-05).
+    const decoder = new StringDecoder('utf8');
     for await (const chunk of stream) {
-      parser.write(chunk.toString('utf-8'));
+      parser.write(typeof chunk === 'string' ? chunk : decoder.write(chunk));
       for (const item of pending) await onItem(item);
       pending = [];
     }
+    parser.write(decoder.end());
     parser.end();
     for (const item of pending) await onItem(item);
 

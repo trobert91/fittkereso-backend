@@ -281,6 +281,39 @@ describe('ProductSourceConfigValidatorService', () => {
       expect(problems.map((problem) => problem.path)).toContain(path);
     });
 
+    it("takes extra spec rows in a feed's section only, each with a label and a field or pipeline", () => {
+      const feed = (extraSpecRows: unknown) => ({
+        baseUrl: 'https://speedbike.hu',
+        feedUrl: 'https://speedbike.hu/feed',
+        categories: { ebikes: { enabled: true, extraSpecRows } },
+        mapping: {
+          brand: { field: 'brand' },
+          name: { field: 'title' },
+          url: { field: 'link' },
+          price: { field: 'price' },
+        },
+      });
+      const sku = [{ op: 'regexCapture', pattern: '_(df|tf)$', group: 1 }];
+
+      expect(
+        validator.problems(
+          'arukereso',
+          feed([
+            { label: 'Kategória', field: 'category' },
+            { label: 'Váz (sku)', field: 'sku', pipeline: sku },
+          ]),
+        ),
+      ).toBeNull();
+      expect(validator.problems('arukereso', feed([{ field: 'category' }]))).not.toBeNull();
+      expect(validator.problems('arukereso', feed([{ label: 'Kategória' }]))).not.toBeNull();
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => (c.categories.ebikes.extraSpecRows = [{ label: 'x', field: 'y' }])),
+        ),
+      ).not.toBeNull();
+    });
+
     it('takes identity rows in a section, but not an empty list', () => {
       expect(
         validator.problems(

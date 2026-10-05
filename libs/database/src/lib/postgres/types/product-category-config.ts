@@ -165,7 +165,9 @@ export type SpecExtractMode =
   | 'cmToInchList'
   | 'mmToCmAndInchList'
   | 'standardRatio'
-  | 'shuffledList';
+  | 'shuffledList'
+  /** The product of an `AxB` term ("2X12" → 24, "3x8 SHIMANO" → 24), else the first number. */
+  | 'multiply';
 
 export interface SourceSpecMapping {
   key: string;
@@ -182,6 +184,17 @@ export interface SourceSpecMapping {
    * (e.g. headphone type) stable without LLM variance.
    */
   valueMap?: Record<string, string>;
+  /**
+   * Values by pattern, for a field whose canonical value the raw text only
+   * implies: an enum named in free text ("Aluminium Superlite" → Alumínium),
+   * a component that means "present" ("ACID 65" → Alapfelszereltség, "nincs"
+   * → Nincs), or a category path ("… > Fully MTB" → Összteleszkópos MTB).
+   * Tried in order as case-insensitive regexes against the raw value; the
+   * first match gives the value, and with no match the mapping gives none.
+   * The value skips valueMap and translation (it is already canonical) and
+   * goes through `extract`. Booleans are "true"/"false".
+   */
+  valuePatterns?: Array<{ pattern: string; value: string }>;
   preferredValueIndex?: number;
   skipValues?: string[];
 }

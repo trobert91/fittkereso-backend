@@ -75,6 +75,18 @@ export class SpecExtractionService {
       if (rawValue === undefined) continue;
       if (this.shouldSkipValue(rawValue, mapping.skipValues)) continue;
 
+      // A value by pattern is already canonical: no valueMap, no translation.
+      if (mapping.valuePatterns?.length) {
+        const matched = this.applyValuePatterns(rawValue, mapping.valuePatterns);
+        if (matched === undefined) continue;
+        result[mapping.key] = this.applyExtractMode(
+          matched,
+          mapping.extract,
+          mapping.extractPatterns,
+        );
+        continue;
+      }
+
       const remapped = this.applyValueMap(rawValue, mapping.valueMap);
       const translated =
         remapped !== undefined
@@ -122,6 +134,26 @@ export class SpecExtractionService {
     }
 
     return lowercased[value.toLowerCase()];
+  }
+
+  /**
+   * The value of the first pattern that matches, tried as case-insensitive
+   * regexes in order; for a list, per item, keeping the items that match.
+   * Undefined when nothing matches.
+   */
+  private applyValuePatterns(
+    value: string | string[],
+    patterns: Array<{ pattern: string; value: string }>,
+  ): string | string[] | undefined {
+    const compiled = patterns.map(({ pattern, value: canonical }) => ({
+      regex: new RegExp(pattern, 'i'),
+      canonical,
+    }));
+    const one = (raw: string) => compiled.find(({ regex }) => regex.test(raw))?.canonical;
+
+    if (!Array.isArray(value)) return one(value);
+    const matched = compact(value.map(one));
+    return matched.length > 0 ? matched : undefined;
   }
 
   private findRawValue(
@@ -247,6 +279,9 @@ export class SpecExtractionService {
 
       case 'removeWhitespace':
         return value.replace(/\s+/g, '');
+
+      case 'multiply':
+        return this.extractProduct(value);
 
       default:
         return value;
@@ -441,6 +476,17 @@ export class SpecExtractionService {
 
     const number = Number(match[0]);
     return Number.isFinite(number) ? number : undefined;
+  }
+
+  /**
+   * A gear count written as chainrings × sprockets: the product of the first
+   * "AxB" term ("2X12 SHIMANO GRX" → 24, "1x11" → 11), else the first number
+   * ("24 gears" → 24).
+   */
+  private extractProduct(value: string): number | undefined {
+    const term = value.match(/(\d+)\s*[x×]\s*(\d+)/i);
+    if (term) return Number(term[1]) * Number(term[2]);
+    return this.extractFirstNumber(value);
   }
 
   private extractSecondNumber(value: string): number | undefined {

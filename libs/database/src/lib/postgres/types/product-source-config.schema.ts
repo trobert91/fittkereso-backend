@@ -44,6 +44,7 @@ const SPEC_EXTRACT_MODES = [
   'mmToCmAndInchList',
   'standardRatio',
   'shuffledList',
+  'multiply',
 ] as const;
 
 /**
@@ -549,6 +550,20 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
             'Deterministic pre-translation remap: a raw value matching a key case-insensitively short-circuits translation entirely. Keeps closed-set categorical fields stable without LLM variance.',
           additionalProperties: { type: 'string' },
         },
+        valuePatterns: {
+          type: 'array',
+          description:
+            'Values by pattern: tried in order as case-insensitive regexes against the raw value; the first match gives the value, and with no match the mapping gives none. For an enum named in free text, a component that means "present", or a category path. The value skips valueMap and translation and goes through extract. Booleans are "true"/"false".',
+          items: {
+            type: 'object',
+            properties: {
+              pattern: { type: 'string', description: 'Regex, matched ignoring case.' },
+              value: { type: 'string', description: 'The canonical value it gives.' },
+            },
+            required: ['pattern', 'value'],
+            additionalProperties: false,
+          },
+        },
         preferredValueIndex: {
           type: 'integer',
           minimum: 0,
@@ -679,6 +694,36 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
 
   $defs: {
     ...(SCRAPING_SOURCE_CONFIG_SCHEMA['$defs'] as JsonSchemaFragment),
+    // A feed's sections also take extra spec rows read off its fields.
+    categorySection: {
+      ...categorySectionSchema,
+      properties: {
+        ...(categorySectionSchema['properties'] as JsonSchemaFragment),
+        extraSpecRows: {
+          type: 'array',
+          description:
+            "Feed fields that become spec rows of this category's listings, beside the feed's own attributes: the category path, a code in the SKU, a line cut from the description. Each is resolved like a mapping target; an empty one adds no row. specMapping, identitySpecRows and spec unification then read them like any row. Added once the category is known, so the rules never see them.",
+          items: {
+            type: 'object',
+            properties: {
+              label: {
+                type: 'string',
+                minLength: 1,
+                description: 'The row label, as specMapping labels and identitySpecRows name it.',
+              },
+              field: {
+                type: 'string',
+                description: 'Feed field seeding the pipeline, matched as mapping fields are.',
+              },
+              pipeline: pipelineRef('Optional transform, using the same op vocabulary as mapping.'),
+            },
+            required: ['label'],
+            anyOf: [{ required: ['field'] }, { required: ['pipeline'] }],
+            additionalProperties: false,
+          },
+        },
+      },
+    },
     feedFieldMapping: {
       type: 'object',
       description: 'Which feed field supplies a target, with an optional transform.',

@@ -899,4 +899,125 @@ describe('SpecExtractionService', () => {
       expect(result['resolution']).toBe('3440x1440');
     });
   });
+
+  // ─── valuePatterns ────────────────────────────────────────────────────────
+
+  describe('valuePatterns', () => {
+    const bikeSchema: SpecDefinitionJsonSchema = {
+      type: 'object',
+      title: 'Bike',
+      properties: {
+        frameMaterial: {
+          type: 'string',
+          title: 'Frame material',
+          enum: ['Alumínium', 'Karbon', 'Acél'],
+        },
+        rack: {
+          type: 'string',
+          title: 'Rack',
+          enum: ['Alapfelszereltség', 'Opcionális', 'Nincs'],
+        },
+        kickstand: { type: 'boolean', title: 'Kickstand' },
+        wheelSize: { type: 'number', title: 'Wheel size' },
+      },
+    };
+    const extract = (name: string, value: string, sourceConfig: SourceSpecConfig) =>
+      service.extractSpecs({
+        scrapedSpecs: [{ name, values: [value] }],
+        schema: bikeSchema,
+        sourceConfig,
+      });
+
+    const material: SourceSpecConfig = {
+      mappings: [
+        {
+          key: 'frameMaterial',
+          labels: ['Váz'],
+          valuePatterns: [
+            { pattern: 'carbon|karbon|C:6\\d', value: 'Karbon' },
+            { pattern: 'alu|alloy', value: 'Alumínium' },
+            { pattern: 'hi-?ten|steel|acél|cr-?mo', value: 'Acél' },
+          ],
+        },
+      ],
+    };
+
+    it.each([
+      ['Aluminium Superlite, Trekking Comfort, Double Butted', 'Alumínium'],
+      ['C:62® Advanced Twin Mold Technology', 'Karbon'],
+      ['HI-TEN ACÉL/STEEL', 'Acél'],
+    ])('reads an enum named in free text: %j → %j', (raw, expected) => {
+      expect(extract('Váz', raw, material)).toEqual({ frameMaterial: expected });
+    });
+
+    it('gives nothing when no pattern matches, rather than the raw text', () => {
+      expect(extract('Váz', 'Titanium Pro', material)).toEqual({});
+    });
+
+    it('turns a named component into "present", and "nincs" into none', () => {
+      const rack: SourceSpecConfig = {
+        mappings: [
+          {
+            key: 'rack',
+            labels: ['Csomagtartó'],
+            valuePatterns: [
+              { pattern: '^(nincs|-|n/a)$', value: 'Nincs' },
+              { pattern: '.', value: 'Alapfelszereltség' },
+            ],
+          },
+          {
+            key: 'kickstand',
+            labels: ['Kitámasztó'],
+            valuePatterns: [{ pattern: '.', value: 'true' }],
+          },
+        ],
+      };
+      expect(extract('Csomagtartó', 'ACID SIC 2.1 RILink', rack)).toEqual({
+        rack: 'Alapfelszereltség',
+      });
+      expect(extract('Csomagtartó', 'nincs', rack)).toEqual({ rack: 'Nincs' });
+      expect(extract('Kitámasztó', 'ACID FM Pure Kickstand', rack)).toEqual({ kickstand: true });
+    });
+
+    it('passes the value through extract', () => {
+      const wheel: SourceSpecConfig = {
+        mappings: [
+          {
+            key: 'wheelSize',
+            labels: ['Kategória'],
+            valuePatterns: [{ pattern: 'Mountain Bike 27,5', value: '27.5' }],
+            extract: 'number',
+          },
+        ],
+      };
+      expect(extract('Kategória', 'Kerékpár > Mountain Bike > Mountain Bike 27,5 > férfi', wheel)).toEqual({
+        wheelSize: 27.5,
+      });
+    });
+  });
+
+  // ─── multiply ─────────────────────────────────────────────────────────────
+
+  describe("extract: 'multiply'", () => {
+    const gears: SourceSpecConfig = {
+      mappings: [{ key: 'refreshRate', labels: ['Fokozatok'], extract: 'multiply' }],
+    };
+
+    it.each([
+      ['2X12 SHIMANO GRX', 24],
+      ['3x8', 24],
+      ['1X11 SHIMANO CUES', 11],
+      ['2 × 10', 20],
+      ['21', 21],
+      ['24 gears', 24],
+    ])('reads %j as %j', (raw, expected) => {
+      expect(
+        service.extractSpecs({
+          scrapedSpecs: [{ name: 'Fokozatok', values: [raw] }],
+          schema,
+          sourceConfig: gears,
+        }),
+      ).toEqual({ refreshRate: expected });
+    });
+  });
 });

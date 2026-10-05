@@ -348,6 +348,41 @@ describe('ArukeresoProductMapperService', () => {
       );
     });
 
+    // Values the feed states outside its attribute table (its category path,
+    // a code in the SKU) become rows the mapping and the LLM calls can read.
+    it("adds the category section's extra rows from the feed fields, after the gate", async () => {
+      const cfg = config({
+        categories: {
+          ebikes: {
+            enabled: true,
+            rules: [{ when: { always: true } }],
+            specMapping: { mappings: [] },
+            extraSpecRows: [
+              { label: 'Kategória', field: 'category' },
+              { label: 'Hiányzó', field: 'no_such_field' },
+            ],
+          },
+        },
+      });
+
+      const result = await call(cfg, item({}, [{ name: 'Motor', value: 'Bosch' }]));
+
+      const rows = [
+        { name: 'Motor', values: ['Bosch'] },
+        { name: 'Kategória', values: ['Termékkategóriák > E-BIKE > Trekking'] },
+      ];
+      expect(specExtraction.extractSpecs).toHaveBeenCalledWith(
+        expect.objectContaining({ scrapedSpecs: rows }),
+      );
+      expect(result.status === 'mapped' && result.scrapedProduct.rawSpecs).toEqual(rows);
+      // The gate saw the feed's own rows only.
+      expect(interpreter.resolveCategory).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        [{ name: 'Motor', values: ['Bosch'] }],
+      );
+    });
+
     it('skips extraction entirely when the category has no specMapping', async () => {
       await call();
 
