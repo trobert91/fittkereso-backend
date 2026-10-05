@@ -16,6 +16,8 @@ import {
   ScrapedProductSpec,
   ProductImportTask,
   isFeedSourceType,
+  categorySectionOf,
+  ProductSourceCategoryConfig,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScraperService } from '@fittkereso-backend/scraper';
@@ -152,9 +154,9 @@ export interface SimulatedFeedIdentifiers {
   specRows: SimulatedSpecRowCoverage;
 }
 
-/** What identityExtraction.specRows lets through, over every eligible item. */
+/** What each category section's identitySpecRows let through, over every eligible item. */
 export interface SimulatedSpecRowCoverage {
-  /** False when the source lists no rows, and every listing sends its whole table. */
+  /** False when no section lists rows, and every listing sends its whole table. */
   configured: boolean;
   listings: number;
   /** Listings that would send the extraction no spec row at all. */
@@ -162,10 +164,11 @@ export interface SimulatedSpecRowCoverage {
   meanRowsSent: number;
   meanRowsTotal: number;
   /**
-   * Per configured label, how many listings it matched on. A label matching
-   * nothing is either a typo or a row the shop has stopped publishing.
+   * Per configured label of each category section, how many of that
+   * category's listings it matched on. A label matching nothing is either a
+   * typo or a row the shop has stopped publishing.
    */
-  byLabel: { label: string; listings: number }[];
+  byLabel: { category: string; label: string; listings: number }[];
 }
 
 export interface ProductSourceImportSimulationResult {
@@ -402,10 +405,7 @@ export class ProductSourceImportSimulationService {
     let wouldImport = 0;
     let itemsWithoutExternalId = 0;
     const productIdentifiers: SimulatedListingIdentifiers[] = [];
-    const identifiers = new FeedIdentifierTally(
-      config.mapping,
-      config.identityExtraction?.specRows,
-    );
+    const identifiers = new FeedIdentifierTally(config.mapping, config.categories);
     // What a run would do with each eligible row, triaged in batches as the
     // run does (last row wins for a repeated URL, the first for a repeated
     // listing id under another URL).
@@ -464,6 +464,7 @@ export class ProductSourceImportSimulationService {
         else externalIds.set(externalId, (externalIds.get(externalId) ?? 0) + 1);
 
         identifiers.add({
+          category: classified.slug,
           brand: await this.previewTarget(config, item, 'brand'),
           gtin: await this.previewTarget(config, item, 'gtin'),
           mpn: await this.previewTarget(config, item, 'mpn'),
@@ -526,7 +527,8 @@ export class ProductSourceImportSimulationService {
                 gtin: offer?.gtin,
                 mpn: offer?.mpn,
                 rawSpecs: toRawSpecs(item),
-                specRows: config.identityExtraction?.specRows,
+                specRows: categorySectionOf(config, classified.slug)
+                  ?.identitySpecRows,
               }),
             );
           }
@@ -569,7 +571,7 @@ export class ProductSourceImportSimulationService {
     }
     if (wouldImport === 0) {
       result.errors.push(
-        'No item survives the category gate — check category.labelFrom, category.slugLookup and categories.<slug>.enabled.',
+        "No item survives the category gate — check category.labelFrom, and each categories.<slug> section's rules and enabled.",
       );
     }
     const identifierSummary = identifiers.summary();
@@ -584,7 +586,7 @@ export class ProductSourceImportSimulationService {
     // A source that does not identify products runs no identity extraction.
     if (!contributes && identifierSummary.specRows.listingsWithNoRowSent > 0) {
       result.warnings.push(
-        `${identifierSummary.specRows.listingsWithNoRowSent} eligible items match none of identityExtraction.specRows, so their identity extraction would see the title alone. Check the labels against the feed's attribute names.`,
+        `${identifierSummary.specRows.listingsWithNoRowSent} eligible items match none of their category section's identitySpecRows, so their identity extraction would see the title alone. Check the labels against the feed's attribute names.`,
       );
     }
     if (itemsWithoutExternalId > 0) {
@@ -662,6 +664,7 @@ class FeedIdentifierTally {
   private readonly mpn: Record<GtinOutcome, number> = { valid: 0, invalid: 0, absent: 0 };
   private readonly invalidGtinByBrand: Record<string, number> = {};
   private readonly invalidGtinSamples: string[] = [];
+  /** Hits per section and label, keyed by slug and label joined with a NUL. */
   private readonly labelHits: Map<string, number>;
   private listings = 0;
   private listingsWithNoRowSent = 0;
@@ -670,12 +673,17 @@ class FeedIdentifierTally {
 
   constructor(
     private readonly mapping: Record<string, ArukeresoMappingEntry>,
-    private readonly specRows: string[] | undefined,
+    private readonly categories: Record<string, ProductSourceCategoryConfig> | undefined,
   ) {
-    this.labelHits = new Map((specRows ?? []).map((label) => [label, 0]));
+    this.labelHits = new Map(
+      Object.entries(categories ?? {}).flatMap(([slug, section]) =>
+        (section.identitySpecRows ?? []).map((label) => [`${slug}\u0000${label}`, 0] as const),
+      ),
+    );
   }
 
   add(item: {
+    category: string;
     brand?: string;
     gtin?: string;
     mpn?: string;
@@ -695,14 +703,16 @@ class FeedIdentifierTally {
 
     this.mpn[normalizeMpn(item.mpn) ? 'valid' : item.mpn ? 'invalid' : 'absent'] += 1;
 
-    const sent = selectIdentitySpecRows(item.rawSpecs, this.specRows);
+    const specRows = this.categories?.[item.category]?.identitySpecRows;
+    const sent = selectIdentitySpecRows(item.rawSpecs, specRows);
     this.rowsSent += sent.length;
     this.rowsTotal += item.rawSpecs.length;
     if (sent.length === 0) this.listingsWithNoRowSent += 1;
 
-    for (const label of this.labelHits.keys()) {
+    for (const label of specRows ?? []) {
       if (selectIdentitySpecRows(item.rawSpecs, [label]).length > 0) {
-        this.labelHits.set(label, (this.labelHits.get(label) ?? 0) + 1);
+        const key = `${item.category}\u0000${label}`;
+        this.labelHits.set(key, (this.labelHits.get(key) ?? 0) + 1);
       }
     }
   }
@@ -718,12 +728,17 @@ class FeedIdentifierTally {
       mpnMapped: !!this.mapping['mpn'],
       mpn: this.mpn,
       specRows: {
-        configured: !!this.specRows?.length,
+        configured: Object.values(this.categories ?? {}).some(
+          (section) => !!section.identitySpecRows?.length,
+        ),
         listings: this.listings,
         listingsWithNoRowSent: this.listingsWithNoRowSent,
         meanRowsSent: mean(this.rowsSent),
         meanRowsTotal: mean(this.rowsTotal),
-        byLabel: [...this.labelHits].map(([label, listings]) => ({ label, listings })),
+        byLabel: [...this.labelHits].map(([key, listings]) => {
+          const [category, label] = key.split('\u0000');
+          return { category, label, listings };
+        }),
       },
     };
   }

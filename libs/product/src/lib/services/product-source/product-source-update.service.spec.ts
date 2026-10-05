@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  ProductCategoryRepository,
   ProductSource,
   ProductSourceRepository,
   Seller,
@@ -60,6 +61,11 @@ describe('ProductSourceUpdateService', () => {
       {} as SellerRepository,
       versionService as unknown as ProductSourceVersionService,
       new ProductSourceSellerRulesService(repo),
+      {
+        findBySlug: jest.fn(async (slug: string) =>
+          ['ebikes', 'bikes'].includes(slug) ? { slug } : null,
+        ),
+      } as unknown as ProductCategoryRepository,
     );
   });
 
@@ -172,6 +178,48 @@ describe('ProductSourceUpdateService', () => {
         }),
       ).rejects.toThrow(message);
       expect(sourceRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('one category section', () => {
+    const ebikes = { enabled: true, rules: [{ when: { always: true as const } }] };
+
+    beforeEach(() => {
+      sellerSources[0] = makeSource({
+        id: 'arukereso',
+        name: 'speedbike-arukereso',
+        priority: 60,
+        config: { baseUrl: 'https://speedbike.hu', categories: { ebikes } } as never,
+      });
+    });
+
+    it('saves the config with that section replaced or added, the others kept, as one version', async () => {
+      const bikes = { enabled: false, specMapping: { mappings: [] } };
+
+      await service.updateCategorySection('arukereso', 'bikes', bikes, { note: 'bike mappings' });
+
+      expect(versionService.addVersionIfChanged).toHaveBeenCalledWith(
+        'arukereso',
+        { baseUrl: 'https://speedbike.hu', categories: { ebikes, bikes } },
+        expect.objectContaining({ note: 'bike mappings' }),
+      );
+    });
+
+    it('removes the section when given none', async () => {
+      await service.updateCategorySection('arukereso', 'ebikes', null);
+
+      expect(versionService.addVersionIfChanged).toHaveBeenCalledWith(
+        'arukereso',
+        { baseUrl: 'https://speedbike.hu', categories: {} },
+        expect.objectContaining({ note: 'Removed the category section "ebikes"' }),
+      );
+    });
+
+    it('refuses a section for a slug no category has', async () => {
+      await expect(
+        service.updateCategorySection('arukereso', 'e-bikes', ebikes),
+      ).rejects.toThrow('No product category has the slug "e-bikes".');
+      expect(versionService.addVersionIfChanged).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,24 +5,19 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "Elektromos kerékpár"
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Elektromos kerékpár"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "Akciók és ajánlatok > Akciós ebike modellek"
+          }
+        }
+      ]
     }
-  },
-  "category": {
-    "slugLookup": [
-      {
-        "when": {
-          "equalsIgnoreCase": "Elektromos kerékpár"
-        },
-        "slug": "ebikes"
-      },
-      {
-        "when": {
-          "equalsIgnoreCase": "Akciók és ajánlatok > Akciós ebike modellek"
-        },
-        "slug": "ebikes"
-      }
-    ]
   },
   "mapping": {
     "externalId": {

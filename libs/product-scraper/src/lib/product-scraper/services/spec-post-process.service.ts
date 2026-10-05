@@ -14,6 +14,7 @@ import {
   ScrapedProduct,
   ScrapedProductFlag,
   SpecDefinitionJsonSchema,
+  categorySectionOf,
 } from '@fittkereso-backend/database';
 import {
   findDescriptionEvidence,
@@ -159,7 +160,10 @@ export class SpecPostProcessService {
 
     const scopes = this.scopesOf(scrapedProduct.category.slug, schema);
     const config = postProcessConfigOf(context.source.config);
-    const specRows = context.source.config?.identityExtraction?.specRows;
+    const specRows = categorySectionOf(
+      context.source.config,
+      scrapedProduct.category.slug,
+    )?.identitySpecRows;
     const deterministic = scrapedProduct.extractedSpecs ?? {};
     const rawTitle = scrapedProduct.originalName;
     const rows = selectIdentitySpecRows(scrapedProduct.rawSpecs, specRows);

@@ -7,6 +7,7 @@ import {
   ProductSourceRepository,
   QueueName,
   systemActor,
+  enabledCategorySlugs,
 } from '@fittkereso-backend/database';
 import { ProductSourceVersionService } from '@fittkereso-backend/product';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -185,8 +186,6 @@ export class ProductSourceSyncListener {
     source: ProductSource,
     categoryIds: string[] | undefined,
   ): Promise<string[]> {
-    const categoriesConfig = source.config.categories ?? {};
-
     let requested: string[] | undefined;
     if (categoryIds && !isEmpty(categoryIds)) {
       const categories = await this.productCategoryRepo.repo.findBy({
@@ -203,9 +202,9 @@ export class ProductSourceSyncListener {
       }
     }
 
-    const slugs = Object.entries(categoriesConfig)
-      .filter(([slug, cfg]) => cfg.enabled && (!requested || requested.includes(slug)))
-      .map(([slug]) => slug);
+    const slugs = enabledCategorySlugs(source.config).filter(
+      (slug) => !requested || requested.includes(slug),
+    );
 
     if (!isEmpty(requested) && isEmpty(slugs)) {
       this.logger.warn('Import: none of the requested categories are enabled', {

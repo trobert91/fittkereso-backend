@@ -176,19 +176,57 @@ const filterSchema: JsonSchemaFragment = {
   additionalProperties: false,
 };
 
-const identityExtractionSchema: JsonSchemaFragment = {
+/**
+ * `categories`: one section per category, keyed by slug. The section itself is
+ * `$defs.categorySection`, so the admin editor can validate one section alone.
+ */
+const categoriesSchema: JsonSchemaFragment = {
   type: 'object',
   description:
-    "What the LLM identity extraction reads from this source's listings. Per source because it is about the shop's labels; the fields the extraction outputs are category config.",
+    'One section per product category, keyed by category slug: whether this source imports it, which listings are in it, how their spec rows map onto its schema, and which rows the identity extraction reads.',
+  additionalProperties: { $ref: '#/$defs/categorySection' },
+};
+
+/** One category's section; see ProductSourceCategoryConfig. */
+const categorySectionSchema: JsonSchemaFragment = {
+  type: 'object',
+  description: 'Everything this source knows about one of our categories.',
   properties: {
-    specRows: {
+    enabled: {
+      type: 'boolean',
+      description:
+        'Whether listings in this category are imported. On a feed, which is the whole catalog, the sections are what keep everything else out.',
+    },
+    rules: {
+      type: 'array',
+      description:
+        'Which listings are in this category: one matching any rule is. A listing matching rules of two categories is ambiguous and skipped, so no rule order between categories decides. Without rules the section matches nothing.',
+      items: {
+        type: 'object',
+        properties: {
+          when: { ...categoryLookupCondition, description: 'Condition that selects this rule.' },
+          unless: {
+            ...categoryLookupCondition,
+            description: 'Condition that disqualifies this rule even when `when` matches.',
+          },
+        },
+        required: ['when'],
+        additionalProperties: false,
+      },
+    },
+    specMapping: {
+      $ref: '#/$defs/sourceSpecConfig',
+      description: "How this source's raw spec labels map onto the category's spec keys.",
+    },
+    identitySpecRows: {
       type: 'array',
       minItems: 1,
       items: { type: 'string' },
       description:
-        'Allowlist of spec-table row labels sent to the identity extraction: the rows carrying frame, motor, battery, wheel, drivetrain, weight or year. Matched ignoring case (as specMapping labels are) and stray whitespace, but not accents. Omit to send the whole table, which suits a shop whose table is already short. Full spec unification always gets the whole table.',
+        "Allowlist of spec-table row labels sent to the identity extraction: the rows carrying this category's identity fields (frame, motor, battery, wheel, drivetrain, weight, year). Matched ignoring case (as specMapping labels are) and stray whitespace, but not accents. Omit to send the whole table, which suits a shop whose table is already short. Full spec unification always gets the whole table.",
     },
   },
+  required: ['enabled'],
   additionalProperties: false,
 };
 
@@ -305,30 +343,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     ),
     maxItems: maxItemsSchema,
     filter: filterSchema,
-    identityExtraction: identityExtractionSchema,
-
-    categories: {
-      type: 'object',
-      description:
-        'Which product categories this source is onboarded for, keyed by category slug.',
-      additionalProperties: {
-        type: 'object',
-        properties: {
-          enabled: {
-            type: 'boolean',
-            description:
-              'Whether products resolving to this category are scraped. A disabled category is skipped at detail-page time.',
-          },
-          sourceTitle: {
-            type: 'string',
-            description:
-              'What this site calls the category, used by discovery mode "categoryTitleMatch".',
-          },
-        },
-        required: ['enabled'],
-        additionalProperties: false,
-      },
-    },
+    categories: categoriesSchema,
 
     listPage: {
       type: 'object',
@@ -389,34 +404,13 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
         ),
         category: {
           type: 'object',
-          description: 'How this page\'s product is resolved to a category slug.',
+          description: "How this page's category label is read; the category sections' rules test it.",
           properties: {
             breadcrumbOrSource: pipelineRef(
-              'Pipeline producing the text the lookup rules are matched against.',
+              "Pipeline producing the text the category sections' rules are matched against.",
             ),
-            slugLookup: {
-              type: 'array',
-              description:
-                'Rules tried in order; the first whose `when` matches and whose `unless` does not wins.',
-              items: {
-                type: 'object',
-                properties: {
-                  when: { ...categoryLookupCondition, description: 'Condition that selects this rule.' },
-                  slug: {
-                    type: 'string',
-                    description: 'Category slug to resolve to. Must be a real ProductCategory slug.',
-                  },
-                  unless: {
-                    ...categoryLookupCondition,
-                    description: 'Condition that disqualifies this rule even when `when` matches.',
-                  },
-                },
-                required: ['when', 'slug'],
-                additionalProperties: false,
-              },
-            },
           },
-          required: ['breadcrumbOrSource', 'slugLookup'],
+          required: ['breadcrumbOrSource'],
           additionalProperties: false,
         },
         brand: pipelineRef('Pipeline producing the brand name.'),
@@ -430,12 +424,6 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
           "Optional. Pipeline producing the ids of this product's other sizes, as the shop itself declares them (e.g. a frame-size variation list), in the same id space as externalId. May include this page's own id. Identity resolution looks them up within this source only, so every size the shop groups lands on one product. Configure it only from a list the shop declares — groupings inferred from shared images or article-number prefixes put different bikes together.",
         ),
         images: pipelineRef('Pipeline producing image URLs.'),
-        specMapping: {
-          type: 'object',
-          description:
-            'How this source\'s raw spec labels map onto the canonical category schema, keyed by category slug.',
-          additionalProperties: { $ref: '#/$defs/sourceSpecConfig' },
-        },
         offers: {
           type: 'object',
           description:
@@ -481,7 +469,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
         },
         postProcess: postProcessConfigSchema,
       },
-      required: ['rawSpecs', 'category', 'brand', 'model', 'images', 'specMapping'],
+      required: ['rawSpecs', 'category', 'brand', 'model', 'images'],
       additionalProperties: false,
     },
   },
@@ -489,6 +477,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
   $defs: {
     pipeline: SCRAPE_PIPELINE_SCHEMA,
     operation: SCRAPE_OPERATION_SCHEMA,
+    categorySection: categorySectionSchema,
 
     sourceSpecConfig: {
       type: 'object',
@@ -615,7 +604,7 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
   description:
     'The complete definition of a feed source, type "arukereso" (an Árukereső feed) or "googleshop" (a Google Shopping TSV feed): where the feed is, how its fields map onto ours, and how its attributes map onto the category schema.',
   type: 'object',
-  required: ['baseUrl', 'feedUrl', 'category', 'mapping'],
+  required: ['baseUrl', 'feedUrl', 'mapping'],
   additionalProperties: false,
 
   properties: {
@@ -649,63 +638,16 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
 
     maxItems: maxItemsSchema,
     filter: filterSchema,
-    identityExtraction: identityExtractionSchema,
-
-    categories: {
-      type: 'object',
-      description:
-        'Which product categories this source is onboarded for, keyed by category slug.',
-      additionalProperties: {
-        type: 'object',
-        properties: {
-          enabled: {
-            type: 'boolean',
-            description:
-              'Whether feed items resolving to this category are imported. A feed is usually the whole catalog, so this gate is what keeps the rest out.',
-          },
-          sourceTitle: {
-            type: 'string',
-            description: 'What this shop calls the category. Informational.',
-          },
-        },
-        required: ['enabled'],
-        additionalProperties: false,
-      },
-    },
+    categories: categoriesSchema,
 
     category: {
       type: 'object',
-      description: "How a feed item's category value resolves to one of our slugs.",
+      description: "How a feed item's category value becomes the label the category sections' rules test.",
       properties: {
         labelFrom: pipelineRef(
           'Optional pipeline turning the raw category value into a matchable label — e.g. splitAndTake to pull "E-BIKE" out of "Termékkategóriák > E-BIKE > Trekking E-BIKE". Without it a full breadcrumb path can never satisfy an equalsIgnoreCase rule.',
         ),
-        slugLookup: {
-          type: 'array',
-          description:
-            'Rules tried in order; the first whose `when` matches and whose `unless` does not wins. Same vocabulary as detailPage.category.slugLookup, so a shop scraped AND fed can share rules verbatim.',
-          items: {
-            type: 'object',
-            properties: {
-              when: {
-                ...categoryLookupCondition,
-                description: 'Condition that selects this rule.',
-              },
-              slug: {
-                type: 'string',
-                description: 'Category slug to resolve to. Must be a real ProductCategory slug.',
-              },
-              unless: {
-                ...categoryLookupCondition,
-                description: 'Condition that disqualifies this rule even when `when` matches.',
-              },
-            },
-            required: ['when', 'slug'],
-            additionalProperties: false,
-          },
-        },
       },
-      required: ['slugLookup'],
       additionalProperties: false,
     },
 
@@ -730,13 +672,6 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
           },
         ],
       },
-    },
-
-    specMapping: {
-      type: 'object',
-      description:
-        "How the feed's attribute pairs map onto each category's canonical spec keys, keyed by category slug. Identical shape to detailPage.specMapping — an Árukereső feed's attribute labels are typically the same labels the shop's own spec table uses, so an existing mapping often transfers unchanged.",
-      additionalProperties: { $ref: '#/$defs/sourceSpecConfig' },
     },
 
     postProcess: postProcessConfigSchema,

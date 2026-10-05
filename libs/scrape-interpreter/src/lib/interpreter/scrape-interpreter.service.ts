@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 import {
   CategoryLookupCondition,
+  categoryRulesOf,
+  ProductSourceCategoryConfig,
   ScrapingSourceConfig,
   ProductSpecs,
   ScrapeOperation,
@@ -39,10 +41,22 @@ export interface RawOfferRecord {
   specs?: ProductSpecs;
 }
 
+/**
+ * Which category section a listing falls in: exactly one section's rules
+ * match, none does, or several do — an ambiguity no rule order settles.
+ */
+export type CategoryResolution =
+  | { status: 'resolved'; slug: string }
+  | { status: 'unidentified' }
+  | { status: 'ambiguous'; slugs: string[] };
+
 export interface DetailPageResult {
   rawSpecs: ScrapedProductSpec[];
   description?: string;
+  /** The one category whose section's rules matched; undefined otherwise. */
   categorySlug: string | undefined;
+  /** Set when the rules of several category sections matched. */
+  ambiguousCategorySlugs?: string[];
   brand: string | undefined;
   model: string | undefined;
   aliases?: string[];
@@ -128,23 +142,34 @@ export class ScrapeInterpreterService {
   }
 
   /**
-   * Resolve a category slug from declarative lookup rules — first match wins.
+   * Which category section a listing belongs to. A section matches when any
+   * of its rules does (`when` holds and `unless` does not); a listing that
+   * two sections claim is ambiguous rather than given to whichever comes
+   * first, so adding a category can never silently take listings from
+   * another. Disabled sections take part: a listing in one is still known to
+   * be in that category, and the caller skips it as not enabled.
    *
    * Public because both page and feed paths need exactly these semantics: a
-   * shop that is both scraped and fed can then share its slugLookup rules
-   * verbatim, and `specValueIncludes` works against a feed's attribute pairs
-   * just as it does against a page's spec table.
+   * shop that is both scraped and fed can then share its rules verbatim, and
+   * `specValueIncludes` works against a feed's attribute pairs just as it
+   * does against a page's spec table.
    */
-  public resolveCategoryFromRules(
-    rules: {
-      when: CategoryLookupCondition;
-      slug: string;
-      unless?: CategoryLookupCondition;
-    }[],
+  public resolveCategory(
+    categories: Record<string, ProductSourceCategoryConfig> | undefined,
     rawLabel: string | undefined,
     rawSpecs: ScrapedProductSpec[] = [],
-  ): string | undefined {
-    return this.resolveCategorySlug(rules, rawLabel, rawSpecs);
+  ): CategoryResolution {
+    const slugs = categoryRulesOf({ categories })
+      .filter(({ rules }) =>
+        rules.some(
+          (rule) =>
+            this.evaluateCondition(rule.when, rawLabel, rawSpecs) &&
+            !(rule.unless && this.evaluateCondition(rule.unless, rawLabel, rawSpecs)),
+        ),
+      )
+      .map(({ slug }) => slug);
+    if (slugs.length === 1) return { status: 'resolved', slug: slugs[0] };
+    return slugs.length ? { status: 'ambiguous', slugs } : { status: 'unidentified' };
   }
 
   /**
@@ -215,12 +240,9 @@ export class ScrapeInterpreterService {
         )) as string | undefined)
       : undefined;
 
-    // 3. resolve category slug via declarative lookup rules, first match wins.
-    const categorySlug = this.resolveCategorySlug(
-      config.detailPage.category.slugLookup,
-      rawCategoryLabel,
-      rawSpecs,
-    );
+    // 3. resolve the category from the sections' rules.
+    const resolution = this.resolveCategory(config.categories, rawCategoryLabel, rawSpecs);
+    const categorySlug = resolution.status === 'resolved' ? resolution.slug : undefined;
 
     // 4. brand/model/aliases/releaseYear/images — may reference vars.categoryName.
     // releaseYear here is a raw deterministic extraction, distinct from the
@@ -282,6 +304,7 @@ export class ScrapeInterpreterService {
       rawSpecs,
       description,
       categorySlug,
+      ...(resolution.status === 'ambiguous' ? { ambiguousCategorySlugs: resolution.slugs } : {}),
       brand,
       model,
       aliases,
@@ -343,21 +366,6 @@ export class ScrapeInterpreterService {
       .map((id) => String(id).trim())
       .filter((id) => id !== '');
     return ids.length ? [...new Set(ids)] : undefined;
-  }
-
-  private resolveCategorySlug(
-    rules: { when: CategoryLookupCondition; slug: string; unless?: CategoryLookupCondition }[],
-    rawLabel: string | undefined,
-    rawSpecs: ScrapedProductSpec[],
-  ): string | undefined {
-    for (const rule of rules) {
-      if (!this.evaluateCondition(rule.when, rawLabel, rawSpecs)) continue;
-      if (rule.unless && this.evaluateCondition(rule.unless, rawLabel, rawSpecs)) {
-        continue;
-      }
-      return rule.slug;
-    }
-    return undefined;
   }
 
   private evaluateCondition(

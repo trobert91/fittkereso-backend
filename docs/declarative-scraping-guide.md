@@ -37,6 +37,24 @@ This is the TypeScript type for the JSONB blob. Its top-level shape:
 
 `ProductSourceConfig` is a **discriminated pair selected by `ProductSource.type`**, not a union inside the document — the type lives on the entity, so repeating it in the config would be a second claim about the same fact.
 
+### Category sections — the same in both shapes
+
+Everything a source knows about one of our categories sits under `categories.<slug>` (`ProductSourceCategoryConfig`):
+
+```ts
+categories?: Record<string, {
+  enabled: boolean;               // whether listings in this category are imported
+  rules?: CategoryMatchRule[];    // which listings are in it: { when, unless? }
+  specMapping?: SourceSpecConfig; // how its spec rows map onto the category's schema
+  identitySpecRows?: string[];    // the rows the identity extraction reads; omitted = every row
+}>;
+```
+
+- **A listing is in a category when any of that section's rules matches** (`when` holds and `unless` does not). The rules test the label the source reads (`detailPage.category.breadcrumbOrSource` or a feed's `category.labelFrom`) and the listing's raw spec rows (`specValueIncludes`).
+- **A listing that two sections claim is skipped as `category_ambiguous`**, so no rule order between categories decides and adding a category can never silently take another's listings. A disabled section still claims its listings; they are skipped as `category_not_enabled`.
+- **The admin UI shows one accordion per section**, each validated against `$defs.categorySection`; MCP `update_product_source_category` saves one section without sending the whole config.
+- Configs written before this layout (a shared `slugLookup` list, `specMapping` keyed by slug, source-wide `identityExtraction.specRows`) are converted by `toCategorySections`: the stored ones by the migration `ProductSourceCategorySections1791000000000`, an old version when it is restored.
+
 ### `type: 'scraping'`
 
 ```ts
@@ -44,7 +62,7 @@ interface ScrapingSourceConfig {
   baseUrl: string;
   startUrls: string[];            // replaced fullSyncStartUrl + the old `discovery` block
   categoryLinks?: ScrapeOperation[];  // only when a start URL is a hub page
-  categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
+  categories?: Record<string, ProductSourceCategoryConfig>;  // see "Category sections" above
   listPage: {
     categoryName: ScrapeOperation[];
     // Evaluated ONCE per run by the importer against page 1, never by a list
@@ -56,13 +74,12 @@ interface ScrapingSourceConfig {
   };
   detailPage: {
     rawSpecs: ScrapeOperation[];
-    category: { breadcrumbOrSource: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
+    category: { breadcrumbOrSource: ScrapeOperation[] };  // the label the sections' rules test
     brand: ScrapeOperation[];
     model: ScrapeOperation[];
     aliases?: ScrapeOperation[];
     releaseYear?: ScrapeOperation[];
     images: ScrapeOperation[];
-    specMapping: Record<string, SourceSpecConfig>; // keyed by category slug
     offers?: { offerList: ScrapeOperation[]; itemMode: 'cheerio' | 'json'; itemPipeline: ScrapeOperation[] /* terminates in assembleOffer */ };
     translation?: { enabled: boolean; sourceLanguage: string; targetLanguage: string; contextTemplate: string };
     // The two LLM calls, switched separately; both on by default.
@@ -97,15 +114,14 @@ interface ArukeresoSourceConfig {
   feedUrl: string;                 // fetched over plain HTTP, never through the paid scraper
   format?: 'auto' | 'xml' | 'csv';
   csv?: { delimiter?: 'auto' | ',' | ';' | '\t' };
-  categories?: Record<string, { enabled: boolean; sourceTitle?: string }>;
-  category: { labelFrom?: ScrapeOperation[]; slugLookup: CategoryLookupRule[] };
+  categories?: Record<string, ProductSourceCategoryConfig>;  // see "Category sections" above
+  category?: { labelFrom?: ScrapeOperation[] };    // turns the raw category value into the label the rules test
   mapping: Record<ArukeresoMappingTarget, FieldMapping | FieldMapping[]>;  // FieldMapping = { field?: string; pipeline?: ScrapeOperation[] }
-  specMapping?: Record<string, SourceSpecConfig>;  // same shape as detailPage.specMapping
   postProcess?: ProductSourcePostProcessConfig;    // the same block ({ identity, specs, … }), read by the same service
 }
 ```
 
-Small on purpose: `field` does the addressing and the op pipeline does the transforming, which is why this type needs **no scrape ops of its own**. The mapping targets are a closed set (`ARUKERESO_MAPPING_TARGETS`) asserted by the schema, so a typo'd target is refused rather than silently ignored. `category` is required here though its scraping counterpart is optional — a feed is the whole catalogue, so a source that cannot categorise an item can import nothing at all.
+Small on purpose: `field` does the addressing and the op pipeline does the transforming, which is why this type needs **no scrape ops of its own**. The mapping targets are a closed set (`ARUKERESO_MAPPING_TARGETS`) asserted by the schema, so a typo'd target is refused rather than silently ignored. A feed is the whole catalogue, so its category sections' rules are what keep everything else out: a feed source with no section imports nothing at all.
 
 **Fallback lists.** A target may map to a list of mappings, tried in order: the first that gives a non-empty value (not undefined, null, `''` or an empty list) wins, and when none does the target is mapped but empty — the source saying "none". Google's price is the case it exists for: `sale_price` when the item is on sale, else `price`. The `coalesce` op cannot do this, as it reads pipeline variables, not feed fields. Google's prices also carry the currency (`2269000 HUF`), which a `stripPattern` removes:
 
@@ -165,7 +181,7 @@ Before touching the live pipeline, look at the tests here — they're the best w
 
 - `ebikeshop-detail-page.spec.ts` / `speedbike-detail-page.spec.ts` — feed synthetic HTML through `runDetailPage` with the *real* production config, assert the exact `brand`/`model`/`categorySlug`/`rawSpecs`/`imageUrls` output.
 - `ebikeshop-list-page.spec.ts` — same idea for list-page parsing.
-- `config-validation.spec.ts` — structural check: every `op` name referenced anywhere in both real configs actually exists in the op registry, and both configs' `category.slugLookup` rules resolve to the expected slugs.
+- `config-validation.spec.ts` — structural check: every `op` name referenced anywhere in both real configs actually exists in the op registry, and each config's category sections resolve sample listings to the expected slugs.
 
 These are the closest thing to living documentation for "what does this config actually produce."
 
@@ -187,11 +203,11 @@ These are the two services that actually get invoked per `ProductImportTask`. Bo
 
 `ProductDetailsPageScraperService` is the more involved one — it's also where the interpreter's raw output gets turned into a finished `ScrapedProduct`:
 1. Calls `interpreter.runDetailPage(...)`.
-2. Checks `categorySlug` was resolved and is `enabled` in `config.categories`.
+2. Checks that exactly one category section's rules matched (two is `category_ambiguous`), and that the section is `enabled`.
 3. Resolves the category slug to a real `ProductCategory` entity via `RuntimeDataProviderService`.
 4. Loads the category's JSON schema (`CategoryConfigService.getJsonSchema` — **this one thing stayed file-based**, see step 9).
 5. **Translation**: reads `config.detailPage.translation`, and if enabled, calls `SpecTranslationSelectorService.collectTranslatableValues()` (which values are worth translating — skips numeric-mode specs and values already resolved by a `valueMap`) then `TranslationService.translateBatch()` (LLM-backed, cached). The interpreter itself never touches translation — this is a deliberate layering decision (DOM-parsing should stay pure; translation is a metered external call).
-6. Calls `SpecExtractionService.extractSpecs()` — the **unchanged** engine that turns raw label/value pairs into canonical `ProductSpecs`, using `config.detailPage.specMapping[categorySlug]` (the same `SourceSpecMapping[]`/`extract` mode/`valueMap` system as before — see step 9).
+6. Calls `SpecExtractionService.extractSpecs()` — the **unchanged** engine that turns raw label/value pairs into canonical `ProductSpecs`, using the category section's `specMapping` (the same `SourceSpecMapping[]`/`extract` mode/`valueMap` system as before — see step 9).
 7. Assembles the final `ScrapedProduct` and hands it to `ProductScrapeUpdaterService` (step 8).
 
 ---
@@ -256,7 +272,7 @@ For example, page `1260042` with sizes S, M and L: one record under `1260042`, a
 
 Not everything moved into the JSONB config. Two things were deliberately left alone:
 
-- **`SpecExtractionService`** (`libs/product/src/lib/services/product-spec/spec-extraction.service.ts`) — the engine that interprets `SourceSpecMapping[]`/`CalculatedSpecRule[]` (label→key mapping, the 12 `extract` modes like `number`/`cmToInchList`/`regexpList`, calculated specs like `presentIfKey`/`featureSearch`). This was already pure declarative JSON consumption before this change; only *where the mapping JSON lives* changed (moved from `libs/config/src/lib/categories/<slug>/specMappings.json` into `config.detailPage.specMapping[slug]` on each `ProductSource`).
+- **`SpecExtractionService`** (`libs/product/src/lib/services/product-spec/spec-extraction.service.ts`) — the engine that interprets `SourceSpecMapping[]`/`CalculatedSpecRule[]` (label→key mapping, the 12 `extract` modes like `number`/`cmToInchList`/`regexpList`, calculated specs like `presentIfKey`/`featureSearch`). This was already pure declarative JSON consumption before this change; only *where the mapping JSON lives* changed (moved from `libs/config/src/lib/categories/<slug>/specMappings.json` into each `ProductSource`'s `config.categories.<slug>.specMapping`).
 - **`CategoryConfigService`** (`libs/config/src/lib/services/category-config.service.ts`) — still file-based, still loads `libs/config/src/lib/categories/<slug>/{config.json,jsonSchema.json,uiSchema.json}` from disk. This is genuinely per-**category** (the canonical spec schema, shared across every source), not per-source parsing config, so it didn't belong in `ProductSource.config`. Its `getSpecMappings*`/`writeSpecMappings` methods *were* removed (that content moved to per-source config) — everything else is untouched.
 
 ---

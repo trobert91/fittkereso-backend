@@ -9,6 +9,7 @@ import {
   ScrapingSourceConfig,
   ProductImportTask,
   SourceSpecConfig,
+  categorySectionOf,
 } from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import { CategoryConfigService } from '@fittkereso-backend/config';
@@ -84,7 +85,7 @@ export interface ProductSourceSimulationResult {
   };
   /**
    * Per offer: the GTIN/MPN as published and as they would be stored, the
-   * declared siblings, and how many spec rows identityExtraction.specRows
+   * declared siblings, and how many spec rows the category section's identitySpecRows
    * lets through — everything identity resolution looks up before any LLM.
    */
   identifiers: SimulatedListingIdentifiers[];
@@ -170,21 +171,28 @@ export class ProductSourceSimulationService {
           mpn: offer.mpn,
           siblingIds: detail.siblingIds,
           rawSpecs: detail.rawSpecs,
-          specRows: config.identityExtraction?.specRows,
+          specRows: categorySectionOf(config, detail.categorySlug)?.identitySpecRows,
         }),
       ),
       warnings,
       errors,
     };
 
-    if (!detail.categorySlug) {
+    if (detail.ambiguousCategorySlugs?.length) {
       errors.push(
-        'Category could not be identified (detailPage.category.slugLookup matched no rule) — the real pipeline would abort product creation here.',
+        `Category is ambiguous: the rules of ${detail.ambiguousCategorySlugs.join(', ')} all match — the real pipeline would abort product creation here.`,
       );
       return result;
     }
 
-    const categoryEnabled = config.categories?.[detail.categorySlug]?.enabled ?? false;
+    if (!detail.categorySlug) {
+      errors.push(
+        "Category could not be identified (no category section's rules matched) — the real pipeline would abort product creation here.",
+      );
+      return result;
+    }
+
+    const categoryEnabled = categorySectionOf(config, detail.categorySlug)?.enabled ?? false;
     const category = await this.tryGetCategory(detail.categorySlug);
 
     result.category = {
@@ -196,13 +204,13 @@ export class ProductSourceSimulationService {
 
     if (!category) {
       errors.push(
-        `Category slug "${detail.categorySlug}" was resolved by slugLookup but does not exist in the database — the real pipeline would abort product creation here.`,
+        `Category slug "${detail.categorySlug}" was resolved by its section's rules but does not exist in the database — the real pipeline would abort product creation here.`,
       );
       return result;
     }
     if (!categoryEnabled) {
       warnings.push(
-        `Category "${detail.categorySlug}" is not enabled in config.categories — the real pipeline would skip product creation (no error, just a silent skip) for this page.`,
+        `Category "${detail.categorySlug}" is not enabled in its config.categories section — the real pipeline would skip product creation (no error, just a silent skip) for this page.`,
       );
     }
 
@@ -221,10 +229,10 @@ export class ProductSourceSimulationService {
       return result;
     }
 
-    const sourceConfig = config.detailPage.specMapping[category.slug];
+    const sourceConfig = categorySectionOf(config, category.slug)?.specMapping;
     if (!sourceConfig) {
       warnings.push(
-        `No detailPage.specMapping entry for category "${category.slug}" — deterministic spec extraction will produce an empty object.`,
+        `No specMapping in the "${category.slug}" category section — deterministic spec extraction will produce an empty object.`,
       );
     }
 

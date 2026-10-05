@@ -7,207 +7,14 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "E-BIKE"
-    }
-  },
-  "listPage": {
-    "categoryName": [
-      {
-        "op": "selectText",
-        "selector": "h1.page-head-center-title",
-        "first": true,
-        "trim": true
-      }
-    ],
-    "items": [
-      {
-        "op": "selectAll",
-        "selector": ".product-snapshot"
-      }
-    ],
-    "itemMode": "cheerio",
-    "itemPipeline": [
-      {
-        "op": "assembleListProduct",
-        "url": [
-          {
-            "op": "selectAttr",
-            "selector": "a.list-productname-link",
-            "attr": "href",
-            "within": "item",
-            "first": true
-          }
-        ],
-        "name": [
-          {
-            "op": "selectFirst",
-            "selector": "a.list-productname-link",
-            "within": "item"
-          },
-          {
-            "op": "selectText",
-            "trim": true
-          }
-        ],
-        "price": [
-          {
-            "op": "selectFirst",
-            "selector": ".list_prouctprice .price",
-            "within": "item"
-          },
-          {
-            "op": "selectText",
-            "trim": true
-          },
-          {
-            "op": "stripPattern",
-            "pattern": "[^0-9]",
-            "flags": "g"
-          },
-          {
-            "op": "jsonPath",
-            "cast": "number"
-          }
-        ],
-        "currency": [
-          {
-            "op": "literal",
-            "value": "HUF"
-          }
-        ]
-      }
-    ]
-  },
-  "detailPage": {
-    "rawSpecs": [
-      {
-        "op": "extractSpecTableV1",
-        "rowSelector": "table.parameter_table tr",
-        "sectionHeaderSelector": "h3",
-        "nameSelector": "td:first-child strong",
-        "nameExcludeChildren": false,
-        "valueCellIndex": 1,
-        "listValueSelector": ".prop .name",
-        "descriptionSelector": ".hint",
-        "descriptionAttr": "data-content",
-        "dedupeBy": "name"
-      }
-    ],
-    "category": {
-      "breadcrumbOrSource": [
-        {
-          "op": "selectAll",
-          "selector": "[itemprop=\"itemListElement\"]",
-          "as": "breadcrumbItems"
-        },
-        {
-          "op": "selectNestedText",
-          "on": "breadcrumbItems",
-          "index": 2,
-          "childSelector": "[itemprop=\"name\"]",
-          "trim": true,
-          "fallback": "unknown"
-        }
-      ],
-      "slugLookup": [
+      "rules": [
         {
           "when": {
             "equalsIgnoreCase": "E-BIKE"
-          },
-          "slug": "ebikes"
+          }
         }
-      ]
-    },
-    "brand": [
-      {
-        "op": "selectAll",
-        "selector": "script",
-        "as": "scripts"
-      },
-      {
-        "op": "findScriptContaining",
-        "on": "scripts",
-        "contains": "ShopRenter.product",
-        "as": "shopRenterJson"
-      },
-      {
-        "op": "regexCapture",
-        "value": "shopRenterJson",
-        "pattern": "\"brand\"\\s*:\\s*\"([^\"]+)\"",
-        "group": 1,
-        "trim": true,
-        "cast": "jsonString"
-      }
-    ],
-    "model": [
-      {
-        "op": "selectAll",
-        "selector": "script",
-        "as": "scripts"
-      },
-      {
-        "op": "findScriptContaining",
-        "on": "scripts",
-        "contains": "ShopRenter.product",
-        "as": "shopRenterJson"
-      },
-      {
-        "op": "regexCapture",
-        "value": "shopRenterJson",
-        "pattern": "\"name\"\\s*:\\s*\"([^\"]+)\"",
-        "group": 1,
-        "trim": true,
-        "cast": "jsonString",
-        "as": "fullName"
-      },
-      {
-        "op": "stripPrefix",
-        "value": "fullName",
-        "prefix": "{{brand}}",
-        "flags": "i"
-      }
-    ],
-    "externalId": [
-      {
-        "op": "selectAll",
-        "selector": "script",
-        "as": "scripts"
-      },
-      {
-        "op": "findScriptContaining",
-        "on": "scripts",
-        "contains": "ShopRenter.product",
-        "as": "shopRenterJson"
-      },
-      {
-        "op": "regexCapture",
-        "value": "shopRenterJson",
-        "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
-        "group": 1,
-        "trim": true
-      }
-    ],
-    "releaseYear": [
-      {
-        "op": "mapSpecValue",
-        "label": "E-bike évjárat",
-        "single": true,
-        "cast": "number"
-      }
-    ],
-    "images": [
-      {
-        "op": "selectAll",
-        "selector": "meta[property=\"og:image\"]"
-      },
-      {
-        "op": "extractAttrList",
-        "attr": "content",
-        "trim": true
-      }
-    ],
-    "specMapping": {
-      "ebikes": {
+      ],
+      "specMapping": {
         "mappings": [
           {
             "key": "modelYear",
@@ -597,7 +404,196 @@
           }
         ]
       }
+    }
+  },
+  "listPage": {
+    "categoryName": [
+      {
+        "op": "selectText",
+        "selector": "h1.page-head-center-title",
+        "first": true,
+        "trim": true
+      }
+    ],
+    "items": [
+      {
+        "op": "selectAll",
+        "selector": ".product-snapshot"
+      }
+    ],
+    "itemMode": "cheerio",
+    "itemPipeline": [
+      {
+        "op": "assembleListProduct",
+        "url": [
+          {
+            "op": "selectAttr",
+            "selector": "a.list-productname-link",
+            "attr": "href",
+            "within": "item",
+            "first": true
+          }
+        ],
+        "name": [
+          {
+            "op": "selectFirst",
+            "selector": "a.list-productname-link",
+            "within": "item"
+          },
+          {
+            "op": "selectText",
+            "trim": true
+          }
+        ],
+        "price": [
+          {
+            "op": "selectFirst",
+            "selector": ".list_prouctprice .price",
+            "within": "item"
+          },
+          {
+            "op": "selectText",
+            "trim": true
+          },
+          {
+            "op": "stripPattern",
+            "pattern": "[^0-9]",
+            "flags": "g"
+          },
+          {
+            "op": "jsonPath",
+            "cast": "number"
+          }
+        ],
+        "currency": [
+          {
+            "op": "literal",
+            "value": "HUF"
+          }
+        ]
+      }
+    ]
+  },
+  "detailPage": {
+    "rawSpecs": [
+      {
+        "op": "extractSpecTableV1",
+        "rowSelector": "table.parameter_table tr",
+        "sectionHeaderSelector": "h3",
+        "nameSelector": "td:first-child strong",
+        "nameExcludeChildren": false,
+        "valueCellIndex": 1,
+        "listValueSelector": ".prop .name",
+        "descriptionSelector": ".hint",
+        "descriptionAttr": "data-content",
+        "dedupeBy": "name"
+      }
+    ],
+    "category": {
+      "breadcrumbOrSource": [
+        {
+          "op": "selectAll",
+          "selector": "[itemprop=\"itemListElement\"]",
+          "as": "breadcrumbItems"
+        },
+        {
+          "op": "selectNestedText",
+          "on": "breadcrumbItems",
+          "index": 2,
+          "childSelector": "[itemprop=\"name\"]",
+          "trim": true,
+          "fallback": "unknown"
+        }
+      ]
     },
+    "brand": [
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"brand\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true,
+        "cast": "jsonString"
+      }
+    ],
+    "model": [
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"name\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true,
+        "cast": "jsonString",
+        "as": "fullName"
+      },
+      {
+        "op": "stripPrefix",
+        "value": "fullName",
+        "prefix": "{{brand}}",
+        "flags": "i"
+      }
+    ],
+    "externalId": [
+      {
+        "op": "selectAll",
+        "selector": "script",
+        "as": "scripts"
+      },
+      {
+        "op": "findScriptContaining",
+        "on": "scripts",
+        "contains": "ShopRenter.product",
+        "as": "shopRenterJson"
+      },
+      {
+        "op": "regexCapture",
+        "value": "shopRenterJson",
+        "pattern": "\"sku\"\\s*:\\s*\"([^\"]+)\"",
+        "group": 1,
+        "trim": true
+      }
+    ],
+    "releaseYear": [
+      {
+        "op": "mapSpecValue",
+        "label": "E-bike évjárat",
+        "single": true,
+        "cast": "number"
+      }
+    ],
+    "images": [
+      {
+        "op": "selectAll",
+        "selector": "meta[property=\"og:image\"]"
+      },
+      {
+        "op": "extractAttrList",
+        "attr": "content",
+        "trim": true
+      }
+    ],
     "offers": {
       "offerList": [
         {

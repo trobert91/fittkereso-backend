@@ -2,8 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import {
   isProductSourceFetchMode,
   PRODUCT_SOURCE_FETCH_MODES,
+  ProductCategoryRepository,
   ProductSource,
   ProductSourceActor,
+  ProductSourceCategoryConfig,
+  ProductSourceConfig,
   ProductSourceFetchMode,
   ProductSourceRepository,
   Seller,
@@ -34,7 +37,46 @@ export class ProductSourceUpdateService {
     private readonly sellerRepo: SellerRepository,
     private readonly versionService: ProductSourceVersionService,
     private readonly sellerRules: ProductSourceSellerRulesService,
+    private readonly productCategoryRepo: ProductCategoryRepository,
   ) {}
+
+  /**
+   * Replaces or adds one category's section of a source's config, or removes
+   * it when `section` is null — as one new version, validated like any other
+   * save. What a caller changing one category sends instead of the whole
+   * config, which is all `updateProductSource` takes.
+   */
+  public async updateCategorySection(
+    productSourceId: string,
+    slug: string,
+    section: ProductSourceCategoryConfig | null,
+    options: { actor?: ProductSourceActor; note?: string } = {},
+  ): Promise<ProductSource> {
+    const source = await this.productSourceRepo.findOne({ where: { id: productSourceId } });
+    if (!source) {
+      throw new NotFoundException('Product source not found');
+    }
+    // A section under a slug no category has would sit in the config looking
+    // effective while nothing could ever resolve to it.
+    if (section && !(await this.productCategoryRepo.findBySlug(slug))) {
+      throw new BadRequestException(`No product category has the slug "${slug}".`);
+    }
+
+    const categories = { ...(source.config.categories ?? {}) };
+    if (section) categories[slug] = section;
+    else delete categories[slug];
+
+    await this.versionService.addVersionIfChanged(
+      source.id,
+      { ...source.config, categories } as ProductSourceConfig,
+      {
+        actor: options.actor ?? UNATTRIBUTED,
+        note: options.note?.trim() || `${section ? 'Category section' : 'Removed the category section'} "${slug}"`,
+      },
+    );
+
+    return this.versionService.getDetail(source.id);
+  }
 
   public async updateProductSource(
     productSourceId: string,

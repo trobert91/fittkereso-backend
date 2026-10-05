@@ -19,13 +19,16 @@ const MINIMAL_CONFIG = {
     rawSpecs: [{ op: 'selectAll', selector: 'tr' }],
     category: {
       breadcrumbOrSource: [{ op: 'selectText', selector: '.crumb' }],
-      slugLookup: [{ when: { always: true }, slug: 'ebikes' }],
     },
     brand: [{ op: 'selectText', selector: '.brand' }],
     model: [{ op: 'selectText', selector: '.model' }],
     images: [{ op: 'extractAttrList', attr: 'src' }],
-    specMapping: {
-      ebikes: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] },
+  },
+  categories: {
+    ebikes: {
+      enabled: true,
+      rules: [{ when: { always: true } }],
+      specMapping: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] },
     },
   },
 };
@@ -246,21 +249,49 @@ describe('ProductSourceConfigValidatorService', () => {
   it('rejects an unknown spec extract mode', () => {
     const message = messageFor(
       configWith((c) => {
-        c.detailPage.specMapping.ebikes.mappings[0].extract = 'numberr';
+        c.categories.ebikes.specMapping.mappings[0].extract = 'numberr';
       }),
     );
 
     expect(message).toContain('extract');
   });
 
-  it('rejects a category lookup rule with no condition', () => {
+  it('rejects a category rule with no condition', () => {
     const message = messageFor(
       configWith((c) => {
-        c.detailPage.category.slugLookup = [{ when: {}, slug: 'ebikes' }];
+        c.categories.ebikes.rules = [{ when: {} }];
       }),
     );
 
-    expect(message).toContain('/detailPage/category/slugLookup/0/when');
+    expect(message).toContain('/categories/ebikes/rules/0/when');
+  });
+
+  // Everything about a category lives in its section now. The old places for
+  // it would sit in a config looking effective while nothing reads them.
+  describe('category sections', () => {
+    it.each([
+      ['a slug on a rule', (c: any) => (c.categories.ebikes.rules[0].slug = 'ebikes'), '/categories/ebikes/rules/0'],
+      ['the shared slugLookup list', (c: any) => (c.detailPage.category.slugLookup = []), '/detailPage/category'],
+      ['a detailPage specMapping', (c: any) => (c.detailPage.specMapping = {}), '/detailPage'],
+      ['an identityExtraction block', (c: any) => (c.identityExtraction = { specRows: ['Motor'] }), '(root)'],
+      ['a sourceTitle', (c: any) => (c.categories.ebikes.sourceTitle = 'E-BIKE'), '/categories/ebikes'],
+      ['a section without enabled', (c: any) => delete c.categories.ebikes.enabled, '/categories/ebikes'],
+    ])('rejects %s', (_label, mutate, path) => {
+      const problems = validator.problems('scraping', configWith(mutate)) ?? [];
+      expect(problems.map((problem) => problem.path)).toContain(path);
+    });
+
+    it('takes identity rows in a section, but not an empty list', () => {
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => (c.categories.ebikes.identitySpecRows = ['Motor', 'Váz'])),
+        ),
+      ).toBeNull();
+      expect(
+        validator.problems('scraping', configWith((c) => (c.categories.ebikes.identitySpecRows = []))),
+      ).not.toBeNull();
+    });
   });
 
   describe('assertValid', () => {
@@ -300,7 +331,7 @@ describe('ProductSourceConfigValidatorService', () => {
     const feedConfig = (mapping: Record<string, unknown> = {}) => ({
       baseUrl: 'https://speedbike.hu',
       feedUrl: 'https://speedbike.hu/api/?route=export/feed&id=google_shopping',
-      category: { slugLookup: [{ when: { always: true }, slug: 'ebikes' }] },
+      categories: { ebikes: { enabled: true, rules: [{ when: { always: true } }] } },
       mapping: {
         brand: { field: 'brand' },
         name: { field: 'title' },

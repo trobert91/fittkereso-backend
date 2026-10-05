@@ -1,10 +1,46 @@
 import { SourceSpecConfig } from './product-category-config';
-import { CategoryLookupRule, ScrapeOperation } from './scrape-operation';
+import { CategoryLookupCondition, ScrapeOperation } from './scrape-operation';
 
+/**
+ * One way a listing shows it belongs to a category: `when` holds and
+ * `unless` does not. The same vocabulary for pages and feeds, so a shop that
+ * is both scraped and fed can share its rules verbatim.
+ */
+export interface CategoryMatchRule {
+  when: CategoryLookupCondition;
+  unless?: CategoryLookupCondition;
+}
 
+/**
+ * Everything a source knows about one of our categories, under
+ * `categories.<slug>`: whether it imports it, which listings are in it, how
+ * their spec rows map onto the category's schema, and which rows the identity
+ * extraction reads.
+ */
 export interface ProductSourceCategoryConfig {
+  /** Whether listings in this category are imported. */
   enabled: boolean;
-  sourceTitle?: string;
+  /**
+   * Which listings are in this category. A listing matching any rule is in
+   * it; one matching rules of two categories is ambiguous and skipped, so no
+   * rule order between categories decides. A section without rules matches
+   * nothing.
+   */
+  rules?: CategoryMatchRule[];
+  /** How this source's spec rows map onto the category's spec keys. */
+  specMapping?: SourceSpecConfig;
+  /**
+   * Allowlist of spec-table row labels sent to the identity extraction — the
+   * rows that carry a primary, matcher or offer-level spec (frame, motor,
+   * battery, wheels, drivetrain, weight, year). Matched ignoring case, as
+   * specMapping labels are, and ignoring stray whitespace — but not accents.
+   *
+   * Per category because the identity fields differ between categories: an
+   * e-bike's motor and battery rows mean nothing for a bike. Omit to send the
+   * whole table, which suits a shop whose table is already short. Full spec
+   * unification always gets the whole table regardless.
+   */
+  identitySpecRows?: string[];
 }
 
 export interface ProductSourcePaginationConfig {
@@ -139,30 +175,6 @@ export interface IdentityDescriptionConfig {
   maxChars?: number;
 }
 
-/**
- * What the LLM identity extraction reads from this source's listings.
- *
- * Per source rather than per category because it is about the SHOP's labels,
- * not the product's fields: every shop names its spec rows differently, but
- * one shop names them the same way on every listing. The fields the extraction
- * OUTPUTS stay category config (primarySpecs, matcherSpecs, offerLevelSpecs).
- */
-export interface ProductSourceIdentityExtractionConfig {
-  /**
-   * Allowlist of spec-table row labels sent to the identity extraction — the
-   * rows that carry a primary, matcher or offer-level spec (frame, motor,
-   * battery, wheels, drivetrain, weight, year). Matched ignoring case, as
-   * specMapping labels are, and ignoring stray whitespace — but not accents.
-   *
-   * Omit to send the whole table, which suits a shop whose table is already
-   * short. A long free-text component list (speedbike's ~32 rows) is worth
-   * narrowing: the other rows are brake pads and bar tape, which cost tokens
-   * and cannot change a bike's identity. Full spec unification always gets
-   * the whole table regardless.
-   */
-  specRows?: string[];
-}
-
 export interface ProductSourceDetailPageConfig {
   rawSpecs: ScrapeOperation[];
   /**
@@ -176,9 +188,9 @@ export interface ProductSourceDetailPageConfig {
    * structured spec table.
    */
   description?: ScrapeOperation[];
+  /** The text each category section's `rules` are matched against. */
   category: {
     breadcrumbOrSource: ScrapeOperation[];
-    slugLookup: CategoryLookupRule[];
   };
   brand: ScrapeOperation[];
   model: ScrapeOperation[];
@@ -206,10 +218,6 @@ export interface ProductSourceDetailPageConfig {
    */
   siblingIds?: ScrapeOperation[];
   images: ScrapeOperation[];
-  // Keyed by category slug — replaces the old per-category specMappings.json
-  // file (which was keyed by source instead, now implicit in "which
-  // ProductSource row this config belongs to").
-  specMapping: Record<string, SourceSpecConfig>;
   offers?: ProductSourceOffersConfig;
   /**
    * Links to sibling detail pages for the SAME underlying product under a
@@ -246,6 +254,7 @@ export interface ScrapingSourceConfig {
    * Walked ONCE per run, by the importer, for the same reason pagination is.
    */
   categoryLinks?: ScrapeOperation[];
+  /** One section per category, keyed by category slug. */
   categories?: Record<string, ProductSourceCategoryConfig>;
   /**
    * Hard ceiling on how many detail tasks one run queues. Unset means no
@@ -265,7 +274,6 @@ export interface ScrapingSourceConfig {
   maxItems?: number;
   /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
   filter?: ProductSourceFilterConfig;
-  identityExtraction?: ProductSourceIdentityExtractionConfig;
   listPage: ProductSourceListPageConfig;
   detailPage: ProductSourceDetailPageConfig;
 }
@@ -364,7 +372,7 @@ export const ARUKERESO_MAPPING_TARGETS = [
   /** Primary image, or a list of them when the pipeline yields an array. */
   'imageUrl',
   'description',
-  /** The raw category value that `category.labelFrom` and slugLookup consume. */
+  /** The raw category value that `category.labelFrom` and the category sections' rules consume. */
   'categoryLabel',
   'aliases',
   'releaseYear',
@@ -426,18 +434,16 @@ export interface ArukeresoSourceConfig {
     /** 'auto' detects between comma, semicolon and tab from the header row. */
     delimiter?: 'auto' | ',' | ';' | '\t';
   };
-  categories?: Record<string, ProductSourceCategoryConfig>;
   /**
-   * Resolves the feed's category path to one of our category slugs.
-   *
-   * Required, unlike the scraping shape's optional pieces: a feed is the whole
-   * catalog, so a source that cannot categorise an item cannot import anything
-   * at all. Use an `always` rule for a single-category shop.
+   * One section per category, keyed by category slug. A feed is the whole
+   * catalog, so the sections' `rules` are what keep everything else out; use
+   * an `always` rule for a single-category shop.
    */
-  category: {
+  categories?: Record<string, ProductSourceCategoryConfig>;
+  /** How the feed's category value becomes the label the sections' rules test. */
+  category?: {
     /** Pipeline turning the raw category value into a matchable label. */
     labelFrom?: ScrapeOperation[];
-    slugLookup: CategoryLookupRule[];
   };
   /**
    * Hard ceiling on how many items one run imports. Unset means no ceiling,
@@ -453,11 +459,7 @@ export interface ArukeresoSourceConfig {
   maxItems?: number;
   /** Narrows a run to a subset of the catalogue. See ProductSourceFilterConfig. */
   filter?: ProductSourceFilterConfig;
-  /** The feed's attribute pairs are its spec table — see ProductSourceIdentityExtractionConfig. */
-  identityExtraction?: ProductSourceIdentityExtractionConfig;
   mapping: Record<string, ArukeresoMappingEntry>;
-  /** Keyed by category slug, exactly as detailPage.specMapping is. */
-  specMapping?: Record<string, SourceSpecConfig>;
   /**
    * The LLM post-processing pass, identical in meaning to
    * `detailPage.postProcess` and read by the same service.

@@ -34,7 +34,8 @@ const config = ebikeshopConfig as unknown as ScrapingSourceConfig;
 
 /** What the deterministic spec mapping makes of a page's rows, before any LLM. */
 function mappedSpecs(rawSpecs: ScrapedProductSpec[]) {
-  const ebikes = config.detailPage.specMapping['ebikes'];
+  const ebikes = config.categories?.['ebikes']?.specMapping;
+  if (!ebikes) throw new Error('The fixture has no ebikes specMapping');
   return new SpecExtractionService(new ProductSpecNormalizationService()).extractSpecs({
     scrapedSpecs: rawSpecs,
     schema: ebikesJsonSchema as unknown as SpecDefinitionJsonSchema,

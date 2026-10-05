@@ -15,6 +15,7 @@ import {
   ProductSourceRepository,
   ProductSourceVersion,
   ProductSourceVersionRepository,
+  toCategorySections,
   User,
 } from '@fittkereso-backend/database';
 import { EntityManager } from 'typeorm';
@@ -205,7 +206,15 @@ export class ProductSourceVersionService {
       throw new ConflictException(`Version ${version} is already the one in force.`);
     }
 
-    await this.addVersion(sourceId, target.config, {
+    const source = await this.productSourceRepo.findOne({ where: { id: sourceId } });
+    if (!source) {
+      throw new NotFoundException('Product source not found');
+    }
+
+    // A version saved before each category had its own section still holds
+    // the old layout. It goes back converted, as the stored configs were, so
+    // the history itself is never rewritten.
+    await this.addVersion(sourceId, toCategorySections(target.config, source.type), {
       actor,
       note: `Restored from version ${target.version}`,
       restoredFromVersion: target.version,

@@ -5,18 +5,14 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "Pedelec kerékpárok"
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Pedelec kerékpárok"
+          }
+        }
+      ]
     }
-  },
-  "category": {
-    "slugLookup": [
-      {
-        "when": {
-          "equalsIgnoreCase": "Pedelec kerékpárok"
-        },
-        "slug": "ebikes"
-      }
-    ]
   },
   "mapping": {
     "externalId": {

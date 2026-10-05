@@ -3,6 +3,7 @@ import {
   ArukeresoFieldMapping,
   ArukeresoMappingTarget,
   ArukeresoSourceConfig,
+  categorySectionOf,
   OfferAvailability,
   OfferCondition,
   parseOfferCondition,
@@ -39,6 +40,8 @@ export type FeedSkipReason =
   | 'missing_name'
   | 'missing_price'
   | 'category_not_identified'
+  /** The rules of more than one category section matched. */
+  | 'category_ambiguous'
   | 'category_not_enabled'
   | 'category_not_requested'
   | 'category_not_in_database'
@@ -121,7 +124,7 @@ export class ArukeresoProductMapperService {
 
     const categoryConfig = this.categoryConfigService.getConfig(category.slug);
     const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
-    const sourceSpecConfig = config.specMapping?.[category.slug];
+    const sourceSpecConfig = categorySectionOf(config, category.slug)?.specMapping;
 
     const rawSpecs = this.toRawSpecs(item);
     const deterministicSpecs = sourceSpecConfig
@@ -280,10 +283,10 @@ export class ArukeresoProductMapperService {
   /**
    * Which of our categories this item belongs to, and whether we want it.
    *
-   * The `categories.<slug>.enabled` gate is doing real work here in a way it
-   * never does on a scraping source: a feed is the entire catalogue, so this is
-   * the only thing keeping the 1396 non-e-bikes of speedbike's 3486 products
-   * out of the database.
+   * The category sections' rules and their `enabled` switch are doing real
+   * work here in a way they never do on a scraping source: a feed is the
+   * entire catalogue, so they are the only thing keeping the 1396 non-e-bikes
+   * of speedbike's 3486 products out of the database.
    */
   private async resolveCategory(
     config: ArukeresoSourceConfig,
@@ -300,27 +303,32 @@ export class ArukeresoProductMapperService {
     const rawLabel = this.asString(
       await this.resolveTarget(config, item, 'categoryLabel'),
     );
-    const label = config.category.labelFrom?.length
+    const labelFrom = config.category?.labelFrom;
+    const label = labelFrom?.length
       ? this.asString(
-          await this.interpreter.runValuePipeline(
-            config.category.labelFrom,
-            rawLabel,
-            { baseUrl: config.baseUrl },
-          ),
+          await this.interpreter.runValuePipeline(labelFrom, rawLabel, {
+            baseUrl: config.baseUrl,
+          }),
         )
       : rawLabel;
 
-    // The feed's attributes are passed in as raw specs so a slugLookup rule can
-    // use `specValueIncludes` exactly as it does against a page's spec table —
+    // The feed's attributes are passed in as raw specs so a rule can use
+    // `specValueIncludes` exactly as it does against a page's spec table —
     // which is what lets a shop that is both scraped and fed share its rules.
-    const slug = this.interpreter.resolveCategoryFromRules(
-      config.category.slugLookup,
+    const resolution = this.interpreter.resolveCategory(
+      config.categories,
       label,
       this.toRawSpecs(item),
     );
-    if (!slug) return { status: 'skipped', reason: 'category_not_identified' };
+    if (resolution.status === 'ambiguous') {
+      return { status: 'skipped', reason: 'category_ambiguous' };
+    }
+    if (resolution.status === 'unidentified') {
+      return { status: 'skipped', reason: 'category_not_identified' };
+    }
+    const slug = resolution.slug;
 
-    if (!config.categories?.[slug]?.enabled) {
+    if (!categorySectionOf(config, slug)?.enabled) {
       return { status: 'skipped', reason: 'category_not_enabled' };
     }
     if (requestedSlugs?.length && !requestedSlugs.includes(slug)) {

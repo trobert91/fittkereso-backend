@@ -22,7 +22,7 @@ describe('ArukeresoProductMapperService', () => {
   let mapper: ArukeresoProductMapperService;
   let interpreter: {
     runValuePipeline: jest.Mock;
-    resolveCategoryFromRules: jest.Mock;
+    resolveCategory: jest.Mock;
   };
   let runtime: { getCategoryBySlug: jest.Mock };
   let categoryConfigService: { getConfig: jest.Mock; getJsonSchema: jest.Mock };
@@ -32,8 +32,7 @@ describe('ArukeresoProductMapperService', () => {
     ({
       baseUrl: 'https://speedbike.hu',
       feedUrl: 'https://speedbike.hu/api/?route=export/feed&id=arukereso',
-      categories: { ebikes: { enabled: true } },
-      category: { slugLookup: [{ when: { always: true }, slug: 'ebikes' }] },
+      categories: { ebikes: { enabled: true, rules: [{ when: { always: true } }] } },
       mapping: {
         externalId: { field: 'sku' },
         brand: { field: 'manufacturer' },
@@ -69,7 +68,7 @@ describe('ArukeresoProductMapperService', () => {
   beforeEach(() => {
     interpreter = {
       runValuePipeline: jest.fn(),
-      resolveCategoryFromRules: jest.fn().mockReturnValue('ebikes'),
+      resolveCategory: jest.fn().mockReturnValue({ status: 'resolved', slug: 'ebikes' }),
     };
     runtime = {
       getCategoryBySlug: jest
@@ -328,7 +327,7 @@ describe('ArukeresoProductMapperService', () => {
   describe('the attribute table', () => {
     it('hands the feed attributes to spec extraction as raw spec rows', async () => {
       const cfg = config({
-        specMapping: { ebikes: { mappings: [] } } as any,
+        categories: { ebikes: { enabled: true, specMapping: { mappings: [] } } },
       });
 
       await call(
@@ -360,7 +359,7 @@ describe('ArukeresoProductMapperService', () => {
     // A feed is the whole catalogue — 1398 of speedbike's 3488 products are
     // not e-bikes — so this gate is the only thing keeping them out.
     it('skips an item whose category is not enabled', async () => {
-      interpreter.resolveCategoryFromRules.mockReturnValue('scooters');
+      interpreter.resolveCategory.mockReturnValue({ status: 'resolved', slug: 'scooters' });
 
       expect(await call()).toEqual({
         status: 'skipped',
@@ -369,11 +368,25 @@ describe('ArukeresoProductMapperService', () => {
     });
 
     it('skips an item whose category no rule matched', async () => {
-      interpreter.resolveCategoryFromRules.mockReturnValue(undefined);
+      interpreter.resolveCategory.mockReturnValue({ status: 'unidentified' });
 
       expect(await call()).toEqual({
         status: 'skipped',
         reason: 'category_not_identified',
+      });
+    });
+
+    // Two sections claiming one item is a config mistake to see, not one for
+    // rule order to hide.
+    it('skips an item whose rules match in two category sections', async () => {
+      interpreter.resolveCategory.mockReturnValue({
+        status: 'ambiguous',
+        slugs: ['ebikes', 'bikes'],
+      });
+
+      expect(await call()).toEqual({
+        status: 'skipped',
+        reason: 'category_ambiguous',
       });
     });
 
@@ -384,10 +397,10 @@ describe('ArukeresoProductMapperService', () => {
       });
     });
 
-    it('passes the feed attributes to the lookup rules, so specValueIncludes works', async () => {
+    it('passes the feed attributes to the sections\' rules, so specValueIncludes works', async () => {
       await call(config(), item({}, [{ name: 'Motor', value: 'Bosch' }]));
 
-      expect(interpreter.resolveCategoryFromRules).toHaveBeenCalledWith(
+      expect(interpreter.resolveCategory).toHaveBeenCalledWith(
         expect.anything(),
         'Termékkategóriák > E-BIKE > Trekking',
         [{ name: 'Motor', values: ['Bosch'] }],
@@ -397,15 +410,13 @@ describe('ArukeresoProductMapperService', () => {
     it('runs labelFrom over the raw category value before matching', async () => {
       interpreter.runValuePipeline.mockResolvedValueOnce('E-BIKE');
       const cfg = config({
-        category: {
-          labelFrom: [{ op: 'splitAndTake', separator: ' > ', index: 1 }],
-          slugLookup: [{ when: { equalsIgnoreCase: 'E-BIKE' }, slug: 'ebikes' }],
-        } as any,
+        categories: { ebikes: { enabled: true, rules: [{ when: { equalsIgnoreCase: 'E-BIKE' } }] } },
+        category: { labelFrom: [{ op: 'splitAndTake', separator: ' > ', index: 1 }] },
       });
 
       await call(cfg);
 
-      expect(interpreter.resolveCategoryFromRules).toHaveBeenCalledWith(
+      expect(interpreter.resolveCategory).toHaveBeenCalledWith(
         expect.anything(),
         'E-BIKE',
         expect.anything(),
@@ -598,7 +609,9 @@ describe('ArukeresoProductMapperService', () => {
     it('carries the split deterministic specs and both hashes', async () => {
       specExtraction.extractSpecs.mockReturnValueOnce({ weight: 24, frameSize: 43 });
 
-      const result = await call(config({ specMapping: { ebikes: { mappings: [] } } }));
+      const result = await call(
+        config({ categories: { ebikes: { enabled: true, specMapping: { mappings: [] } } } }),
+      );
 
       expect(result.status).toBe('mapped');
       if (result.status !== 'mapped') return;
@@ -872,10 +885,16 @@ describe('ArukeresoProductMapperService reading bike years from the feed', () =>
     const config = read(
       `../../../../scrape-interpreter/src/lib/interpreter/__fixtures__/${shop}-arukereso.config.json`,
     ) as ArukeresoSourceConfig;
+    // Every row is a bike here; the shop's own bike section keeps its mapping.
     return {
       ...config,
-      categories: { bikes: { enabled: true } },
-      category: { slugLookup: [{ slug: 'bikes', when: { always: true as const } }] },
+      categories: {
+        bikes: {
+          ...config.categories?.['bikes'],
+          enabled: true,
+          rules: [{ when: { always: true as const } }],
+        },
+      },
     } as ArukeresoSourceConfig;
   };
   let mapper: ArukeresoProductMapperService;

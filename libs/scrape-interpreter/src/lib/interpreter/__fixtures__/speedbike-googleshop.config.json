@@ -6,7 +6,13 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "E-BIKE"
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "E-BIKE"
+          }
+        }
+      ]
     }
   },
   "category": {
@@ -16,14 +22,6 @@
         "separator": " > ",
         "index": 1,
         "trim": true
-      }
-    ],
-    "slugLookup": [
-      {
-        "when": {
-          "equalsIgnoreCase": "E-BIKE"
-        },
-        "slug": "ebikes"
       }
     ]
   },

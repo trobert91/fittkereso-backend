@@ -1,5 +1,6 @@
 export * from './product-category-config';
 export * from './product-source-config';
+export * from './product-source-category-sections';
 export * from './product-source-actor';
 export * from './product-source-action';
 export * from './product-source-type';

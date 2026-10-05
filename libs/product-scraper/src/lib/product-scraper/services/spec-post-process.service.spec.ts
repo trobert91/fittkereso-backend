@@ -121,7 +121,9 @@ describe('SpecPostProcessService', () => {
   describe('extractIdentity', () => {
     it('asks for the identity fields, from the raw title, their deterministic values and the selected rows', async () => {
       await service.extractIdentity({
-        context: context({ identityExtraction: { specRows: ['motor', 'Akkumulátor'] } }),
+        context: context({
+          categories: { ebikes: { enabled: true, identitySpecRows: ['motor', 'Akkumulátor'] } },
+        }),
         scrapedProduct: listing(),
       });
 

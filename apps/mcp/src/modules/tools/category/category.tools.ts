@@ -7,7 +7,7 @@ import {
   ProductModelRepository,
   ProductSourceRepository,
   type ProductCategoryConfig,
-  isScrapingConfig,
+  categorySectionOf,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { generateSlug } from '@fittkereso-backend/utils';
@@ -342,10 +342,10 @@ export class CategoryTools {
     }
   }
 
-  // Spec mappings now live per-ProductSource (config.detailPage.specMapping,
-  // keyed by category slug) rather than in a per-category specMappings.json
-  // file keyed by source. Collect the mapping for this category slug across
-  // every configured source.
+  // Spec mappings live in each ProductSource's category section
+  // (config.categories.<slug>.specMapping) rather than in a per-category
+  // specMappings.json file keyed by source. Collect the mapping for this
+  // category slug across every configured source, scraped or fed.
   private async getSpecMappingsForCategory(
     slug: string,
   ): Promise<Record<string, { mappings?: unknown[]; calculated?: unknown[] }>> {
@@ -353,11 +353,7 @@ export class CategoryTools {
     const result: Record<string, { mappings?: unknown[]; calculated?: unknown[] }> = {};
 
     for (const source of sources) {
-      // Only scraping configs carry detailPage spec mappings; an Árukereső
-      // source maps its specs from feed attributes instead.
-      const mapping = isScrapingConfig(source.config)
-        ? source.config.detailPage?.specMapping?.[slug]
-        : undefined;
+      const mapping = categorySectionOf(source.config, slug)?.specMapping;
       if (mapping) {
         result[source.name] = mapping;
       }

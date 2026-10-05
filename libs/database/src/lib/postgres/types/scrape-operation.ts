@@ -596,6 +596,11 @@ export type CategoryLookupCondition =
   | { specSectionTitleIn: string[] }
   | { always: true };
 
+/**
+ * A rule of the old shared `slugLookup` list, from before each category had
+ * its own section. Only `toCategorySections` reads it now, to convert a
+ * stored config or an old version; new configs use CategoryMatchRule.
+ */
 export interface CategoryLookupRule {
   when: CategoryLookupCondition;
   slug: string;

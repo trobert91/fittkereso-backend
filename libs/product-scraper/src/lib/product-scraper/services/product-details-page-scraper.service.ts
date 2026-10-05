@@ -4,6 +4,7 @@ import {
   ProductImportTask,
   SourceSpecConfig,
   asScrapingConfig,
+  categorySectionOf,
 } from '@fittkereso-backend/database';
 import { ScraperService } from '@fittkereso-backend/scraper';
 import * as cheerio from 'cheerio';
@@ -257,6 +258,18 @@ export class ProductDetailsPageScraperService {
 
     this.assertCardsProduct(task, detail);
 
+    if (detail.ambiguousCategorySlugs?.length) {
+      this.logger.warn('Category is ambiguous, skipping product creation', {
+        taskId: task.id,
+        url: task.url,
+        categorySlugs: detail.ambiguousCategorySlugs,
+      });
+      this.scrapingMetrics.recordExtractionSkipReason(task.source.name, 'category_ambiguous');
+      throw new Error(
+        `Category is ambiguous: the rules of ${detail.ambiguousCategorySlugs.join(', ')} all match`,
+      );
+    }
+
     if (!detail.categorySlug) {
       this.logger.warn(
         'Category could not be identified, skipping product creation',
@@ -269,8 +282,7 @@ export class ProductDetailsPageScraperService {
       throw new Error('Category could not be identified');
     }
 
-    const categoryEnabled =
-      config.categories?.[detail.categorySlug]?.enabled ?? false;
+    const categoryEnabled = categorySectionOf(config, detail.categorySlug)?.enabled ?? false;
     if (!categoryEnabled) {
       this.logger.debug(
         `Skipping product — category '${detail.categorySlug}' not enabled for ${task.source.name}`,
@@ -329,7 +341,7 @@ export class ProductDetailsPageScraperService {
 
     const categoryConfig = this.categoryConfigService.getConfig(category.slug);
     const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
-    const sourceConfig = config.detailPage.specMapping[category.slug];
+    const sourceConfig = categorySectionOf(config, category.slug)?.specMapping;
     const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
 
     // Deterministic mapping runs unconditionally and unconditionally cheap

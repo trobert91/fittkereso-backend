@@ -143,17 +143,19 @@ export class ProductSourceConfigGeneratorTools {
         JSON.stringify(
           {
             baseUrl: parsed.baseUrl,
-            ...(parsed.fullSyncStartUrl && {
-              fullSyncStartUrl: parsed.fullSyncStartUrl,
-            }),
-            listPage: { categoryName: [], categoryLinks: [], productLinks: [] },
+            startUrls: parsed.fullSyncStartUrl ? [parsed.fullSyncStartUrl] : [],
+            // One section per category: its switch, which listings are in it
+            // (rules) and how their spec rows map onto its schema.
+            categories: {
+              '<category slug>': { enabled: false, rules: [], specMapping: { mappings: [] } },
+            },
+            listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
             detailPage: {
               rawSpecs: [],
-              category: { breadcrumbOrSource: [], slugLookup: [] },
+              category: { breadcrumbOrSource: [] },
               brand: [],
               model: [],
               images: [],
-              specMapping: {},
             },
           },
           null,

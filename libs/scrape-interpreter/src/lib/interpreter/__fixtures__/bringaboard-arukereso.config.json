@@ -5,7 +5,777 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "E-BIKE"
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "E-BIKE"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpár > E-Bike kerékpárok"
+          },
+          "unless": {
+            "specValueIncludes": {
+              "label": "Cassette / freewheel",
+              "anyOf": ["SINGLE"]
+            }
+          }
+        }
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
+            "extract": "number"
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": [
+              "Akkukapacitás",
+              "Battery Capacity",
+              "KAPACITÁS",
+              "teljesítménye",
+              "BATTERY",
+              "Akkumulátor",
+              "Akku",
+              "AKKU/BATTERY"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{3,4})\\s*Wh"]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret", "WHEELSIZE", "Kerék átmérő", "Wheel size", "Kerékméret (\")"],
+            "replacePatterns": [
+              { "from": ",", "to": "." },
+              { "from": "700C", "to": "28" },
+              { "from": "700c", "to": "28" }
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": [
+              "Max. nyomaték",
+              "Drive Unit",
+              "Engine",
+              "Type of Motor",
+              "Meghajtó egység",
+              "MOTOR CAPACITY",
+              "Motor típus",
+              "Motor"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2,3})\\s*Nm"]
+          },
+          {
+            "key": "motorPower",
+            "labels": [
+              "Motor névleges teljesítménye",
+              "Drive Unit",
+              "Engine",
+              "Type of Motor",
+              "Meghajtó egység",
+              "MOTOR CAPACITY",
+              "Motor"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{3})\\s*W(?!h)"]
+          },
+          {
+            "key": "topSpeed",
+            "labels": ["Rásegítéssel elérhető sebesség", "Drive Unit", "Type of Motor", "Engine", "Motor"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2})\\s*km\\s*/\\s*h"]
+          },
+          {
+            "key": "weight",
+            "labels": [
+              "WEIGHT",
+              "Súly",
+              "Tömeg",
+              "Approx weight in KG",
+              "Approx weights in KG",
+              "Teljes súly",
+              "Net weight"
+            ],
+            "skipValues": ["tbd", "0"],
+            "replacePatterns": [{ "from": ",", "to": "." }],
+            "extract": "number"
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Anyag", "Vázanyag", "VÁZ ANYAGA"],
+            "valueMap": {
+              "hliník": "Alumínium",
+              "aluminium": "Alumínium",
+              "alumínium": "Alumínium",
+              "alumínium ötvözet": "Alumínium",
+              "alimínium": "Alumínium",
+              "karbon": "Karbon",
+              "carbon": "Karbon"
+            }
+          },
+          {
+            "key": "gearCount",
+            "labels": [
+              "Sebességek száma",
+              "Fokozatok száma",
+              "Fokozat",
+              "Speed",
+              "Sebesség",
+              "Number of gears",
+              "Number of speeds"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": ["^(?:\\d\\s*[x×*]\\s*)?(\\d{1,2})\\b"]
+          },
+          {
+            "key": "frameSize",
+            "labels": ["Méret"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d+(?:[.,]\\d+)?)\\s*cm"]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": ["Mérettáblázat"],
+            "extract": "regexpList",
+            "extractPatterns": ["^\\s*(XXL|XL|XS|S|M|L)\\s*$"]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Rugózás"],
+            "valueMap": {
+              "elöl": "Első teleszkóp",
+              "elöl-hátul": "Első teleszkóp, hátsó rugóstag"
+            }
+          },
+          {
+            "key": "brakeType",
+            "labels": ["Fék típus", "Féktípus"],
+            "valueMap": {
+              "hidraulikus tárcsafék": "Tárcsa",
+              "első és hátsó tárcsafék": "Tárcsa",
+              "mechanikus felnifék": "Racker (Felni)",
+              "hidraulikus felnifék": "Racker (Felni)"
+            }
+          },
+          {
+            "key": "gearType",
+            "labels": ["Váltórendszer", "VÁLTÓ TÍPUS"],
+            "valueMap": {
+              "láncváltó": "Láncváltó",
+              "külső váltó": "Láncváltó",
+              "agyváltó": "Agyváltó"
+            }
+          },
+          {
+            "key": "motorPosition",
+            "labels": ["Motor elhelyezkedés", "MOTOR ELHELYEZKEDÉSE"],
+            "valueMap": {
+              "középmotor": "Középmotor",
+              "középmotoros": "Középmotor"
+            }
+          },
+          {
+            "key": "motorBrand",
+            "labels": ["MOTOR MÁRKA"],
+            "valueMap": {
+              "bafang": "Bafang",
+              "bosch": "Bosch"
+            }
+          },
+          {
+            "key": "sensorType",
+            "labels": ["Szenzor típusa"],
+            "valueMap": {
+              "nyomatékszenzor": "Nyomatékszenzor"
+            }
+          },
+          {
+            "key": "batteryPosition",
+            "labels": ["AKKUMULÁTOR ELHELYEZKEDÉSE", "elhelyezkedése"],
+            "valueMap": {
+              "alsócsőbe integrált": "Vázba integrált",
+              "vázba integrált": "Vázba integrált",
+              "csomagtartón": "Csomagtartóra szerelt",
+              "csomagtartóra szerelt": "Csomagtartóra szerelt",
+              "alsócsövön": "Külső"
+            }
+          },
+          {
+            "key": "maxTotalWeight",
+            "labels": [
+              "PERMISSIBLE TOTAL WEIGHT",
+              "Max. System Weight",
+              "Max összsúly",
+              "Megengedett összsúly",
+              "Megengedett össztömeg",
+              "MAXSYSTEM WEIGHT",
+              "SYS. WEIGHT"
+            ],
+            "replacePatterns": [{ "from": ",", "to": "." }],
+            "extract": "number"
+          },
+          {
+            "key": "maxLoad",
+            "labels": ["Maximum load"],
+            "extract": "number"
+          },
+          {
+            "key": "forkTravel",
+            "labels": ["Első rugóút", "Villa rugóút", "Rugóút elöl", "Futómű elöl", "Travel"],
+            "extract": "number"
+          },
+          {
+            "key": "rearTravel",
+            "labels": ["Hásó rugóút", "Hátsó rugóút"],
+            "extract": "regexpList",
+            "extractPatterns": ["^\\s*(\\d{2,3})\\s*mm"]
+          },
+          {
+            "key": "range",
+            "labels": ["Hatótáv", "Maximum range", "Távolság tartomány"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2,3})\\s*km"]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": [
+              "Féktárcsa Első",
+              "Féktárcsa e",
+              "BRAKE ROTOR FRONT",
+              "Brake disc front",
+              "FRONT BRAKE DISC",
+              "Első féktárcsa",
+              "Front Disc Rotor",
+              "ROTOR",
+              "BRAKE-DISC",
+              "Féktárcsa"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": ["(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"]
+          },
+          {
+            "key": "handlebarWidth",
+            "labels": ["Kormány szélesség"],
+            "extract": "number"
+          },
+          {
+            "key": "frameModel",
+            "labels": ["Váz", "FRAME", "VÁZ/FRAME", "KERET"]
+          },
+          {
+            "key": "forkModel",
+            "labels": ["Villa", "FORK", "Első villa", "VILLA/FORK", "Teleszkóp/Villa", "Függesztő villa"]
+          },
+          {
+            "key": "rearShockModel",
+            "labels": [
+              "Rugóstag",
+              "SHOCK",
+              "Rear Shock",
+              "Hátsó lengéscsillapító",
+              "Hátsó rugóstag",
+              "DAMPER",
+              "Rear Suspension"
+            ],
+            "skipValues": ["-", "n/a", "nincs", "none"]
+          },
+          {
+            "key": "motorModel",
+            "labels": [
+              "Motor",
+              "Drive Unit",
+              "Engine",
+              "Type of Motor",
+              "Meghajtó egység",
+              "Motor típus",
+              "E.Drive System",
+              "MOTOR CAPACITY"
+            ],
+            "skipValues": ["-", "0"]
+          },
+          {
+            "key": "ebikeSystem",
+            "labels": ["E-SYSTEM"]
+          },
+          {
+            "key": "batteryModel",
+            "labels": ["BATTERY", "Akkumulátor", "Akku", "AKKU/BATTERY"]
+          },
+          {
+            "key": "batteryLock",
+            "labels": ["Akkuzár"]
+          },
+          {
+            "key": "chargerModel",
+            "labels": ["CHARGER", "Töltő", "Akkutöltő"]
+          },
+          {
+            "key": "displayModel",
+            "labels": [
+              "DISPLAY",
+              "Kijelző",
+              "KIJELZŐ/DISPLAY",
+              "Vezérlőegység",
+              "computer display",
+              "Computer",
+              "KÉPERNYŐ"
+            ]
+          },
+          {
+            "key": "controlUnit",
+            "labels": ["Kezelő", "Üzemmódváltó", "váltó kapcsoló", "Controller", "KAPCSOLÓ", "Switch"]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": [
+              "Hátsó váltó",
+              "Rear Derailleur",
+              "R.DERAILL",
+              "R. DERAILL",
+              "R. DERAILL.",
+              "Derailleur",
+              "Hátsóváltó",
+              "h. váltó",
+              "Váltó Hátsó",
+              "HÁTSÓ VÁLTÓ/REAR DERAILLEUR",
+              "hátsó váltó, szerelék/rear dereilleur",
+              "Váltó"
+            ],
+            "skipValues": ["-", "n/a", "nincs"]
+          },
+          {
+            "key": "frontDerailleur",
+            "labels": ["Első váltó", "ELSŐ VÁLTÓ/FRONT DERAILLEUR", "Front Derailleur"],
+            "valueMap": {
+              "-": "Nincs",
+              "n/a": "Nincs",
+              "nincs": "Nincs"
+            }
+          },
+          {
+            "key": "shifter",
+            "labels": [
+              "SHIFTLEV.",
+              "Shifters",
+              "Váltókar",
+              "Váltókarok",
+              "Váltókar h",
+              "Váltókar Hátsó",
+              "VÁLTÓKAR/SHIFTERS",
+              "SHIFTER",
+              "SHIFTING",
+              "Shift lever right",
+              "Shiftlever right",
+              "Váltók jobbra",
+              "Rendezés"
+            ]
+          },
+          {
+            "key": "crankset",
+            "labels": [
+              "CRANKSET",
+              "Hajtómű",
+              "HAJTÓMŰ/CRANKSET",
+              "Hajtókarok",
+              "Hajtókar/hajtómű",
+              "HAJTÓKAR / HAJTÓMŰ",
+              "CRANK MECHANISM",
+              "Chainwheel"
+            ]
+          },
+          {
+            "key": "chainring",
+            "labels": ["CHAINRING", "Első áttétel"]
+          },
+          {
+            "key": "cassette",
+            "labels": [
+              "Kazetta",
+              "SPROCKET",
+              "Cassette",
+              "Fogaskoszorú",
+              "Freewheel",
+              "kazettás fogaskoszorú",
+              "Lánckeréksor",
+              "Hátsó fogaskoszorú",
+              "Hátsó áttétel",
+              "CASSETTE/FREEWHEEL"
+            ]
+          },
+          {
+            "key": "chain",
+            "labels": ["CHAIN", "Lánc", "Szíj"]
+          },
+          {
+            "key": "bottomBracket",
+            "labels": ["BB-Set", "Középcsapágy", "BOTTOM BRACKET", "Középrész"],
+            "skipValues": ["-", "n/a"]
+          },
+          {
+            "key": "pedals",
+            "labels": ["Pedals", "Pedál", "PEDAL", "Pedálok"]
+          },
+          {
+            "key": "brakeModel",
+            "labels": [
+              "BRAKE",
+              "Brakes",
+              "Fékek",
+              "Fék",
+              "Első fék",
+              "ELSŐ FÉK/FRONT BRAKE",
+              "Fék Első",
+              "Brake front",
+              "Front brake",
+              "Brakes Front",
+              "ELSŐ FÉKEK",
+              "Fékek elöl"
+            ]
+          },
+          {
+            "key": "brakeLever",
+            "labels": ["Fékkar", "Brake Levers", "Fékkarok"]
+          },
+          {
+            "key": "rotorModel",
+            "labels": [
+              "ROTOR",
+              "Féktárcsa",
+              "BRAKE-DISC",
+              "Féktárcsa Első",
+              "Féktárcsa e",
+              "Brake disc front",
+              "Brake disc",
+              "Féktárcsák",
+              "Első féktárcsa",
+              "BRAKE ROTOR FRONT",
+              "Féktárcsa első/hátsó",
+              "Rotor elöl"
+            ]
+          },
+          {
+            "key": "wheelset",
+            "labels": ["WHEELSET", "Kerékszett", "WHEEL F", "Első kerék", "KEREKEK"]
+          },
+          {
+            "key": "rimModel",
+            "labels": [
+              "Felni",
+              "Rims",
+              "Felnik",
+              "Első felni",
+              "Rim",
+              "FELNIK/RIMS",
+              "Felni e",
+              "Front Rim",
+              "Felnik elöl",
+              "Abroncs"
+            ]
+          },
+          {
+            "key": "hubModel",
+            "labels": [
+              "Agy",
+              "Hub (Front)",
+              "Agy e",
+              "Első agy",
+              "Agyak",
+              "kerékagyak",
+              "Kerékagy",
+              "Hubs",
+              "FRONT HUB",
+              "Agy Első",
+              "ELSŐ AGY/FRONT HUB",
+              "HUB FRONT"
+            ]
+          },
+          {
+            "key": "spokes",
+            "labels": ["Spokes", "Küllő", "Küllők"]
+          },
+          {
+            "key": "tireModel",
+            "labels": [
+              "TIRE F",
+              "Front Tire",
+              "Első külső",
+              "Külső gumi",
+              "Külsők",
+              "Tires",
+              "Gumiabroncs",
+              "Gumiabroncsok",
+              "KÖPENY/TIRE",
+              "Gumikülső Első",
+              "Kerékpár külső",
+              "Külső",
+              "Gumiköpeny",
+              "Külsőgumi",
+              "Gumik",
+              "Gumiköpenyek",
+              "Köpeny",
+              "Gumiabroncs első/hátsó",
+              "Külső gumi elöl",
+              "első gumiabroncs",
+              "TYRES",
+              "Tire front",
+              "Gumik elöl"
+            ]
+          },
+          {
+            "key": "handlebar",
+            "labels": ["Kormány", "BAR", "Handlebar", "Handlebars"]
+          },
+          {
+            "key": "stem",
+            "labels": ["Kormányszár", "STEM", "H'stem", "Stucni", "Kormányfej", "Szár", "Szára", "HANDLEBAR BRIDGE"]
+          },
+          {
+            "key": "headset",
+            "labels": ["HEADSET", "Kormánycsapágy", "Head set", "FEJSZERELÉS", "Fejhallgató"]
+          },
+          {
+            "key": "grips",
+            "labels": ["Grips", "Markolat", "GRIP", "Kormánymarkolat", "Markolatok", "FOGANTYÚK"]
+          },
+          {
+            "key": "saddle",
+            "labels": ["Nyereg", "SADDLE", "Seat"]
+          },
+          {
+            "key": "seatpost",
+            "labels": ["SEATPOST", "Nyeregcső", "Nyeregszár", "Seat post", "Üléscső", "Ülőoszlop"]
+          },
+          {
+            "key": "seatClamp",
+            "labels": ["Nyeregcsőbilincs", "SEATCLAMP"]
+          }
+        ]
+      },
+      "identitySpecRows": [
+        "Évjárat",
+        "Model year",
+        "Váz",
+        "FRAME",
+        "VÁZ/FRAME",
+        "KERET",
+        "Anyag",
+        "Vázanyag",
+        "VÁZ ANYAGA",
+        "Női vázgeometria",
+        "Villa",
+        "FORK",
+        "Első villa",
+        "VILLA/FORK",
+        "Teleszkóp/Villa",
+        "Teleszkóp",
+        "Rugóstag",
+        "SHOCK",
+        "Rear Shock",
+        "Hátsó lengéscsillapító",
+        "Hátsó rugóstag",
+        "Rugózás",
+        "Első rugóút",
+        "Hásó rugóút",
+        "Hátsó rugóút",
+        "Travel",
+        "Motor",
+        "Drive Unit",
+        "Engine",
+        "Type of Motor",
+        "Meghajtó egység",
+        "Motor típus",
+        "E-SYSTEM",
+        "E.Drive System",
+        "MOTOR CAPACITY",
+        "MOTOR MÁRKA",
+        "Max. nyomaték",
+        "Motor névleges teljesítménye",
+        "Motor elhelyezkedés",
+        "MOTOR ELHELYEZKEDÉSE",
+        "Szenzor típusa",
+        "Rásegítéssel elérhető sebesség",
+        "BATTERY",
+        "Akkumulátor",
+        "Akku",
+        "AKKU/BATTERY",
+        "Akkukapacitás",
+        "Battery Capacity",
+        "KAPACITÁS",
+        "AKKUMULÁTOR ELHELYEZKEDÉSE",
+        "Kerékméret",
+        "WHEELSIZE",
+        "Kerék átmérő",
+        "Wheel size",
+        "TIRE F",
+        "TIRE R",
+        "Front Tire",
+        "Rear Tire",
+        "Első külső",
+        "Hátsó külső",
+        "Külső gumi",
+        "Külsők",
+        "Tires",
+        "Gumiabroncs",
+        "Gumiabroncsok",
+        "KÖPENY/TIRE",
+        "Gumikülső Első",
+        "Kerékpár külső",
+        "Külső",
+        "Gumiköpeny",
+        "Külsőgumi",
+        "Hátsó váltó",
+        "R.DERAILL",
+        "R. DERAILL",
+        "Rear Derailleur",
+        "Derailleur",
+        "Hátsóváltó",
+        "Váltó Hátsó",
+        "HÁTSÓ VÁLTÓ/REAR DERAILLEUR",
+        "SHIFTLEV.",
+        "Shifters",
+        "Váltókar",
+        "Váltókarok",
+        "Sebességek száma",
+        "Fokozatok száma",
+        "Speed",
+        "Váltórendszer",
+        "Kazetta",
+        "SPROCKET",
+        "Cassette",
+        "Fogaskoszorú",
+        "CHAIN",
+        "Lánc",
+        "Szíj",
+        "WEIGHT",
+        "Súly",
+        "Tömeg",
+        "Approx weight in KG",
+        "Szín",
+        "Szín(ek)",
+        "Color",
+        "Méret"
+      ]
+    },
+    "bikes": {
+      "enabled": false,
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
+            "extract": "number"
+          }
+        ]
+      },
+      "identitySpecRows": [
+        "Évjárat",
+        "Model year",
+        "Váz",
+        "FRAME",
+        "VÁZ/FRAME",
+        "KERET",
+        "Anyag",
+        "Vázanyag",
+        "VÁZ ANYAGA",
+        "Női vázgeometria",
+        "Villa",
+        "FORK",
+        "Első villa",
+        "VILLA/FORK",
+        "Teleszkóp/Villa",
+        "Teleszkóp",
+        "Rugóstag",
+        "SHOCK",
+        "Rear Shock",
+        "Hátsó lengéscsillapító",
+        "Hátsó rugóstag",
+        "Rugózás",
+        "Első rugóút",
+        "Hásó rugóút",
+        "Hátsó rugóút",
+        "Travel",
+        "Motor",
+        "Drive Unit",
+        "Engine",
+        "Type of Motor",
+        "Meghajtó egység",
+        "Motor típus",
+        "E-SYSTEM",
+        "E.Drive System",
+        "MOTOR CAPACITY",
+        "MOTOR MÁRKA",
+        "Max. nyomaték",
+        "Motor névleges teljesítménye",
+        "Motor elhelyezkedés",
+        "MOTOR ELHELYEZKEDÉSE",
+        "Szenzor típusa",
+        "Rásegítéssel elérhető sebesség",
+        "BATTERY",
+        "Akkumulátor",
+        "Akku",
+        "AKKU/BATTERY",
+        "Akkukapacitás",
+        "Battery Capacity",
+        "KAPACITÁS",
+        "AKKUMULÁTOR ELHELYEZKEDÉSE",
+        "Kerékméret",
+        "WHEELSIZE",
+        "Kerék átmérő",
+        "Wheel size",
+        "TIRE F",
+        "TIRE R",
+        "Front Tire",
+        "Rear Tire",
+        "Első külső",
+        "Hátsó külső",
+        "Külső gumi",
+        "Külsők",
+        "Tires",
+        "Gumiabroncs",
+        "Gumiabroncsok",
+        "KÖPENY/TIRE",
+        "Gumikülső Első",
+        "Kerékpár külső",
+        "Külső",
+        "Gumiköpeny",
+        "Külsőgumi",
+        "Hátsó váltó",
+        "R.DERAILL",
+        "R. DERAILL",
+        "Rear Derailleur",
+        "Derailleur",
+        "Hátsóváltó",
+        "Váltó Hátsó",
+        "HÁTSÓ VÁLTÓ/REAR DERAILLEUR",
+        "SHIFTLEV.",
+        "Shifters",
+        "Váltókar",
+        "Váltókarok",
+        "Sebességek száma",
+        "Fokozatok száma",
+        "Speed",
+        "Váltórendszer",
+        "Kazetta",
+        "SPROCKET",
+        "Cassette",
+        "Fogaskoszorú",
+        "CHAIN",
+        "Lánc",
+        "Szíj",
+        "WEIGHT",
+        "Súly",
+        "Tömeg",
+        "Approx weight in KG",
+        "Szín",
+        "Szín(ek)",
+        "Color",
+        "Méret"
+      ]
     }
   },
   "category": {
@@ -15,132 +785,6 @@
         "pattern": "^(E-BIKE(?! > E-ROLLER\\b)|Kerékpár > E-Bike kerékpárok)(?: > |$)",
         "group": 1
       }
-    ],
-    "slugLookup": [
-      {
-        "when": {
-          "equalsIgnoreCase": "E-BIKE"
-        },
-        "slug": "ebikes"
-      },
-      {
-        "when": {
-          "equalsIgnoreCase": "Kerékpár > E-Bike kerékpárok"
-        },
-        "unless": {
-          "specValueIncludes": {
-            "label": "Cassette / freewheel",
-            "anyOf": ["SINGLE"]
-          }
-        },
-        "slug": "ebikes"
-      }
-    ]
-  },
-  "identityExtraction": {
-    "specRows": [
-      "Évjárat",
-      "Model year",
-      "Váz",
-      "FRAME",
-      "VÁZ/FRAME",
-      "KERET",
-      "Anyag",
-      "Vázanyag",
-      "VÁZ ANYAGA",
-      "Női vázgeometria",
-      "Villa",
-      "FORK",
-      "Első villa",
-      "VILLA/FORK",
-      "Teleszkóp/Villa",
-      "Teleszkóp",
-      "Rugóstag",
-      "SHOCK",
-      "Rear Shock",
-      "Hátsó lengéscsillapító",
-      "Hátsó rugóstag",
-      "Rugózás",
-      "Első rugóút",
-      "Hásó rugóút",
-      "Hátsó rugóút",
-      "Travel",
-      "Motor",
-      "Drive Unit",
-      "Engine",
-      "Type of Motor",
-      "Meghajtó egység",
-      "Motor típus",
-      "E-SYSTEM",
-      "E.Drive System",
-      "MOTOR CAPACITY",
-      "MOTOR MÁRKA",
-      "Max. nyomaték",
-      "Motor névleges teljesítménye",
-      "Motor elhelyezkedés",
-      "MOTOR ELHELYEZKEDÉSE",
-      "Szenzor típusa",
-      "Rásegítéssel elérhető sebesség",
-      "BATTERY",
-      "Akkumulátor",
-      "Akku",
-      "AKKU/BATTERY",
-      "Akkukapacitás",
-      "Battery Capacity",
-      "KAPACITÁS",
-      "AKKUMULÁTOR ELHELYEZKEDÉSE",
-      "Kerékméret",
-      "WHEELSIZE",
-      "Kerék átmérő",
-      "Wheel size",
-      "TIRE F",
-      "TIRE R",
-      "Front Tire",
-      "Rear Tire",
-      "Első külső",
-      "Hátsó külső",
-      "Külső gumi",
-      "Külsők",
-      "Tires",
-      "Gumiabroncs",
-      "Gumiabroncsok",
-      "KÖPENY/TIRE",
-      "Gumikülső Első",
-      "Kerékpár külső",
-      "Külső",
-      "Gumiköpeny",
-      "Külsőgumi",
-      "Hátsó váltó",
-      "R.DERAILL",
-      "R. DERAILL",
-      "Rear Derailleur",
-      "Derailleur",
-      "Hátsóváltó",
-      "Váltó Hátsó",
-      "HÁTSÓ VÁLTÓ/REAR DERAILLEUR",
-      "SHIFTLEV.",
-      "Shifters",
-      "Váltókar",
-      "Váltókarok",
-      "Sebességek száma",
-      "Fokozatok száma",
-      "Speed",
-      "Váltórendszer",
-      "Kazetta",
-      "SPROCKET",
-      "Cassette",
-      "Fogaskoszorú",
-      "CHAIN",
-      "Lánc",
-      "Szíj",
-      "WEIGHT",
-      "Súly",
-      "Tömeg",
-      "Approx weight in KG",
-      "Szín",
-      "Szín(ek)",
-      "Color",
-      "Méret"
     ]
   },
   "mapping": {
@@ -238,549 +882,5 @@
         ]
       }
     ]
-  },
-  "specMapping": {
-    "bikes": {
-      "mappings": [
-        {
-          "key": "modelYear",
-          "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
-          "extract": "number"
-        }
-      ]
-    },
-    "ebikes": {
-      "mappings": [
-        {
-          "key": "modelYear",
-          "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
-          "extract": "number"
-        },
-        {
-          "key": "batteryCapacity",
-          "labels": [
-            "Akkukapacitás",
-            "Battery Capacity",
-            "KAPACITÁS",
-            "teljesítménye",
-            "BATTERY",
-            "Akkumulátor",
-            "Akku",
-            "AKKU/BATTERY"
-          ],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d{3,4})\\s*Wh"]
-        },
-        {
-          "key": "wheelSize",
-          "labels": ["Kerékméret", "WHEELSIZE", "Kerék átmérő", "Wheel size", "Kerékméret (\")"],
-          "replacePatterns": [
-            { "from": ",", "to": "." },
-            { "from": "700C", "to": "28" },
-            { "from": "700c", "to": "28" }
-          ],
-          "extract": "number"
-        },
-        {
-          "key": "torque",
-          "labels": [
-            "Max. nyomaték",
-            "Drive Unit",
-            "Engine",
-            "Type of Motor",
-            "Meghajtó egység",
-            "MOTOR CAPACITY",
-            "Motor típus",
-            "Motor"
-          ],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d{2,3})\\s*Nm"]
-        },
-        {
-          "key": "motorPower",
-          "labels": [
-            "Motor névleges teljesítménye",
-            "Drive Unit",
-            "Engine",
-            "Type of Motor",
-            "Meghajtó egység",
-            "MOTOR CAPACITY",
-            "Motor"
-          ],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d{3})\\s*W(?!h)"]
-        },
-        {
-          "key": "topSpeed",
-          "labels": ["Rásegítéssel elérhető sebesség", "Drive Unit", "Type of Motor", "Engine", "Motor"],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d{2})\\s*km\\s*/\\s*h"]
-        },
-        {
-          "key": "weight",
-          "labels": [
-            "WEIGHT",
-            "Súly",
-            "Tömeg",
-            "Approx weight in KG",
-            "Approx weights in KG",
-            "Teljes súly",
-            "Net weight"
-          ],
-          "skipValues": ["tbd", "0"],
-          "replacePatterns": [{ "from": ",", "to": "." }],
-          "extract": "number"
-        },
-        {
-          "key": "frameMaterial",
-          "labels": ["Anyag", "Vázanyag", "VÁZ ANYAGA"],
-          "valueMap": {
-            "hliník": "Alumínium",
-            "aluminium": "Alumínium",
-            "alumínium": "Alumínium",
-            "alumínium ötvözet": "Alumínium",
-            "alimínium": "Alumínium",
-            "karbon": "Karbon",
-            "carbon": "Karbon"
-          }
-        },
-        {
-          "key": "gearCount",
-          "labels": [
-            "Sebességek száma",
-            "Fokozatok száma",
-            "Fokozat",
-            "Speed",
-            "Sebesség",
-            "Number of gears",
-            "Number of speeds"
-          ],
-          "extract": "regexpList",
-          "extractPatterns": ["^(?:\\d\\s*[x×*]\\s*)?(\\d{1,2})\\b"]
-        },
-        {
-          "key": "frameSize",
-          "labels": ["Méret"],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d+(?:[.,]\\d+)?)\\s*cm"]
-        },
-        {
-          "key": "frameSizeLabel",
-          "labels": ["Mérettáblázat"],
-          "extract": "regexpList",
-          "extractPatterns": ["^\\s*(XXL|XL|XS|S|M|L)\\s*$"]
-        },
-        {
-          "key": "suspension",
-          "labels": ["Rugózás"],
-          "valueMap": {
-            "elöl": "Első teleszkóp",
-            "elöl-hátul": "Első teleszkóp, hátsó rugóstag"
-          }
-        },
-        {
-          "key": "brakeType",
-          "labels": ["Fék típus", "Féktípus"],
-          "valueMap": {
-            "hidraulikus tárcsafék": "Tárcsa",
-            "első és hátsó tárcsafék": "Tárcsa",
-            "mechanikus felnifék": "Racker (Felni)",
-            "hidraulikus felnifék": "Racker (Felni)"
-          }
-        },
-        {
-          "key": "gearType",
-          "labels": ["Váltórendszer", "VÁLTÓ TÍPUS"],
-          "valueMap": {
-            "láncváltó": "Láncváltó",
-            "külső váltó": "Láncváltó",
-            "agyváltó": "Agyváltó"
-          }
-        },
-        {
-          "key": "motorPosition",
-          "labels": ["Motor elhelyezkedés", "MOTOR ELHELYEZKEDÉSE"],
-          "valueMap": {
-            "középmotor": "Középmotor",
-            "középmotoros": "Középmotor"
-          }
-        },
-        {
-          "key": "motorBrand",
-          "labels": ["MOTOR MÁRKA"],
-          "valueMap": {
-            "bafang": "Bafang",
-            "bosch": "Bosch"
-          }
-        },
-        {
-          "key": "sensorType",
-          "labels": ["Szenzor típusa"],
-          "valueMap": {
-            "nyomatékszenzor": "Nyomatékszenzor"
-          }
-        },
-        {
-          "key": "batteryPosition",
-          "labels": ["AKKUMULÁTOR ELHELYEZKEDÉSE", "elhelyezkedése"],
-          "valueMap": {
-            "alsócsőbe integrált": "Vázba integrált",
-            "vázba integrált": "Vázba integrált",
-            "csomagtartón": "Csomagtartóra szerelt",
-            "csomagtartóra szerelt": "Csomagtartóra szerelt",
-            "alsócsövön": "Külső"
-          }
-        },
-        {
-          "key": "maxTotalWeight",
-          "labels": [
-            "PERMISSIBLE TOTAL WEIGHT",
-            "Max. System Weight",
-            "Max összsúly",
-            "Megengedett összsúly",
-            "Megengedett össztömeg",
-            "MAXSYSTEM WEIGHT",
-            "SYS. WEIGHT"
-          ],
-          "replacePatterns": [{ "from": ",", "to": "." }],
-          "extract": "number"
-        },
-        {
-          "key": "maxLoad",
-          "labels": ["Maximum load"],
-          "extract": "number"
-        },
-        {
-          "key": "forkTravel",
-          "labels": ["Első rugóút", "Villa rugóút", "Rugóút elöl", "Futómű elöl", "Travel"],
-          "extract": "number"
-        },
-        {
-          "key": "rearTravel",
-          "labels": ["Hásó rugóút", "Hátsó rugóút"],
-          "extract": "regexpList",
-          "extractPatterns": ["^\\s*(\\d{2,3})\\s*mm"]
-        },
-        {
-          "key": "range",
-          "labels": ["Hatótáv", "Maximum range", "Távolság tartomány"],
-          "extract": "regexpList",
-          "extractPatterns": ["(\\d{2,3})\\s*km"]
-        },
-        {
-          "key": "rotorSizeFront",
-          "labels": [
-            "Féktárcsa Első",
-            "Féktárcsa e",
-            "BRAKE ROTOR FRONT",
-            "Brake disc front",
-            "FRONT BRAKE DISC",
-            "Első féktárcsa",
-            "Front Disc Rotor",
-            "ROTOR",
-            "BRAKE-DISC",
-            "Féktárcsa"
-          ],
-          "extract": "regexpList",
-          "extractPatterns": ["(?:^|\\D)(140|160|180|200|203|220)(?:\\D|$)"]
-        },
-        {
-          "key": "handlebarWidth",
-          "labels": ["Kormány szélesség"],
-          "extract": "number"
-        },
-        {
-          "key": "frameModel",
-          "labels": ["Váz", "FRAME", "VÁZ/FRAME", "KERET"]
-        },
-        {
-          "key": "forkModel",
-          "labels": ["Villa", "FORK", "Első villa", "VILLA/FORK", "Teleszkóp/Villa", "Függesztő villa"]
-        },
-        {
-          "key": "rearShockModel",
-          "labels": [
-            "Rugóstag",
-            "SHOCK",
-            "Rear Shock",
-            "Hátsó lengéscsillapító",
-            "Hátsó rugóstag",
-            "DAMPER",
-            "Rear Suspension"
-          ],
-          "skipValues": ["-", "n/a", "nincs", "none"]
-        },
-        {
-          "key": "motorModel",
-          "labels": [
-            "Motor",
-            "Drive Unit",
-            "Engine",
-            "Type of Motor",
-            "Meghajtó egység",
-            "Motor típus",
-            "E.Drive System",
-            "MOTOR CAPACITY"
-          ],
-          "skipValues": ["-", "0"]
-        },
-        {
-          "key": "ebikeSystem",
-          "labels": ["E-SYSTEM"]
-        },
-        {
-          "key": "batteryModel",
-          "labels": ["BATTERY", "Akkumulátor", "Akku", "AKKU/BATTERY"]
-        },
-        {
-          "key": "batteryLock",
-          "labels": ["Akkuzár"]
-        },
-        {
-          "key": "chargerModel",
-          "labels": ["CHARGER", "Töltő", "Akkutöltő"]
-        },
-        {
-          "key": "displayModel",
-          "labels": [
-            "DISPLAY",
-            "Kijelző",
-            "KIJELZŐ/DISPLAY",
-            "Vezérlőegység",
-            "computer display",
-            "Computer",
-            "KÉPERNYŐ"
-          ]
-        },
-        {
-          "key": "controlUnit",
-          "labels": ["Kezelő", "Üzemmódváltó", "váltó kapcsoló", "Controller", "KAPCSOLÓ", "Switch"]
-        },
-        {
-          "key": "rearDerailleur",
-          "labels": [
-            "Hátsó váltó",
-            "Rear Derailleur",
-            "R.DERAILL",
-            "R. DERAILL",
-            "R. DERAILL.",
-            "Derailleur",
-            "Hátsóváltó",
-            "h. váltó",
-            "Váltó Hátsó",
-            "HÁTSÓ VÁLTÓ/REAR DERAILLEUR",
-            "hátsó váltó, szerelék/rear dereilleur",
-            "Váltó"
-          ],
-          "skipValues": ["-", "n/a", "nincs"]
-        },
-        {
-          "key": "frontDerailleur",
-          "labels": ["Első váltó", "ELSŐ VÁLTÓ/FRONT DERAILLEUR", "Front Derailleur"],
-          "valueMap": {
-            "-": "Nincs",
-            "n/a": "Nincs",
-            "nincs": "Nincs"
-          }
-        },
-        {
-          "key": "shifter",
-          "labels": [
-            "SHIFTLEV.",
-            "Shifters",
-            "Váltókar",
-            "Váltókarok",
-            "Váltókar h",
-            "Váltókar Hátsó",
-            "VÁLTÓKAR/SHIFTERS",
-            "SHIFTER",
-            "SHIFTING",
-            "Shift lever right",
-            "Shiftlever right",
-            "Váltók jobbra",
-            "Rendezés"
-          ]
-        },
-        {
-          "key": "crankset",
-          "labels": [
-            "CRANKSET",
-            "Hajtómű",
-            "HAJTÓMŰ/CRANKSET",
-            "Hajtókarok",
-            "Hajtókar/hajtómű",
-            "HAJTÓKAR / HAJTÓMŰ",
-            "CRANK MECHANISM",
-            "Chainwheel"
-          ]
-        },
-        {
-          "key": "chainring",
-          "labels": ["CHAINRING", "Első áttétel"]
-        },
-        {
-          "key": "cassette",
-          "labels": [
-            "Kazetta",
-            "SPROCKET",
-            "Cassette",
-            "Fogaskoszorú",
-            "Freewheel",
-            "kazettás fogaskoszorú",
-            "Lánckeréksor",
-            "Hátsó fogaskoszorú",
-            "Hátsó áttétel",
-            "CASSETTE/FREEWHEEL"
-          ]
-        },
-        {
-          "key": "chain",
-          "labels": ["CHAIN", "Lánc", "Szíj"]
-        },
-        {
-          "key": "bottomBracket",
-          "labels": ["BB-Set", "Középcsapágy", "BOTTOM BRACKET", "Középrész"],
-          "skipValues": ["-", "n/a"]
-        },
-        {
-          "key": "pedals",
-          "labels": ["Pedals", "Pedál", "PEDAL", "Pedálok"]
-        },
-        {
-          "key": "brakeModel",
-          "labels": [
-            "BRAKE",
-            "Brakes",
-            "Fékek",
-            "Fék",
-            "Első fék",
-            "ELSŐ FÉK/FRONT BRAKE",
-            "Fék Első",
-            "Brake front",
-            "Front brake",
-            "Brakes Front",
-            "ELSŐ FÉKEK",
-            "Fékek elöl"
-          ]
-        },
-        {
-          "key": "brakeLever",
-          "labels": ["Fékkar", "Brake Levers", "Fékkarok"]
-        },
-        {
-          "key": "rotorModel",
-          "labels": [
-            "ROTOR",
-            "Féktárcsa",
-            "BRAKE-DISC",
-            "Féktárcsa Első",
-            "Féktárcsa e",
-            "Brake disc front",
-            "Brake disc",
-            "Féktárcsák",
-            "Első féktárcsa",
-            "BRAKE ROTOR FRONT",
-            "Féktárcsa első/hátsó",
-            "Rotor elöl"
-          ]
-        },
-        {
-          "key": "wheelset",
-          "labels": ["WHEELSET", "Kerékszett", "WHEEL F", "Első kerék", "KEREKEK"]
-        },
-        {
-          "key": "rimModel",
-          "labels": [
-            "Felni",
-            "Rims",
-            "Felnik",
-            "Első felni",
-            "Rim",
-            "FELNIK/RIMS",
-            "Felni e",
-            "Front Rim",
-            "Felnik elöl",
-            "Abroncs"
-          ]
-        },
-        {
-          "key": "hubModel",
-          "labels": [
-            "Agy",
-            "Hub (Front)",
-            "Agy e",
-            "Első agy",
-            "Agyak",
-            "kerékagyak",
-            "Kerékagy",
-            "Hubs",
-            "FRONT HUB",
-            "Agy Első",
-            "ELSŐ AGY/FRONT HUB",
-            "HUB FRONT"
-          ]
-        },
-        {
-          "key": "spokes",
-          "labels": ["Spokes", "Küllő", "Küllők"]
-        },
-        {
-          "key": "tireModel",
-          "labels": [
-            "TIRE F",
-            "Front Tire",
-            "Első külső",
-            "Külső gumi",
-            "Külsők",
-            "Tires",
-            "Gumiabroncs",
-            "Gumiabroncsok",
-            "KÖPENY/TIRE",
-            "Gumikülső Első",
-            "Kerékpár külső",
-            "Külső",
-            "Gumiköpeny",
-            "Külsőgumi",
-            "Gumik",
-            "Gumiköpenyek",
-            "Köpeny",
-            "Gumiabroncs első/hátsó",
-            "Külső gumi elöl",
-            "első gumiabroncs",
-            "TYRES",
-            "Tire front",
-            "Gumik elöl"
-          ]
-        },
-        {
-          "key": "handlebar",
-          "labels": ["Kormány", "BAR", "Handlebar", "Handlebars"]
-        },
-        {
-          "key": "stem",
-          "labels": ["Kormányszár", "STEM", "H'stem", "Stucni", "Kormányfej", "Szár", "Szára", "HANDLEBAR BRIDGE"]
-        },
-        {
-          "key": "headset",
-          "labels": ["HEADSET", "Kormánycsapágy", "Head set", "FEJSZERELÉS", "Fejhallgató"]
-        },
-        {
-          "key": "grips",
-          "labels": ["Grips", "Markolat", "GRIP", "Kormánymarkolat", "Markolatok", "FOGANTYÚK"]
-        },
-        {
-          "key": "saddle",
-          "labels": ["Nyereg", "SADDLE", "Seat"]
-        },
-        {
-          "key": "seatpost",
-          "labels": ["SEATPOST", "Nyeregcső", "Nyeregszár", "Seat post", "Üléscső", "Ülőoszlop"]
-        },
-        {
-          "key": "seatClamp",
-          "labels": ["Nyeregcsőbilincs", "SEATCLAMP"]
-        }
-      ]
-    }
   }
 }

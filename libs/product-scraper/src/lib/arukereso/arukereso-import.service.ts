@@ -9,6 +9,7 @@ import {
   ProductSource,
   ProductSourceRecordRepository,
   TaskStatus,
+  enabledCategorySlugs,
 } from '@fittkereso-backend/database';
 import { TaskConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
@@ -275,9 +276,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
     summary: ImportRunSummary;
   }): Promise<void> {
     const { source, config, requestedSlugs, capped, seenExternalIds, summary } = params;
-    const enabledSlugs = Object.entries(config.categories ?? {})
-      .filter(([, category]) => category.enabled)
-      .map(([slug]) => slug);
+    const enabledSlugs = enabledCategorySlugs(config);
     const incomplete: RemovalSkipReason | undefined = capped
       ? 'capped'
       : config.filter?.conditions?.length

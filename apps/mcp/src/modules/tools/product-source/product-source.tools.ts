@@ -3,6 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
   ProductSource,
+  ProductSourceCategoryConfig,
   ProductSourceConfigValidatorService,
   ProductSourceRepository,
   SellerRepository,
@@ -374,6 +375,49 @@ export class ProductSourceTools {
     }
   }
 
+  @Tool({
+    name: 'update_product_source_category',
+    description:
+      "Replace, add or remove ONE category's section of a ProductSource config — categories.<slug>: its enabled switch, its rules (which listings are in the category), its specMapping and its identitySpecRows — without sending the whole config. Saved as one new config version, validated like update_product_source. Use get_product_source to read the current section first; a section passed here replaces that section entirely.",
+    parameters: z.object({
+      productSourceId: z.string().describe('ProductSource UUID'),
+      categorySlug: z.string().min(1).describe('The category slug, e.g. "ebikes" or "bikes"'),
+      section: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'The complete section: { enabled, rules?, specMapping?, identitySpecRows? }. Omit together with remove: true to delete the section.',
+        ),
+      remove: z.boolean().optional().describe('true removes the section instead.'),
+      note: z.string().optional().describe('Why — kept with the version.'),
+    }),
+    annotations: { destructiveHint: false, idempotentHint: true },
+  })
+  async updateProductSourceCategory(args: {
+    productSourceId: string;
+    categorySlug: string;
+    section?: Record<string, unknown>;
+    remove?: boolean;
+    note?: string;
+  }): Promise<string> {
+    if (!args.remove === !args.section) {
+      return 'Pass either a section, or remove: true — exactly one of them.';
+    }
+    try {
+      const source = await this.updateService.updateCategorySection(
+        args.productSourceId,
+        args.categorySlug,
+        // Validated with the whole config before it is stored.
+        args.remove ? null : (args.section as unknown as ProductSourceCategoryConfig),
+        { actor: systemActor('mcp'), note: args.note },
+      );
+      return `Category section "${args.categorySlug}" of "${source.name}" ${args.remove ? 'removed' : 'saved'}.\n\n${this.formatSource(source)}`;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `Failed to update the "${args.categorySlug}" section of product source ${args.productSourceId}: ${message}`;
+    }
+  }
+
   // ─── Config version tools ──────────────────────────────────────────────────
 
   @Tool({
@@ -612,6 +656,15 @@ export class ProductSourceTools {
     L.push(`- **Detail refresh interval**: ${source.detailRefreshInterval}`);
     L.push(`- **Next run**: ${source.nextRunAt?.toISOString() ?? '_not scheduled_'}`);
     L.push(`- **Last run**: ${source.lastRunAt?.toISOString() ?? '_never_'}`);
+    L.push('');
+    L.push('## Categories');
+    const sections = Object.entries(source.config?.categories ?? {});
+    if (!sections.length) L.push('_No category section: this source imports nothing._');
+    for (const [slug, section] of sections) {
+      L.push(
+        `- **${slug}**: ${section.enabled ? 'enabled' : 'disabled'} · ${section.rules?.length ?? 0} rules · ${section.specMapping?.mappings.length ?? 0} spec mappings · ${section.identitySpecRows ? `${section.identitySpecRows.length} identity rows` : 'every row to identity'}`,
+      );
+    }
     L.push('');
     L.push('## Config');
     L.push('```json');

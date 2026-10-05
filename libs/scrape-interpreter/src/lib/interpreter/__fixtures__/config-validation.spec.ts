@@ -124,15 +124,17 @@ describe('hand-authored source configs', () => {
     attributes: ScrapedProductSpec[] = [],
   ): Promise<string | undefined> {
     const rawLabel = await readText(config, 'categoryLabel', fields);
-    const label = isEmpty(config.category.labelFrom)
+    const label = isEmpty(config.category?.labelFrom)
       ? rawLabel
       : asText(
-          await interpreter.runValuePipeline(config.category.labelFrom ?? [], rawLabel, {
+          await interpreter.runValuePipeline(config.category?.labelFrom ?? [], rawLabel, {
             baseUrl: config.baseUrl,
           }),
         );
 
-    return interpreter.resolveCategoryFromRules(config.category.slugLookup, label, attributes);
+    const resolution = interpreter.resolveCategory(config.categories, label, attributes);
+    if (resolution.status === 'ambiguous') return `ambiguous: ${resolution.slugs.join(', ')}`;
+    return resolution.status === 'resolved' ? resolution.slug : undefined;
   }
 
   it('validates the ebikeshop config against the config schema', () => {
@@ -157,8 +159,10 @@ describe('hand-authored source configs', () => {
           path: 'props.product.category.slug',
         },
       ],
-      slugLookup: [{ when: { equalsIgnoreCase: 'elektromos-kerekparok' }, slug: 'ebikes' }],
     });
+    expect(config.categories?.['ebikes']?.rules).toEqual([
+      { when: { equalsIgnoreCase: 'elektromos-kerekparok' } },
+    ]);
   });
 
   // ebikeshop's listing paginates on `oldal` (Hungarian for "page") — the
@@ -223,14 +227,14 @@ describe('hand-authored source configs', () => {
   // Its 23-row property table is short enough to send whole.
   it('ebikeshop config sends its whole spec table to the identity extraction', () => {
     expect(
-      (ebikeshopConfig as unknown as ScrapingSourceConfig).identityExtraction,
+      (ebikeshopConfig as unknown as ScrapingSourceConfig).categories?.['ebikes']?.identitySpecRows,
     ).toBeUndefined();
   });
 
   it('speedbike config resolves E-BIKE breadcrumb text to the ebikes category', () => {
     const config = speedbikeConfig as unknown as ScrapingSourceConfig;
-    expect(config.detailPage.category.slugLookup).toEqual([
-      { when: { equalsIgnoreCase: 'E-BIKE' }, slug: 'ebikes' },
+    expect(config.categories?.['ebikes']?.rules).toEqual([
+      { when: { equalsIgnoreCase: 'E-BIKE' } },
     ]);
   });
 
@@ -317,7 +321,7 @@ describe('hand-authored source configs', () => {
       ['drivetrain', ['Hátsó váltó', 'Fogaskoszorú', 'Gear Shift']],
       ['weight', ['Súly', 'Weight']],
     ])('sends the %s rows to the identity extraction', (_group, labels) => {
-      expect(config.identityExtraction?.specRows).toEqual(
+      expect(config.categories?.['ebikes']?.identitySpecRows).toEqual(
         expect.arrayContaining(labels),
       );
     });
@@ -328,9 +332,10 @@ describe('hand-authored source configs', () => {
     // in its size selector rather than its spec table, while the feed carries
     // it as a `Méret` (or `size`) attribute on about half of its e-bike rows.
     it('reuses the scraping source spec mappings, plus the frame size', () => {
-      const scraping = (speedbikeConfig as unknown as ScrapingSourceConfig)
-        .detailPage.specMapping['ebikes'];
-      const feed = config.specMapping?.['ebikes'];
+      const scraping = (speedbikeConfig as unknown as ScrapingSourceConfig).categories?.[
+        'ebikes'
+      ]?.specMapping;
+      const feed = config.categories?.['ebikes']?.specMapping;
       const isSize = (mapping: SourceSpecMapping) => SIZE_KEYS.includes(mapping.key);
 
       expect({ ...feed, mappings: feed?.mappings.filter((m) => !isSize(m)) }).toEqual(
@@ -355,7 +360,7 @@ describe('hand-authored source configs', () => {
       ['Méret', '24" / 20": ONE SIZE', {}],
       ['Méret', '26": ONE SIZE', {}],
     ])('reads the %s attribute %j', (name, value, expected) => {
-      const ebikes = config.specMapping?.['ebikes'];
+      const ebikes = config.categories?.['ebikes']?.specMapping;
       if (!ebikes) throw new Error('The fixture has no ebikes specMapping');
       const specs = new SpecExtractionService(
         new ProductSpecNormalizationService(),
@@ -369,9 +374,8 @@ describe('hand-authored source configs', () => {
     });
 
     it('resolves the breadcrumb path to the same category rule the scraper uses', () => {
-      expect(config.category.slugLookup).toEqual(
-        (speedbikeConfig as unknown as ScrapingSourceConfig).detailPage.category
-          .slugLookup,
+      expect(config.categories?.['ebikes']?.rules).toEqual(
+        (speedbikeConfig as unknown as ScrapingSourceConfig).categories?.['ebikes']?.rules,
       );
     });
 
@@ -415,9 +419,18 @@ describe('hand-authored source configs', () => {
       expect(config.mapping['priceWithoutDiscount']).toEqual({ field: 'price', pipeline: stripCurrency });
     });
 
+    // The same label and the same rules; the spec mapping and the identity
+    // rows are no use to a source that runs neither LLM call.
     it('resolves categories as the Árukereső source does', () => {
+      const gates = (categories: ArukeresoSourceConfig['categories']) =>
+        Object.fromEntries(
+          Object.entries(categories ?? {}).map(([slug, section]) => [
+            slug,
+            pick(section, ['enabled', 'rules']),
+          ]),
+        );
       expect(config.category).toEqual(arukereso.category);
-      expect(config.categories).toEqual(arukereso.categories);
+      expect(gates(config.categories)).toEqual(gates(arukereso.categories));
     });
 
     // It identifies nothing and carries no specs: no LLM call has anything to do.
@@ -719,7 +732,7 @@ describe('hand-authored source configs', () => {
         ['bikes', bikesJsonSchema],
         ['ebikes', ebikesJsonSchema],
       ] as const) {
-        const mapping = config.specMapping?.[slug];
+        const mapping = config.categories?.[slug]?.specMapping;
         if (!mapping) throw new Error(`The fixture has no ${slug} specMapping`);
         const specs = new SpecExtractionService(new ProductSpecNormalizationService()).extractSpecs({
           scrapedSpecs: [{ name, values: [value] }],

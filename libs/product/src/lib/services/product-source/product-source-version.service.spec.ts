@@ -25,12 +25,17 @@ const CONFIG = {
     rawSpecs: [{ op: 'selectAll', selector: 'tr' }],
     category: {
       breadcrumbOrSource: [{ op: 'selectText', selector: '.crumb' }],
-      slugLookup: [{ when: { always: true }, slug: 'ebikes' }],
     },
     brand: [{ op: 'selectText', selector: '.brand' }],
     model: [{ op: 'selectText', selector: '.model' }],
     images: [{ op: 'extractAttrList', attr: 'src' }],
-    specMapping: { ebikes: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] } },
+  },
+  categories: {
+    ebikes: {
+      enabled: true,
+      rules: [{ when: { always: true } }],
+      specMapping: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] },
+    },
   },
 } as unknown as ScrapingSourceConfig;
 
@@ -176,6 +181,7 @@ describe('ProductSourceVersionService', () => {
     // database can come back reordered without anybody touching it.
     it('treats a key-reordered config as unchanged', async () => {
       const reordered = {
+        categories: CONFIG.categories,
         detailPage: CONFIG.detailPage,
         listPage: CONFIG.listPage,
         startUrls: CONFIG.startUrls,
@@ -258,6 +264,44 @@ describe('ProductSourceVersionService', () => {
       const action = actionRepo.record.mock.calls[0][0];
       expect(action.type).toBe('config_restored');
       expect(action.payload).toEqual({ version: 6, restoredFromVersion: 2 });
+    });
+
+    // A version saved before each category had its own section: restoring it
+    // puts the same settings back in the current layout, which is the only
+    // one a run accepts. The history row itself is not touched.
+    it('converts a version from before the category sections on the way back', async () => {
+      const { categories: _categories, ...rest } = OLD_CONFIG;
+      versionRepo.findByVersion.mockResolvedValue({
+        id: 'version-2',
+        version: 2,
+        config: {
+          ...rest,
+          categories: { ebikes: { enabled: true, sourceTitle: 'E-BIKE' } },
+          identityExtraction: { specRows: ['Motor'] },
+          detailPage: {
+            ...OLD_CONFIG.detailPage,
+            category: {
+              ...OLD_CONFIG.detailPage.category,
+              slugLookup: [{ when: { always: true }, slug: 'ebikes' }],
+            },
+            specMapping: { ebikes: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] } },
+          },
+        },
+      });
+
+      await service.restoreVersion(SOURCE.id, 2, ACTOR);
+
+      expect(versionRows()[0].config).toEqual({
+        ...OLD_CONFIG,
+        categories: {
+          ebikes: {
+            enabled: true,
+            rules: [{ when: { always: true } }],
+            specMapping: { mappings: [{ key: 'motorBrand', labels: ['Motor'] }] },
+            identitySpecRows: ['Motor'],
+          },
+        },
+      });
     });
 
     it('refuses to restore the version already in force', async () => {

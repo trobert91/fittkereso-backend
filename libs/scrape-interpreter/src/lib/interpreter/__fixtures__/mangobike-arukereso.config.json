@@ -5,7 +5,13 @@
   "categories": {
     "ebikes": {
       "enabled": true,
-      "sourceTitle": "Elektromos Kerékpárok"
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Elektromos Kerékpárok"
+          }
+        }
+      ]
     }
   },
   "category": {
@@ -19,14 +25,6 @@
         "separator": " > ",
         "index": 0,
         "trim": true
-      }
-    ],
-    "slugLookup": [
-      {
-        "when": {
-          "equalsIgnoreCase": "Elektromos Kerékpárok"
-        },
-        "slug": "ebikes"
       }
     ]
   },

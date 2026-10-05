@@ -82,11 +82,10 @@ describe('ScrapeInterpreterService', () => {
         },
         detailPage: {
           rawSpecs: [],
-          category: { breadcrumbOrSource: [], slugLookup: [{ when: { always: true }, slug: 'monitors' }] },
+          category: { breadcrumbOrSource: [] },
           brand: [],
           model: [],
           images: [],
-          specMapping: {},
         },
       };
 
@@ -150,11 +149,10 @@ describe('ScrapeInterpreterService', () => {
         },
         detailPage: {
           rawSpecs: [],
-          category: { breadcrumbOrSource: [], slugLookup: [{ when: { always: true }, slug: 'monitors' }] },
+          category: { breadcrumbOrSource: [] },
           brand: [],
           model: [],
           images: [],
-          specMapping: {},
         },
       };
 
@@ -189,6 +187,7 @@ describe('ScrapeInterpreterService', () => {
       const config: ScrapingSourceConfig = {
         baseUrl: 'https://www.arukereso.hu',
         startUrls: ['https://www.arukereso.hu/monitorok'],
+        categories: { monitors: { enabled: true, rules: [{ when: { always: true } }] } },
         listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
         detailPage: {
           rawSpecs: [
@@ -207,7 +206,6 @@ describe('ScrapeInterpreterService', () => {
           ],
           category: {
             breadcrumbOrSource: [{ op: 'identity' }],
-            slugLookup: [{ when: { always: true }, slug: 'monitors' }],
           },
           brand: [
             { op: 'selectAll', selector: 'script', as: 'scripts' },
@@ -243,7 +241,6 @@ describe('ScrapeInterpreterService', () => {
             },
           ],
           images: [],
-          specMapping: {},
         },
       };
 
@@ -262,97 +259,104 @@ describe('ScrapeInterpreterService', () => {
       ]);
     });
 
-    it('resolves headphones vs headsets via a specValueIncludes rule with unless', async () => {
-      const $ = cheerio.load('<div></div>');
+    describe('category sections', () => {
+      // Rows are passed straight in, isolating the category resolution from
+      // the rest of the (already-covered) op vocabulary.
+      const label = 'fülhallgató, fejhallgató';
+      const headset = {
+        specValueIncludes: { label: 'Típus', anyOf: ['headset', 'gamer'] },
+      };
+      const resolve = (
+        categories: ScrapingSourceConfig['categories'],
+        values: string[],
+      ) => interpreter.resolveCategory(categories, label, [{ name: 'Típus', values }]);
 
       // Mirrors ArukeresoCategoryMapperService.resolveHeadphonesOrHeadsets:
-      // default to headphones unless the "Típus" spec explicitly reads as a
-      // headset/gaming-headset shape, in which case route to headsets.
-      const slugLookup = [
-        {
-          when: { equalsIgnoreCase: 'fülhallgató, fejhallgató' },
-          slug: 'headphones' as const,
-          unless: {
-            specValueIncludes: {
-              label: 'Típus',
-              anyOf: ['headset', 'gamer'],
-            },
-          },
+      // headphones, unless the "Típus" spec reads as a headset.
+      const headphonesOrHeadsets = {
+        headphones: {
+          enabled: true,
+          rules: [{ when: { equalsIgnoreCase: label }, unless: headset }],
         },
-        {
-          when: { equalsIgnoreCase: 'fülhallgató, fejhallgató' },
-          slug: 'headsets' as const,
-        },
-      ];
-
-      // A stub registry lets rawSpecs/breadcrumbOrSource return fixed test
-      // fixtures directly, isolating the category-resolution logic under
-      // test from the rest of the (already-covered) op vocabulary.
-      const buildConfig = (
-        specs: { name: string; values: string[] }[],
-      ): ScrapingSourceConfig => ({
-        baseUrl: 'https://www.arukereso.hu',
-        startUrls: ['https://www.arukereso.hu/monitorok'],
-        listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
-        detailPage: {
-          rawSpecs: [{ op: 'returnFixture', fixture: 'specs' } as never],
-          category: {
-            breadcrumbOrSource: [
-              { op: 'returnFixture', fixture: 'breadcrumb' } as never,
-            ],
-            slugLookup,
-          },
-          brand: [],
-          model: [],
-          images: [],
-          specMapping: {},
-        },
-        __fixtures: { specs, breadcrumb: 'fülhallgató, fejhallgató' },
-      } as unknown as ScrapingSourceConfig);
-
-      const stubRegistry = new ScrapeOpRegistryService();
-      const stubRunner = new ScrapePipelineRunnerService(stubRegistry);
-      stubRegistry.register('returnFixture' as never, (ctx, _input, op: any) => {
-        const fixtures = (ctx.task as any).__fixtures;
-        return fixtures[op.fixture];
-      });
-      const stubInterpreter = new ScrapeInterpreterService(
-        stubRunner,
-        runtime,
-      );
-
-      const runWithSpecs = (specs: { name: string; values: string[] }[]) => {
-        const config = buildConfig(specs);
-        const task = {
-          ...makeTask(),
-          __fixtures: (config as any).__fixtures,
-        } as unknown as ProductImportTask;
-        return stubInterpreter.runDetailPage(task, $, config);
+        headsets: { enabled: true, rules: [{ when: headset }] },
       };
 
-      const headphoneResult = await runWithSpecs([
-        { name: 'Típus', values: ['fülhallgató'] },
-      ]);
-      expect(headphoneResult.categorySlug).toBe('headphones');
+      it('resolves headphones vs headsets via a specValueIncludes rule with unless', () => {
+        expect(resolve(headphonesOrHeadsets, ['fülhallgató'])).toEqual({
+          status: 'resolved',
+          slug: 'headphones',
+        });
+        expect(resolve(headphonesOrHeadsets, ['gamer headset'])).toEqual({
+          status: 'resolved',
+          slug: 'headsets',
+        });
+      });
 
-      const headsetResult = await runWithSpecs([
-        { name: 'Típus', values: ['gamer headset'] },
-      ]);
-      expect(headsetResult.categorySlug).toBe('headsets');
+      // No section is a fallback for another: a listing that two claim is
+      // reported, not given to whichever comes first.
+      it('reports a listing whose rules match in two sections as ambiguous', () => {
+        const overlapping = {
+          ...headphonesOrHeadsets,
+          headsets: { enabled: true, rules: [{ when: { equalsIgnoreCase: label } }] },
+        };
+        expect(resolve(overlapping, ['fülhallgató'])).toEqual({
+          status: 'ambiguous',
+          slugs: ['headphones', 'headsets'],
+        });
+      });
+
+      // A disabled section still claims its listings, so the caller can skip
+      // them as not enabled rather than not recognised.
+      it('resolves to a disabled section too, and matches nothing without rules', () => {
+        expect(
+          resolve({ headphones: { enabled: false, rules: [{ when: { always: true } }] } }, []),
+        ).toEqual({ status: 'resolved', slug: 'headphones' });
+        expect(resolve({ headphones: { enabled: true } }, [])).toEqual({
+          status: 'unidentified',
+        });
+      });
+
+      it('gives the detail page its category, or the slugs that both claim it', async () => {
+        const $ = cheerio.load('<div></div>');
+        const page = (categories: ScrapingSourceConfig['categories']): ScrapingSourceConfig => ({
+          baseUrl: 'https://www.arukereso.hu',
+          startUrls: ['https://www.arukereso.hu/monitorok'],
+          categories,
+          listPage: { categoryName: [], items: [], itemMode: 'cheerio', itemPipeline: [] },
+          detailPage: {
+            rawSpecs: [],
+            category: { breadcrumbOrSource: [{ op: 'literal', value: label }] },
+            brand: [],
+            model: [],
+            images: [],
+          },
+        });
+
+        const single = await interpreter.runDetailPage(makeTask(), $, page(headphonesOrHeadsets));
+        expect(single.categorySlug).toBe('headphones');
+        expect(single.ambiguousCategorySlugs).toBeUndefined();
+
+        const both = await interpreter.runDetailPage(
+          makeTask(),
+          $,
+          page({
+            headphones: { enabled: true, rules: [{ when: { always: true } }] },
+            headsets: { enabled: true, rules: [{ when: { always: true } }] },
+          }),
+        );
+        expect(both.categorySlug).toBeUndefined();
+        expect(both.ambiguousCategorySlugs).toEqual(['headphones', 'headsets']);
+      });
     });
   });
 
   describe('runDetailPage offers', () => {
     const baseDetailPage = () => ({
       rawSpecs: [],
-      category: {
-        breadcrumbOrSource: [],
-        slugLookup: [{ when: { always: true } as const, slug: 'ebikes' }],
-      },
+      category: { breadcrumbOrSource: [] },
       brand: [{ op: 'identity' as const, value: undefined }],
       model: [{ op: 'identity' as const, value: undefined }],
       images: [],
-      specMapping: {},
     });
 
     it('extracts a single self-offer when offerList resolves to one item and price resolves', async () => {

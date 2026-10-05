@@ -29,14 +29,14 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
         id: 'source-1',
         name: 'speedbike',
         config: {
-          categories: { ebikes: { enabled: true } },
+          categories: { ebikes: { enabled: true, specMapping: { mappings: [] } } },
           listPage: {
             categoryName: [],
             items: [],
             itemMode: 'cheerio',
             itemPipeline: [],
           },
-          detailPage: { specMapping: { ebikes: { mappings: [] } } },
+          detailPage: {},
         },
       },
     } as unknown as ProductImportTask;
@@ -151,12 +151,30 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
 
   it('skips extraction without a specMapping for the category', async () => {
     const task = buildTask();
-    asScrapingConfig(task.source.config).detailPage.specMapping = {};
+    asScrapingConfig(task.source.config).categories = { ebikes: { enabled: true } };
 
     const result = await callExtractProduct(task);
 
     expect(specExtraction.extractSpecs).not.toHaveBeenCalled();
     expect(result.scrapedProduct.extractedSpecs).toEqual({});
+  });
+
+  // A page two category sections claim fails like one none claims, under its
+  // own reason, so the config mistake shows on the task and in the metrics.
+  it('fails a page whose rules match in two category sections', async () => {
+    interpreter.runDetailPage.mockResolvedValueOnce({
+      ...detail,
+      categorySlug: undefined,
+      ambiguousCategorySlugs: ['ebikes', 'bikes'],
+    });
+
+    await expect(callExtractProduct(buildTask())).rejects.toThrow(
+      'Category is ambiguous: the rules of ebikes, bikes all match',
+    );
+    expect(scrapingMetrics.recordExtractionSkipReason).toHaveBeenCalledWith(
+      'speedbike',
+      'category_ambiguous',
+    );
   });
 
   // Listing-level values arrive once the identity extraction has read them;

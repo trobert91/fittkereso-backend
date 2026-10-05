@@ -32,7 +32,7 @@ describe('ProductSourceImportSimulationService', () => {
     config: {
       baseUrl: 'https://speedbike.hu',
       feedUrl: 'https://speedbike.hu/feed',
-      category: { slugLookup: [] },
+      categories: { ebikes: { enabled: true } },
       mapping: { externalId: { field: 'identifier' } },
     },
   } as unknown as ProductSource;
@@ -224,7 +224,7 @@ describe('ProductSourceImportSimulationService', () => {
       // source's postProcess.identity decides whether that calls the LLM. The
       // spec rows it would read are no concern of a contributing source.
       expect(specPostProcess.extractIdentity).toHaveBeenCalledTimes(3);
-      expect(result.warnings.join(' ')).not.toMatch(/identityExtraction\.specRows/);
+      expect(result.warnings.join(' ')).not.toMatch(/identitySpecRows/);
     });
 
     // Google's reason to exist next to the Árukereső feed.
@@ -339,7 +339,7 @@ describe('ProductSourceImportSimulationService', () => {
             gtin: { field: 'ean_code' },
             mpn: { field: 'sku' },
           },
-          identityExtraction: { specRows: ['Motor', 'Váz', 'Kerék'] },
+          categories: { ebikes: { enabled: true, identitySpecRows: ['Motor', 'Váz', 'Kerék'] } },
         },
       } as unknown as ProductSource;
 
@@ -392,9 +392,9 @@ describe('ProductSourceImportSimulationService', () => {
           meanRowsSent: 1,
           meanRowsTotal: 1.7,
           byLabel: [
-            { label: 'Motor', listings: 2 },
-            { label: 'Váz', listings: 1 },
-            { label: 'Kerék', listings: 0 },
+            { category: 'ebikes', label: 'Motor', listings: 2 },
+            { category: 'ebikes', label: 'Váz', listings: 1 },
+            { category: 'ebikes', label: 'Kerék', listings: 0 },
           ],
         });
         expect(result.warnings.join(' ')).toMatch(/1 eligible items match none/);

@@ -3,6 +3,8 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
   PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceConfig,
+  ProductSourceConfigValidatorService,
   ProductSourceFetchMode,
   ProductSourceRepository,
   ScrapedProduct,
@@ -20,6 +22,7 @@ export class ProductSourceSimulateImportTools {
     private readonly simulation: ProductSourceImportSimulationService,
     private readonly productSourceRepo: ProductSourceRepository,
     private readonly matchQuery: ProductMatchQueryService,
+    private readonly configValidator: ProductSourceConfigValidatorService,
   ) {}
 
   @Tool({
@@ -54,6 +57,12 @@ export class ProductSourceSimulateImportTools {
         .describe(
           "Fetch as if the source were in this mode — 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent) — for every fetch of the run, the page walk included. Defaults to the source's own fetchMode. The source itself is not changed: pass 'direct' to check a shop before switching it.",
         ),
+      config: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          "A draft config to run with instead of the stored one — the complete object, as update_product_source would take it. Validated first; nothing is saved. Use it to dry-run a category section's rules or spec mapping before saving them.",
+        ),
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false },
   })
@@ -63,6 +72,7 @@ export class ProductSourceSimulateImportTools {
     limit?: number;
     categorySlugs?: string[];
     fetchMode?: ProductSourceFetchMode;
+    config?: Record<string, unknown>;
   }): Promise<string> {
     const source = await this.productSourceRepo.findOne({
       where: { id: args.productSourceId },
@@ -70,6 +80,14 @@ export class ProductSourceSimulateImportTools {
     });
     if (!source) {
       return `No ProductSource found with id ${args.productSourceId}.`;
+    }
+    if (args.config) {
+      const problems = this.configValidator.problems(source.type, args.config);
+      if (problems) {
+        return `The draft config is not valid: ${this.configValidator.format(problems)}`;
+      }
+      // An in-memory copy: the simulation reads the source, never saves it.
+      source.config = args.config as unknown as ProductSourceConfig;
     }
 
     try {
@@ -233,7 +251,7 @@ export class ProductSourceSimulateImportTools {
       L.push('_This source does not identify products: no identity extraction runs._');
     } else if (!specRows.configured) {
       L.push(
-        `_identityExtraction.specRows is not set — every listing sends its whole table (${specRows.meanRowsTotal} rows on average)._`,
+        `_No category section sets identitySpecRows — every listing sends its whole table (${specRows.meanRowsTotal} rows on average)._`,
       );
     } else {
       L.push(
@@ -245,8 +263,8 @@ export class ProductSourceSimulateImportTools {
       L.push(
         '- **listings each label matched** (0 = a typo, or a row the shop no longer publishes):',
       );
-      for (const { label, listings } of specRows.byLabel) {
-        L.push(`  - ${label}: ${listings}${share(listings)}`);
+      for (const { category, label, listings } of specRows.byLabel) {
+        L.push(`  - ${category} › ${label}: ${listings}${share(listings)}`);
       }
     }
     L.push('');

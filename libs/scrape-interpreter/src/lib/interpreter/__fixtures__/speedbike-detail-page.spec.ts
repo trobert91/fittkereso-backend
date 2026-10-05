@@ -342,7 +342,7 @@ describe('speedbike.hu detail page — declarative config golden fixture', () =>
     const specs = specExtraction.extractSpecs({
       scrapedSpecs: result.rawSpecs,
       schema: ebikesJsonSchema as unknown as SpecDefinitionJsonSchema,
-      sourceConfig: config.detailPage.specMapping!['ebikes'],
+      sourceConfig: config.categories?.['ebikes']?.specMapping ?? { mappings: [] },
     });
 
     // Fields this page never fills a matching label for (frameType,
