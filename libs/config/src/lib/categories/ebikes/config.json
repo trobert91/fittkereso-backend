@@ -239,7 +239,6 @@
   "primarySpecs": [
     "modelYear",
     "batteryCapacity",
-    "wheelSize",
     "torque",
     "usageType",
     "frameType"
@@ -277,9 +276,6 @@
       "modelYear": {
         "absolute": 0
       },
-      "wheelSize": {
-        "absolute": 0
-      },
       "batteryCapacity": {
         "absolute": 0
       },
@@ -303,7 +299,7 @@
       "modelYear": 50
     },
     "model": {
-      "excludeSpecs": ["modelYear", "gender", "wheelSize", "frameType"],
+      "excludeSpecs": ["modelYear", "gender", "frameType"],
       "examples": [
         { "title": "KTM MACINA STYLE 810 Di2 Unisex 2026 46cm Olive Pearl", "model": "MACINA STYLE 810 Di2", "specs": { "modelYear": 2026, "gender": "Uniszex", "frameSize": 46, "color": "Olive Pearl" } },
         { "title": "Cube Kathmandu Hybrid ONE 800 smaragdgrey'n'black 2025 Trapeze 54", "model": "Kathmandu Hybrid ONE 800", "specs": { "frameType": "Trapéz", "modelYear": 2025, "frameSize": 54, "color": "smaragdgrey'n'black" } },
@@ -365,7 +361,8 @@
     "frameSize",
     "frameSizeLabel",
     "color",
-    "mileage"
+    "mileage",
+    "wheelSize"
   ],
   "displayedSpecsInList": [
     "modelYear",

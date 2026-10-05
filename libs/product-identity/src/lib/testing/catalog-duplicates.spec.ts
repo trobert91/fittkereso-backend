@@ -153,11 +153,13 @@ describe('duplicate detection on the real KTM catalog', () => {
   it('keeps the pair count sane — detection is not a cross join', () => {
     const paired = allScoredPairs().filter((pair) => pair.score >= NEAR_MISS_SCORE);
 
-    // 334 pairs are recalled; 6 are worth a person's attention. It was 19
+    // 334 pairs are recalled; 7 are worth a person's attention. It was 19
     // until frameType became a primary spec and pushed four frame-shape pairs
     // below the bar, then 15 until baseScore became a blend and the trim-word
     // pairs it used to leave in the band dropped out of it, then 9 until a
-    // model year apart got its own penalty and the three year siblings left.
-    expect(paired).toHaveLength(6);
+    // model year apart got its own penalty and the three year siblings left,
+    // and 6 until wheelSize became a listing-level spec (2026-10-05) and the
+    // AERA 872 LFC / LFC ABS pair stopped losing 30 points for its wheels.
+    expect(paired).toHaveLength(7);
   });
 });

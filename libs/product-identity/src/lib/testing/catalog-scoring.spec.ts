@@ -156,12 +156,14 @@ describe('scoring the real KTM catalog', () => {
       // name difference the character measures could not classify used to
       // land, and six of those ten resolved to one side of it or the other.
       // Then 4, until a model year apart got its own penalty and the three
-      // year siblings left the band.
+      // year siblings left the band. 2 since wheelSize became a listing-level
+      // spec (2026-10-05): MACINA AERA 872 LFC against 872 LFC ABS no longer
+      // loses 30 points for its 28" against 27.5" wheels, and lands at 77.
       expect(
         pairs.filter(
           (pair) => pair.score >= NEAR_MISS_SCORE && pair.score < ACCEPT_SCORE,
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(2);
     });
 
     /**

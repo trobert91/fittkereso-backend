@@ -27,10 +27,13 @@ describe('gates on the real KTM catalog', () => {
     // it split one model across products and refused correct GTIN/MPN joins;
     // as a matcher spec a model's frames share a product, and Uniszex is
     // compatible with both (`matchingConfig.compatibleValues`).
+    //
+    // wheelSize left primarySpecs for offerLevelSpecs on 2026-10-05: Cube sells
+    // one model on 27.5" wheels in size S and 29" in M–XL, under one article
+    // code, so the wheel describes the listing, as the frame size does.
     expect(EBIKES.primarySpecs).toEqual([
       'modelYear',
       'batteryCapacity',
-      'wheelSize',
       'torque',
       'usageType',
       'frameType',
