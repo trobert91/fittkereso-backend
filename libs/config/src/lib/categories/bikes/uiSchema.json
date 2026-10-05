@@ -57,9 +57,6 @@
   "maxLoad": {
     "ui:widget": "updown"
   },
-  "waterResistance": {
-    "ui:widget": "text"
-  },
   "suspension": {
     "ui:widget": "select"
   },
@@ -266,7 +263,6 @@
     "topTubeLength",
     "maxTotalWeight",
     "maxLoad",
-    "waterResistance",
     "forkModel",
     "forkTravel",
     "forkType",

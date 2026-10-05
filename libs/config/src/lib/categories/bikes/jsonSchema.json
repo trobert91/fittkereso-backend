@@ -117,8 +117,9 @@
     "frameModel": {
       "meta": {
         "examples": [
-          "Macina Scarp Prem CB 140 UDH|CPT400 Bosch BDU31/M4830",
-          "Macina Scarp Premium Carbon 140 UDH"
+          "Aluminium Superlite, Trekking Comfort",
+          "SQUARE CROSS AL",
+          "28\" Alloy 6061 ONROAD / T-1450-M"
         ]
       },
       "type": "string",
@@ -274,18 +275,6 @@
       "type": "number",
       "title": "Max payload",
       "translation": "Maximális terhelhetőség"
-    },
-    "waterResistance": {
-      "meta": {
-        "examples": [
-          "IPX4",
-          "IPX5",
-          "IPX6"
-        ]
-      },
-      "type": "string",
-      "title": "Water resistance",
-      "translation": "Vízállóság"
     },
     "suspension": {
       "meta": {
@@ -463,8 +452,8 @@
     "crankset": {
       "meta": {
         "examples": [
-          "Race Face Aeffect-R170",
-          "KTM E-TEAM2 ISIS 170mm Q8"
+          "Shimano Tourney T501 46-30T",
+          "Shimano Cues FC-UT400, 32T"
         ]
       },
       "type": "string",
@@ -528,8 +517,8 @@
     "cassette": {
       "meta": {
         "examples": [
-          "Shimano LG700-11 / 11-50",
-          "SRAM GX T-Type XS-1275 / 10-52"
+          "Shimano CS-HG400-9 11-34",
+          "SRAM PG-1231 11-44"
         ]
       },
       "type": "string",
@@ -553,8 +542,8 @@
     "chain": {
       "meta": {
         "examples": [
-          "KMC e11 Sport EPT e-bike",
-          "SRAM GX T-Type 12s"
+          "KMC X9",
+          "Shimano CN-M8100"
         ]
       },
       "type": "string",
@@ -695,8 +684,8 @@
     "wheelset": {
       "meta": {
         "examples": [
-          "DT HXC 1501 Spline LS 29 Carbon",
-          "KTM E-PRIME Trail 29 by DT"
+          "ACID EX25, 32H, Disc",
+          "Giant P-R1 Disc"
         ]
       },
       "type": "string",
@@ -771,9 +760,9 @@
     "tireModel": {
       "meta": {
         "examples": [
-          "Schwalbe Wicked Will Evo SuperGround TLE",
           "Schwalbe Smart Sam",
-          "Schwalbe Johnny Watts"
+          "Schwalbe Marathon Mondial",
+          "Continental Contact Urban"
         ]
       },
       "type": "string",

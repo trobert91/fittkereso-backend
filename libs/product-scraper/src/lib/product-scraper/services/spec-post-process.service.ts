@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import {
+  CategorySpecPromptExamples,
   isArukeresoConfig,
   isScrapingConfig,
   modelExcludedSpecKeys,
@@ -47,6 +48,8 @@ export interface CategorySpecScopes {
   unificationKeys: string[];
   /** What the identity extraction is told about the model name. */
   modelRule: ModelRuleRequest;
+  /** The category's examples for both prompts' rules (promptConfig.specExamples). */
+  promptExamples?: CategorySpecPromptExamples;
 }
 
 /**
@@ -101,6 +104,7 @@ export class SpecPostProcessService {
         ),
         ...(examples?.length ? { examples } : {}),
       },
+      promptExamples: config?.promptConfig?.specExamples,
     };
   }
 
@@ -176,6 +180,7 @@ export class SpecPostProcessService {
         outputKeys: scopes.identityKeys,
         offerLevelSpecs: scopes.offerLevelKeys,
         modelRule: scopes.modelRule,
+        promptExamples: scopes.promptExamples,
         ...llmOptionsOf(config),
       });
 
@@ -313,6 +318,7 @@ export class SpecPostProcessService {
       goldenSample: this.categoryConfigService.getGoldenSample(
         scrapedProduct.category.slug,
       ),
+      promptExamples: scopes.promptExamples,
       ...llmOptionsOf(config),
     });
 

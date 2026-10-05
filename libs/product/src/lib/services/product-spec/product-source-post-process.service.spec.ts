@@ -1,5 +1,10 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { ProductSourcePostProcessService } from './product-source-post-process.service';
-import type { SpecDefinitionJsonSchema } from '@fittkereso-backend/database';
+import type {
+  CategorySpecPromptExamples,
+  SpecDefinitionJsonSchema,
+} from '@fittkereso-backend/database';
 
 describe('ProductSourcePostProcessService', () => {
   let service: ProductSourcePostProcessService;
@@ -1127,6 +1132,89 @@ describe('ProductSourcePostProcessService', () => {
         expect(result?.model).toBe(cleanedModel);
         expect(result?.specs).toEqual({ frameSize: 43 });
       });
+    });
+  });
+
+  // The rules are shared; their examples are the category's own parts
+  // (promptConfig.specExamples), so a bike prompt never talks about motors.
+  describe("the category's examples", () => {
+    const prompts = async (promptExamples?: CategorySpecPromptExamples) => {
+      aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+      await service.extractIdentity({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        outputKeys: ['weight', 'frameType'],
+        offerLevelSpecs: [],
+        modelRule: { excludedKeys: [] },
+        promptExamples,
+      });
+      await service.processModelSpecs({
+        data: { brand: 'KTM', model: 'Macina Scarp', specs: {} },
+        schema,
+        goldenSample,
+        outputKeys: ['weight', 'frameType'],
+        promptExamples,
+      });
+      const [identity, unification] = aiChat.createChat.mock.calls.map(
+        ([request]) => request.messages[0].content as string,
+      );
+      return { identity, unification };
+    };
+
+    it('shows each example after its rule', async () => {
+      const { identity, unification } = await prompts({
+        identityComponentRow: 'IDENTITY-ROW',
+        componentInference: 'INFERENCE',
+        componentRow: 'UNIFICATION-ROW',
+        descriptionStatement: 'DESCRIPTION',
+        noDerivation: 'DERIVATION',
+      });
+
+      expect(identity).toContain('a free-text component row (e.g. IDENTITY-ROW). Extract it');
+      expect(unification).toContain('include it rather than omitting it: e.g. INFERENCE. An equipment row');
+      expect(unification).toContain('a free-text component description (e.g. UNIFICATION-ROW). Extract from');
+      expect(unification).toContain('unambiguously stated (e.g. DESCRIPTION) — never from');
+      expect(unification).toContain("the input didn't provide (e.g. DERIVATION).\n");
+    });
+
+    it('states the rules alone for a category without examples', async () => {
+      const { identity, unification } = await prompts();
+
+      expect(identity).toContain('a free-text component row. Extract it');
+      expect(unification).toContain('include it rather than omitting it. An equipment row');
+      expect(unification).toContain('a free-text component description. Extract from');
+      expect(unification).toContain('unambiguously stated — never from');
+      expect(unification).toContain("the input didn't provide.\n");
+      expect(`${identity}${unification}`).not.toMatch(/Motor|Bosch|pedelec|Purion|battery/i);
+    });
+
+    // The e-bike examples were written into the prompts until 2026-10-05; moved
+    // to the e-bike config, they must read exactly as before (the inference
+    // rule's examples are what gpt-6-luna needs, see DEFAULT_MODEL).
+    it('renders the e-bike examples exactly as the prompts had them', async () => {
+      const ebikes = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, '../../../../../config/src/lib/categories/ebikes/config.json'),
+          'utf8',
+        ),
+      );
+      const { identity, unification } = await prompts(ebikes.promptConfig.specExamples);
+
+      expect(identity).toContain(
+        'the value can sit inside a free-text component row (e.g. a "Motor" row naming the drive unit, a frame row stating the material or the suspension). Extract it',
+      );
+      expect(unification).toContain(
+        'include it rather than omitting it: e.g. a Bosch Performance Line / BDU drive unit is a mid-drive motor (motorPosition), a Shimano shifter/derailleur without Di2 is mechanical shiftingActuation while Di2/AXS is electronic, a stated 25 km/h assist limit means pedelecClass "Pedelec", a named display or remote (Purion, Kiox, LED Remote, Mini Remote) means display true, and "Smart System" components mean smartConnectivity true. An equipment row',
+      );
+      expect(unification).toContain(
+        'a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row\'s free text may state the frame type or suspension). Extract from',
+      );
+      expect(unification).toContain(
+        'unambiguously stated (e.g. "a váz felső csövéből egyszerűen eltávolítható akkumulátor" clearly states batteryRemovable=true) — never from',
+      );
+      expect(unification).toContain(
+        "- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n",
+      );
     });
   });
 });

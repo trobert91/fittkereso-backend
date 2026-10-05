@@ -372,5 +372,14 @@
     "batteryCapacity",
     "motorModel",
     "wheelSize"
-  ]
+  ],
+  "promptConfig": {
+    "specExamples": {
+      "identityComponentRow": "a \"Motor\" row naming the drive unit, a frame row stating the material or the suspension",
+      "componentInference": "a Bosch Performance Line / BDU drive unit is a mid-drive motor (motorPosition), a Shimano shifter/derailleur without Di2 is mechanical shiftingActuation while Di2/AXS is electronic, a stated 25 km/h assist limit means pedelecClass \"Pedelec\", a named display or remote (Purion, Kiox, LED Remote, Mini Remote) means display true, and \"Smart System\" components mean smartConnectivity true",
+      "componentRow": "a row named \"Motor\" with value \"Bosch PERFORMANCE SX BDU3144\" may be the only place motorPower/motorPosition/brand info appears; a \"Váz\"/frame row's free text may state the frame type or suspension",
+      "descriptionStatement": "\"a váz felső csövéből egyszerűen eltávolítható akkumulátor\" clearly states batteryRemovable=true",
+      "noDerivation": "don't derive torque from motor power"
+    }
+  }
 }

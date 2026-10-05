@@ -123,6 +123,29 @@ export interface CategoryPromptConfig {
    *  "monitor", "ultrawide monitor", "headphones", "projector" — so generic-named
    *  products land on the right SKU pages. */
   searchKeywordSuffix?: string;
+  /** This category's examples for the rules of the shared spec prompts. */
+  specExamples?: CategorySpecPromptExamples;
+}
+
+/**
+ * The examples the spec prompts give for their rules, in this category's own
+ * parts (ProductSourcePostProcessService). The rules are the same for every
+ * category; each example is shown after its rule's "e.g.", and a category
+ * without one gets the rule alone.
+ */
+export interface CategorySpecPromptExamples {
+  /** Identity extraction: a free-text component row holding a value no row is
+   *  labelled for — e.g. a frame row stating the material. */
+  identityComponentRow?: string;
+  /** Spec unification: categorical or yes/no values that follow from a named
+   *  component or a stated limit. */
+  componentInference?: string;
+  /** Spec unification: the component-row example, at more length. */
+  componentRow?: string;
+  /** Spec unification: a description sentence that clearly states a value. */
+  descriptionStatement?: string;
+  /** Spec unification: a value never to be computed from another. */
+  noDerivation?: string;
 }
 
 // ─── Spec Extraction Config ─────────────────────────────────────────────────

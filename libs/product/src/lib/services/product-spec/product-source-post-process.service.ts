@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AiChatService } from '@fittkereso-backend/ai';
 import type {
   CategoryModelExample,
+  CategorySpecPromptExamples,
   ProductSpecs,
   ScrapedProductSpec,
   SpecDefinitionJsonSchema,
@@ -188,6 +189,8 @@ export class ProductSourcePostProcessService {
     offerLevelSpecs: string[];
     /** Which spec values the model leaves out, and the category's examples. */
     modelRule: ModelRuleRequest;
+    /** The category's examples for the prompt's rules (promptConfig.specExamples). */
+    promptExamples?: CategorySpecPromptExamples;
     model?: string;
     thinking?: boolean;
     effort?: string;
@@ -202,6 +205,7 @@ export class ProductSourcePostProcessService {
         outputKeys,
         offerLevelSpecs,
         params.modelRule,
+        params.promptExamples,
       ),
       userMessage: this.buildUserMessage(data, rawSpecs, undefined, description),
       responseSchema: this.buildIdentityResponseSchema(schema, outputKeys),
@@ -249,6 +253,8 @@ export class ProductSourcePostProcessService {
     outputKeys: string[];
     /** The category's one golden sample; only its `outputKeys` are shown. */
     goldenSample?: ProductSpecs;
+    /** The category's examples for the prompt's rules (promptConfig.specExamples). */
+    promptExamples?: CategorySpecPromptExamples;
     model?: string;
     thinking?: boolean;
     effort?: string;
@@ -269,6 +275,7 @@ export class ProductSourcePostProcessService {
         schema,
         outputKeys,
         pick(goldenSample ?? {}, outputKeys),
+        params.promptExamples,
       ),
       userMessage: this.buildUserMessage(data, rawSpecs, knownSpecs, description),
       responseSchema: this.buildModelSpecResponseSchema(schema, outputKeys),
@@ -515,6 +522,7 @@ export class ProductSourcePostProcessService {
     outputKeys: string[],
     offerLevelSpecs: string[],
     modelRule: ModelRuleRequest,
+    examples: CategorySpecPromptExamples = {},
   ): string {
     const fieldDescriptions = this.buildFieldDescriptions(schema, outputKeys);
 
@@ -555,7 +563,7 @@ export class ProductSourcePostProcessService {
       `Rules for "specs":\n` +
       `- Aim to fill every canonical field above that the input supports. These fields decide which product this listing is: a value left out can let two different products merge, and a wrong one splits one product in two.\n` +
       `- deterministicSpecs is merged in automatically after your response — only include a key when your value is NEW (the field is missing in deterministicSpecs) or a CORRECTION (rawModel or rawSpecs clearly gives a more precise or different value). Do not echo back a value deterministicSpecs already has right.\n` +
-      `- Look through rawModel and rawSpecs for every field deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can sit inside a free-text component row (e.g. a "Motor" row naming the drive unit, a frame row stating the material or the suspension). Extract it when it is clearly and unambiguously present.\n` +
+      `- Look through rawModel and rawSpecs for every field deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can sit inside a free-text component row${forExample(examples.identityComponentRow)}. Extract it when it is clearly and unambiguously present.\n` +
       yearRule +
       offerLevelRule +
       `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it (e.g. a spec table listing a rear shock describes a full-suspension frame). This never extends to numbers: never fill a numeric field (power, torque, capacity, weight, size, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
@@ -593,6 +601,7 @@ export class ProductSourcePostProcessService {
     schema: SpecDefinitionJsonSchema,
     outputKeys: string[],
     goldenSubset: ProductSpecs,
+    examples: CategorySpecPromptExamples = {},
   ): string {
     const fieldDescriptions = this.buildFieldDescriptions(schema, outputKeys);
     // Without a golden sample the section is left out entirely rather than
@@ -616,14 +625,14 @@ export class ProductSourcePostProcessService {
       // on the 2026-09-23 replay). The "never numbers" sentence is what
       // stopped it from filling motorPower/torque from its own knowledge of
       // a named drive unit.
-      `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it: e.g. a Bosch Performance Line / BDU drive unit is a mid-drive motor (motorPosition), a Shimano shifter/derailleur without Di2 is mechanical shiftingActuation while Di2/AXS is electronic, a stated 25 km/h assist limit means pedelecClass "Pedelec", a named display or remote (Purion, Kiox, LED Remote, Mini Remote) means display true, and "Smart System" components mean smartConnectivity true. An equipment row that is present in rawSpecs but has no value (e.g. "Első sárvédő" with empty values) means that item is not included. This never extends to numbers: never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
+      `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it${examples.componentInference ? `: e.g. ${examples.componentInference}` : ''}. An equipment row that is present in rawSpecs but has no value (e.g. "Első sárvédő" with empty values) means that item is not included. This never extends to numbers: never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
       this.buildExplicitOnlyRule(schema, outputKeys) +
-      `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description (e.g. a row named "Motor" with value "Bosch PERFORMANCE SX BDU3144" may be the only place motorPower/motorPosition/brand info appears; a "Váz"/frame row's free text may state the frame type or suspension). Extract from either source when the value is clearly and unambiguously present.\n` +
-      `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated (e.g. "a váz felső csövéből egyszerűen eltávolítható akkumulátor" clearly states batteryRemovable=true) — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
+      `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description${forExample(examples.componentRow)}. Extract from either source when the value is clearly and unambiguously present.\n` +
+      `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated${forExample(examples.descriptionStatement)} — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
       this.buildAllowedValuesRule() +
       unitRule +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
-      `- Do not recompute or convert units the input didn't provide (e.g. don't derive torque from motor power).\n` +
+      `- Do not recompute or convert units the input didn't provide${forExample(examples.noDerivation)}.\n` +
       `- Return a single JSON object with a "specs" key only — new/corrected canonical fields only, never values already matching deterministicSpecs. Never return "brand"/"model" — those are not part of this response.`
     );
   }
@@ -721,4 +730,9 @@ export class ProductSourcePostProcessService {
     }
     return properties;
   }
+}
+
+/** ` (e.g. <example>)` after a rule, or nothing for a category without one. */
+function forExample(example: string | undefined): string {
+  return example ? ` (e.g. ${example})` : '';
 }
