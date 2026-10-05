@@ -10,7 +10,7 @@
  * (127.0.0.1:5432/fittkereso) actually held on 2026-09-18, so a re-created dev
  * DB comes back with the same brands, category, sellers and sources the running
  * dev environment was built on, plus the wave-1 feed shops onboarded on
- * 2026-10-02. The scrape configs are read from
+ * 2026-10-02 and the Bikes category added on 2026-10-05. The scrape configs are read from
  * libs/scrape-interpreter's fixtures, the same hand-authored files that
  * library's test suite validates and that
  * apps/product-collector/scripts/seed-product-source-configs.ts pushes from the
@@ -114,7 +114,10 @@ interface SeedCategorySpec {
  * - which is what generateSlug does. Renaming a category here without moving
  * that directory leaves it with no spec definition.
  */
-const CATEGORIES: SeedCategorySpec[] = [{ name: 'Ebikes', enabled: true }];
+const CATEGORIES: SeedCategorySpec[] = [
+  { name: 'Ebikes', enabled: true },
+  { name: 'Bikes', enabled: true },
+];
 
 interface SeedSellerSpec {
   name: string;

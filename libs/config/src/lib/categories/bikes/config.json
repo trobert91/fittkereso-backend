@@ -1,0 +1,234 @@
+{
+  "filterSpecs": [
+    {
+      "key": "frameType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "gender",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "wheelSize",
+      "buckets": [
+        {
+          "max": 12,
+          "label": "12\""
+        },
+        {
+          "min": 14,
+          "max": 14,
+          "label": "14\""
+        },
+        {
+          "min": 16,
+          "max": 16,
+          "label": "16\""
+        },
+        {
+          "min": 18,
+          "max": 18,
+          "label": "18\""
+        },
+        {
+          "min": 20,
+          "max": 20,
+          "label": "20\""
+        },
+        {
+          "min": 24,
+          "max": 24,
+          "label": "24\""
+        },
+        {
+          "min": 26,
+          "max": 26,
+          "label": "26\""
+        },
+        {
+          "min": 27.5,
+          "max": 27.5,
+          "label": "27.5\""
+        },
+        {
+          "min": 28,
+          "max": 28,
+          "label": "28\""
+        },
+        {
+          "min": 29,
+          "label": "29\""
+        }
+      ],
+      "filterType": "multiselect"
+    },
+    {
+      "key": "modelYear",
+      "filterType": "range"
+    },
+    {
+      "key": "usageType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "frameMaterial",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "weight",
+      "filterType": "range"
+    },
+    {
+      "key": "suspension",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "gearCount",
+      "filterType": "range"
+    },
+    {
+      "key": "color",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "frameSize",
+      "filterType": "range"
+    },
+    {
+      "key": "frameSizeLabel",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "maxTotalWeight",
+      "filterType": "range"
+    },
+    {
+      "key": "forkTravel",
+      "filterType": "range"
+    },
+    {
+      "key": "forkType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rearTravel",
+      "filterType": "range"
+    },
+    {
+      "key": "drivetrain",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "gearType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "shiftingActuation",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "brakeType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rotorSizeFront",
+      "filterType": "range"
+    },
+    {
+      "key": "brakePistons",
+      "filterType": "range"
+    },
+    {
+      "key": "tubeless",
+      "filterType": "boolean"
+    },
+    {
+      "key": "seatpostType",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "lighting",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "rack",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "fenders",
+      "filterType": "multiselect"
+    },
+    {
+      "key": "kickstand",
+      "filterType": "boolean"
+    }
+  ],
+  "primarySpecs": [
+    "modelYear",
+    "usageType",
+    "frameType"
+  ],
+  "matcherSpecs": [
+    "gearCount",
+    "weight",
+    "frameMaterial",
+    "gender"
+  ],
+  "matchingConfig": {
+    "compatibleValues": {
+      "usageType": {
+        "MTB": [
+          "Összteleszkópos MTB"
+        ],
+        "Trekking": [
+          "Cross Trekking"
+        ]
+      },
+      "gender": {
+        "Uniszex": [
+          "Férfi",
+          "Női"
+        ],
+        "Unisex": [
+          "Férfi",
+          "Női"
+        ]
+      }
+    },
+    "specTolerances": {
+      "modelYear": {
+        "absolute": 0
+      },
+      "gearCount": {
+        "absolute": 0
+      }
+    },
+    "missingSpecPenalty": {
+      "modelYear": 25
+    },
+    "specMismatchPenalty": {
+      "modelYear": 50
+    },
+    "model": {
+      "excludeSpecs": [
+        "modelYear",
+        "gender",
+        "frameType"
+      ],
+      "examples": []
+    }
+  },
+  "offerLevelSpecs": [
+    "frameSize",
+    "frameSizeLabel",
+    "color",
+    "mileage",
+    "wheelSize"
+  ],
+  "displayedSpecsInList": [
+    "modelYear",
+    "usageType",
+    "frameType",
+    "gearCount"
+  ]
+}

@@ -47,6 +47,14 @@ const read = (slug: string, file: string) =>
   JSON.parse(fs.readFileSync(path.join(__dirname, slug, file), 'utf8'));
 
 /**
+ * `it.each`, except that a category without the setting has nothing to check:
+ * jest refuses an empty table, and bikes, say, has no brand identifier rules.
+ */
+function eachOf<T extends readonly unknown[]>(table: readonly T[]) {
+  return table.length ? it.each(table) : it.skip.each([[] as unknown as T]);
+}
+
+/**
  * Settings the code reads by key and silently ignores when a key is wrong: a
  * mistyped spec name in `specMismatchPenalty` charges nothing and says nothing,
  * and a year marker on a text field converts nothing.
@@ -72,7 +80,7 @@ describe.each(categories)('the %s category config', (slug) => {
 
   // The prompt tells the LLM to keep only the title's own words, in order; an
   // example that breaks the rule teaches it to.
-  it.each(
+  eachOf(
     (config.matchingConfig?.model?.examples ?? []).map(
       (example) => [example.model, example] as const,
     ),
@@ -94,7 +102,7 @@ describe.each(categories)('the %s category config', (slug) => {
   // An example's specs show where the words the model leaves out go: only
   // specs the model excludes, each a value its field can hold.
   const leftOut = [...(config.offerLevelSpecs ?? []), ...keyExcludes];
-  it.each(
+  eachOf(
     (config.matchingConfig?.model?.examples ?? []).flatMap((example) =>
       Object.entries(example.specs ?? {}).map(
         ([key, value]) => [`${key}: ${value}`, example.model, key, value] as const,
@@ -115,7 +123,7 @@ describe.each(categories)('the %s category config', (slug) => {
     (key) => properties[key]?.type === 'string' && !properties[key]?.enum?.length,
   );
   const spaced = (text: string) => text.replace(/\s+/g, ' ');
-  it.each(
+  eachOf(
     (config.matchingConfig?.model?.examples ?? []).flatMap((example) =>
       verbatimKeys
         .filter((key) => example.specs?.[key] !== undefined)
@@ -154,21 +162,21 @@ describe.each(categories)('the %s category config', (slug) => {
     rules.map((rule) => [`${brand} ${rule.spec} ${rule.pattern}`, rule] as const),
   );
 
-  it.each(brandRules)('fills a field of the schema from a brand identifier: %s', (_name, rule) => {
+  eachOf(brandRules)('fills a field of the schema from a brand identifier: %s', (_name, rule) => {
     expect(Object.keys(properties)).toContain(rule.spec);
     expect(['mpn', 'gtin']).toContain(rule.identifier);
   });
 
   // The value is the first group; a pattern with none (or a second one)
   // reads nothing or the wrong digits, silently.
-  it.each(brandRules)('reads one capture group off a brand identifier: %s', (_name, rule) => {
+  eachOf(brandRules)('reads one capture group off a brand identifier: %s', (_name, rule) => {
     const groups = new RegExp(`${rule.pattern}|`).exec('')?.length ?? 0;
     expect(groups - 1).toBe(1);
   });
 
   // A code table's value off the field's list fills nothing, silently; a
   // prefix beside it is never written.
-  it.each(brandRules.filter(([, rule]) => rule.values))(
+  eachOf(brandRules.filter(([, rule]) => rule.values))(
     'maps each code to an allowed value: %s',
     (_name, rule) => {
       expect(rule.prefix).toBeUndefined();

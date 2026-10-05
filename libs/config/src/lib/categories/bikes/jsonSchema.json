@@ -1,0 +1,989 @@
+{
+  "type": "object",
+  "title": "Bicycle",
+  "properties": {
+    "brand": {
+      "meta": {
+        "examples": [
+          "Cube",
+          "Giant",
+          "Csepel",
+          "Neuzer"
+        ]
+      },
+      "type": "string",
+      "title": "Brand",
+      "translation": "Márka"
+    },
+    "modelYear": {
+      "meta": {
+        "order": 0,
+        "examples": [
+          "2024",
+          "2025",
+          "2026"
+        ],
+        "min": 2010,
+        "max": 2030,
+        "format": "year"
+      },
+      "type": "number",
+      "title": "Model year",
+      "translation": "Modellév"
+    },
+    "frameType": {
+      "meta": {
+        "order": 1
+      },
+      "enum": [
+        "Magas",
+        "Alacsony",
+        "Trapéz"
+      ],
+      "type": "string",
+      "title": "Frame type",
+      "translation": "Váztípus"
+    },
+    "gender": {
+      "meta": {
+        "order": 2,
+        "explicitOnly": true
+      },
+      "enum": [
+        "Férfi",
+        "Női",
+        "Uniszex",
+        "Gyermek"
+      ],
+      "type": "string",
+      "title": "Target rider",
+      "translation": "Nem"
+    },
+    "usageType": {
+      "meta": {
+        "order": 7
+      },
+      "enum": [
+        "Országúti",
+        "Gravel",
+        "Cyclocross",
+        "MTB",
+        "Összteleszkópos MTB",
+        "Dirt",
+        "BMX",
+        "Trekking",
+        "Cross Trekking",
+        "City",
+        "Fitness",
+        "Cruiser",
+        "Single speed / Fixi",
+        "Összecsukható",
+        "Tandem",
+        "Fat",
+        "Cargo",
+        "Gyerek",
+        "Futóbicikli"
+      ],
+      "type": "string",
+      "title": "Usage type",
+      "translation": "Felhasználás módja"
+    },
+    "color": {
+      "meta": {
+        "examples": [
+          "Olive Pearl",
+          "Space Galaxy Matt (Grey+Black)",
+          "BLACK/TITAN",
+          "fekete"
+        ]
+      },
+      "type": "string",
+      "title": "Color",
+      "translation": "Szín"
+    },
+    "mileage": {
+      "meta": {
+        "unit": "km",
+        "examples": [
+          "1065"
+        ],
+        "min": 0,
+        "max": 200000
+      },
+      "type": "number",
+      "title": "Mileage",
+      "translation": "Futásteljesítmény"
+    },
+    "frameModel": {
+      "meta": {
+        "examples": [
+          "Macina Scarp Prem CB 140 UDH|CPT400 Bosch BDU31/M4830",
+          "Macina Scarp Premium Carbon 140 UDH"
+        ]
+      },
+      "type": "string",
+      "title": "Frame model",
+      "translation": "Váz típusa"
+    },
+    "frameMaterial": {
+      "meta": {
+        "order": 9
+      },
+      "enum": [
+        "Alumínium",
+        "Karbon",
+        "Acél",
+        "Titán"
+      ],
+      "type": "string",
+      "title": "Frame material",
+      "translation": "Váz anyaga"
+    },
+    "frameSize": {
+      "meta": {
+        "unit": "cm",
+        "unitFormat": "none",
+        "examples": [
+          "43",
+          "48",
+          "53"
+        ],
+        "min": 20,
+        "max": 70
+      },
+      "type": "number",
+      "title": "Frame size",
+      "translation": "Vázméret"
+    },
+    "frameSizeLabel": {
+      "meta": {},
+      "enum": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL",
+        "XXL"
+      ],
+      "type": "string",
+      "title": "Frame size label",
+      "translation": "Vázméret jelölés"
+    },
+    "standoverHeight": {
+      "meta": {
+        "unit": "cm",
+        "examples": [
+          "kb. 80-84 cm"
+        ]
+      },
+      "type": "string",
+      "title": "Standover height",
+      "translation": "Állómagasság"
+    },
+    "recommendedRiderHeight": {
+      "meta": {
+        "unit": "cm",
+        "examples": [
+          "kb. 115-130 cm",
+          "kb. 175-188 cm"
+        ]
+      },
+      "type": "string",
+      "title": "Recommended rider height",
+      "translation": "Ajánlott testmagasság"
+    },
+    "recommendedAge": {
+      "meta": {
+        "examples": [
+          "3-5 év",
+          "7-11 év"
+        ]
+      },
+      "type": "string",
+      "title": "Recommended rider age",
+      "translation": "Ajánlott életkor"
+    },
+    "seatTubeLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "430",
+          "480"
+        ],
+        "min": 300,
+        "max": 700
+      },
+      "type": "number",
+      "title": "Seat tube length",
+      "translation": "Nyeregcső hossza"
+    },
+    "topTubeLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "601",
+          "625"
+        ],
+        "min": 400,
+        "max": 800
+      },
+      "type": "number",
+      "title": "Top tube length",
+      "translation": "Felső cső hossza"
+    },
+    "weight": {
+      "meta": {
+        "order": 10,
+        "unit": "kg",
+        "examples": [
+          "5.2",
+          "12.4",
+          "16.5"
+        ],
+        "min": 2,
+        "max": 45
+      },
+      "type": "number",
+      "title": "Weight",
+      "translation": "Tömeg"
+    },
+    "maxTotalWeight": {
+      "meta": {
+        "unit": "kg",
+        "examples": [
+          "118",
+          "128"
+        ],
+        "min": 80,
+        "max": 250
+      },
+      "type": "number",
+      "title": "Max permissible total weight",
+      "translation": "Megengedett össztömeg"
+    },
+    "maxLoad": {
+      "meta": {
+        "unit": "kg",
+        "examples": [
+          "120",
+          "150"
+        ],
+        "min": 50,
+        "max": 200
+      },
+      "type": "number",
+      "title": "Max payload",
+      "translation": "Maximális terhelhetőség"
+    },
+    "waterResistance": {
+      "meta": {
+        "examples": [
+          "IPX4",
+          "IPX5",
+          "IPX6"
+        ]
+      },
+      "type": "string",
+      "title": "Water resistance",
+      "translation": "Vízállóság"
+    },
+    "suspension": {
+      "meta": {
+        "order": 11
+      },
+      "enum": [
+        "Első teleszkóp",
+        "Első teleszkóp, hátsó rugóstag",
+        "Rugózatlan"
+      ],
+      "type": "string",
+      "title": "Suspension",
+      "translation": "Rugózás"
+    },
+    "forkModel": {
+      "meta": {
+        "examples": [
+          "FOX 36SL Float 29\" Factory 140mm",
+          "SR Suntour XCR 34",
+          "RockShox Recon Silver RL"
+        ]
+      },
+      "type": "string",
+      "title": "Fork model",
+      "translation": "Villa típusa"
+    },
+    "forkTravel": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "63",
+          "120",
+          "140"
+        ],
+        "min": 20,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Fork travel",
+      "translation": "Villa rugóútja"
+    },
+    "forkType": {
+      "meta": {},
+      "enum": [
+        "Levegős",
+        "Acélrugós",
+        "Merev"
+      ],
+      "type": "string",
+      "title": "Fork type",
+      "translation": "Villa típusa (levegős/rugós)"
+    },
+    "rearShockModel": {
+      "meta": {
+        "examples": [
+          "FOX Float Factory 2-Pos 230x60"
+        ]
+      },
+      "type": "string",
+      "title": "Rear shock model",
+      "translation": "Lengéscsillapító típusa"
+    },
+    "rearTravel": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "140",
+          "150"
+        ],
+        "min": 20,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Rear travel",
+      "translation": "Hátsó rugóút"
+    },
+    "drivetrain": {
+      "meta": {},
+      "enum": [
+        "Lánc",
+        "Szíj"
+      ],
+      "type": "string",
+      "title": "Drivetrain",
+      "translation": "Erőátvitel"
+    },
+    "gearType": {
+      "meta": {},
+      "enum": [
+        "Láncváltó",
+        "Agyváltó",
+        "Egysebességes"
+      ],
+      "type": "string",
+      "title": "Gear type",
+      "translation": "Váltó típusa"
+    },
+    "gearCount": {
+      "meta": {
+        "order": 12,
+        "examples": [
+          "1",
+          "3",
+          "7",
+          "21",
+          "24"
+        ],
+        "min": 1,
+        "max": 36
+      },
+      "type": "number",
+      "title": "Number of gears (chainrings × sprockets)",
+      "translation": "Sebességek száma"
+    },
+    "shiftingActuation": {
+      "meta": {},
+      "enum": [
+        "Mechanikus",
+        "Elektromos"
+      ],
+      "type": "string",
+      "title": "Shifting actuation",
+      "translation": "Váltás módja"
+    },
+    "autoShift": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Automatic shifting",
+      "translation": "Automatikus váltás"
+    },
+    "rearDerailleur": {
+      "meta": {
+        "examples": [
+          "Shimano Deore XT Di2 M8260-11 LG SGS",
+          "SRAM GX Eagle T-Type 12speed"
+        ]
+      },
+      "type": "string",
+      "title": "Rear derailleur",
+      "translation": "Hátsó váltó"
+    },
+    "rearDerailleurTier": {
+      "meta": {
+        "examples": [
+          "Shimano XT Di2",
+          "SRAM GX Eagle"
+        ]
+      },
+      "type": "string",
+      "title": "Rear derailleur tier",
+      "translation": "Hátsó váltó szériája"
+    },
+    "frontDerailleur": {
+      "meta": {
+        "examples": [
+          "Nincs",
+          "Shimano Deore FD-M5100"
+        ]
+      },
+      "type": "string",
+      "title": "Front derailleur",
+      "translation": "Első váltó"
+    },
+    "shifter": {
+      "meta": {
+        "examples": [
+          "Shimano Deore XT Di2 M8250",
+          "SRAM POD Rocker AXS Controller"
+        ]
+      },
+      "type": "string",
+      "title": "Shifter",
+      "translation": "Váltókar"
+    },
+    "crankset": {
+      "meta": {
+        "examples": [
+          "Race Face Aeffect-R170",
+          "KTM E-TEAM2 ISIS 170mm Q8"
+        ]
+      },
+      "type": "string",
+      "title": "Crankset",
+      "translation": "Hajtókar"
+    },
+    "crankLength": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "165",
+          "170",
+          "175"
+        ],
+        "min": 130,
+        "max": 200
+      },
+      "type": "number",
+      "title": "Crank length",
+      "translation": "Hajtókar hossza"
+    },
+    "chainring": {
+      "meta": {
+        "examples": [
+          "KTM aluminium 34T Direct Mount"
+        ]
+      },
+      "type": "string",
+      "title": "Chainring",
+      "translation": "Lánckerék"
+    },
+    "chainringTeeth": {
+      "meta": {
+        "unit": "T",
+        "unitFormat": "none",
+        "examples": [
+          "34",
+          "38"
+        ],
+        "min": 20,
+        "max": 50
+      },
+      "type": "number",
+      "title": "Chainring teeth",
+      "translation": "Lánckerék fogszáma"
+    },
+    "chainringCount": {
+      "meta": {
+        "examples": [
+          "1",
+          "2",
+          "3"
+        ],
+        "min": 1,
+        "max": 3
+      },
+      "type": "number",
+      "title": "Chainring count",
+      "translation": "Lánckerekek száma"
+    },
+    "cassette": {
+      "meta": {
+        "examples": [
+          "Shimano LG700-11 / 11-50",
+          "SRAM GX T-Type XS-1275 / 10-52"
+        ]
+      },
+      "type": "string",
+      "title": "Cassette",
+      "translation": "Fogaskoszorú"
+    },
+    "cassetteRange": {
+      "meta": {
+        "unit": "T",
+        "unitFormat": "none",
+        "examples": [
+          "11-50T",
+          "10-52T",
+          "11-43T"
+        ]
+      },
+      "type": "string",
+      "title": "Cassette range",
+      "translation": "Fogaskoszorú fogszám-tartománya"
+    },
+    "chain": {
+      "meta": {
+        "examples": [
+          "KMC e11 Sport EPT e-bike",
+          "SRAM GX T-Type 12s"
+        ]
+      },
+      "type": "string",
+      "title": "Chain",
+      "translation": "Lánc"
+    },
+    "bottomBracket": {
+      "meta": {
+        "examples": [
+          "Shimano BB-MT500"
+        ]
+      },
+      "type": "string",
+      "title": "Bottom bracket",
+      "translation": "Középcsapágy"
+    },
+    "pedals": {
+      "meta": {
+        "examples": [
+          "MTB-Pedal flat VP-539 nylon",
+          "fém platform"
+        ]
+      },
+      "type": "string",
+      "title": "Pedals",
+      "translation": "Pedál"
+    },
+    "brakeType": {
+      "meta": {},
+      "enum": [
+        "Tárcsa",
+        "Racker (Felni)",
+        "Tárcsa + kontrafék",
+        "Kontrafék",
+        "Racker + kontrafék",
+        "Görgős fék"
+      ],
+      "type": "string",
+      "title": "Brake type",
+      "translation": "Fékfajta"
+    },
+    "brakeModel": {
+      "meta": {
+        "examples": [
+          "Shimano XT M8200/BR-M8220",
+          "Shimano MT200 / MT200 2-Piston",
+          "Tektro Gemini SL"
+        ]
+      },
+      "type": "string",
+      "title": "Brake model",
+      "translation": "Fék típusa"
+    },
+    "brakeLever": {
+      "meta": {
+        "examples": [
+          "Tektro Gemini SL hidr. fékkar szett"
+        ]
+      },
+      "type": "string",
+      "title": "Brake lever",
+      "translation": "Fékkar"
+    },
+    "rotorModel": {
+      "meta": {
+        "examples": [
+          "Shimano CL800 CL 203 freeza",
+          "Shimano MT800 / CL900"
+        ]
+      },
+      "type": "string",
+      "title": "Brake rotor model",
+      "translation": "Féktárcsa típusa"
+    },
+    "rotorSizeFront": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "180",
+          "203"
+        ],
+        "min": 140,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Front rotor size",
+      "translation": "Első féktárcsa mérete"
+    },
+    "rotorSizeRear": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "160",
+          "180"
+        ],
+        "min": 140,
+        "max": 220
+      },
+      "type": "number",
+      "title": "Rear rotor size",
+      "translation": "Hátsó féktárcsa mérete"
+    },
+    "brakePistons": {
+      "meta": {
+        "examples": [
+          "2",
+          "4"
+        ],
+        "min": 1,
+        "max": 6
+      },
+      "type": "number",
+      "title": "Brake pistons",
+      "translation": "Fékdugattyúk száma"
+    },
+    "wheelSize": {
+      "meta": {
+        "order": 4,
+        "unit": "\"",
+        "unitFormat": "none",
+        "examples": [
+          "12",
+          "16",
+          "20",
+          "24",
+          "26",
+          "27.5",
+          "28",
+          "29"
+        ],
+        "min": 10,
+        "max": 29
+      },
+      "type": "number",
+      "title": "Wheel size",
+      "translation": "Kerékméret"
+    },
+    "wheelset": {
+      "meta": {
+        "examples": [
+          "DT HXC 1501 Spline LS 29 Carbon",
+          "KTM E-PRIME Trail 29 by DT"
+        ]
+      },
+      "type": "string",
+      "title": "Wheelset",
+      "translation": "Kerékszett"
+    },
+    "rimModel": {
+      "meta": {
+        "examples": [
+          "DT Swiss HXC 1501 Spline LS 29 Carbon",
+          "Ryde Rival 30"
+        ]
+      },
+      "type": "string",
+      "title": "Rim model",
+      "translation": "Felni típusa"
+    },
+    "hubModel": {
+      "meta": {
+        "examples": [
+          "Shimano MT410/400 Boost"
+        ]
+      },
+      "type": "string",
+      "title": "Hub model",
+      "translation": "Agy típusa"
+    },
+    "hubSpacingFront": {
+      "meta": {
+        "unit": "mm",
+        "unitFormat": "none",
+        "examples": [
+          "110x15"
+        ]
+      },
+      "type": "string",
+      "title": "Front hub spacing",
+      "translation": "Első agy szélessége"
+    },
+    "hubSpacingRear": {
+      "meta": {
+        "unit": "mm",
+        "unitFormat": "none",
+        "examples": [
+          "148x12"
+        ]
+      },
+      "type": "string",
+      "title": "Rear hub spacing",
+      "translation": "Hátsó agy szélessége"
+    },
+    "hubType": {
+      "meta": {},
+      "enum": [
+        "CenterLock",
+        "6-lyukas (IS)"
+      ],
+      "type": "string",
+      "title": "Hub rotor mount",
+      "translation": "Agy rögzítési típusa"
+    },
+    "spokes": {
+      "meta": {
+        "examples": [
+          "DT Swiss Competition"
+        ]
+      },
+      "type": "string",
+      "title": "Spokes",
+      "translation": "Küllők"
+    },
+    "tireModel": {
+      "meta": {
+        "examples": [
+          "Schwalbe Wicked Will Evo SuperGround TLE",
+          "Schwalbe Smart Sam",
+          "Schwalbe Johnny Watts"
+        ]
+      },
+      "type": "string",
+      "title": "Tire model",
+      "translation": "Gumiabroncs típusa"
+    },
+    "tireSize": {
+      "meta": {
+        "examples": [
+          "62-622",
+          "47-622",
+          "29x2.35"
+        ]
+      },
+      "type": "string",
+      "title": "Tire size",
+      "translation": "Gumiabroncs mérete"
+    },
+    "tireType": {
+      "meta": {
+        "examples": [
+          "SuperGround TLE",
+          "Performance"
+        ]
+      },
+      "type": "string",
+      "title": "Tire casing",
+      "translation": "Gumiabroncs típusa (köpeny)"
+    },
+    "tubeless": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Tubeless ready",
+      "translation": "Tömlő nélküli (tubeless)"
+    },
+    "handlebar": {
+      "meta": {
+        "examples": [
+          "FSA NS SIC cockpit ICR carbon",
+          "KTM PRIME II flat Carbon 780mm"
+        ]
+      },
+      "type": "string",
+      "title": "Handlebar",
+      "translation": "Kormány"
+    },
+    "handlebarMaterial": {
+      "meta": {},
+      "enum": [
+        "Alumínium",
+        "Karbon"
+      ],
+      "type": "string",
+      "title": "Handlebar material",
+      "translation": "Kormány anyaga"
+    },
+    "handlebarWidth": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "720",
+          "780"
+        ],
+        "min": 500,
+        "max": 900
+      },
+      "type": "number",
+      "title": "Handlebar width",
+      "translation": "Kormány szélessége"
+    },
+    "stem": {
+      "meta": {
+        "examples": [
+          "FSA NS MTB -10° ICR",
+          "KTM alu állítható dőlésszögű"
+        ]
+      },
+      "type": "string",
+      "title": "Stem",
+      "translation": "Kormányszár"
+    },
+    "adjustableStem": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Adjustable stem",
+      "translation": "Állítható kormányszár"
+    },
+    "headset": {
+      "meta": {
+        "examples": [
+          "FSA SRS drop/in 1.5\" internal",
+          "FSA ACR drop/in 1.5\" internal"
+        ]
+      },
+      "type": "string",
+      "title": "Headset",
+      "translation": "Kormánycsapágy"
+    },
+    "grips": {
+      "meta": {
+        "examples": [
+          "ESI Chunky silicone",
+          "KTM Comp Ergo Lock"
+        ]
+      },
+      "type": "string",
+      "title": "Grips",
+      "translation": "Markolat"
+    },
+    "saddle": {
+      "meta": {
+        "examples": [
+          "Fizik Terra Aidon X5 SAlloy",
+          "Selle Royal Essenza"
+        ]
+      },
+      "type": "string",
+      "title": "Saddle",
+      "translation": "Nyereg"
+    },
+    "seatpost": {
+      "meta": {
+        "examples": [
+          "FOX Transfer Factory 30.9 internal",
+          "KTM COMP II 30.9/350"
+        ]
+      },
+      "type": "string",
+      "title": "Seatpost",
+      "translation": "Nyeregcső"
+    },
+    "seatpostType": {
+      "meta": {},
+      "enum": [
+        "Merev",
+        "Teleszkópos (dropper)"
+      ],
+      "type": "string",
+      "title": "Seatpost type",
+      "translation": "Nyeregcső típusa"
+    },
+    "seatpostDiameter": {
+      "meta": {
+        "unit": "mm",
+        "examples": [
+          "27.2",
+          "30.9",
+          "31.6"
+        ],
+        "min": 25,
+        "max": 35
+      },
+      "type": "number",
+      "title": "Seatpost diameter",
+      "translation": "Nyeregcső átmérője"
+    },
+    "seatClamp": {
+      "meta": {
+        "examples": [
+          "KTM TEAM Light CL-FJ21 - 34,9mm"
+        ]
+      },
+      "type": "string",
+      "title": "Seat clamp",
+      "translation": "Nyeregbilincs"
+    },
+    "lighting": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Lighting",
+      "translation": "Világítás"
+    },
+    "rack": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Rack",
+      "translation": "Csomagtartó"
+    },
+    "fenders": {
+      "meta": {},
+      "enum": [
+        "Alapfelszereltség",
+        "Opcionális",
+        "Nincs"
+      ],
+      "type": "string",
+      "title": "Fenders",
+      "translation": "Sárvédő"
+    },
+    "kickstand": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Kickstand",
+      "translation": "Kitámasztó"
+    },
+    "chainGuard": {
+      "meta": {},
+      "type": "boolean",
+      "title": "Chain guard",
+      "translation": "Láncvédő"
+    }
+  }
+}
