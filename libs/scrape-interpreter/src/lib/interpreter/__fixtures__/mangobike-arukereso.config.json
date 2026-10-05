@@ -98,7 +98,7 @@
       "pipeline": [
         {
           "op": "regexCapture",
-          "pattern": "/catalog/KT-(1\\d{9})/",
+          "pattern": "/catalog/KT-([12]\\d{9}|0\\d{8})/",
           "group": 1
         }
       ]

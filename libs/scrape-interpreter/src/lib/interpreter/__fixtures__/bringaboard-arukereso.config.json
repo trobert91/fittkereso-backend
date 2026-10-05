@@ -216,23 +216,44 @@
         ]
       }
     ],
-    "mpn": {
-      "field": "sku",
-      "pipeline": [
-        {
-          "op": "regexCapture",
-          "pattern": "^(?:ktm-)?([125]\\d{9})$",
-          "group": 1
-        }
-      ]
-    }
+    "mpn": [
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(?:ktm-)?([125]\\d{9})$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(2\\d{2}-\\d{3})$",
+            "group": 1
+          }
+        ]
+      }
+    ]
   },
   "specMapping": {
+    "bikes": {
+      "mappings": [
+        {
+          "key": "modelYear",
+          "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
+          "extract": "number"
+        }
+      ]
+    },
     "ebikes": {
       "mappings": [
         {
           "key": "modelYear",
-          "labels": ["Évjárat", "Model year"],
+          "labels": ["Évjárat", "Year", "Model year", "Modell év", "Modellév"],
           "extract": "number"
         },
         {

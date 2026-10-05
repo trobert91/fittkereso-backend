@@ -13,6 +13,10 @@ import {
   ScrapePipelineRunnerService,
 } from '@fittkereso-backend/scrape-interpreter';
 import { hashSpecs } from '@fittkereso-backend/utils';
+import {
+  ProductSpecNormalizationService,
+  SpecExtractionService,
+} from '@fittkereso-backend/product';
 
 describe('ArukeresoProductMapperService', () => {
   let mapper: ArukeresoProductMapperService;
@@ -855,5 +859,91 @@ describe("ArukeresoProductMapperService reading specs off a brand's article numb
       year: undefined,
       mpn: '1244000767',
     });
+  });
+});
+
+// The years bike listings state only in their feed's ids or spec rows
+// (2026-10-05), read with the bikes category's rules and schema. Every
+// row is let into bikes here; which rows are bikes is each shop's own setting.
+describe('ArukeresoProductMapperService reading bike years from the feed', () => {
+  const read = (file: string) => JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8'));
+  const bikes = (file: string) => read(`../../../../config/src/lib/categories/bikes/${file}`);
+  const fixture = (shop: string) => {
+    const config = read(
+      `../../../../scrape-interpreter/src/lib/interpreter/__fixtures__/${shop}-arukereso.config.json`,
+    ) as ArukeresoSourceConfig;
+    return {
+      ...config,
+      categories: { bikes: { enabled: true } },
+      category: { slugLookup: [{ slug: 'bikes', when: { always: true as const } }] },
+    } as ArukeresoSourceConfig;
+  };
+  let mapper: ArukeresoProductMapperService;
+
+  beforeAll(() => {
+    const registry = new ScrapeOpRegistryService();
+    const runner = new ScrapePipelineRunnerService(registry);
+    new ScrapeInterpreterModule(registry, runner, new ProductValueMapperService()).onModuleInit();
+    const runtime = {
+      getCategoryBySlug: jest.fn().mockResolvedValue({ id: 'cat-2', slug: 'bikes', name: 'Bikes' }),
+    };
+    mapper = new ArukeresoProductMapperService(
+      new ScrapeInterpreterService(runner, runtime as never),
+      runtime as never,
+      { getConfig: () => bikes('config.json'), getJsonSchema: () => bikes('jsonSchema.json') } as never,
+      new SpecExtractionService(new ProductSpecNormalizationService()),
+    );
+  });
+
+  const yearOf = async (
+    shop: string,
+    fields: Record<string, string>,
+    attributes: { name: string; value: string }[] = [],
+  ) => {
+    const mapped = await mapper.map({
+      config: fixture(shop),
+      item: {
+        fields: { name: 'bike', producturl: `https://${shop}.hu/bike`, price: '199 000', ...fields },
+        attributes,
+      },
+    });
+    if (mapped.status !== 'mapped') throw new Error(`skipped: ${mapped.reason}`);
+    return mapped.scrapedProduct.specs?.['modelYear'];
+  };
+
+  it.each([
+    ['bringaboard', { manufacturer: 'KTM kerékpár', sku: 'ktm-2270446215' }, 2027],
+    ['bringaboard', { manufacturer: 'KTM kerékpár', sku: 'ktm-1250305113' }, 2025],
+    ['bringaboard', { manufacturer: 'CTM kerékpár', sku: '224-286' }, 2024],
+    ['bikelife', { manufacturer: 'KTM', manufacturerpartnumber: '2230541116' }, 2023],
+    [
+      'mangobike',
+      { manufacturer: 'KTM', imageurl: 'https://www.mangobike.hu/_upload/images/catalog/KT-2260452119/KT-2260452119_1.jpg' },
+      2026,
+    ],
+  ])("reads %s's article number %j as %j", async (shop, fields, year) => {
+    expect(await yearOf(shop, fields)).toBe(year);
+  });
+
+  // KTM's 9-digit bike numbers disagree with the titles (kids' bikes sold for
+  // years under one number); only the 10-digit forms are read.
+  it("reads no year off KTM's 9-digit bike number", async () => {
+    expect(await yearOf('bikelife', { manufacturer: 'KTM', manufacturerpartnumber: '021251100' })).toBeUndefined();
+  });
+
+  it("reads bringaboard's year row", async () => {
+    expect(await yearOf('bringaboard', { manufacturer: 'Pells', sku: '3P23041211' }, [{ name: 'Year', value: '2024' }])).toBe(
+      2024,
+    );
+  });
+
+  // A year in an image file name is not read (the user's call, 2026-10-05).
+  it('reads no year off a mangobike image file name', async () => {
+    expect(
+      await yearOf('mangobike', {
+        manufacturer: 'Merida',
+        imageurl: 'https://www.mangobike.hu/_upload/images/catalog/BF-2600216/BF-2600216_Merida-Silex-700-2026-piros-S.jpg',
+      }),
+    ).toBeUndefined();
   });
 });

@@ -32,6 +32,8 @@ import speedbikeGoogleshopConfig from './speedbike-googleshop.config.json';
 // speedbike-detail-page.spec.ts does, for the same reason.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import ebikesJsonSchema from '../../../../../config/src/lib/categories/ebikes/jsonSchema.json';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import bikesJsonSchema from '../../../../../config/src/lib/categories/bikes/jsonSchema.json';
 
 const SIZE_KEYS = ['frameSize', 'frameSizeLabel'];
 
@@ -619,16 +621,20 @@ describe('hand-authored source configs', () => {
       expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
     });
 
-    // The image folder is the size-level SKU; only KTM's (`KT-` plus the
-    // 10-digit article number) is a manufacturer code. The ebikes brand rule
-    // reads the model year off it.
+    // The image folder is the size-level SKU; only KTM's (`KT-` plus its
+    // 10-digit e-bike or bike article number, or a 9-digit one) is a
+    // manufacturer code. The category brand rules read the model year off it.
     it.each([
       ['KT-1260152106', '1260152106'],
+      ['KT-2260452119', '2260452119'],
+      ['KT-023826211', '023826211'],
       ['VB-1107672-L', undefined],
     ])('reads the MPN off the image folder %j', async (sku, mpn) => {
       expect(await readText(config, 'mpn', { image_url: imageOf(sku) })).toBe(mpn);
     });
 
+    // Merida's and Orbea's image file names carry a year, but a file name is
+    // not a manufacturer's statement: the user ruled it out (2026-10-05).
     it('reads no year of its own', () => {
       expect(config.mapping['releaseYear']).toBeUndefined();
     });
@@ -677,14 +683,40 @@ describe('hand-authored source configs', () => {
       expect(await readText(config, 'gtin', { ean_code: eanCode, sku })).toBe(gtin);
     });
 
-    // Only KTM's (`ktm-` stripped) and Giant's 10-digit article numbers are
-    // manufacturer codes; every other sku is the shop's own or an EAN.
+    // Only KTM's (`ktm-` stripped) and Giant's 10-digit article numbers and
+    // CTM's (`224-286`, its first digits the year) are manufacturer codes;
+    // every other sku is the shop's own or an EAN.
     it.each([
       ['ktm-1250041113', '1250041113'],
       ['2103235144', '2103235144'],
+      ['224-286', '224-286'],
       ['8585053831129', undefined],
+      ['ne-NE2561612023', undefined],
     ])('reads the MPN from sku %j as %j', async (sku, mpn) => {
       expect(await readText(config, 'mpn', { sku })).toBe(mpn);
+    });
+
+    // Some brands' rows state the year, under five labels (2026-10-05:
+    // 378 bikes, mostly CTM, Pells, LOOK and Norco).
+    it.each([
+      ['Évjárat', '2024', 2024],
+      ['Year', '2025', 2025],
+      ['Modell év', '2022', 2022],
+      ['Modellév', '2022', 2022],
+    ])('reads the year from a %s row, for bikes and e-bikes', (name, value, year) => {
+      for (const [slug, schema] of [
+        ['bikes', bikesJsonSchema],
+        ['ebikes', ebikesJsonSchema],
+      ] as const) {
+        const mapping = config.specMapping?.[slug];
+        if (!mapping) throw new Error(`The fixture has no ${slug} specMapping`);
+        const specs = new SpecExtractionService(new ProductSpecNormalizationService()).extractSpecs({
+          scrapedSpecs: [{ name, values: [value] }],
+          schema: schema as unknown as SpecDefinitionJsonSchema,
+          sourceConfig: mapping,
+        });
+        expect(specs['modelYear']).toBe(year);
+      }
     });
 
     it('drops the Árukereső tracking query from the URL', async () => {

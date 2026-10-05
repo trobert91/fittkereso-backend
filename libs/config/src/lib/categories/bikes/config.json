@@ -166,13 +166,13 @@
   "primarySpecs": [
     "modelYear",
     "usageType",
-    "frameType"
+    "frameType",
+    "gender"
   ],
   "matcherSpecs": [
     "gearCount",
     "weight",
-    "frameMaterial",
-    "gender"
+    "frameMaterial"
   ],
   "matchingConfig": {
     "compatibleValues": {
@@ -215,8 +215,62 @@
         "gender",
         "frameType"
       ],
-      "examples": []
+      "examples": [
+        { "title": "Cube Reaction Pro  fuchsia´n´black XS  MTB kerékpár - 2027", "model": "Reaction Pro", "specs": { "modelYear": 2027, "frameSizeLabel": "XS", "color": "fuchsia´n´black" } },
+        { "title": "Cube Litening AIR C:68X SLT beamfibre´n´black 28\" 2027 országúti kerékpár", "model": "Litening AIR C:68X SLT", "specs": { "modelYear": 2027, "wheelSize": 28, "color": "beamfibre´n´black" } },
+        { "title": "Cube Nuroad C:62 Pro FE cedar´n´stone 28\" 2027 Országúti Kerékpár - barna", "model": "Nuroad C:62 Pro FE", "specs": { "modelYear": 2027, "wheelSize": 28, "color": "cedar´n´stone" } },
+        { "title": "Cube Kathmandu Pro  metallicwhite´n´chrome Trapeze 46 cm  trekking kerékpár - 2027", "model": "Kathmandu Pro", "specs": { "frameType": "Trapéz", "frameSize": 46, "modelYear": 2027, "color": "metallicwhite´n´chrome" } },
+        { "title": "Cube Town ONE frostyleaves´n´blue 28\" 2027 Onroad Trekking Easy Entry Kerékpár - szürke", "model": "Town ONE", "specs": { "frameType": "Alacsony", "modelYear": 2027, "wheelSize": 28, "color": "frostyleaves´n´blue" } },
+        { "title": "CUBE CROSS RACE C:62 PRO SWAMPGREY N ORANGE 2023 FÉRFI CYCLOCROSS KERÉKPÁR", "model": "CROSS RACE C:62 PRO", "specs": { "color": "SWAMPGREY N ORANGE", "modelYear": 2023, "gender": "Férfi" } },
+        { "title": "KTM PENNY LANE STREET 291 - 29\" MTB kerékpár - L/48 méretben, PERI MATT színben - 2027", "model": "PENNY LANE STREET 291", "specs": { "wheelSize": 29, "frameSizeLabel": "L", "frameSize": 48, "color": "PERI MATT", "modelYear": 2027 } },
+        { "title": "KTM X-LIFE RACE cross trekking kerékpár - D 46 méretben, JUNGLE színben - 2027", "model": "X-LIFE RACE", "specs": { "frameSize": 46, "color": "JUNGLE", "modelYear": 2027 } },
+        { "title": "KTM REVELATOR ALTO EXONIC AXS PM országúti kerékpár - L/57 méretben, CARBON CRYSTAL RED színben - 2027", "model": "REVELATOR ALTO EXONIC AXS PM", "specs": { "frameSizeLabel": "L", "frameSize": 57, "color": "CARBON CRYSTAL RED", "modelYear": 2027 } },
+        { "title": "KTM X-STRADA LFC COPPER TITAN (BLACK+ORANGE) 2024 FELSZERELÉS NÉLKÜL!!!", "model": "X-STRADA LFC", "specs": { "color": "COPPER TITAN (BLACK+ORANGE)", "modelYear": 2024 } },
+        { "title": "KTM Life Space női trekking kerékpár 2x9 fokozatú CUES váltó, tárcsafék, zöld/lila mono váz 46cm", "model": "Life Space", "specs": { "gender": "Női", "color": "zöld/lila", "frameType": "Alacsony", "frameSize": 46 } },
+        { "title": "GIANT TCR ADVANCED 1 PRO COMPACT ASPHALT GREEN 2025 FÉRFI ORSZÁGÚTI KERÉKPÁR", "model": "TCR ADVANCED 1 PRO COMPACT", "specs": { "color": "ASPHALT GREEN", "modelYear": 2025, "gender": "Férfi" } },
+        { "title": "GIANT Defy Advanced Pro 1 férfi országúti kerékpár - M méretben", "model": "Defy Advanced Pro 1", "specs": { "gender": "Férfi", "frameSizeLabel": "M" } },
+        { "title": "Giant Revolt Advanced 1 férfi Gravel kerékpár Blue Ashes S", "model": "Revolt Advanced 1", "specs": { "gender": "Férfi", "color": "Blue Ashes", "frameSizeLabel": "S" } },
+        { "title": "Giant Attend CS 1 LDS 2022 női City Kerékpár Black S", "model": "Attend CS 1", "specs": { "modelYear": 2022, "gender": "Női", "color": "Black", "frameSizeLabel": "S" } },
+        { "title": "GIANT YUKON 2 PHANTOM GREEN 2023 FAT BIKE KERÉKPÁR", "model": "YUKON 2", "specs": { "color": "PHANTOM GREEN", "modelYear": 2023 } },
+        { "title": "Romet Mustang M4 CS 2024 férfi Mountain Bike ezüst-kék 17\" M", "model": "Mustang M4 CS", "specs": { "modelYear": 2024, "gender": "Férfi", "color": "ezüst-kék", "frameSize": 43, "frameSizeLabel": "M" } },
+        { "title": "Lapierre Crosshill CF 8.0 férfi Gravel Kerékpár Paris Stone Beige M (170-182 cm)", "model": "Crosshill CF 8.0", "specs": { "gender": "Férfi", "color": "Paris Stone Beige", "frameSizeLabel": "M" } },
+        { "title": "GHOST Nirvana Tour Base 27,5 férfi Mountain Bike Metallic Black/Metallic Bright Orange Glossy S (162-174 cm)", "model": "Nirvana Tour Base", "specs": { "wheelSize": 27.5, "gender": "Férfi", "color": "Metallic Black/Metallic Bright Orange Glossy", "frameSizeLabel": "S" } },
+        { "title": "Stevens Primera férfi Trekking Kerékpár stealth black 52cm", "model": "Primera", "specs": { "gender": "Férfi", "color": "stealth black", "frameSize": 52 } },
+        { "title": "Csepel Rapid 3* 28/510 2025 férfi Gravel Kerékpár Zöld", "model": "Rapid 3*", "specs": { "wheelSize": 28, "frameSize": 51, "modelYear": 2025, "gender": "Férfi", "color": "Zöld" } },
+        { "title": "Cross Riviera Low Step 8 seb. SH agyváltó női City Kerékpár 48cm", "model": "Riviera", "specs": { "frameType": "Alacsony", "gender": "Női", "frameSize": 48 } },
+        { "title": "PELLS Aeron 1 férfi Országúti Kerékpár Anthracite M (167-180 cm)", "model": "Aeron 1", "specs": { "gender": "Férfi", "color": "Anthracite", "frameSizeLabel": "M" } },
+        { "title": "Kellys Whip 30 Graphite Grey Unisex Dirt Jump Kerékpár 26\" M", "model": "Whip 30", "specs": { "color": "Graphite Grey", "gender": "Uniszex", "wheelSize": 26, "frameSizeLabel": "M" } },
+        { "title": "Kellys Cristy 40 Purple női trekking kerékpár 24 fokozatú Shimano Altus váltó, V-fék, agydinamó, M/19\"", "model": "Cristy 40", "specs": { "color": "Purple", "gender": "Női", "frameSizeLabel": "M", "frameSize": 48 } },
+        { "title": "Csepel Budapest B 26\"-os városi kerékpár kontrafékes, fényes kék", "model": "Budapest B", "specs": { "wheelSize": 26, "color": "fényes kék" } },
+        { "title": "Kellys Arwen Dutch Black 28\"-os holland jellegű városi kerékpár 3 fokozatú Nexus agyváltó, 46cm", "model": "Arwen Dutch", "specs": { "color": "Black", "wheelSize": 28, "frameSize": 46 } },
+        { "title": "Neuzer California cruiser kerékpár Nexus3 agyváltóval női orgona", "model": "California", "specs": { "gender": "Női", "color": "orgona" } },
+        { "title": "Scott Sub Cross 30 Lady női cross kerékpár 27f. Alivio váltó Suntour NEX HLO 63mm lila XL", "model": "Sub Cross 30", "specs": { "gender": "Női", "color": "lila", "frameSizeLabel": "XL" } },
+        { "title": "Neuzer Twilight tandem kerékpár 26-os Shimano Nexus 3 fokozatú agyváltóval", "model": "Twilight", "specs": { "wheelSize": 26 } },
+        { "title": "Csepel Woodlands Pro 2.1 Cues 18sp 27,5\" MTB Kerékpár - kék", "model": "Woodlands Pro 2.1", "specs": { "wheelSize": 27.5, "color": "kék" } },
+        { "title": "Orbea Terra M20iTeam Gravel Kerékpár 2025 Cosmic Carbon View-Metallic Olive Green (Gloss) - zöld", "model": "Terra M20iTeam", "specs": { "modelYear": 2025, "color": "Cosmic Carbon View-Metallic Olive Green (Gloss) - zöld" } },
+        { "title": "Kross Trans 4.0 Lady 28\" Városi Kerékpárok - kék", "model": "Trans 4.0", "specs": { "gender": "Női", "wheelSize": 28, "color": "kék" } },
+        { "title": "Neuzer Cindy 24-es lány gyerek kerékpár 7 sebességes Shimano váltó fehér/magenta", "model": "Cindy", "specs": { "wheelSize": 24, "gender": "Gyermek", "color": "fehér/magenta" } },
+        { "title": "Csepel Woodlands Zero 24-es gyerek kerékpár alumínium vázzal, 6sebességes, matt zöld", "model": "Woodlands Zero", "specs": { "wheelSize": 24, "gender": "Gyermek", "color": "matt zöld" } },
+        { "title": "Hauser Puma 18\"-os gyerekkerékpár, kontrás, matt szürke", "model": "Puma", "specs": { "wheelSize": 18, "gender": "Gyermek", "color": "matt szürke" } },
+        { "title": "Kellys KIRU Lime futóbicikli Alu/Mg váz, csapágyazott fém kerekű, tömlős, fék nélküli", "model": "KIRU", "specs": { "color": "Lime" } },
+        { "title": "Kellys KITE Race futóbicikli alu váz, csapágyazott fém kerekű, tömlős, V-fékes, neon zöld", "model": "KITE Race", "specs": { "color": "neon zöld" } },
+        { "title": "Woom GO 3 Metallic Blue 16\" gyerek kerékpár", "model": "GO 3", "specs": { "color": "Metallic Blue", "wheelSize": 16, "gender": "Gyermek" } },
+        { "title": "Cube Numove 120 walk topasblue´n´nebula 12\" 2027 Gyerek Kerékpár - kék", "model": "Numove 120 walk", "specs": { "color": "topasblue´n´nebula", "wheelSize": 12, "modelYear": 2027, "gender": "Gyermek" } },
+        { "title": "GIANT ARX 24 férfi gyermek cross/gravel kerékpár - 24\" méretben", "model": "ARX", "specs": { "gender": "Gyermek", "wheelSize": 24 } },
+        { "title": "MARIN San Quentin 24 Gyerek Kerékpár kék", "model": "San Quentin", "specs": { "wheelSize": 24, "gender": "Gyermek", "color": "kék" } },
+        { "title": "Merida Matts J 20+ 20\" Gyerek Kerékpár - Uni Matt Mint(Purple/Wht/Blk) - lila", "model": "Matts J 20+", "specs": { "wheelSize": 20, "gender": "Gyermek", "color": "Uni Matt Mint(Purple/Wht/Blk) - lila" } },
+        { "title": "KTM KTM WILD CAT 24 méretben -  gyermek kerékpár - PERI MATT színben - 2027", "model": "WILD CAT", "specs": { "wheelSize": 24, "gender": "Gyermek", "color": "PERI MATT", "modelYear": 2027 } }
+      ]
     }
+  },
+  "brandIdentifierSpecs": {
+    "KTM": [
+      { "spec": "modelYear", "identifier": "mpn", "pattern": "^1(2\\d)\\d{7}$", "prefix": "20" },
+      { "spec": "modelYear", "identifier": "mpn", "pattern": "^2(2\\d)\\d{7}$", "prefix": "20" }
+    ],
+    "CTM": [
+      { "spec": "modelYear", "identifier": "mpn", "pattern": "^2(2\\d)-\\d{3}$", "prefix": "20" }
+    ]
   },
   "offerLevelSpecs": [
     "frameSize",
