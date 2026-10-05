@@ -448,5 +448,10 @@
         }
       ]
     }
+  },
+  "postProcess": {
+    "identityDescription": {
+      "mode": "evidence"
+    }
   }
 }

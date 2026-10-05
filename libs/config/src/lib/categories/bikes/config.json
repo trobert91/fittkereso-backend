@@ -165,11 +165,11 @@
   ],
   "primarySpecs": [
     "modelYear",
-    "usageType",
     "frameType",
     "gender"
   ],
   "matcherSpecs": [
+    "usageType",
     "gearCount",
     "weight",
     "frameMaterial"

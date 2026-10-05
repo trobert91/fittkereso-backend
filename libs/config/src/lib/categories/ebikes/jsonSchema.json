@@ -80,7 +80,7 @@
           "Tandem": "For two riders, one behind the other. It is Tandem whatever its riding type.",
           "Fat": "Tyres about 4″ (100 mm) wide or wider (\"fatbike\"). It is Fat whatever its riding type.",
           "Cargo": "Built to carry loads or passengers: a front box or platform, a long-tail rear, or called a cargo bike (\"cargo\", \"teherkerékpár\"). It is Cargo whatever its riding type.",
-          "Gyerek": "A bike made for children: the input calls it a children's or junior bike (\"gyerek\", \"gyermek\", \"junior\", \"kids\"), or gives a child's age or rider height. A children's bike is Gyerek whatever its riding type (a kids' MTB or gravel bike too). Wheel size alone doesn't make a bike Gyerek.",
+          "Gyerek": "A bike made for children: the input calls it a children's or junior bike (\"gyerek\", \"gyermek\", \"junior\", \"kids\"), or gives a child's age or rider height. A children's bike is Gyerek, never its riding type: a kids' MTB, cross or gravel bike is Gyerek. Wheel size alone doesn't make a bike Gyerek.",
           "Futóbicikli": "A balance bike: no pedals and no drivetrain, for small children (\"futóbicikli\", \"futókerékpár\"). It is Futóbicikli, never Gyerek."
         }
       },

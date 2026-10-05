@@ -511,7 +511,7 @@ export class ProductSourcePostProcessService {
     );
     if (!titles.length) return '';
     const one = titles.length === 1;
-    return `- ${titles.join(', ')} ${one ? 'sorts' : 'sort'} each product into one of ${one ? 'its' : 'their'} defined values above. Judge from everything the input says about the product: rawModel's words, the model's own name included${forExample(examples.definedValues)}, the rawSpecs rows, and the description or its evidence excerpts. Pick the value whose definition fits it best; a definition can say that it wins over others. Use only what the input says, never what you know of this model from elsewhere. When no definition fits, or the input doesn't tell, omit it.\n`;
+    return `- ${titles.join(', ')} ${one ? 'sorts' : 'sort'} each product into one of ${one ? 'its' : 'their'} defined values above. Judge from everything the input says about the product: rawModel's words, the model's own name included${forExample(examples.definedValues)}, the rawSpecs rows, and the description or its evidence excerpts. Pick the value whose definition fits it best. A definition that says it wins over others decides whenever it fits, even when the title also names another value: check those first. Use only what the input says, never what you know of this model from elsewhere. When no definition fits, or the input doesn't tell, omit it.\n`;
   }
 
   /**
@@ -522,7 +522,7 @@ export class ProductSourcePostProcessService {
    */
   private buildDescriptionEvidenceRule(titles: string[]): string {
     return titles.length
-      ? `- When available, the user message also has "descriptionEvidence": excerpts of the listing's description, cut around words that can tell what kind of product it is. Use them only for ${titles.join(', ')}; never read another field from them (a year, a size, a colour). A description often talks about the brand, other models or a whole kind of product, so use an excerpt only when it clearly describes this product. They count as the description: lower confidence than rawModel and rawSpecs.\n`
+      ? `- When available, the user message also has "descriptionEvidence": excerpts of the listing's description, cut around words that can tell what kind of product it is. Use them only for ${titles.join(', ')}; never read another field from them: not a year, not a colour, not who the product is made for, and not a size — a size or size letter in an excerpt (an "XL") is never this listing's own size, and never a reason to leave a word out of "model". A description often talks about the brand, other models or a whole kind of product, so use an excerpt only when it clearly describes this product. They count as the description: lower confidence than rawModel and rawSpecs.\n`
       : '';
   }
 

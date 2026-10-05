@@ -113,5 +113,10 @@
         }
       ]
     }
+  },
+  "postProcess": {
+    "identityDescription": {
+      "mode": "evidence"
+    }
   }
 }

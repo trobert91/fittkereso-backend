@@ -450,8 +450,19 @@ describe('hand-authored source configs', () => {
     });
 
     // An identifying source: both LLM calls run.
-    it('leaves postProcess at its default', () => {
-      expect(config.postProcess).toBeUndefined();
+    it('leaves both LLM calls on', () => {
+      expect(config.postProcess?.identity).not.toBe(false);
+      expect(config.postProcess?.specs).not.toBe(false);
+    });
+
+    // Only where the measured excerpts added usage types (bikelife's and
+    // akosbike's descriptions name them; ambringa's are brand talk, and
+    // mangobike's titles already name them): plan vivid-skipping-hopper.md.
+    it('sends the identity extraction description excerpts only where they help', () => {
+      const evidence = ['akosbike-arukereso', 'bikelife-arukereso'].includes(name);
+      expect(config.postProcess?.identityDescription).toEqual(
+        evidence ? { mode: 'evidence' } : undefined,
+      );
     });
   });
 
