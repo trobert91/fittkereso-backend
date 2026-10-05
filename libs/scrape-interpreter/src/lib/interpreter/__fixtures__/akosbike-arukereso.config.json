@@ -441,6 +441,16 @@
     ],
     "gtin": {
       "field": "ean_code"
+    },
+    "mpn": {
+      "field": "identifier",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^VLB_(\\d{6,7}-(?:\\d{2}|XX?S|S|M|L|XX?L))(?:cm|[TE])?$",
+          "group": 1
+        }
+      ]
     }
   },
   "postProcess": {

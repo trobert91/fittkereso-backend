@@ -62,14 +62,26 @@
     "gtin": {
       "field": "gtin"
     },
-    "mpn": {
-      "field": "manufacturer_partnumber",
-      "pipeline": [
-        {
-          "op": "stripPattern",
-          "pattern": "^(\\d{2}(-\\d{2})?-[A-Z]{1,3}|\\d{13})$"
-        }
-      ]
-    }
+    "mpn": [
+      {
+        "field": "manufacturer_partnumber",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\d{6,7}-(?:\\d{2}|XX?S|S|M|L|XX?L))(?:cm|[TE])?$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "manufacturer_partnumber",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "^(\\d{2}(-\\d{2})?-[A-Z]{1,3}|\\d{13})$"
+          }
+        ]
+      }
+    ]
   }
 }

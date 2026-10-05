@@ -880,6 +880,36 @@
             "group": 1
           }
         ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^bf-(\\d{7})$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\d{8}[A-Z][A-Z0-9]{1,2})$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(KR[A-Z0-9]{14,18})$",
+            "group": 1
+          }
+        ]
       }
     ]
   }

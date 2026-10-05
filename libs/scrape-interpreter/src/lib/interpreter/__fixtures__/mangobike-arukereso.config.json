@@ -91,15 +91,57 @@
         "field": "category"
       }
     ],
-    "mpn": {
-      "field": "image_url",
-      "pipeline": [
-        {
-          "op": "regexCapture",
-          "pattern": "/catalog/KT-([12]\\d{9}|0\\d{8})/",
-          "group": 1
-        }
-      ]
-    }
+    "mpn": [
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/KT-([12]\\d{9}|0\\d{8})/",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/VB-(\\d{6,7}-(?:\\d{2}|XX?S|S|M|L|XX?L))(?:cm|[TE])?/",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/BF-(\\d{7})/",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/CS-(\\d{8}[A-Z][A-Z0-9]{1,2})/",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/KR-(KR[A-Z0-9]{14,18})/",
+            "group": 1
+          }
+        ]
+      }
+    ]
   }
 }

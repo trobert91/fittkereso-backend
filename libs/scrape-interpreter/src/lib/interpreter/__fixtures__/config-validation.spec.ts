@@ -4,6 +4,7 @@ import {
   ProductSourceConfig,
   ProductSourceType,
   ScrapedProductSpec,
+  ScrapeOperation,
   ScrapingSourceConfig,
   ProductSourceConfigValidatorService,
   SourceSpecMapping,
@@ -198,8 +199,25 @@ describe('hand-authored source configs', () => {
     ];
 
     expect(offer.gtin).toEqual(readsPath('props.product.gtin'));
-    expect(offer.mpn).toEqual(readsPath('props.product.productCode'));
+    expect(offer.mpn).toEqual([
+      ...readsPath('props.product.productCode'),
+      { op: 'stripPattern', pattern: '^MY\\d{2}_' },
+      { op: 'stripPattern', pattern: '(?<=^\\d{6,7}-\\d{2})(?:cm|[TE])$' },
+    ]);
     expect(offer.externalId).toEqual(readsPath('props.product.productCode'));
+  });
+
+  // The same Cube article and size every other shop writes: "MY26_114500-46E"
+  // is 114500-46, whatever the year prefix and the frame letter.
+  it.each([
+    ['MY26_114500-46E', '114500-46'],
+    ['MY25_814200-50T', '814200-50'],
+    ['1260040108', '1260040108'],
+  ])("reads ebikeshop's MPN %j as %j", async (productCode, mpn) => {
+    const offer = (ebikeshopConfig as unknown as ScrapingSourceConfig).detailPage
+      .offers?.itemPipeline[0] as { mpn: ScrapeOperation[] };
+    const steps = offer.mpn.slice(1);
+    expect(await interpreter.runValuePipeline(steps, productCode, { baseUrl: 'https://ebikeshop.hu' })).toBe(mpn);
   });
 
   // The shop's own size grouping, and the only sibling signal trusted: all 752
@@ -289,8 +307,14 @@ describe('hand-authored source configs', () => {
 
     // 75% of the feed's e-bike rows carry a checksum-valid ean_code. GIANT and
     // LIV put 7-digit article stubs there instead, which normalizeGtin drops.
-    it('reads the GTIN from ean_code', () => {
-      expect(config.mapping['gtin']).toEqual({ field: 'ean_code' });
+    it.each([
+      ['4054571529404', '', '4054571529404'],
+      // GIANT's 7-digit article stub is no barcode; the sku is, on 23 rows.
+      ['5060018', '', undefined],
+      ['', '4054624124136', '4054624124136'],
+      ['', '1260040108', undefined],
+    ])('reads the GTIN from ean_code %j, else the 13-digit sku %j', async (eanCode, sku, gtin) => {
+      expect(await readText(config, 'gtin', { ean_code: eanCode, sku })).toBe(gtin);
     });
 
     // The sku is the manufacturer's article number, sometimes with an "MX"
@@ -304,6 +328,12 @@ describe('hand-authored source configs', () => {
       ['', '1260132506', '1260132506'],
       ['', 'KTM-12501571XX-2025', undefined],
       ['', 'KTM-0223532xx-2022-F', undefined],
+      // Cube: the article and size every shop shares, not the 11-digit sku.
+      ['11102000054', '1110200-50', '1110200-50'],
+      ['812610', 'cube-812610-50-2025', '812610-50'],
+      ['551100', 'CUBE-551100-xx-2022', '551100'],
+      // Haibike and Winora rows carry their EAN as the sku.
+      ['4054624124136', 'HAIBIKE-451641xx-2023', undefined],
     ])('reads the MPN from sku %j, else from the id %j: %j', async (sku, identifier, mpn) => {
       expect(await readText(config, 'mpn', { sku, identifier })).toBe(mpn);
     });
@@ -510,6 +540,8 @@ describe('hand-authored source configs', () => {
       ['1230101111', '1230101111'],
       ['525803480845', '525803480845'],
       ['112110-54', '112110-54'],
+      ['111122-46E', '111122-46'],
+      ['111121-50T', '111121-50'],
       ['BK29431-44COLO01', 'BK29431-44COLO01'],
     ])('reads the MPN %j as %j', async (partNumber, mpn) => {
       expect(
@@ -553,10 +585,21 @@ describe('hand-authored source configs', () => {
     // `identifier` is unique on every row; `sku` holds shop notes on 27% of
     // rows. It is the distributor's VLB_ code, not Cube's article number, so
     // it is no MPN either.
-    it('keys offers on identifier, reads the GTIN from ean_code, and maps no MPN', () => {
+    it('keys offers on identifier and reads the GTIN from ean_code', () => {
       expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
       expect(config.mapping['gtin']).toEqual({ field: 'ean_code' });
-      expect(config.mapping['mpn']).toBeUndefined();
+    });
+
+    // `VLB_` is the distributor's prefix; what follows is the Cube article and
+    // size the other shops write, the size's cm or frame letter aside.
+    it.each([
+      ['VLB_1110200-50', '1110200-50'],
+      ['VLB_860301-46T', '860301-46'],
+      ['VLB_860200-50cm', '860200-50'],
+      ['VLB_845700-XL', '845700-XL'],
+      ['VLB_T377-750', undefined],
+    ])('reads the MPN from identifier %j as %j', async (identifier, mpn) => {
+      expect(await readText(config, 'mpn', { identifier })).toBe(mpn);
     });
   });
 
@@ -588,6 +631,11 @@ describe('hand-authored source configs', () => {
     it.each([
       ['1260149146', '1260149146'],
       ['8585053831129', undefined],
+      ['NE2292411020', 'NE2292411020'],
+      ['94531221BK', '94531221BK'],
+      ['286290-006', '286290-006'],
+      ['KITE RACE 12', undefined],
+      ['SPIDER', undefined],
     ])('reads the MPN %j as %j', async (partNumber, mpn) => {
       expect(
         await readText(config, 'mpn', { manufacturer_partnumber: partNumber }),
@@ -652,7 +700,13 @@ describe('hand-authored source configs', () => {
       ['KT-1260152106', '1260152106'],
       ['KT-2260452119', '2260452119'],
       ['KT-023826211', '023826211'],
-      ['VB-1107672-L', undefined],
+      ['VB-1107672-L', '1107672-L'],
+      ['VB-150170-12', '150170-12'],
+      ['BF-2402882', '2402882'],
+      ['CS-94253614BK', '94253614BK'],
+      ['KR-KRLV2Z29X19M002326', 'KRLV2Z29X19M002326'],
+      ['OR-S11053AJ', undefined],
+      ['SC-4254390002008', undefined],
     ])('reads the MPN off the image folder %j', async (sku, mpn) => {
       expect(await readText(config, 'mpn', { image_url: imageOf(sku) })).toBe(mpn);
     });
@@ -716,6 +770,11 @@ describe('hand-authored source configs', () => {
       ['224-286', '224-286'],
       ['8585053831129', undefined],
       ['ne-NE2561612023', undefined],
+      ['bf-2201733', '2201733'],
+      ['94253614BK', '94253614BK'],
+      ['KRTR2Z28X19M002501', 'KRTR2Z28X19M002501'],
+      // Norco's 10-digit sku is the shop's own.
+      ['0670821702', undefined],
     ])('reads the MPN from sku %j as %j', async (sku, mpn) => {
       expect(await readText(config, 'mpn', { sku })).toBe(mpn);
     });
