@@ -107,16 +107,16 @@ export interface ProductSourcePostProcessConfig {
    */
   maxTokens?: number;
   /**
-   * Whether `detailPage.description` (when the source configures it) is
-   * forwarded to the identity extraction. Defaults to false — that call reads
-   * the name and identity fields from the title and the selected spec rows,
-   * and a marketing blurb is unlikely to state those more precisely, so most
-   * sources gain nothing from paying to send it. Enable per-source if a
-   * listing's title omits a color/size/year that its description does state
-   * clearly. (The name predates the identity extraction, and is kept so
-   * stored configs keep validating.)
+   * What of the listing's description the identity extraction gets. Unset is
+   * `none`: that call reads the name and identity fields from the title and
+   * the selected spec rows. A whole description is long and talks about the
+   * brand, other models and other years (a Bosch blurb's "2026 újdonságai"
+   * on every bike), so `evidence` sends only the text around the category's
+   * `evidenceKeywords` — the words that tell what kind of product it is,
+   * which titles often leave out — and the call uses it only for the fields
+   * whose values are defined. `full` sends the whole description as text.
    */
-  includeDescriptionInOfferIdentity?: boolean;
+  identityDescription?: IdentityDescriptionConfig;
   /**
    * Whether `detailPage.description` (when the source configures it) is
    * forwarded to full spec unification (formerly the model-spec call). Defaults to true, matching this call's
@@ -126,6 +126,17 @@ export interface ProductSourcePostProcessConfig {
    * copy with no reliable spec content, to skip the extra input tokens.
    */
   includeDescriptionInModelSpecs?: boolean;
+}
+
+/** ProductSourcePostProcessConfig.identityDescription. */
+export interface IdentityDescriptionConfig {
+  /** `none` (the default): nothing; `evidence`: the text around the
+   *  category's evidence keywords; `full`: the whole description. */
+  mode: 'none' | 'evidence' | 'full';
+  /** `evidence`: words kept on each side of a keyword (default 10). */
+  windowWords?: number;
+  /** `evidence`: the most characters of excerpts per listing (default 3000). */
+  maxChars?: number;
 }
 
 /**

@@ -722,6 +722,123 @@ describe('ProductSourcePostProcessService', () => {
       expect(withoutField).not.toContain('only when the input states the value itself');
     });
 
+    it('shows each defined value under its field and sorts the product into one, by title', async () => {
+      aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+      const monitors: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'Monitor',
+        properties: {
+          screenSize: { type: 'number', title: 'Screen size', meta: { unit: 'inch' } },
+          use: {
+            type: 'string',
+            title: 'Intended use',
+            enum: ['Office', 'Gaming'],
+            meta: {
+              valueDefinitions: {
+                Gaming: 'A high refresh rate, made for games.',
+                Office: 'A plain screen for work.',
+              },
+            },
+          },
+        },
+      };
+      const extract = (outputKeys: string[]) =>
+        service.extractIdentity({
+          data: { brand: 'LG', model: 'raw title', specs: {} },
+          schema: monitors,
+          outputKeys,
+          offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
+          promptExamples: { definedValues: 'a "Pro" in it' },
+        });
+
+      await extract(['screenSize', 'use']);
+      await extract(['screenSize']);
+
+      const [withField, withoutField] = aiChat.createChat.mock.calls.map(
+        (call) => call[0].messages[0].content as string,
+      );
+      // In the list's order, under the field's own line.
+      expect(withField).toContain(
+        '- use (string, allowed values (pick exactly one of these, verbatim): Office | Gaming): Intended use\n' +
+          '  - Office: A plain screen for work.\n' +
+          '  - Gaming: A high refresh rate, made for games.\n',
+      );
+      expect(withField).toContain(
+        "- Intended use sorts each product into one of its defined values above. Judge from everything the input says about the product: rawModel's words, the model's own name included (e.g. a \"Pro\" in it),",
+      );
+      expect(withoutField).not.toContain('defined values');
+    });
+
+    // Excerpts also carry the brand's talk and other years, so they may fill
+    // only the fields whose values are defined.
+    describe('the description evidence', () => {
+      const monitors: SpecDefinitionJsonSchema = {
+        type: 'object',
+        title: 'Monitor',
+        properties: {
+          releaseYear: { type: 'number', title: 'Release year' },
+          use: {
+            type: 'string',
+            title: 'Intended use',
+            enum: ['Office', 'Gaming'],
+            meta: { valueDefinitions: { Office: 'For work.', Gaming: 'For games.' } },
+          },
+        },
+      };
+      const extract = (outputKeys: string[], descriptionEvidence?: string[]) =>
+        service.extractIdentity({
+          data: { brand: 'LG', model: 'raw title', specs: {} },
+          schema: monitors,
+          outputKeys,
+          offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
+          descriptionEvidence,
+        });
+      const call = (index: number) => {
+        const [system, user] = aiChat.createChat.mock.calls[index][0].messages;
+        return { system: system.content as string, user: JSON.parse(user.content) };
+      };
+
+      it('sends the excerpts, and keeps them to the fields with defined values', async () => {
+        aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+
+        await extract(['releaseYear', 'use'], ['a fast gaming screen, new in 2026']);
+
+        expect(call(0).user.descriptionEvidence).toEqual(['a fast gaming screen, new in 2026']);
+        expect(call(0).system).toContain(
+          '- When available, the user message also has "descriptionEvidence": excerpts of the listing\'s description, cut around words that can tell what kind of product it is. Use them only for Intended use; never read another field from them',
+        );
+      });
+
+      it('sends nothing of them to a call without a defined field, and no rule without them', async () => {
+        aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+
+        await extract(['releaseYear'], ['a fast gaming screen, new in 2026']);
+        await extract(['releaseYear', 'use']);
+
+        expect(call(0).user.descriptionEvidence).toBeUndefined();
+        expect(call(0).system).not.toContain('descriptionEvidence');
+        expect(call(1).system).not.toContain('descriptionEvidence');
+      });
+
+      // A feed's HTML can be twice as long as what it says.
+      it('sends a whole description as text', async () => {
+        aiChat.createChat.mockResolvedValue({ content: '{}', parsed: {} });
+
+        await service.extractIdentity({
+          data: { brand: 'LG', model: 'raw title', specs: {} },
+          schema: monitors,
+          outputKeys: ['use'],
+          offerLevelSpecs: [],
+          modelRule: { excludedKeys: [] },
+          description: '<style>p { color: red }</style><p>A <b>gaming</b> screen.</p>',
+        });
+
+        expect(call(0).user.description).toBe('A gaming screen.');
+      });
+    });
+
     it('puts exactly its output keys in the response schema, beside brand and model', async () => {
       aiChat.createChat.mockResolvedValueOnce({ content: '{}', parsed: {} });
       const schemaWithFrameSize: SpecDefinitionJsonSchema = {

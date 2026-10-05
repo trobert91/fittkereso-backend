@@ -6,11 +6,17 @@ import type {
   ProductSpecs,
   ScrapedProductSpec,
   SpecDefinitionJsonSchema,
+  SpecDefinitionProperty,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
+import { htmlToText } from '@fittkereso-backend/utils';
 import { isEmpty, pick } from 'lodash';
 import { ProductSpecNormalizationService } from './product-spec-normalization.service';
-import { getExplicitOnlySpecKeys, getVerbatimSpecKeys } from './product-level-specs';
+import {
+  getDefinedValueSpecKeys,
+  getExplicitOnlySpecKeys,
+  getVerbatimSpecKeys,
+} from './product-level-specs';
 import { identityWords } from '../product-normalizer.service';
 
 /**
@@ -182,6 +188,13 @@ export class ProductSourcePostProcessService {
     };
     rawSpecs?: ScrapedProductSpec[];
     description?: string;
+    /**
+     * Excerpts of the description around the category's evidence keywords
+     * (findDescriptionEvidence), sent in place of the whole of it. They count
+     * only for the fields with defined values, so a call without one ignores
+     * them.
+     */
+    descriptionEvidence?: string[];
     schema: SpecDefinitionJsonSchema;
     /** Every field this call fills: the category's primary, matcher and offer-level specs. */
     outputKeys: string[];
@@ -198,6 +211,11 @@ export class ProductSourcePostProcessService {
   }): Promise<IdentityContribution | undefined> {
     const { data, rawSpecs, description, schema, outputKeys, offerLevelSpecs } =
       params;
+    const evidenceTitles = this.titlesOf(
+      schema,
+      getDefinedValueSpecKeys(schema).filter((key) => outputKeys.includes(key)),
+    );
+    const descriptionEvidence = evidenceTitles.length ? params.descriptionEvidence : undefined;
 
     const response = await this.runContributionCall({
       systemPrompt: this.buildIdentitySystemPrompt(
@@ -206,8 +224,9 @@ export class ProductSourcePostProcessService {
         offerLevelSpecs,
         params.modelRule,
         params.promptExamples,
+        descriptionEvidence?.length ? evidenceTitles : [],
       ),
-      userMessage: this.buildUserMessage(data, rawSpecs, undefined, description),
+      userMessage: this.buildUserMessage(data, rawSpecs, undefined, description, descriptionEvidence),
       responseSchema: this.buildIdentityResponseSchema(schema, outputKeys),
       model: params.model,
       thinking: params.thinking,
@@ -422,10 +441,19 @@ export class ProductSourcePostProcessService {
           !options && prop.meta?.examples?.length
             ? `, examples: ${prop.meta.examples.join(', ')}`
             : '';
-        return `- ${key} (${prop.type}${unit}${options}${examples}): ${prop.title}`;
+        return `- ${key} (${prop.type}${unit}${options}${examples}): ${prop.title}${this.valueDefinitionLines(prop)}`;
       })
       .filter((line): line is string => Boolean(line))
       .join('\n');
+  }
+
+  /** One line per defined value (`meta.valueDefinitions`), in the list's order, under its field. */
+  private valueDefinitionLines(prop: SpecDefinitionProperty): string {
+    const definitions = prop.meta?.valueDefinitions ?? {};
+    return (prop.enum ?? [])
+      .filter((value) => definitions[value])
+      .map((value) => `\n  - ${value}: ${definitions[value]}`)
+      .join('');
   }
 
   /**
@@ -462,6 +490,39 @@ export class ProductSourcePostProcessService {
     );
     return titles.length
       ? `- Fill ${titles.join(', ')} only when the input states the value itself in words: a word in rawModel, a rawSpecs row, or the description. Never derive it from another field's value, a code or abbreviation, the product's name, or what such products usually are — the rule above about values that follow from a named component does not apply here. When the input doesn't state it, omit it.\n`
+      : '';
+  }
+
+  /**
+   * The fields of this call whose values are each defined
+   * (`meta.valueDefinitions`): the product is sorted into the value whose
+   * definition fits, from all the input says of it, and left empty when the
+   * input can't tell. Shops name a product's kind in different words, so one
+   * definition per value keeps them on one value.
+   */
+  private buildDefinedValuesRule(
+    schema: SpecDefinitionJsonSchema,
+    outputKeys: string[],
+    examples: CategorySpecPromptExamples,
+  ): string {
+    const titles = this.titlesOf(
+      schema,
+      getDefinedValueSpecKeys(schema).filter((key) => outputKeys.includes(key)),
+    );
+    if (!titles.length) return '';
+    const one = titles.length === 1;
+    return `- ${titles.join(', ')} ${one ? 'sorts' : 'sort'} each product into one of ${one ? 'its' : 'their'} defined values above. Judge from everything the input says about the product: rawModel's words, the model's own name included${forExample(examples.definedValues)}, the rawSpecs rows, and the description or its evidence excerpts. Pick the value whose definition fits it best; a definition can say that it wins over others. Use only what the input says, never what you know of this model from elsewhere. When no definition fits, or the input doesn't tell, omit it.\n`;
+  }
+
+  /**
+   * The excerpts of a description (findDescriptionEvidence) may fill only the
+   * fields whose values are defined: a description also talks about the
+   * brand, other models and other years ("2026 újdonságai" on every bike of
+   * a Bosch blurb), and an excerpt carries those along.
+   */
+  private buildDescriptionEvidenceRule(titles: string[]): string {
+    return titles.length
+      ? `- When available, the user message also has "descriptionEvidence": excerpts of the listing's description, cut around words that can tell what kind of product it is. Use them only for ${titles.join(', ')}; never read another field from them (a year, a size, a colour). A description often talks about the brand, other models or a whole kind of product, so use an excerpt only when it clearly describes this product. They count as the description: lower confidence than rawModel and rawSpecs.\n`
       : '';
   }
 
@@ -523,6 +584,8 @@ export class ProductSourcePostProcessService {
     offerLevelSpecs: string[],
     modelRule: ModelRuleRequest,
     examples: CategorySpecPromptExamples = {},
+    /** The fields this call's description excerpts may fill; none when it has no excerpts. */
+    evidenceTitles: string[] = [],
   ): string {
     const fieldDescriptions = this.buildFieldDescriptions(schema, outputKeys);
 
@@ -568,7 +631,9 @@ export class ProductSourcePostProcessService {
       offerLevelRule +
       `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it (e.g. a spec table listing a rear shock describes a full-suspension frame). This never extends to numbers: never fill a numeric field (power, torque, capacity, weight, size, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
       this.buildExplicitOnlyRule(schema, outputKeys) +
+      this.buildDefinedValuesRule(schema, outputKeys, examples) +
       `- When available, the user message also has a top-level "description" string — the listing's own marketing prose. Treat it as LOWER confidence than rawModel or rawSpecs: only extract a value from it when clearly, specifically and unambiguously stated, never from general marketing tone, and prefer rawModel/rawSpecs/deterministicSpecs whenever they have a value for the same field.\n` +
+      this.buildDescriptionEvidenceRule(evidenceTitles) +
       this.buildAllowedValuesRule() +
       `- Give a number in the unit shown for its field above, as a bare number.\n` +
       `- Only use evidence present in the input. Never invent or guess a spec value for a field the input doesn't support — omit the key entirely instead.\n` +
@@ -627,6 +692,7 @@ export class ProductSourcePostProcessService {
       // a named drive unit.
       `- A categorical or yes/no value that follows directly from a named component or a stated limit counts as clearly present — include it rather than omitting it${examples.componentInference ? `: e.g. ${examples.componentInference}` : ''}. An equipment row that is present in rawSpecs but has no value (e.g. "Első sárvédő" with empty values) means that item is not included. This never extends to numbers: never fill a numeric field (power, torque, capacity, travel, weight, etc.) from your own knowledge of a component — only from a number actually written in the input.\n` +
       this.buildExplicitOnlyRule(schema, outputKeys) +
+      this.buildDefinedValuesRule(schema, outputKeys, examples) +
       `- Then look through rawSpecs AND rawModel for canonical spec fields deterministicSpecs is missing. A source may not have a row labeled like the canonical field at all — the value can be embedded inside a free-text component description${forExample(examples.componentRow)}. Extract from either source when the value is clearly and unambiguously present.\n` +
       `- When available, the user message also has a top-level "description" string — the listing's own marketing/product-description prose (distinct from a rawSpecs row's own per-row "description" field above). Treat it as LOWER confidence than rawSpecs or rawModel: it's unstructured sales copy, not a labeled spec table, so it can restate a spec correctly, omit it, or describe it only vaguely/figuratively. Only extract a value from it when a spec is clearly, specifically, and unambiguously stated${forExample(examples.descriptionStatement)} — never from general marketing tone or a category/discipline claim alone (e.g. "versenyorientált fully kerékpár" praising a bike as competition-oriented does NOT by itself justify picking a specific usageType/frameType enum value unless that value is genuinely and specifically what the sentence describes). When rawSpecs/deterministicSpecs already has a value for a field, prefer it over anything implied by description.\n` +
       this.buildAllowedValuesRule() +
@@ -661,6 +727,7 @@ export class ProductSourcePostProcessService {
     rawSpecs?: ScrapedProductSpec[],
     knownSpecs?: ProductSpecs,
     description?: string,
+    descriptionEvidence?: string[],
   ): string {
     const payload: Record<string, unknown> = {
       deterministicSpecs: data.specs,
@@ -689,11 +756,18 @@ export class ProductSourcePostProcessService {
     // Free-text marketing description. Only the source's own config
     // populates it (most sources have none), and only when the caller opts
     // this call into receiving it (ProductSourcePostProcessConfig's
-    // includeDescriptionInOfferIdentity/includeDescriptionInModelSpecs).
-    // Both prompts treat it as lower confidence than rawModel/rawSpecs, per
-    // their own "description" rule.
-    if (description?.trim()) {
-      payload['description'] = description.trim();
+    // identityDescription/includeDescriptionInModelSpecs). Both prompts
+    // treat it as lower confidence than rawModel/rawSpecs, per their own
+    // "description" rule. As text: a feed's HTML (style blocks and all) can
+    // be twice as long as what it says.
+    const text = description ? htmlToText(description).trim() : '';
+    if (text) {
+      payload['description'] = text;
+    }
+
+    // Excerpts of it instead, for the identity extraction (findDescriptionEvidence).
+    if (descriptionEvidence?.length) {
+      payload['descriptionEvidence'] = descriptionEvidence;
     }
 
     return JSON.stringify(payload);

@@ -332,6 +332,35 @@ describe('ProductSourceConfigValidatorService', () => {
       ]);
     });
 
+    // A mode replaced the old boolean: excerpts around the category's
+    // evidence keywords are the third choice beside nothing and everything.
+    it('takes what of the description the identity extraction gets as a mode, not the old switch', () => {
+      const withPostProcess = (postProcess: Record<string, unknown>) => ({
+        ...feedConfig(),
+        postProcess,
+      });
+
+      for (const mode of ['none', 'evidence', 'full']) {
+        expect(
+          validator.problems('arukereso', withPostProcess({ identityDescription: { mode } })),
+        ).toBeNull();
+      }
+      expect(
+        validator.problems(
+          'arukereso',
+          withPostProcess({ identityDescription: { mode: 'evidence', windowWords: 8, maxChars: 2000 } }),
+        ),
+      ).toBeNull();
+      for (const postProcess of [
+        { identityDescription: { mode: 'some' } },
+        { identityDescription: { windowWords: 8 } },
+        { identityDescription: { mode: 'evidence', windowWords: 0 } },
+        { includeDescriptionInOfferIdentity: true },
+      ]) {
+        expect(validator.problems('arukereso', withPostProcess(postProcess))).not.toBeNull();
+      }
+    });
+
     it('accepts a list of fallbacks for a target', () => {
       const config = feedConfig({
         price: [

@@ -58,6 +58,13 @@ export function getExplicitOnlySpecKeys(schema: SpecDefinitionJsonSchema): strin
   );
 }
 
+/** The fields whose values are each defined (`meta.valueDefinitions`): the LLM sorts the product into one. */
+export function getDefinedValueSpecKeys(schema: SpecDefinitionJsonSchema): string[] {
+  return Object.keys(schema.properties).filter(
+    (key) => !isEmpty(schema.properties[key].meta?.valueDefinitions),
+  );
+}
+
 /** The schema's year fields: numbers holding a calendar year (`meta.format: 'year'`). */
 export function getYearSpecKeys(schema: SpecDefinitionJsonSchema): string[] {
   return Object.keys(schema.properties).filter(

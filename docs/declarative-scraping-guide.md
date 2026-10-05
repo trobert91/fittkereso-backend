@@ -71,7 +71,16 @@ interface ScrapingSourceConfig {
     //   Off, the listing has no model/displayName, only its title
     //   (`originalName`, flagged `identity_off`), and matching uses the title.
     // specs: full spec unification, once per product per source.
-    postProcess?: { identity?: boolean; specs?: boolean; /* model, thinking, effort, maxTokens, includeDescriptionIn… */ };
+    // identityDescription: what of the description the identity extraction
+    //   gets — `none` (default), `evidence` (the text around the category's
+    //   evidenceKeywords, used only for fields with defined values, so a
+    //   description's stray years stay out) or `full`.
+    postProcess?: {
+      identity?: boolean;
+      specs?: boolean;
+      identityDescription?: { mode: 'none' | 'evidence' | 'full'; windowWords?: number; maxChars?: number };
+      /* model, thinking, effort, maxTokens, includeDescriptionInModelSpecs */
+    };
   };
 }
 ```
@@ -291,7 +300,7 @@ A shop may have several sources: speedbike has its Árukereső feed and its Goog
   - the unattached count in `get_product_source_import_status`, and the Listings box on the admin source page;
   - `simulate_product_source_import`, which for a contributing source counts the rows matching an existing offer, and for any feed the rows carrying an old price.
 - **A contributing source's names:** it never names a product, and its record stores no match key (`normalizedSourceName` null), since nothing matches on it. With `postProcess.identity` on, its listings still get the identity extraction: that names the record and reads its listing-level specs (size, colour), which fill the offer's keys the seller's higher sources lack. With it off, a record has only its title (`originalName`), flagged `identity_off`.
-- **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess: { identity: false, specs: false }`, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number. Its titles are the same as Árukereső's and it has no spec table, so an extraction there would add nothing but the colour a few descriptions state (Giant/Liv), which also needs `includeDescriptionInOfferIdentity`.
+- **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess: { identity: false, specs: false }`, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number. Its titles are the same as Árukereső's and it has no spec table, so an extraction there would add nothing but the colour a few descriptions state (Giant/Liv), which also needs `postProcess.identityDescription` in `full` mode.
 - **Checked by** `apps/product-collector/scripts/verify-multi-source.ts` on `fittkereso_e2e`: A then G, G then A and both at once end in the same state, plus the removal and admin-description scenarios.
 
 ---

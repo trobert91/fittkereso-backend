@@ -16,6 +16,7 @@ import {
   SpecDefinitionJsonSchema,
 } from '@fittkereso-backend/database';
 import {
+  findDescriptionEvidence,
   getYearSpecKeys,
   IdentityContribution,
   MODEL_PROMPT_VERSION,
@@ -31,7 +32,7 @@ import {
   SpecUnificationTrigger,
 } from '@fittkereso-backend/metrics';
 import { CustomLogger } from '@fittkereso-backend/logger';
-import { filterDefinedSpecs } from '@fittkereso-backend/utils';
+import { filterDefinedSpecs, htmlToText } from '@fittkereso-backend/utils';
 import { difference, isEmpty, isNil, omit, omitBy, pick, uniq } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 
@@ -50,6 +51,8 @@ export interface CategorySpecScopes {
   modelRule: ModelRuleRequest;
   /** The category's examples for both prompts' rules (promptConfig.specExamples). */
   promptExamples?: CategorySpecPromptExamples;
+  /** The words a description's excerpts are cut around (evidenceKeywords). */
+  evidenceKeywords: string[];
 }
 
 /**
@@ -105,6 +108,7 @@ export class SpecPostProcessService {
         ...(examples?.length ? { examples } : {}),
       },
       promptExamples: config?.promptConfig?.specExamples,
+      evidenceKeywords: config?.evidenceKeywords ?? [],
     };
   }
 
@@ -159,15 +163,19 @@ export class SpecPostProcessService {
     const deterministic = scrapedProduct.extractedSpecs ?? {};
     const rawTitle = scrapedProduct.originalName;
     const rows = selectIdentitySpecRows(scrapedProduct.rawSpecs, specRows);
-    const description = config?.includeDescriptionInOfferIdentity
-      ? scrapedProduct.description
-      : undefined;
+    const { description, descriptionEvidence } = identityDescriptionOf(
+      scrapedProduct.description,
+      config,
+      scopes,
+    );
     const data = {
       brand: scrapedProduct.brand,
       model: rawTitle,
       specs: filterDefinedSpecs(pick(deterministic, scopes.identityKeys)),
     };
-    const identityInputHash = hashOf({ ...data, rows, description });
+    // A listing whose description has no keyword hashes as it did before its
+    // source sent excerpts, so it isn't asked again for nothing.
+    const identityInputHash = hashOf({ ...data, rows, description, descriptionEvidence });
 
     const enabled = config?.identity !== false;
     const modelContract = contractOf(scopes);
@@ -176,6 +184,7 @@ export class SpecPostProcessService {
         data,
         rawSpecs: rows,
         description,
+        descriptionEvidence,
         schema,
         outputKeys: scopes.identityKeys,
         offerLevelSpecs: scopes.offerLevelKeys,
@@ -421,6 +430,25 @@ function postProcessConfigOf(
   if (isScrapingConfig(config)) return config.detailPage.postProcess;
   if (isArukeresoConfig(config)) return config.postProcess;
   return undefined;
+}
+
+/**
+ * What of the listing's description the identity extraction gets, by the
+ * source's `identityDescription` mode: nothing (the default), the excerpts
+ * around the category's evidence keywords, or the whole of it. A description
+ * with no keyword gives no excerpts, so its listing is asked as before.
+ */
+function identityDescriptionOf(
+  description: string | undefined,
+  config: ProductSourcePostProcessConfig | undefined,
+  scopes: CategorySpecScopes,
+): { description?: string; descriptionEvidence?: string[] } {
+  const setting = config?.identityDescription;
+  if (!description?.trim() || !setting || setting.mode === 'none') return {};
+  if (setting.mode === 'full') return { description };
+
+  const excerpts = findDescriptionEvidence(htmlToText(description), scopes.evidenceKeywords, setting);
+  return isEmpty(excerpts) ? {} : { descriptionEvidence: excerpts };
 }
 
 function llmOptionsOf(config: ProductSourcePostProcessConfig | undefined) {

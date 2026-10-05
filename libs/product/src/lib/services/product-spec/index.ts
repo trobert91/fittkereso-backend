@@ -13,3 +13,4 @@ export * from './get-latest-source-per-source';
 export * from './product-level-specs';
 export * from './identity-spec-rows';
 export * from './group-records-by-seller';
+export * from './description-evidence';

@@ -111,6 +111,9 @@ describe('SpecPostProcessService', () => {
         unificationKeys: ['forkTravel', 'tubeless'],
         // The offer-level specs are always left out of the model.
         modelRule: { excludedKeys: ['frameSize', 'color'] },
+        promptExamples: undefined,
+        // A category without evidence keywords cuts no excerpts.
+        evidenceKeywords: [],
       });
     });
   });
@@ -189,15 +192,61 @@ describe('SpecPostProcessService', () => {
       ]);
     });
 
-    it('forwards the description only when the source opts in', async () => {
-      await service.extractIdentity({
-        context: context({ postProcess: { includeDescriptionInOfferIdentity: true } }),
-        scrapedProduct: listing(),
+    describe("the description, by the source's identityDescription mode", () => {
+      const trekking =
+        '<h2>KTM Macina Style 720 elektromos trekking kerékpár</h2><p>A Bosch 2026 újdonságai mindenhol.</p>';
+      const withKeywords = (evidenceKeywords: string[]) => {
+        const config = categoryConfigService.getConfig();
+        categoryConfigService.getConfig.mockReturnValue({ ...config, evidenceKeywords });
+      };
+      const sent = () => postProcess.extractIdentity.mock.calls[0][0];
+
+      it('sends none of it by default', async () => {
+        await service.extractIdentity({ context: context(), scrapedProduct: listing() });
+
+        expect(sent().description).toBeUndefined();
+        expect(sent().descriptionEvidence).toBeUndefined();
       });
 
-      expect(postProcess.extractIdentity).toHaveBeenCalledWith(
-        expect.objectContaining({ description: 'Könnyű, strapabíró.' }),
-      );
+      it('sends all of it in full mode', async () => {
+        await service.extractIdentity({
+          context: context({ postProcess: { identityDescription: { mode: 'full' } } }),
+          scrapedProduct: listing(),
+        });
+
+        expect(sent().description).toBe('Könnyű, strapabíró.');
+        expect(sent().descriptionEvidence).toBeUndefined();
+      });
+
+      it("sends the text around the category's keywords in evidence mode", async () => {
+        withKeywords(['trekking']);
+
+        await service.extractIdentity({
+          context: context({
+            postProcess: { identityDescription: { mode: 'evidence', windowWords: 2 } },
+          }),
+          scrapedProduct: listing({ description: trekking }),
+        });
+
+        expect(sent().description).toBeUndefined();
+        expect(sent().descriptionEvidence).toEqual(['720 elektromos trekking kerékpár A']);
+      });
+
+      // Switching a source to evidence re-asks only the listings it gives excerpts.
+      it('asks a listing whose description has no keyword as it did before', async () => {
+        withKeywords(['gravel']);
+        const asBefore = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing({ description: trekking }),
+        });
+        const inEvidenceMode = await service.extractIdentity({
+          context: context({ postProcess: { identityDescription: { mode: 'evidence' } } }),
+          scrapedProduct: listing({ description: trekking }),
+        });
+
+        expect(postProcess.extractIdentity.mock.calls[1][0].descriptionEvidence).toBeUndefined();
+        expect(inEvidenceMode.identityInputHash).toBe(asBefore.identityInputHash);
+      });
     });
 
     it('continues on the deterministic data when the LLM fails, with no name and the failure flagged', async () => {

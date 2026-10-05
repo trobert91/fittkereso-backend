@@ -61,6 +61,14 @@ export interface SpecDefinitionMeta {
    * matching.
    */
   explicitOnly?: boolean;
+  /**
+   * What each value of the field's `enum` means, keyed by the value. The LLM
+   * is shown them and sorts every product into the value whose definition
+   * fits, leaving the field empty when the input can't tell — for a field
+   * that classifies the product (its usage type), where shops use the same
+   * words for different things.
+   */
+  valueDefinitions?: Record<string, string>;
 }
 
 export interface SpecDefinitionProperty {

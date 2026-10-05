@@ -146,6 +146,9 @@ export interface CategorySpecPromptExamples {
   descriptionStatement?: string;
   /** Spec unification: a value never to be computed from another. */
   noDerivation?: string;
+  /** Both calls: a word of a model's own name that tells which defined value
+   *  (`meta.valueDefinitions`) the product takes. */
+  definedValues?: string;
 }
 
 // ─── Spec Extraction Config ─────────────────────────────────────────────────
@@ -233,6 +236,12 @@ export interface ProductCategoryConfig {
    *  first rule that matches one of the listing's identifiers wins. */
   brandIdentifierSpecs?: Record<string, BrandIdentifierSpec[]>;
   promptConfig?: CategoryPromptConfig;
+  /** The words a listing's description is searched for when its source sends
+   *  the identity extraction excerpts rather than the whole description
+   *  (`postProcess.identityDescription.mode: 'evidence'`): the text around
+   *  each one goes. Written naturally — accents and case don't matter, and a
+   *  word also matches with a suffix or one typo (findDescriptionEvidence). */
+  evidenceKeywords?: string[];
   /** Ordered list of spec keys to use for product context and scoring (e.g. ["screenSize", "resolution", "refreshRate"]). */
   primarySpecs?: string[];
   /** Secondary spec keys for matching disambiguation.

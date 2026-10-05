@@ -232,10 +232,25 @@ const postProcessConfigSchema: JsonSchemaFragment = {
       description:
         'Ceiling on generated tokens. Must stay well above a fully-populated specs object — a truncated response fails JSON parsing and silently degrades the pass to deterministic-only.',
     },
-    includeDescriptionInOfferIdentity: {
-      type: 'boolean',
+    identityDescription: {
+      type: 'object',
       description:
-        'Whether the extracted description reaches the identity extraction (the per-listing call reading the name, size, colour, year and other identity fields). Defaults to false — a marketing blurb rarely states those better than the title and spec table.',
+        'What of the description the identity extraction (the per-listing call reading the name, size, colour, year and other identity fields) gets. Unset is `none`. `evidence` sends only the text around the category\'s evidenceKeywords, used only for fields with defined values; `full` sends the whole description, years and all.',
+      properties: {
+        mode: { type: 'string', enum: ['none', 'evidence', 'full'] },
+        windowWords: {
+          type: 'integer',
+          minimum: 1,
+          description: '`evidence`: words kept on each side of a keyword. Default 10.',
+        },
+        maxChars: {
+          type: 'integer',
+          minimum: 1,
+          description: '`evidence`: the most characters of excerpts per listing. Default 3000.',
+        },
+      },
+      required: ['mode'],
+      additionalProperties: false,
     },
     includeDescriptionInModelSpecs: {
       type: 'boolean',

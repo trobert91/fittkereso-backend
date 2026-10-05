@@ -4,10 +4,11 @@ import * as path from 'path';
 interface SchemaProperty {
   type: string;
   enum?: string[];
-  meta?: { format?: string };
+  meta?: { format?: string; valueDefinitions?: Record<string, string> };
 }
 
 interface CategoryConfig {
+  evidenceKeywords?: string[];
   primarySpecs?: string[];
   matcherSpecs?: string[];
   offerLevelSpecs?: string[];
@@ -191,5 +192,44 @@ describe.each(categories)('the %s category config', (slug) => {
   )('marks %s as a year only on a number field', (_key, property) => {
     expect(property.meta?.format).toBe('year');
     expect(property.type).toBe('number');
+  });
+
+  // The LLM is shown a definition per value and picks among them: a value
+  // without one is never picked on purpose, and a definition of a value off
+  // the list describes something the response can't hold.
+  eachOf(
+    Object.entries(properties).filter(([, property]) => property.meta?.valueDefinitions),
+  )('defines exactly the allowed values of %s', (_key, property) => {
+    expect(Object.keys(property.meta?.valueDefinitions ?? {}).sort()).toEqual(
+      [...(property.enum ?? [])].sort(),
+    );
+    for (const definition of Object.values(property.meta?.valueDefinitions ?? {})) {
+      expect(definition.trim()).not.toBe('');
+    }
+  });
+
+  // Keywords are compared accent- and case-free (findDescriptionEvidence), so
+  // "Túra" beside "tura" is one keyword listed twice, and an empty one would
+  // match nothing.
+  it('lists each evidence keyword once, none empty', () => {
+    const plain = (config.evidenceKeywords ?? []).map((keyword) =>
+      keyword.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().trim().replace(/\s+/g, ' '),
+    );
+    expect(plain).not.toContain('');
+    expect(new Set(plain).size).toBe(plain.length);
+  });
+});
+
+// Bikes and e-bikes sort products into one list of usage types, so a bike and
+// an e-bike of one kind are described, filtered and classified alike.
+describe('the usage types', () => {
+  const sharing = categories.filter((slug) => read(slug, 'jsonSchema.json').properties.usageType);
+
+  it.each(sharing.slice(1))('are the same list, with the same definitions, in %s', (slug) => {
+    const [first] = sharing;
+    const usageOf = (category: string): SchemaProperty =>
+      read(category, 'jsonSchema.json').properties.usageType;
+    expect(usageOf(slug).enum).toEqual(usageOf(first).enum);
+    expect(usageOf(slug).meta?.valueDefinitions).toEqual(usageOf(first).meta?.valueDefinitions);
   });
 });
