@@ -88,8 +88,9 @@ export function modelExcludedSpecKeys(config: ProductCategoryConfig | undefined)
 
 /** One spec value a brand writes into its own article numbers or barcodes —
  *  e.g. KTM's 10-digit article number `1260040108`, whose digits 2–3 are the
- *  model year. A manufacturer's fact, so it holds at every shop; a shop's own
- *  id format belongs in that shop's source config instead. */
+ *  model year and whose 8th digit is the frame. A manufacturer's fact, so it
+ *  holds at every shop; a shop's own id format belongs in that shop's source
+ *  config instead. */
 export interface BrandIdentifierSpec {
   /** The spec key the value fills (a field of the category schema). */
   spec: string;
@@ -99,6 +100,9 @@ export interface BrandIdentifierSpec {
   pattern: string;
   /** Written before the captured value — `20` turns KTM's `26` into `2026`. */
   prefix?: string;
+  /** The value each captured code stands for — KTM's frame digit `1` is
+   *  `Magas`. A code it doesn't list fills nothing. Replaces `prefix`. */
+  values?: Record<string, string>;
 }
 
 /** How far apart two numeric values may be and still count as the same.

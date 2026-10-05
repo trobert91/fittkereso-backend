@@ -49,7 +49,7 @@ describe('foldBrandIdentifierSpecs', () => {
     type: 'object',
     properties: {
       modelYear: { type: 'number', title: 'Model year', meta: { format: 'year' } },
-      frameType: { type: 'string', title: 'Frame', enum: ['Magas', 'Alacsony'] },
+      frameType: { type: 'string', title: 'Frame', enum: ['Magas', 'Alacsony', 'Trapéz'] },
     },
   } as SpecDefinitionJsonSchema;
   // KTM's two article-number forms, as the ebikes config states them.
@@ -136,5 +136,44 @@ describe('foldBrandIdentifierSpecs', () => {
     expect(fold({ brand: 'KTM', offers: [{ mpn: `F-${captured}` }] }, {}, byFrame)).toEqual(
       expected,
     );
+  });
+
+  // KTM's frame digit (H, D, US), as the ebikes config states it.
+  const frameCodes = { '1': 'Magas', '2': 'Trapéz', '5': 'Alacsony' };
+  const frames = {
+    KTM: [
+      { spec: 'frameType', identifier: 'mpn' as const, pattern: '^12\\d{5}(\\d)\\d{2}$', values: frameCodes },
+      { spec: 'frameType', identifier: 'mpn' as const, pattern: '^02\\d{4}(\\d)\\d{2}$', values: frameCodes },
+    ],
+  };
+
+  it.each([
+    ['1260040108', 'Magas'],
+    ['1260153211', 'Trapéz'],
+    ['1230155536', 'Alacsony'],
+    ['022356206', 'Trapéz'],
+    ['023690536', 'Alacsony'],
+  ])("reads the frame code off KTM's article number %s as %s", (mpn, frameType) => {
+    expect(fold({ brand: 'KTM', offers: [{ mpn }] }, {}, frames)).toEqual({ frameType });
+  });
+
+  // KTM's unisex mountain bikes carry a 6, which no frame type stands for.
+  it('fills nothing for a code the rule does not list', () => {
+    expect(fold({ brand: 'KTM', offers: [{ mpn: '1260083650' }] }, {}, frames)).toEqual({});
+  });
+
+  it('never overrides a frame the listing states', () => {
+    expect(
+      fold({ brand: 'KTM', offers: [{ mpn: '1260040108' }] }, { frameType: 'Alacsony' }, frames),
+    ).toEqual({ frameType: 'Alacsony' });
+  });
+
+  it('writes no prefix before a listed value', () => {
+    const prefixed = {
+      KTM: [{ ...frames.KTM[0], prefix: 'x' }],
+    };
+    expect(fold({ brand: 'KTM', offers: [{ mpn: '1260040108' }] }, {}, prefixed)).toEqual({
+      frameType: 'Magas',
+    });
   });
 });

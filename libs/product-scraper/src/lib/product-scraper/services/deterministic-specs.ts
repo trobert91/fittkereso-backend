@@ -38,14 +38,15 @@ export interface BrandIdentifiedListing {
 /**
  * Folds in the spec values the listing's brand writes into its own article
  * numbers or barcodes (ProductCategoryConfig.brandIdentifierSpecs) — KTM's
- * model year, say, which every shop's MPN carries whether or not its spec
- * table states the year.
+ * model year and frame, say, which every shop's MPN carries whether or not its
+ * spec table states them.
  *
  * Runs after the spec mapping and `foldReleaseYear` and only fills what they
  * left empty: a value the shop states is its own reading of the listing. Per
- * spec, the first rule that matches one of the listing's identifiers wins. The
- * value is typed as the schema field reads (a year through `normalizeYear`);
- * one the field can't hold is left out.
+ * spec, the first rule that matches one of the listing's identifiers wins. A
+ * rule with `values` reads the captured code through it, and a code it doesn't
+ * list matches nothing. The value is typed as the schema field reads (a year
+ * through `normalizeYear`); one the field can't hold is left out.
  */
 export function foldBrandIdentifierSpecs(
   specs: ProductSpecs,
@@ -69,7 +70,9 @@ export function foldBrandIdentifierSpecs(
     for (const identifier of identifiers[rule.identifier]) {
       const captured = identifier.match(pattern)?.[1];
       if (captured === undefined) continue;
-      const value = toSpecValue(`${rule.prefix ?? ''}${captured}`, schema.properties[rule.spec]);
+      const text = rule.values ? rule.values[captured] : `${rule.prefix ?? ''}${captured}`;
+      if (text === undefined) continue;
+      const value = toSpecValue(text, schema.properties[rule.spec]);
       if (value === undefined) continue;
       specs[rule.spec] = value;
       break;

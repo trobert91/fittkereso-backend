@@ -721,7 +721,7 @@ describe("ArukeresoProductMapperService on speedbike's Google Shopping feed", ()
 
 // The ebikes brand rules (brandIdentifierSpecs) through the real ops, the
 // shops' fixture configs and the category's own config and schema.
-describe("ArukeresoProductMapperService reading a year off a brand's article number", () => {
+describe("ArukeresoProductMapperService reading specs off a brand's article number", () => {
   const read = (file: string) => JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8'));
   const fixture = (shop: string) =>
     read(
@@ -801,6 +801,32 @@ describe("ArukeresoProductMapperService reading a year off a brand's article num
         manufacturerpartnumber: '025163108',
       }),
     ).toEqual({ year: 2025, mpn: '025163108' });
+  });
+
+  // The same numbers carry KTM's frame code: the 8th digit, the 7th in the
+  // 9-digit form. Its unisex mountain bikes' 6 stands for no frame type.
+  it.each([
+    ['1260149146', 'Magas'],
+    ['1230151533', 'Alacsony'],
+    ['022356206', 'Trapéz'],
+    ['1260083650', undefined],
+  ])("reads the frame off KTM's article number %s as %j", async (manufacturerpartnumber, frameType) => {
+    const mapped = await mapper.map({
+      config: fixture('bikelife'),
+      item: {
+        fields: {
+          manufacturer: 'KTM',
+          name: 'KTM Macina Style 720',
+          producturl: 'https://bikelife.hu/ktm-macina-style-720',
+          price: '1 299 000',
+          category: 'Pedelec kerékpárok',
+          manufacturerpartnumber,
+        },
+        attributes: [],
+      },
+    });
+    if (mapped.status !== 'mapped') throw new Error(`skipped: ${mapped.reason}`);
+    expect(mapped.scrapedProduct.specs?.['frameType']).toBe(frameType);
   });
 
   // speedbike leaves most KTM sku empty and writes the article number as its

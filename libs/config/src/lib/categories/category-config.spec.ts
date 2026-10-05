@@ -21,7 +21,13 @@ interface CategoryConfig {
   };
   brandIdentifierSpecs?: Record<
     string,
-    { spec: string; identifier: string; pattern: string; prefix?: string }[]
+    {
+      spec: string;
+      identifier: string;
+      pattern: string;
+      prefix?: string;
+      values?: Record<string, string>;
+    }[]
   >;
 }
 
@@ -159,6 +165,18 @@ describe.each(categories)('the %s category config', (slug) => {
     const groups = new RegExp(`${rule.pattern}|`).exec('')?.length ?? 0;
     expect(groups - 1).toBe(1);
   });
+
+  // A code table's value off the field's list fills nothing, silently; a
+  // prefix beside it is never written.
+  it.each(brandRules.filter(([, rule]) => rule.values))(
+    'maps each code to an allowed value: %s',
+    (_name, rule) => {
+      expect(rule.prefix).toBeUndefined();
+      const allowed = properties[rule.spec]?.enum;
+      if (!allowed) return;
+      for (const value of Object.values(rule.values ?? {})) expect(allowed).toContain(value);
+    },
+  );
 
   it.each(
     Object.entries(properties).filter(([, property]) => property.meta?.format),
