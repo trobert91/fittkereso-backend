@@ -9,15 +9,18 @@ import {
   ProductKeyLookupService,
 } from './product-key-lookup.service';
 
-// As the real ebikes config: years and capacities must match exactly.
+// As the real ebikes config: years and capacities must match exactly, and a
+// shop's torque figure is no reason to refuse an identifier.
 const ebikes: ProductCategoryConfig = {
-  primarySpecs: ['modelYear', 'batteryCapacity'],
+  primarySpecs: ['modelYear', 'batteryCapacity', 'torque'],
   matcherSpecs: ['weight'],
   matchingConfig: {
     specTolerances: {
       modelYear: { absolute: 0 },
       batteryCapacity: { absolute: 0 },
+      torque: { absolute: 0 },
     },
+    identifierGateExcludes: ['torque'],
   },
 };
 
@@ -195,6 +198,33 @@ describe('ProductKeyLookupService', () => {
       expect(decision.failedGates['p1']).toEqual([
         expect.objectContaining({ spec: 'modelYear', queryValue: 2027, candidateValue: 2025 }),
       ]);
+    });
+
+    // ambringa's description gives 85 Nm on every Bosch CX bike; the GTIN
+    // is the stronger evidence. The pair still records the disagreement.
+    it('attaches through a contradiction on a spec the config excuses, keeping it for the pair', async () => {
+      givenProducts({ p1: { brandId: 'ktm', specs: { modelYear: 2026, torque: 100 } } });
+
+      const decision = await service.decide(
+        [match('gtin', 'p1')],
+        listing({ modelYear: 2026, torque: 85 }),
+      );
+
+      expect(decision.verdict).toEqual({ kind: 'attach', via: 'gtin', productId: 'p1' });
+      expect(decision.failedGates['p1']).toEqual([
+        expect.objectContaining({ spec: 'torque', queryValue: 85, candidateValue: 100 }),
+      ]);
+    });
+
+    it('still refuses when an excused spec comes with one that is not', async () => {
+      givenProducts({ p1: { brandId: 'ktm', specs: { modelYear: 2025, torque: 100 } } });
+
+      const decision = await service.decide(
+        [match('gtin', 'p1')],
+        listing({ modelYear: 2026, torque: 85 }),
+      );
+
+      expect(decision.verdict).toMatchObject({ kind: 'conflict', reason: 'spec_mismatch' });
     });
 
     it('lets the first tier that found anything decide, even when a later one is clean', async () => {

@@ -15,6 +15,7 @@ interface CategoryConfig {
   matchingConfig?: {
     specMismatchPenalty?: Record<string, unknown>;
     compatibleValues?: Record<string, Record<string, string[]>>;
+    identifierGateExcludes?: string[];
     model?: {
       excludeSpecs?: string[];
       examples?: { title: string; model: string; specs?: Record<string, string | number> }[];
@@ -142,6 +143,14 @@ describe.each(categories)('the %s category config', (slug) => {
     expect(typeof points).toBe('number');
     expect(points).toBeGreaterThanOrEqual(0);
   });
+
+  // Only a primary spec can refuse an identifier; another name excuses nothing.
+  eachOf((config.matchingConfig?.identifierGateExcludes ?? []).map((key) => [key] as const))(
+    'lets an identifier through a %s disagreement, a primary spec',
+    (key) => {
+      expect(config.primarySpecs ?? []).toContain(key);
+    },
+  );
 
   it.each(compatibleValues)('lists compatible values of %s, a spec the gates compare', (key) => {
     expect(gated).toContain(key);

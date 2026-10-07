@@ -39,6 +39,13 @@ export interface CategoryMatchingConfig {
    *  gender: { Uniszex: ["Férfi", "Női"] } }` — Férfi against Női still
    *  contradicts. */
   compatibleValues?: Record<string, Record<string, string[]>>;
+  /** Primary specs a shared identifier (GTIN, MPN, declared size) need not
+   *  agree on: ones shops often get wrong, where a disagreement says more
+   *  about a shop's text than about the bike — e.g. `["torque", "usageType"]`.
+   *  A listing still attaches to the product its identifier found; the
+   *  contradiction stays on the duplicate pair as evidence. Name matching
+   *  compares them as before. */
+  identifierGateExcludes?: string[];
   /** What the identity extraction's `model` leaves out, and the examples it is
    *  shown. See CategoryModelConfig. */
   model?: CategoryModelConfig;

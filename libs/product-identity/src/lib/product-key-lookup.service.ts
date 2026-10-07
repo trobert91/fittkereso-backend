@@ -211,6 +211,9 @@ export class ProductKeyLookupService {
       (product) => product.id,
     );
     const categoryConfig = this.categoryConfigService.getConfig(listing.categorySlug);
+    // Specs shops often get wrong don't refuse an identifier; they stay as
+    // the pair's evidence.
+    const ignored = new Set(categoryConfig?.matchingConfig?.identifierGateExcludes ?? []);
 
     const failedGates: Record<string, FailedGate[]> = {};
     for (const productId of productIds) {
@@ -235,7 +238,7 @@ export class ProductKeyLookupService {
       if (!listing.brandId || brandId !== listing.brandId) {
         return { kind: 'conflict', via, reason: 'brand_mismatch', productIds: found };
       }
-      if (!isEmpty(failedGates[productId])) {
+      if (failedGates[productId]?.some((gate) => !gate.spec || !ignored.has(gate.spec))) {
         return { kind: 'conflict', via, reason: 'spec_mismatch', productIds: found };
       }
       return { kind: 'attach', via, productId };

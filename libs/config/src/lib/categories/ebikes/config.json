@@ -298,6 +298,10 @@
     "specMismatchPenalty": {
       "modelYear": 50
     },
+    "identifierGateExcludes": [
+      "torque",
+      "usageType"
+    ],
     "model": {
       "excludeSpecs": ["modelYear", "gender", "frameType"],
       "examples": [
