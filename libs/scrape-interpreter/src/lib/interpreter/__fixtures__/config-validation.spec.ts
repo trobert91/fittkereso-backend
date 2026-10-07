@@ -414,6 +414,16 @@ describe('hand-authored source configs', () => {
       expect(specsOf(config, 'ebikes', { [name]: value })[key]).toEqual(expected);
     });
 
+    // Plan Part D: the path's wheel size agreed with the identity outputs, the
+    // other shops and the titles on every listing measured (2026-10-05).
+    it.each([
+      ['KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"', 27.5],
+      ['KERÉKPÁR > Gyerek kerékpár > 20" (115-135cm)', 20],
+      ['KERÉKPÁR > Országúti > Női', undefined],
+    ])('reads the wheel size off the path %j: %j', (path, wheelSize) => {
+      expect(specsOf(config, 'bikes', { 'Webshop kategória': path })['wheelSize']).toBe(wheelSize);
+    });
+
     it('sends the shop category path, without its root, as a spec row', async () => {
       expect(
         await extraRowOf(config, 'bikes', 'Webshop kategória', {
@@ -930,6 +940,9 @@ describe('hand-authored source configs', () => {
       ['ebikes', 'Csomagtartó', 'ACID SIC 2.1 RILink', 'rack', 'Alapfelszereltség'],
       ['ebikes', 'Első lámpa', 'nincs', 'lighting', 'Nincs'],
       ['ebikes', 'Kezelőszerv', 'Bosch Purion 200 with Integrated Display', 'display', true],
+      // The wheel size a kids' path names, when it names one.
+      ['bikes', 'Webshop kategória', 'Cube kerékpárok > 20" gyerek kerékpár', 'wheelSize', 20],
+      ['bikes', 'Webshop kategória', 'Cube kerékpárok > 24", 26" gyerek kerékpár', 'wheelSize', undefined],
     ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
       expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
     });
@@ -951,8 +964,24 @@ describe('hand-authored source configs', () => {
       ['bikes', 'Méret', '130-150 cm', 'frameSize', undefined],
       ['bikes', 'Pedálok', 'N/A', 'pedals', undefined],
       ['ebikes', 'Kitámasztó', 'ÁLLÍTHATÓ', 'kickstand', true],
+      // Colour as the shop writes it.
+      ['bikes', 'Szín(ek)', 'Stealth Black', 'color', 'Stealth Black'],
+      // The wheel size its path names (plan Part D: 100% against the identity
+      // outputs, the other shops and the titles, 2026-10-05).
+      ['bikes', 'Webshop kategória', 'Kerékpár > Mountain Bike > Mountain Bike 27,5 Fully > férfi', 'wheelSize', 27.5],
+      ['bikes', 'Webshop kategória', 'Kerékpár > Gyerek Kerékpár > Gyerek kerékpár 16', 'wheelSize', 16],
+      ['bikes', 'Webshop kategória', 'Kerékpár > Országúti kerékpár > férfi', 'wheelSize', undefined],
     ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
       expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
+    it('lets a wheel-size row decide over the path', () => {
+      expect(
+        specsOf(config, 'bikes', {
+          'Webshop kategória': 'Kerékpár > Mountain Bike > Mountain Bike 27,5 > női',
+          Kerékméret: '29',
+        })['wheelSize'],
+      ).toBe(29);
     });
   });
 
@@ -983,6 +1012,12 @@ describe('hand-authored source configs', () => {
       ['CUBE-STEREO_fs', 'Váz kialakítás', undefined],
     ])('reads sku %s as %s %j', async (sku, label, row) => {
       expect(await extraRowOf(config, 'ebikes', label, { sku })).toBe(row);
+    });
+
+    // The suffix agrees with KTM's frame digit and Cube's E/T sizes, so the
+    // frame it names is fixed for the identity call (plan Part D).
+    it.each(['Magas', 'Trapéz', 'Alacsony'])('takes the frame %j its sku names as given', (frame) => {
+      expect(specsOf(config, 'ebikes', { 'Váz kialakítás': frame })['frameType']).toBe(frame);
     });
 
     it("reads the description's motor lines, never a weight or the capacity", async () => {

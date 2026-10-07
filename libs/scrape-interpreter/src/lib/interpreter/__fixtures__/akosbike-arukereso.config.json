@@ -108,6 +108,16 @@
             ]
           },
           {
+            "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^Cube kerékpárok > (\\d{2})\" gyerek"
+            ]
+          },
+          {
             "key": "recommendedRiderHeight",
             "labels": [
               "Ajánlott magasság",
@@ -1002,6 +1012,16 @@
             "extract": "regexpList",
             "extractPatterns": [
               "^(?:(?:Easy Entry|Trapeze)\\s+)?(?:\\d+\\s*cm\\s*/\\s*)?(XXL|XL|XS|S|M|L)\\b(?!\\s*,\\s*(?:XXL|XL|XS|S|M|L)\\b)"
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^Cube kerékpárok > (\\d{2})\" gyerek"
             ]
           },
           {

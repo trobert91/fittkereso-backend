@@ -47,6 +47,16 @@
           },
           {
             "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:Mountain [Bb]ike|Gyerek kerékpár|BMX kerékpárok -) (\\d{2}(?:[.,]5)?)(?: |$)"
+            ]
+          },
+          {
+            "key": "wheelSize",
             "labels": ["Kerékméret", "WHEELSIZE", "Kerék átmérő", "Wheel size", "Kerékméret (\")"],
             "replacePatterns": [
               { "from": ",", "to": "." },
@@ -182,6 +192,25 @@
             "labels": ["Mérettáblázat"],
             "extract": "regexpList",
             "extractPatterns": ["^\\s*(XXL|XL|XS|S|M|L)\\s*$"]
+          },
+          {
+            "key": "color",
+            "labels": [
+              "Szín",
+              "Szín(ek)"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
           },
           {
             "key": "suspension",
@@ -1257,6 +1286,16 @@
           },
           {
             "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?:Mountain [Bb]ike|Gyerek kerékpár|BMX kerékpárok -) (\\d{2}(?:[.,]5)?)(?: |$)"
+            ]
+          },
+          {
+            "key": "wheelSize",
             "labels": ["Kerékméret", "WHEELSIZE", "Kerék átmérő", "Wheel size", "Kerékméret (\")"],
             "replacePatterns": [
               { "from": ",", "to": "." },
@@ -1357,6 +1396,25 @@
             "labels": ["Mérettáblázat"],
             "extract": "regexpList",
             "extractPatterns": ["^\\s*(XXL|XL|XS|S|M|L)\\s*$"]
+          },
+          {
+            "key": "color",
+            "labels": [
+              "Szín",
+              "Szín(ek)"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
           },
           {
             "key": "suspension",

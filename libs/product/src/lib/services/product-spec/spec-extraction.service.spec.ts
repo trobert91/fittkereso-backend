@@ -666,6 +666,7 @@ describe('SpecExtractionService', () => {
       ['Schwalbe Land Cruiser, Active, 50-622', '(\\d{2}-\\d{3})', '50-622'],
       ['118  - 136 cm (átlépési magasság : 52 - 63 cm)', '^(\\d{2,3}\\s*-\\s*\\d{2,3}\\s*cm)', '118  - 136 cm'],
       ['Maxxis Rekon 29x2.4", EXO', '(\\d{2}x\\d\\.\\d)', '29x2.4'],
+      ['Mountain Bike 27,5 Fully', '(\\d{2}(?:[.,]5)?)', '27.5'],
     ])('keeps a size or range from %j whole, not its first number', (raw, pattern, expected) => {
       const result = service.extractSpecs({
         scrapedSpecs: [{ name: 'Gumi', values: [raw] }],

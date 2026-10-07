@@ -17,6 +17,30 @@
           }
         }
       ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "frameType",
+            "labels": [
+              "Váz kialakítás"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^Magas$",
+                "value": "Magas"
+              },
+              {
+                "pattern": "^Trapéz$",
+                "value": "Trapéz"
+              },
+              {
+                "pattern": "^Alacsony$",
+                "value": "Alacsony"
+              }
+            ]
+          }
+        ]
+      },
       "extraSpecRows": [
         {
           "label": "Váz kialakítás",

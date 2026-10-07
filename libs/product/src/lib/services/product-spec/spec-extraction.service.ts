@@ -394,7 +394,10 @@ export class SpecExtractionService {
     // "180/160") is not the number it starts with.
     if (/^\s*-?\d+(?:[.,]\d+)?\s*[-–x×/]\s*\d/i.test(value)) return value;
 
-    const number = parseFloat(value);
+    // A lone decimal comma ("27,5") is a decimal, not the number before it.
+    const number = parseFloat(
+      /^\s*-?\d+,\d+\s*$/.test(value) ? value.replace(',', '.') : value,
+    );
     if (!Number.isFinite(number)) return value;
 
     const rounded = Math.round(number * 100) / 100;
