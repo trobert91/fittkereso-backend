@@ -4,8 +4,13 @@ import { firstValueFrom } from 'rxjs';
 import { Readable } from 'stream';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { NativeScraperMetricsService } from '@fittkereso-backend/metrics';
+import { DEFAULT_STALL_TIMEOUT_MS, withStallGuard } from './stream-stall-guard';
 
 export interface NativeFetchOptions {
+  /**
+   * How long to wait for the response headers with nothing arriving. Once the
+   * headers are in, axios stops counting: the body is `stallTimeoutMs`'s.
+   */
   timeoutMs?: number;
   /**
    * Custom request headers.
@@ -17,6 +22,11 @@ export interface NativeFetchOptions {
   headers?: Record<string, string>;
   /** Bytes. A response exceeding this is abandoned rather than buffered. */
   maxBytes?: number;
+  /**
+   * How long the body may send nothing while it is being read. `timeoutMs`
+   * covers only the wait for the response headers.
+   */
+  stallTimeoutMs?: number;
 }
 
 export interface NativeFetchResult {
@@ -138,7 +148,15 @@ export class NativeScraperService {
         ms: Date.now() - startedAt,
       });
 
-      return { statusCode, contentType, stream: response.data as Readable };
+      return {
+        statusCode,
+        contentType,
+        stream: withStallGuard(
+          response.data as Readable,
+          opts.stallTimeoutMs ?? DEFAULT_STALL_TIMEOUT_MS,
+          url,
+        ),
+      };
     } catch (error) {
       this.metrics.fetchFailed();
       this.metrics.recordFetchDuration((Date.now() - startedAt) / 1000);
