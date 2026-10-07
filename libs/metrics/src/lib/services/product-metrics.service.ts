@@ -61,7 +61,11 @@ export type ScrapeResolutionOutcome =
   /** Path 4: the extraction failed, so the listing has no model key, and a
    *  candidate scored a near-miss by its title. The task fails to be retried
    *  rather than create a likely duplicate. */
-  | 'deferred_no_model';
+  | 'deferred_no_model'
+  /** This source's record of the listing sat on a product of another
+   *  category: taken off it, so the listing is identified afresh in its own.
+   *  Counted beside the outcome of that identification. */
+  | 'left_other_category';
 
 /**
  * How two things came to claim one offer identity.

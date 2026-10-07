@@ -13,7 +13,6 @@ import {
   ProductAlias,
   ProductAliasRepository,
   ProductAliasSource,
-  ProductCategory,
   ProductModel,
   ProductModelRepository,
   ProductSource,
@@ -226,12 +225,14 @@ export class ProductScrapeUpdaterService {
 
       // The listing's own history first, because it decides whether the
       // extraction can reuse this listing's stored result instead of calling
-      // the LLM — the path every unchanged listing of a re-import takes.
+      // the LLM — the path every unchanged listing of a re-import takes. A
+      // listing now of another category leaves its old product here.
       const history = await this.resolveFromHistory(
         context,
         listingId,
         scrapedProduct,
         seller,
+        { leaveOtherCategory: true },
       );
       const extracted = await this.specPostProcess.extractIdentity({
         context,
@@ -344,12 +345,14 @@ export class ProductScrapeUpdaterService {
     };
 
     // Twice at most: the offer can appear, move or go between the lookup and
-    // the lock, and the second pass then takes the other branch.
+    // the lock, and the second pass then takes the other branch. An offer on
+    // a product of another category is none to join.
     for (let attempt = 1; attempt <= 2; attempt++) {
       const offer = await this.offerRepo.findFirstBySellerAndExternalIdsWithModelRelations(
         seller.id,
         keys,
         this.getProductRelations(),
+        scrapedProduct.category.id,
       );
       await this.detachOwnRecordElsewhere(write, offer?.model?.id);
 
@@ -458,6 +461,7 @@ export class ProductScrapeUpdaterService {
           seller.id,
           keys,
           [],
+          listing.category.id,
         );
         if (offer?.model) return false;
         const existing = await this.sourceRecordRepo.findBySourceAndExternalId(
@@ -543,6 +547,55 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
+   * This source's record of the listing, when it sits on a product of another
+   * category than the listing's now (the shop filed it elsewhere, or the
+   * source's rules changed): taken off that product with the offers only it
+   * carried, and the product merged and priced again without it. The listing
+   * is then identified afresh within its own category, and the product it
+   * lands on adopts the record (adoptOwnRecord). A product never changes
+   * category with one of its listings.
+   */
+  private async leaveOtherCategory(
+    context: ProductImportContext,
+    own: ProductSourceRecord,
+    productId: string,
+    scrapedProduct: ScrapedProduct,
+  ): Promise<void> {
+    await this.locks.withLocks([productLock(productId)], async () => {
+      const model = await this.productRepo.findOneOrFail({
+        where: { id: productId },
+        relations: this.getProductRelations(),
+      });
+      const record = (model.sources ?? []).find((candidate) => candidate.id === own.id);
+      if (!record) return;
+
+      const keys = this.storedKeysOf(record);
+      await this.contributorDetach.detachRecords(model, [record]);
+      await this.dealWithDroppedOffers({ context, model, dropped: keys });
+      // Its offers without an externalId are only ever its own.
+      const unkeyed = (await this.offerRepo.findAllByModelAndSource(model.id, context.source.id))
+        .filter((offer) => !offer.externalId && offer.sourceRecord?.id === record.id);
+      if (!isEmpty(unkeyed)) await this.offerRepo.deleteByIds(unkeyed.map((offer) => offer.id));
+      await this.mergeService.recomputePrice(model);
+      await this.productRepo.save(model);
+
+      this.productMetricsService.scrapeResolutionOutcome(
+        context.source.name,
+        'left_other_category',
+      );
+      this.logger.log('A listing changed category: it left its product to be identified again', {
+        taskId: context.task?.id,
+        url: context.url,
+        source: context.source.name,
+        productId: model.id,
+        from: model.productCategory?.slug,
+        to: scrapedProduct.category.slug,
+        listingsLeft: model.sources?.length ?? 0,
+      });
+    });
+  }
+
+  /**
    * This source's record of the listing, when it waits unattached: brought
    * onto the product, so the write updates it instead of inserting a second
    * record of one (source, externalId).
@@ -561,7 +614,7 @@ export class ProductScrapeUpdaterService {
     if (!own) return;
     if (own.product) {
       throw new Error(
-        `Listing ${listingId} of ${context.source.name} moved to product ${own.product.id} meanwhile; the task retries it`,
+        `Listing ${listingId} of ${context.source.name} is on product ${own.product.id}, not on ${model.id ?? 'the new one'}; the task retries it`,
       );
     }
     own.offers = undefined;
@@ -788,6 +841,7 @@ export class ProductScrapeUpdaterService {
       gtins: compact(identifiers.map((identifier) => identifier.gtin)),
       mpns: compact(identifiers.map((identifier) => identifier.mpn)),
       brandId,
+      categoryId: scrapedProduct.category.id,
     });
     const { verdict, failedGates: keyGates } = await this.keyLookup.decide(
       keyMatches,
@@ -848,21 +902,26 @@ export class ProductScrapeUpdaterService {
    * This exact listing, seen before: its task was pinned to a product (Path 1),
    * one of its offers is already stored for this seller (Path 2), or this source
    * already has its record (Path 3). All are the listing's own history, so none
-   * needs checking against anything.
+   * needs checking against anything but its category: history on a product of
+   * another category is no history (see leaveOtherCategory).
    */
   private async resolveFromHistory(
     context: ProductImportContext,
     listingId: string,
     scrapedProduct: ScrapedProduct,
     seller: Seller,
+    /** The first look only: the re-check under the brand's lock just reads. */
+    options: { leaveOtherCategory?: boolean } = {},
   ): Promise<HistoryHit | undefined> {
+    const categoryId = scrapedProduct.category.id;
+
     // Path 1: task already pinned to a product
     if (context.product?.id) {
       const model = await this.productRepo.findOneOrFail({
         where: { id: context.product.id },
         relations: this.getProductRelations(),
       });
-      return { model, via: 'pinned' };
+      if (model.productCategory?.id === categoryId) return { model, via: 'pinned' };
     }
 
     // Path 2: variant-level Offer.externalId reuse, multi-candidate — try
@@ -883,6 +942,7 @@ export class ProductScrapeUpdaterService {
           seller.id,
           candidateExternalIds,
           this.getProductRelations(),
+          categoryId,
         );
       if (existingOffer?.model) {
         this.productMetricsService.scrapeResolutionOutcome(
@@ -904,12 +964,16 @@ export class ProductScrapeUpdaterService {
         listingId,
         this.getProductRelations(),
       );
-    if (existingSource?.product) {
+    const product = existingSource?.product;
+    if (product && product.productCategory?.id === categoryId) {
       this.productMetricsService.scrapeResolutionOutcome(
         context.source.name,
         'external_id_hit',
       );
-      return { model: existingSource.product, via: 'external_id' };
+      return { model: product, via: 'external_id' };
+    }
+    if (existingSource && product && options.leaveOtherCategory) {
+      await this.leaveOtherCategory(context, existingSource, product.id, scrapedProduct);
     }
 
     return undefined;
@@ -1150,10 +1214,12 @@ export class ProductScrapeUpdaterService {
     const { context, listing, brand, normalizedModel } = write;
     const previousExternalIds = this.storedExternalIdsOf(write, model);
 
-    this.applyScrapedProductDetails(model, listing);
+    this.assertSameCategory(model, listing);
     // Before the listing's own record: when its source used to contribute
     // only, its record is among them, and is updated rather than duplicated.
     await this.attachWaitingRecords(write, model);
+    // So is its record when it left a product of another category.
+    await this.adoptOwnRecord(write, model);
 
     const sourceRecord = await this.sourceRecordUpdater.upsertSourceRecord({
       model,
@@ -1167,8 +1233,8 @@ export class ProductScrapeUpdaterService {
     });
 
     // model.productCategory may only be the { id } stub set by
-    // newProductModel/applyScrapedProductDetails — pass the slug explicitly
-    // from ScrapedProduct.category, which is always fully populated.
+    // newProductModel — pass the slug explicitly from ScrapedProduct.category,
+    // which is always fully populated.
     await this.mergeService.mergeSources(model, listing.category.slug);
 
     if (newId) {
@@ -1676,21 +1742,18 @@ export class ProductScrapeUpdaterService {
   }
 
   /**
-   * The listing's category on its product. Not its names: the name merge
-   * (mergeSources, right after) names the product after its highest-priority
-   * source, which this listing may not be.
+   * A product's category is set when it is created and never changes with a
+   * listing: every lookup that finds a product for a listing searches the
+   * listing's category only, and a listing filed elsewhere leaves its product
+   * first (leaveOtherCategory). One of another category reaching a write is a
+   * bug, and the task fails rather than move the product.
    */
-  private applyScrapedProductDetails(
-    model: ProductModel,
-    scrapedProduct: ScrapedProduct,
-  ): void {
-    // Only replace productCategory when it's actually changing — it's normally
-    // the fully-loaded entity fetched via getProductRelations(), and a bare
-    // { id } stub here (TypeORM only needs the id for the FK save) is fine
-    // since mergeSources takes categorySlug as an explicit parameter rather
-    // than reading it off this relation.
-    if (model.productCategory?.id !== scrapedProduct.category.id) {
-      model.productCategory = { id: scrapedProduct.category.id } as ProductCategory;
+  private assertSameCategory(model: ProductModel, scrapedProduct: ScrapedProduct): void {
+    const categoryId = model.productCategory?.id;
+    if (categoryId && categoryId !== scrapedProduct.category.id) {
+      throw new Error(
+        `A ${scrapedProduct.category.slug} listing was about to be written onto product ${model.id} of another category`,
+      );
     }
   }
 

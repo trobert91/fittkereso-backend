@@ -696,17 +696,23 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
   }
 
   /**
-   * Which products hold one of this source's records under these externalIds —
-   * the declared-sibling lookup: the other sizes a shop lists for a product,
-   * wherever this source has already put them.
+   * Which products of this category hold one of this source's records under
+   * these externalIds — the declared-sibling lookup: the other sizes a shop
+   * lists for a product, wherever this source has already put them. A size on
+   * a product of another category is no sibling: a listing never joins one.
    */
   async findModelIdsBySourceAndExternalIds(
     sourceId: string,
     externalIds: string[],
+    categoryId: string,
   ): Promise<{ modelId: string; externalId: string }[]> {
     if (externalIds.length === 0) return [];
     const records = await this.repo.find({
-      where: { source: { id: sourceId }, externalId: In(externalIds) },
+      where: {
+        source: { id: sourceId },
+        externalId: In(externalIds),
+        product: { productCategory: { id: categoryId } },
+      },
       relations: { product: true },
       select: { id: true, externalId: true, product: { id: true } },
     });

@@ -152,6 +152,43 @@ describe('ProductSourceRecordRepository.findBySourceAndExternalId', () => {
   });
 });
 
+describe('ProductSourceRecordRepository.findModelIdsBySourceAndExternalIds', () => {
+  function repositoryFinding(records: unknown[]) {
+    const repository = Object.create(ProductSourceRecordRepository.prototype);
+    const find = jest.fn().mockResolvedValue(records);
+    (repository as unknown as { repo: unknown }).repo = { find };
+    return { repository: repository as ProductSourceRecordRepository, find };
+  }
+
+  // A size on another category's product is no sibling of the listing.
+  it("finds the declared sizes on products of the listing's category only", async () => {
+    const { repository, find } = repositoryFinding([
+      { id: 'record-1', externalId: 'SKU-M', product: { id: 'model-1' } },
+      { id: 'record-2', externalId: 'SKU-L', product: null },
+    ]);
+
+    expect(
+      await repository.findModelIdsBySourceAndExternalIds('source-1', ['SKU-M', 'SKU-L'], 'category-bikes'),
+    ).toEqual([{ modelId: 'model-1', externalId: 'SKU-M' }]);
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          source: { id: 'source-1' },
+          externalId: expect.anything(),
+          product: { productCategory: { id: 'category-bikes' } },
+        },
+      }),
+    );
+  });
+
+  it('does not query for an empty list', async () => {
+    const { repository, find } = repositoryFinding([]);
+
+    expect(await repository.findModelIdsBySourceAndExternalIds('source-1', [], 'category-bikes')).toEqual([]);
+    expect(find).not.toHaveBeenCalled();
+  });
+});
+
 describe('ProductSourceRecordRepository.searchRecords', () => {
   it('filters by source, attachment and text, and shapes each row', async () => {
     const seen = new Date('2026-09-20');

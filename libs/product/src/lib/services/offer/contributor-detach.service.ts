@@ -84,7 +84,7 @@ export class ContributorDetachService {
     for (const record of records) record.product = null;
     await this.mergeService.mergeSources(model);
 
-    this.logger.log('Detached contributing listings from a product', {
+    this.logger.log('Detached listings from a product', {
       productId: model.id,
       recordIds: [...ids],
     });

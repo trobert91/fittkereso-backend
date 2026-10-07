@@ -232,6 +232,25 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
+  // A new product's category is a bare { id } stub: the listing's own is the
+  // same category, and its schema still applies.
+  it("validates a new product's listing against the listing's category schema", async () => {
+    const schema = { type: 'object' };
+    categoryConfigService.getJsonSchema.mockReturnValue(schema);
+    const model = { productCategory: { id: 'category-1' }, sources: [] } as unknown as ProductModel;
+
+    await service.upsertSourceRecord({
+      model,
+      source,
+      scrapedProduct: { specs: { weight: 22 }, category: { id: 'category-1', slug: 'bikes' } } as any,
+      externalId: 'product-1',
+      sourceUrl: 'https://speedbike.hu/product-1',
+    });
+
+    expect(categoryConfigService.getJsonSchema).toHaveBeenCalledWith('bikes');
+    expect(validatorService.validateSpecs).toHaveBeenCalledWith(schema, expect.anything());
+  });
+
   it('does not skip when scrapedProduct is undefined but no matching source row exists yet', async () => {
     const model = makeModel(); // no existing sources
 

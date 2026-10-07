@@ -88,17 +88,20 @@ describe('ProductKeyLookupService', () => {
       gtins: ['09008594503199', '09008594503199'],
       mpns: ['1260040108'],
       brandId: 'ktm',
+      categoryId: 'category-ebikes',
     };
 
-    it('asks each tier with its own identifiers, deduplicated', async () => {
+    // Another category's product is never a candidate.
+    it("asks each tier with its own identifiers, deduplicated, in the listing's category", async () => {
       await service.lookup(identifiers);
 
       expect(sourceRecordRepo.findModelIdsBySourceAndExternalIds).toHaveBeenCalledWith(
         'ebikeshop',
         ['1260040103', '1260040113'],
+        'category-ebikes',
       );
-      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(['09008594503199']);
-      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith('ktm', ['1260040108']);
+      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(['09008594503199'], 'category-ebikes');
+      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith('ktm', ['1260040108'], 'category-ebikes');
     });
 
     // An article number is only unique inside its manufacturer's numbering.
@@ -318,7 +321,7 @@ describe('ProductKeyLookupService', () => {
       id: 'a-product',
       specs: { modelYear: 2027 },
       brand: { id: 'ktm' },
-      productCategory: { slug: 'ebikes' },
+      productCategory: { id: 'category-ebikes', slug: 'ebikes' },
     } as unknown as ProductModel;
 
     beforeEach(() => {
@@ -334,12 +337,24 @@ describe('ProductKeyLookupService', () => {
     it('looks up what this product\'s offers and listings carry', async () => {
       await service.storedPairRows(product, 'scan');
 
-      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(['04054571447913']);
-      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith('ktm', ['1260040108']);
+      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(['04054571447913'], 'category-ebikes');
+      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith('ktm', ['1260040108'], 'category-ebikes');
       expect(sourceRecordRepo.findModelIdsBySourceAndExternalIds).toHaveBeenCalledWith(
         'ebikeshop',
         ['1260040103', '1260040108'],
+        'category-ebikes',
       );
+    });
+
+    // Only products of one category pair, so without one there is nothing to look up.
+    it('looks nothing up for a product without a category', async () => {
+      expect(
+        await service.storedPairRows(
+          { ...product, productCategory: undefined } as unknown as ProductModel,
+          'scan',
+        ),
+      ).toEqual([]);
+      expect(offerRepo.find).not.toHaveBeenCalled();
     });
 
     it('pairs every other product sharing one, with the stored specs\' contradictions', async () => {

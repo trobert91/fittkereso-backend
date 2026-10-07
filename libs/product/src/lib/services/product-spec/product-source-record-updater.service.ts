@@ -95,7 +95,9 @@ export class ProductSourceRecordUpdaterService {
       return source;
     }
 
-    const categorySlug = model.productCategory?.slug;
+    // A new product's category is a bare { id } stub; the listing's own is
+    // the same category (a listing only ever joins a product of its own).
+    const categorySlug = model.productCategory?.slug ?? scrapedProduct?.category?.slug;
     const jsonSchema = categorySlug
       ? this.categoryConfigService.getJsonSchema(categorySlug)
       : undefined;

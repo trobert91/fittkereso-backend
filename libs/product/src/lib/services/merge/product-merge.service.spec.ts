@@ -416,6 +416,47 @@ describe('ProductMergeService.mergeProducts', () => {
     );
     expect(order).toEqual(['lock', 'transaction', 'recompute', 'unlock']);
   });
+
+  // One product is one category's: its listings were identified within it.
+  it('refuses to merge products of two categories, moving nothing', async () => {
+    const productRepo = {
+      repo: {
+        manager: {
+          connection: {
+            transaction: jest.fn(async (work: (m: unknown) => Promise<void>) => work({})),
+          },
+        },
+      },
+    };
+    const service = new ProductMergeService(
+      productRepo as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { getProductById: jest.fn() } as any,
+      {} as any,
+      { carryDismissalsForMerge: jest.fn() } as any,
+      {} as any,
+      { withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()) } as any,
+      {} as any, // sourceRepo
+      {} as any, // descriptionService
+    );
+    const steps = TRANSACTION_STEPS.map((step) =>
+      jest.spyOn(service as any, step).mockResolvedValue([]),
+    );
+    jest.spyOn(service as any, 'loadProductForMerge').mockImplementation(async (_manager, id) => ({
+      id,
+      productCategory: id === 'source-1' ? { id: 'c-bikes', slug: 'bikes' } : { id: 'c-ebikes', slug: 'ebikes' },
+    }));
+
+    await expect(
+      service.mergeProducts({ sourceId: 'source-1', targetId: 'target-1' }),
+    ).rejects.toThrow('Products of two categories cannot be merged');
+    for (const step of steps) expect(step).not.toHaveBeenCalled();
+  });
 });
 
 describe('ProductMergeService.mergeSources', () => {

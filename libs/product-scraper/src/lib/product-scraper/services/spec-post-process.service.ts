@@ -137,7 +137,8 @@ export class SpecPostProcessService {
    * nothing is called: the path every listing of a nightly re-import takes.
    * Otherwise the LLM extracts again, and the fields unification gave that
    * record are carried over, because unification does not re-run for a
-   * listing its source has already contributed.
+   * listing its source has already contributed. A record made for another
+   * category gives neither.
    *
    * Never throws for an LLM failure: the listing continues on its
    * deterministic data with no `model`, flagged `identity_failed`, and the
@@ -198,8 +199,12 @@ export class SpecPostProcessService {
       });
 
     // Only a result that named the listing is worth keeping: one that did
-    // not (the call failed, or was off) is asked again.
-    const stored = ownRecord?.scrapedProduct;
+    // not (the call failed, or was off) is asked again. So is one made for
+    // another category: its specs are that category's.
+    const stored =
+      ownRecord?.scrapedProduct?.category?.slug === scrapedProduct.category.slug
+        ? ownRecord.scrapedProduct
+        : undefined;
     if (
       stored?.model &&
       !context.force &&

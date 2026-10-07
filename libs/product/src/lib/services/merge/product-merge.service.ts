@@ -254,6 +254,13 @@ export class ProductMergeService {
         if (!target) {
           throw new NotFoundException(`Target product ${targetId} not found`);
         }
+        // One product is one category's: its listings were all identified
+        // within it, and its specs follow its schema.
+        if (source.productCategory?.id !== target.productCategory?.id) {
+          throw new BadRequestException(
+            `Products of two categories cannot be merged: ${source.productCategory?.slug} ${sourceId} into ${target.productCategory?.slug} ${targetId}`,
+          );
+        }
 
         this.logger.log('Starting product merge', {
           sourceId,

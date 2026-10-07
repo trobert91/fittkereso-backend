@@ -40,6 +40,8 @@ export interface ListingIdentifiers {
   mpns: string[];
   /** The listing's resolved brand. Without one, MPNs are not looked up. */
   brandId?: string;
+  /** The listing's category: only its products are looked up. */
+  categoryId: string;
 }
 
 /** The listing side of the sanity check. */
@@ -94,17 +96,21 @@ export class ProductKeyLookupService {
     private readonly categoryConfigService: CategoryConfigService,
   ) {}
 
-  /** Every product each tier points at, in tier order, one entry per (tier, product). */
+  /**
+   * Every product each tier points at, in tier order, one entry per (tier,
+   * product). Only products of the listing's category: one of another category
+   * is never a candidate, however its identifiers agree.
+   */
   public async lookup(identifiers: ListingIdentifiers): Promise<KeyMatch[]> {
-    const { sourceId, brandId } = identifiers;
+    const { sourceId, brandId, categoryId } = identifiers;
     const siblingIds = uniq(identifiers.siblingIds);
     const gtins = uniq(identifiers.gtins);
     const mpns = uniq(identifiers.mpns);
 
     const [siblings, byGtin, byMpn] = await Promise.all([
-      this.sourceRecordRepo.findModelIdsBySourceAndExternalIds(sourceId, siblingIds),
-      this.offerRepo.findModelIdsByGtins(gtins),
-      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns) : [],
+      this.sourceRecordRepo.findModelIdsBySourceAndExternalIds(sourceId, siblingIds, categoryId),
+      this.offerRepo.findModelIdsByGtins(gtins, categoryId),
+      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns, categoryId) : [],
     ]);
 
     return this.matchesOf(siblings, byGtin, byMpn);
@@ -120,12 +126,15 @@ export class ProductKeyLookupService {
    *
    * The gates compare the two stored products, where the import compared the
    * listing with the other product. Expects `brand` and `productCategory`
-   * loaded; without a brand no MPN is looked up.
+   * loaded; without a brand no MPN is looked up, and without a category
+   * nothing is, since only products of one category pair.
    */
   public async storedPairRows(
     product: ProductModel,
     detectedBy: DuplicateDetectedBy,
   ): Promise<DuplicatePairRow[]> {
+    const categoryId = product.productCategory?.id;
+    if (!categoryId) return [];
     const [offers, declared] = await Promise.all([
       this.offerRepo.find({
         where: { model: { id: product.id } },
@@ -143,11 +152,12 @@ export class ProductKeyLookupService {
           this.sourceRecordRepo.findModelIdsBySourceAndExternalIds(
             sourceId,
             uniq(siblingIds),
+            categoryId,
           ),
         ),
       ).then((rows) => rows.flat()),
-      this.offerRepo.findModelIdsByGtins(gtins),
-      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns) : [],
+      this.offerRepo.findModelIdsByGtins(gtins, categoryId),
+      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns, categoryId) : [],
     ]);
 
     // A product's own sizes point back at itself.

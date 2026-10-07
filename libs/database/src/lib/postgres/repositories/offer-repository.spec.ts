@@ -28,6 +28,7 @@ describe('OfferRepository.findFirstBySellerAndExternalIdsWithModelRelations', ()
       'seller-1',
       [],
       [],
+      'category-bikes',
     );
 
     expect(result).toBeNull();
@@ -49,10 +50,16 @@ describe('OfferRepository.findFirstBySellerAndExternalIdsWithModelRelations', ()
       'seller-1',
       ['sku-1', 'sku-2'],
       ['productCategory', 'mainImage'],
+      'category-bikes',
     );
 
     expect(mockRepo.findOne).toHaveBeenCalledWith({
-      where: { seller: { id: 'seller-1' }, externalId: expect.anything() },
+      where: {
+        seller: { id: 'seller-1' },
+        externalId: expect.anything(),
+        // An offer on another category's product is no history of this listing.
+        model: { productCategory: { id: 'category-bikes' } },
+      },
       relations: [
         'model',
         'sourceRecord',
@@ -73,33 +80,41 @@ describe('OfferRepository identifier lookups', () => {
     (repository as unknown as { repo: unknown }).repo = mockRepo;
   });
 
-  it('finds the products behind a GTIN at any seller', async () => {
+  it("finds the products behind a GTIN at any seller, in the listing's category only", async () => {
     mockRepo.find.mockResolvedValue([
       { id: 'o1', gtin: '09008594503199', model: { id: 'model-1' } },
     ]);
 
-    expect(await repository.findModelIdsByGtins(['09008594503199'])).toEqual([
+    expect(await repository.findModelIdsByGtins(['09008594503199'], 'category-bikes')).toEqual([
       { modelId: 'model-1', gtin: '09008594503199' },
     ]);
     // No seller in the filter: a GTIN is the same at every shop.
     expect(mockRepo.find).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { gtin: expect.anything() } }),
+      expect.objectContaining({
+        where: {
+          gtin: expect.anything(),
+          model: { productCategory: { id: 'category-bikes' } },
+        },
+      }),
     );
   });
 
-  it('only finds MPNs within one brand', async () => {
-    await repository.findModelIdsByMpns('brand-ktm', ['1260040108']);
+  it("only finds MPNs within one brand and the listing's category", async () => {
+    await repository.findModelIdsByMpns('brand-ktm', ['1260040108'], 'category-bikes');
 
     expect(mockRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { mpn: expect.anything(), model: { brand: { id: 'brand-ktm' } } },
+        where: {
+          mpn: expect.anything(),
+          model: { brand: { id: 'brand-ktm' }, productCategory: { id: 'category-bikes' } },
+        },
       }),
     );
   });
 
   it('does not query for an empty list', async () => {
-    expect(await repository.findModelIdsByGtins([])).toEqual([]);
-    expect(await repository.findModelIdsByMpns('brand-ktm', [])).toEqual([]);
+    expect(await repository.findModelIdsByGtins([], 'category-bikes')).toEqual([]);
+    expect(await repository.findModelIdsByMpns('brand-ktm', [], 'category-bikes')).toEqual([]);
     expect(mockRepo.find).not.toHaveBeenCalled();
   });
 });

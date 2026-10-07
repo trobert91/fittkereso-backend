@@ -470,6 +470,26 @@ describe('SpecPostProcessService', () => {
         expect(postProcess.extractIdentity).toHaveBeenCalled();
       });
 
+      // The shop filed the listing under another category since: what was
+      // read for the old one is that category's.
+      it('neither reuses nor carries over a record made for another category', async () => {
+        const ownRecord = await storedRecord();
+        const stored = ownRecord.scrapedProduct as ScrapedProduct;
+        ownRecord.scrapedProduct = {
+          ...stored,
+          category: { ...stored.category, id: 'category-bikes', slug: 'bikes' },
+        };
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing(),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).toHaveBeenCalled();
+        expect(result.specs).not.toHaveProperty('tubeless');
+      });
+
       describe('a model asked under an older rule', () => {
         const refreshed = {
           model: 'MACINA SCARP SX PRESTIGE Di2',

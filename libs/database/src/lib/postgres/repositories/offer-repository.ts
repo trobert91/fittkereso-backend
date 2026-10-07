@@ -59,15 +59,21 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   // ProductScrapeUpdaterService.getProductRelations() — i.e. relations of
   // ProductModel itself (e.g. "productCategory"), not of Offer — so they
   // must be prefixed with the `model` relation path here rather than
-  // spread as siblings of it.
+  // spread as siblings of it. Only offers on products of `categoryId`: a
+  // listing never joins a product of another category.
   async findFirstBySellerAndExternalIdsWithModelRelations(
     sellerId: string,
     externalIds: string[],
     modelRelations: string[],
+    categoryId: string,
   ): Promise<Offer | null> {
     if (externalIds.length === 0) return null;
     return this.repo.findOne({
-      where: { seller: { id: sellerId }, externalId: In(externalIds) },
+      where: {
+        seller: { id: sellerId },
+        externalId: In(externalIds),
+        model: { productCategory: { id: categoryId } },
+      },
       relations: [
         nameOf<Offer>('model'),
         nameOf<Offer>('sourceRecord'),
@@ -151,18 +157,21 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   }
 
   /**
-   * Which products have an offer carrying one of these GTINs, at any seller.
+   * Which products of this category have an offer carrying one of these
+   * GTINs, at any seller.
    *
    * Across sellers on purpose: a GTIN names one sellable item everywhere, so
    * this is how one shop's listing finds the product another shop's listing
-   * already created. Pass normalized values (normalizeGtin).
+   * already created. Within one category, because a listing never joins a
+   * product of another. Pass normalized values (normalizeGtin).
    */
   async findModelIdsByGtins(
     gtins: string[],
+    categoryId: string,
   ): Promise<{ modelId: string; gtin: string }[]> {
     if (gtins.length === 0) return [];
     const offers = await this.repo.find({
-      where: { gtin: In(gtins) },
+      where: { gtin: In(gtins), model: { productCategory: { id: categoryId } } },
       relations: { model: true },
       select: { id: true, gtin: true, model: { id: true } },
     });
@@ -173,14 +182,16 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
 
   /**
    * Pairs of listings (source records) whose offers carry the same
-   * identifier: a GTIN, or an MPN within one brand. Ground truth for "the
-   * same model" when a matching rule is measured, whichever products the two
-   * sit on today. Each pair once, with the lower record id first.
+   * identifier: a GTIN, or an MPN within one brand, on products of one
+   * category. Ground truth for "the same model" when a matching rule is
+   * measured, whichever products the two sit on today. Each pair once, with
+   * the lower record id first.
    */
   async findRecordPairsSharingIdentifier(): Promise<RecordIdentifierPair[]> {
     const record = `"${nameOf<Offer>('sourceRecord')}Id"`;
     const model = `"${nameOf<Offer>('model')}Id"`;
     const brand = `"${nameOf<ProductModel>('brand')}Id"`;
+    const category = `"${nameOf<ProductModel>('productCategory')}Id"`;
     const gtin = `"${nameOf<Offer>('gtin')}"`;
     const mpn = `"${nameOf<Offer>('mpn')}"`;
     const offers = this.repo.metadata.tableName;
@@ -190,6 +201,8 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       `SELECT DISTINCT a.${record} AS "a", b.${record} AS "b", 'gtin' AS "via", a.${gtin} AS "value"
          FROM ${offers} a
          JOIN ${offers} b ON b.${gtin} = a.${gtin} AND b.${record} > a.${record}
+         JOIN ${products} pa ON pa.id = a.${model}
+         JOIN ${products} pb ON pb.id = b.${model} AND pb.${category} = pa.${category}
         WHERE a.${gtin} IS NOT NULL
        UNION
        SELECT DISTINCT a.${record}, b.${record}, 'mpn', a.${mpn}
@@ -197,23 +210,30 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
          JOIN ${offers} b ON b.${mpn} = a.${mpn} AND b.${record} > a.${record}
          JOIN ${products} pa ON pa.id = a.${model}
          JOIN ${products} pb ON pb.id = b.${model} AND pb.${brand} = pa.${brand}
+          AND pb.${category} = pa.${category}
         WHERE a.${mpn} IS NOT NULL`,
     );
   }
 
   /**
-   * Which of this brand's products have an offer carrying one of these MPNs.
+   * Which of this brand's products of this category have an offer carrying
+   * one of these MPNs.
    *
    * Brand-scoped because an article number is only unique within its
-   * manufacturer's own numbering. Pass normalized values (normalizeMpn).
+   * manufacturer's own numbering; category-scoped because a listing never
+   * joins a product of another category. Pass normalized values (normalizeMpn).
    */
   async findModelIdsByMpns(
     brandId: string,
     mpns: string[],
+    categoryId: string,
   ): Promise<{ modelId: string; mpn: string }[]> {
     if (mpns.length === 0) return [];
     const offers = await this.repo.find({
-      where: { mpn: In(mpns), model: { brand: { id: brandId } } },
+      where: {
+        mpn: In(mpns),
+        model: { brand: { id: brandId }, productCategory: { id: categoryId } },
+      },
       relations: { model: true },
       select: { id: true, mpn: true, model: { id: true } },
     });

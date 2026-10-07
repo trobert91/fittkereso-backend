@@ -597,6 +597,8 @@ describe('ProductScrapeUpdaterService', () => {
         gtins: ['09008594503199'],
         mpns: ['1260040108'],
         brandId: 'brand-1',
+        // Only the listing's category is searched.
+        categoryId: 'category-1',
       });
     });
 
@@ -1052,6 +1054,84 @@ describe('ProductScrapeUpdaterService', () => {
       expect(mockSourceRecordUpdater.upsertSourceRecord).toHaveBeenCalledWith(
         expect.objectContaining({ externalId: 'product' }),
       );
+    });
+  });
+
+  // A product is one category's: a listing finds products of its own only,
+  // and one the shop now files under another category leaves its old one.
+  describe("a listing of another category than its product's", () => {
+    const ebikes = () => makeCategory({ id: 'category-ebikes', slug: 'ebikes' });
+
+    it('leaves its old product, is identified afresh, and takes its record along', async () => {
+      const old = makeExistingModel();
+      old.productCategory = ebikes();
+      const own = {
+        id: 'record-own',
+        externalId: 'product',
+        source: { id: 'source-arukereso' },
+        scrapedProduct: { offers: [] },
+        product: old,
+      };
+      old.sources = [own as never];
+      mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValueOnce(own as never);
+      // Taken off the old product, it waits unattached for the new one.
+      mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue({ ...own, product: null } as never);
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct());
+
+      expect(mockContributorDetach.detachRecords).toHaveBeenCalledWith(old, [own]);
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'left_other_category',
+      );
+      expect(mockListingMatch.match).toHaveBeenCalled();
+      expect(result?.id).toBe('model-created');
+      // The new product adopts the record rather than inserting a second one.
+      const written = mockSourceRecordUpdater.upsertSourceRecord.mock.calls[0][0];
+      expect(written.model.sources).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'record-own' })]),
+      );
+      expect(old.productCategory?.slug).toBe('ebikes');
+    });
+
+    it('does not take a pinned product of another category as its history', async () => {
+      const task = makeTask();
+      task.product = { id: 'model-1' } as never;
+      makeExistingModel().productCategory = ebikes();
+
+      const result = await service.createOrUpdateProduct(contextFromTask(task), makeScrapedProduct());
+
+      expect(mockListingMatch.match).toHaveBeenCalled();
+      expect(result?.id).toBe('model-created');
+    });
+
+    it("looks its seller's offers up on products of its own category only", async () => {
+      await service.createOrUpdateProduct(
+        contextFromTask(makeTask()),
+        makeScrapedProduct({ offers: [{ price: 1, externalId: 'sku-1' }] }),
+      );
+
+      expect(mockOfferRepo.findFirstBySellerAndExternalIdsWithModelRelations).toHaveBeenCalledWith(
+        'seller-arukereso',
+        ['sku-1'],
+        expect.any(Array),
+        'category-1',
+      );
+    });
+
+    it("never moves a product into the listing's category", async () => {
+      const other = makeExistingModel();
+      other.productCategory = ebikes();
+      mockListingMatch.match.mockResolvedValueOnce({
+        productId: other.id,
+        decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+      } as never);
+
+      await expect(
+        service.createOrUpdateProduct(contextFromTask(makeTask()), makeScrapedProduct()),
+      ).rejects.toThrow('of another category');
+      expect(other.productCategory?.slug).toBe('ebikes');
+      expect(mockSourceRecordUpdater.upsertSourceRecord).not.toHaveBeenCalled();
     });
   });
 
