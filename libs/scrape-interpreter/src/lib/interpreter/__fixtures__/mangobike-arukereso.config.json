@@ -10,6 +10,16 @@
           "when": {
             "equalsIgnoreCase": "Elektromos Kerékpárok"
           }
+        },
+        {
+          "when": [
+            {
+              "equalsIgnoreCase": "Kerékpárok"
+            },
+            {
+              "titleMatches": "\\bElektromos\\b"
+            }
+          ]
         }
       ],
       "extraSpecRows": [
@@ -26,7 +36,17 @@
       ]
     },
     "bikes": {
-      "enabled": false,
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpárok"
+          },
+          "unless": {
+            "titleMatches": "\\bElektromos\\b"
+          }
+        }
+      ],
       "extraSpecRows": [
         {
           "label": "Webshop kategória",

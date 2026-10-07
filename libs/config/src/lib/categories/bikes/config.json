@@ -273,6 +273,10 @@
     ],
     "CTM": [
       { "spec": "modelYear", "identifier": "mpn", "pattern": "^2(2\\d)-\\d{3}$", "prefix": "20" }
+    ],
+    "Kross": [
+      { "spec": "wheelSize", "identifier": "mpn", "pattern": "^KR[A-Z0-9]{4}(\\d{2})X\\d{2}[A-Z]\\d+$", "values": { "12": "12", "14": "14", "16": "16", "20": "20", "24": "24", "26": "26", "27": "27.5", "28": "28", "29": "29" } },
+      { "spec": "gender", "identifier": "mpn", "pattern": "^KR[A-Z0-9]{4}(?:28|29)X\\d{2}([MW])\\d+$", "values": { "M": "Férfi", "W": "Női" } }
     ]
   },
   "offerLevelSpecs": [

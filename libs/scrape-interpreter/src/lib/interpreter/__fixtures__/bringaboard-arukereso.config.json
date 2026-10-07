@@ -21,6 +21,19 @@
               "anyOf": ["SINGLE"]
             }
           }
+        },
+        {
+          "when": [
+            {
+              "equalsIgnoreCase": "Akció > Kerékpárok"
+            },
+            {
+              "titleMatches": "\\bE-bike\\b"
+            }
+          ],
+          "unless": {
+            "titleMatches": "rakodóegység"
+          }
         }
       ],
       "specMapping": {
@@ -54,6 +67,19 @@
             "extractPatterns": [
               "(?:Mountain [Bb]ike|Gyerek kerékpár|BMX kerékpárok -) (\\d{2}(?:[.,]5)?)(?: |$)"
             ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "> Gyerek kerékpár 27$",
+                "value": "27.5"
+              }
+            ],
+            "extract": "number"
           },
           {
             "key": "wheelSize",
@@ -1276,7 +1302,46 @@
       ]
     },
     "bikes": {
-      "enabled": false,
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpár"
+          },
+          "unless": {
+            "titleMatches": "kismotor"
+          }
+        },
+        {
+          "when": [
+            {
+              "equalsIgnoreCase": "Kerékpár > E-Bike kerékpárok"
+            },
+            {
+              "specValueIncludes": {
+                "label": "Cassette / freewheel",
+                "anyOf": ["SINGLE"]
+              }
+            }
+          ]
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "Akció > Kerékpárok"
+          },
+          "unless": [
+            {
+              "titleMatches": "\\bE-bike\\b"
+            },
+            {
+              "titleMatches": "Ajándékutalvány"
+            },
+            {
+              "titleMatches": "kismotor"
+            }
+          ]
+        }
+      ],
       "specMapping": {
         "mappings": [
           {
@@ -1293,6 +1358,19 @@
             "extractPatterns": [
               "(?:Mountain [Bb]ike|Gyerek kerékpár|BMX kerékpárok -) (\\d{2}(?:[.,]5)?)(?: |$)"
             ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": [
+              "Webshop kategória"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "> Gyerek kerékpár 27$",
+                "value": "27.5"
+              }
+            ],
+            "extract": "number"
           },
           {
             "key": "wheelSize",
@@ -2315,7 +2393,7 @@
     "labelFrom": [
       {
         "op": "regexCapture",
-        "pattern": "^(E-BIKE(?! > E-ROLLER\\b)|Kerékpár > E-Bike kerékpárok)(?: > |$)",
+        "pattern": "^(E-BIKE(?! > E-ROLLER\\b)|Kerékpár > E-Bike kerékpárok|Kerékpár(?= > (?!E-Bike|Speciális Kerékpárok > (?:Roller|Használt)|Üzletben))|Akció > Kerékpárok)(?: > |$)",
         "group": 1
       }
     ]
@@ -2324,16 +2402,28 @@
     "externalId": {
       "field": "identifier"
     },
-    "brand": {
-      "field": "manufacturer",
-      "pipeline": [
-        {
-          "op": "stripPattern",
-          "pattern": "\\s+kerékpár$",
-          "flags": "i"
-        }
-      ]
-    },
+    "brand": [
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^Giant (Liv)\\b",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "manufacturer",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s+kerékpár$",
+            "flags": "i"
+          }
+        ]
+      }
+    ],
     "name": {
       "field": "name"
     },

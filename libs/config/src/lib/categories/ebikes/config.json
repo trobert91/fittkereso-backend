@@ -360,6 +360,10 @@
       { "spec": "modelYear", "identifier": "mpn", "pattern": "^0(2\\d)\\d{6}$", "prefix": "20" },
       { "spec": "frameType", "identifier": "mpn", "pattern": "^12\\d{5}(\\d)\\d{2}$", "values": { "1": "Magas", "2": "Trapéz", "5": "Alacsony" } },
       { "spec": "frameType", "identifier": "mpn", "pattern": "^02\\d{4}(\\d)\\d{2}$", "values": { "1": "Magas", "2": "Trapéz", "5": "Alacsony" } }
+    ],
+    "Kross": [
+      { "spec": "wheelSize", "identifier": "mpn", "pattern": "^KR[A-Z0-9]{4}(\\d{2})X\\d{2}[A-Z]\\d+$", "values": { "12": "12", "14": "14", "16": "16", "20": "20", "24": "24", "26": "26", "27": "27.5", "28": "28", "29": "29" } },
+      { "spec": "gender", "identifier": "mpn", "pattern": "^KR[A-Z0-9]{4}(?:28|29)X\\d{2}([MW])\\d+$", "values": { "M": "Férfi", "W": "Női" } }
     ]
   },
   "offerLevelSpecs": [

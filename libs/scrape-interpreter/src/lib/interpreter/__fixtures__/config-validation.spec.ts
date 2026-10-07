@@ -474,6 +474,17 @@ describe('hand-authored source configs', () => {
       );
     });
 
+    // Cube's framesets sit among the road bikes, and say so only in the title.
+    it.each([
+      ['Termékkategóriák > E-BIKE > Trekking E-BIKE', 'KTM MACINA STYLE 720 2025 TREKKING E-BIKE', 'ebikes'],
+      ['Termékkategóriák > KERÉKPÁR > Országúti > Női', 'Cube Attain Pro 58 cm országúti kerékpár - 2027', 'bikes'],
+      ['Termékkategóriák > KERÉKPÁR', 'KTM WILD CROSS 16 FIRE ORANGE (WHITE) 2023 GYEREK KERÉKPÁR', 'bikes'],
+      ['Termékkategóriák > KERÉKPÁR > Országúti > Női', 'Cube Litening AIR C:68X Frameset graphic´n´white 58 cm országúti kerékpár - 2027', undefined],
+      ['Termékkategóriák > ALKATRÉSZ > Váz', 'Cube frame', undefined],
+    ])('gates the category %j (title %j) to %s', async (category, name, slug) => {
+      expect(await slugOf(config, { category, name })).toBe(slug);
+    });
+
     // Being in the feed is the stock signal: a shop generates its feed from
     // what it is currently offering. `delivery_time` is empty on all 3486 of
     // speedbike's products, and mapValue returns its `default` for a non-string
@@ -514,18 +525,14 @@ describe('hand-authored source configs', () => {
       expect(config.mapping['priceWithoutDiscount']).toEqual({ field: 'price', pipeline: stripCurrency });
     });
 
-    // The same label and the same rules; the spec mapping and the identity
-    // rows are no use to a source that runs neither LLM call.
-    it('resolves categories as the Árukereső source does', () => {
-      const gates = (categories: ArukeresoSourceConfig['categories']) =>
-        Object.fromEntries(
-          Object.entries(categories ?? {}).map(([slug, section]) => [
-            slug,
-            pick(section, ['enabled', 'rules']),
-          ]),
-        );
+    // The same label and the same e-bike rules; the spec mapping and the
+    // identity rows are no use to a source that runs neither LLM call. Its
+    // bikes stay off: the shop's Google feed carries its e-bikes only.
+    it('resolves e-bikes as the Árukereső source does, and takes no bikes', () => {
+      const gate = (section: unknown) => pick(section, ['enabled', 'rules']);
       expect(config.category).toEqual(arukereso.category);
-      expect(gates(config.categories)).toEqual(gates(arukereso.categories));
+      expect(gate(config.categories?.['ebikes'])).toEqual(gate(arukereso.categories?.['ebikes']));
+      expect(gate(config.categories?.['bikes'])).toEqual({ enabled: false });
     });
 
     // It identifies nothing and carries no specs: no LLM call has anything to do.
@@ -633,10 +640,24 @@ describe('hand-authored source configs', () => {
 
     it.each([
       [newEbikes, 'Új kerékpár', 'ebikes'],
-      ['Cube kerékpárok > MTB kerékpár', 'Új kerékpár', undefined],
+      ['Cube kerékpárok > MTB kerékpár', 'Új kerékpár', 'bikes'],
+      ['Cube kerékpárok > 20" gyerek kerékpár', 'Új kerékpár', 'bikes'],
+      // Used and demo bikes stay out among the bikes too.
+      ['Cube kerékpárok > MTB kerékpár', 'használt kerékpár', undefined],
+      ['Kiegészítők > Szállítás és tárolás > Utánfutó', 'Új termék', undefined],
       ['Kiegészítők > Táskák és kosarak > Hátizsák', 'Új termék', undefined],
     ])('gates the category %j (Állapot %j) to %s', async (category, state, slug) => {
       expect(await slugOf(config, { category }, condition(state))).toBe(slug);
+    });
+
+    it('drops a frame set filed with the road bikes', async () => {
+      expect(
+        await slugOf(
+          config,
+          { category: 'Cube kerékpárok > Országúti kerékpár', name: 'Cube Litening Air C:68X Team ICW 2024 vázszett 58 cm' },
+          condition('Új kerékpár'),
+        ),
+      ).toBeUndefined();
     });
 
     // The one demo/ex-rental bike filed with the new e-bikes stays out until
@@ -675,9 +696,16 @@ describe('hand-authored source configs', () => {
     // shop's `0200` SKU prefix tells them apart; `0201`–`0203` are e-bike
     // parts and `1901` e-scooters. Rows outside the tree keep their own path,
     // which no rule matches.
+    // Its bikes are `01xx`, minus trailers (`0111`), adult tricycles (`0113`)
+    // and scooter parts (`0114`).
     it.each([
       ['Kerékpárok', '020052000082', 'ebikes'],
       ['Kerékpárok > Pedelec kerékpárok', '020054000009', 'ebikes'],
+      ['Kerékpárok', '010500000001', 'bikes'],
+      ['Kerékpárok > Gyerek kerékpárok', '010100000001', 'bikes'],
+      ['Kerékpárok > Utánfutók', '011100000001', undefined],
+      ['Kerékpárok', '011300000001', undefined],
+      ['Kerékpárok > Speciális kerékpárok', '011400000001', undefined],
       ['Kerékpárok', '020100000001', undefined],
       ['Alkatrészek > Elektromos kerékpár alkatrészek', '020100000001', undefined],
       ['Alkatrészek > Elektromos kerékpár alkatrészek', '020052000082', undefined],
@@ -744,7 +772,13 @@ describe('hand-authored source configs', () => {
       [`${navJunk.replace(/&nbsp;/g, ' ')}${trekking}`, ktm, 'ebikes'],
       [trekking, ktm, 'ebikes'],
       [`${navJunk}Alkatrészek > Elektromos kerékpár alkatrészek > Akkumulátorok`, ktm, undefined],
-      [`${navJunk}Kerékpárok > Trekking Kerékpárok`, ktm, undefined],
+      [`${navJunk}Kerékpárok > Túra Kerékpárok > Onroad Trekking Kerékpár`, 'KTM Life Joy Trekking Kerékpár - fekete', 'bikes'],
+      // An e-bike filed among the bikes says so in its title.
+      [
+        `${navJunk}Kerékpárok > Összecsukható Kerékpárok`,
+        'KTM Macina Fold 20 500Wh Összecsukható Elektromos Városi Kerékpár - Olive Pearl - zöld',
+        'ebikes',
+      ],
       [
         `${navJunk}Elektromos Kerékpárok > Elektromos MTB Kerékpárok > Elektromos Light Hardtail MTB`,
         'Cube Trike Family Hybrid 750 grey´n´reflex',
@@ -806,10 +840,34 @@ describe('hand-authored source configs', () => {
       ['Kerékpár > E-Bike kerékpárok > női', [], 'ebikes'],
       ['Kerékpár > E-Bike kerékpárok > férfi', freewheel('Shimano CS-M5100 11-51T'), 'ebikes'],
       ['E-BIKE > E-ROLLER', [], undefined],
-      ['Akció > Kerékpárok', [], undefined],
-      ['Kerékpár > E-Bike kerékpárok > gyerek', freewheel('SINGLE'), undefined],
+      // So they are bikes.
+      ['Kerékpár > E-Bike kerékpárok > gyerek', freewheel('SINGLE'), 'bikes'],
+      ['Kerékpár > Mountain Bike > Mountain Bike 29 > férfi', [], 'bikes'],
+      ['Kerékpár > Speciális Kerékpárok > Roller', [], undefined],
     ])('gates the category %j (%j) to %s', async (category, attributes, slug) => {
       expect(await slugOf(config, { category }, attributes)).toBe(slug);
+    });
+
+    // The sale path holds bikes and e-bikes alike, told apart by the title;
+    // Koliken's toy motorbikes sit among the balance bikes.
+    it.each([
+      ['Akció > Kerékpárok', 'Giant Yukon 2 2022 Fatbike knight shield L', 'bikes'],
+      ['Akció > Kerékpárok', 'NORCO Range VLT A2 29 férfi E-bike Dark Green M', 'ebikes'],
+      ['Akció > Kerékpárok', 'Bergamont E-Cargoville LJ Load Unit unisex E-bike rakodóegység 50cm', undefined],
+      ['Akció > Kerékpárok', 'Ajándékutalvány', undefined],
+      ['Kerékpár > Gyerek Kerékpár > Futókerékpár', 'Koliken műanyag kismotor M fehér-ciklámen', undefined],
+      ['Kerékpár > Gyerek Kerékpár > Futókerékpár', 'Cardamo 12 futókerékpár - rózsaszín', 'bikes'],
+    ])('gates the category %j (title %j) to %s', async (category, name, slug) => {
+      expect(await slugOf(config, { category, name })).toBe(slug);
+    });
+
+    // Liv is its own brand; the shop lists it under Giant, titled "Giant Liv …".
+    it.each([
+      ['Giant Liv Tempt 29 4 2022 női Mountain Bike black chrome M', 'Giant', 'Liv'],
+      ['Giant Yukon 2 2022 Fatbike knight shield L', 'Giant', 'Giant'],
+      ['Neuzer Ravenna 50 férfi Trekking Kerékpár', 'Neuzer kerékpár', 'Neuzer'],
+    ])('reads the brand of %j (manufacturer %j) as %j', async (name, manufacturer, brand) => {
+      expect(await readText(config, 'brand', { name, manufacturer })).toBe(brand);
     });
 
     // Unique on all 36,641 rows; it falls back to the name where `sku` is empty.
@@ -895,12 +953,16 @@ describe('hand-authored source configs', () => {
       ebikes: new Set(Object.keys(ebikesJsonSchema.properties)),
     };
 
-    // Bikes get their rules, and are switched on, with the next plan.
-    // ambringa sells e-bikes only.
-    it('keeps bikes off, with no rules yet', () => {
+    // ambringa sells e-bikes only, and speedbike's Google feed carries its
+    // e-bikes only; every other shop takes its bikes.
+    it('switches bikes on with rules, where the feed has bikes', () => {
       const bikes = config.categories?.['bikes'];
       if (name === 'ambringa-arukereso') expect(bikes).toBeUndefined();
-      else expect(pick(bikes, ['enabled', 'rules'])).toEqual({ enabled: false });
+      else if (name === 'speedbike-googleshop') expect(pick(bikes, ['enabled', 'rules'])).toEqual({ enabled: false });
+      else {
+        expect(bikes?.enabled).toBe(true);
+        expect(bikes?.rules?.length).toBeGreaterThan(0);
+      }
     });
 
     it('maps only specs its category has', () => {

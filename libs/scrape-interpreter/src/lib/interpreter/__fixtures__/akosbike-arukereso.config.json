@@ -929,7 +929,30 @@
       ]
     },
     "bikes": {
-      "enabled": false,
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Cube kerékpárok"
+          },
+          "unless": [
+            {
+              "specValueIncludes": {
+                "label": "Állapot",
+                "anyOf": [
+                  "használt",
+                  "bemutató",
+                  "futott",
+                  "újszerű"
+                ]
+              }
+            },
+            {
+              "titleMatches": "vázszett"
+            }
+          ]
+        }
+      ],
       "specMapping": {
         "mappings": [
           {
@@ -1697,7 +1720,7 @@
     "labelFrom": [
       {
         "op": "regexCapture",
-        "pattern": "^(Elektromos kerékpárok > Új E-bike Kerékpár)(?: > |$)",
+        "pattern": "^(Elektromos kerékpárok > Új E-bike Kerékpár|Cube kerékpárok)(?: > |$)",
         "group": 1
       }
     ]

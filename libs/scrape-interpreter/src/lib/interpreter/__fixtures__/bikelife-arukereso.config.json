@@ -14,7 +14,14 @@
       ]
     },
     "bikes": {
-      "enabled": false,
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpárok"
+          }
+        }
+      ],
       "extraSpecRows": [
         {
           "label": "Webshop kategória",
@@ -128,6 +135,22 @@
             "op": "mapValue",
             "cases": {
               "0200": "Pedelec kerékpárok"
+            }
+          }
+        ]
+      },
+      {
+        "field": "sku",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(01)(?!1[134])\\d{10}$",
+            "group": 1
+          },
+          {
+            "op": "mapValue",
+            "cases": {
+              "01": "Kerékpárok"
             }
           }
         ]

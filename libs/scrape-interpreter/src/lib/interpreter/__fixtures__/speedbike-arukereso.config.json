@@ -1350,7 +1350,17 @@
       ]
     },
     "bikes": {
-      "enabled": false,
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "KERÉKPÁR"
+          },
+          "unless": {
+            "titleMatches": "\\bFrameset\\b"
+          }
+        }
+      ],
       "specMapping": {
         "mappings": [
           {
