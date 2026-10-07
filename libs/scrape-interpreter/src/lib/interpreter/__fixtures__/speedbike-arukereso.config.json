@@ -1286,6 +1286,12 @@
             "extractPatterns": [
               "> (\\d{2}(?:\\.5)?)\""
             ]
+          },
+          {
+            "key": "gender",
+            "labels": [
+              "Nem (vázkód)"
+            ]
           }
         ]
       },
@@ -1341,7 +1347,8 @@
         "size",
         "HAJTÁSRENDSZER",
         "NETTÓ TÖMEG",
-        "Vázkód (cím)"
+        "Vázkód (cím)",
+        "Nem (vázkód)"
       ],
       "extraSpecRows": [
         {
@@ -1373,6 +1380,25 @@
                 "H": "Magas",
                 "D": "Trapéz",
                 "US": "Alacsony"
+              }
+            }
+          ]
+        },
+        {
+          "label": "Nem (vázkód)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|\\s)(H|D|US)\\s\\d{2}(?=\\s|$|/)",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "H": "Férfi",
+                "D": "Női",
+                "US": "Uniszex"
               }
             }
           ]
@@ -2390,6 +2416,12 @@
             "extractPatterns": [
               "> (\\d{2}(?:\\.5)?)\""
             ]
+          },
+          {
+            "key": "gender",
+            "labels": [
+              "Nem (vázkód)"
+            ]
           }
         ]
       },
@@ -2445,7 +2477,8 @@
         "size",
         "HAJTÁSRENDSZER",
         "NETTÓ TÖMEG",
-        "Vázkód (cím)"
+        "Vázkód (cím)",
+        "Nem (vázkód)"
       ],
       "extraSpecRows": [
         {
@@ -2477,6 +2510,25 @@
                 "H": "Magas",
                 "D": "Trapéz",
                 "US": "Alacsony"
+              }
+            }
+          ]
+        },
+        {
+          "label": "Nem (vázkód)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|\\s)(H|D|US)\\s\\d{2}(?=\\s|$|/)",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "H": "Férfi",
+                "D": "Női",
+                "US": "Uniszex"
               }
             }
           ]

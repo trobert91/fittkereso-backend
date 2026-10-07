@@ -458,6 +458,22 @@ describe('hand-authored source configs', () => {
       }
     });
 
+    // The code names the rider too (Herren, Damen, unisex); where a title also
+    // states a gender it agreed every time. A frame alone left the women's
+    // listing free to join a men's "H 51" product by name.
+    it.each([
+      ['KTM LIFE SPACE trekking kerékpár - H 51 méretben, GREEN PURPLE FLIP MATT színben - 2027', 'Férfi'],
+      ['KTM LIFE SPACE trekking kerékpár - D 46 méretben, GREEN PURPLE FLIP MATT színben - 2027', 'Női'],
+      ['KTM MACINA AERA 871 LFC Di2  US 46 Unisex elektromos MTB kerékpár MARBLE WHITE színben 2026', 'Uniszex'],
+      ['Cube Aim SLX  slateblack´n´chrome M  MTB kerékpár - 2027', undefined],
+    ])('reads the rider of the frame code in %j as %j', async (name, gender) => {
+      for (const slug of ['bikes', 'ebikes']) {
+        const row = await extraRowOf(config, slug, 'Nem (vázkód)', { name });
+        expect(row).toBe(gender);
+        if (row) expect(specsOf(config, slug as 'bikes' | 'ebikes', { 'Nem (vázkód)': row })['gender']).toBe(gender);
+      }
+    });
+
     // The feed names its Moustache bikes "Norco" or "Mavic".
     it.each([
       ['MOUSTACHE SAMEDI DIMANCHE 28.4 ROAD PEBBLE GREY 2025 FÉRFI ELEKTROMOS KERÉKPÁR', 'Norco', 'MOUSTACHE'],
