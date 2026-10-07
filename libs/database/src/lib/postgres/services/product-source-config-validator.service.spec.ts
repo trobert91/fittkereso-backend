@@ -314,6 +314,45 @@ describe('ProductSourceConfigValidatorService', () => {
       ).not.toBeNull();
     });
 
+    // A page resolves its category before it reads its title, so only a
+    // feed's rules can test one.
+    it("takes title rules in a feed's section only, and condition lists in both", () => {
+      const feedWith = (rules: unknown) => ({
+        baseUrl: 'https://speedbike.hu',
+        feedUrl: 'https://speedbike.hu/feed',
+        categories: { bikes: { enabled: true, rules } },
+        mapping: {
+          brand: { field: 'brand' },
+          name: { field: 'title' },
+          url: { field: 'link' },
+          price: { field: 'price' },
+        },
+      });
+      const bikes = { equalsIgnoreCase: 'Kerékpárok' };
+      const electric = { titleMatches: '\\bElektromos\\b' };
+
+      expect(
+        validator.problems(
+          'arukereso',
+          feedWith([{ when: bikes, unless: [electric, { titleMatches: 'vázszett' }] }, { when: [bikes, electric] }]),
+        ),
+      ).toBeNull();
+      expect(validator.problems('arukereso', feedWith([{ when: [] }]))).not.toBeNull();
+      expect(validator.problems('arukereso', feedWith([{ when: { titleMatches: '' } }]))).not.toBeNull();
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => (c.categories.ebikes.rules = [{ when: [{ always: true }], unless: [{ specSectionTitleIn: ['x'] }] }])),
+        ),
+      ).toBeNull();
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => (c.categories.ebikes.rules = [{ when: electric }])),
+        ),
+      ).not.toBeNull();
+    });
+
     it('takes identity rows in a section, but not an empty list', () => {
       expect(
         validator.problems(

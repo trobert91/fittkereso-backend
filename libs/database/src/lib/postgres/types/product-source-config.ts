@@ -3,12 +3,14 @@ import { CategoryLookupCondition, ScrapeOperation } from './scrape-operation';
 
 /**
  * One way a listing shows it belongs to a category: `when` holds and
- * `unless` does not. The same vocabulary for pages and feeds, so a shop that
- * is both scraped and fed can share its rules verbatim.
+ * `unless` does not. A list in `when` holds when every condition does; a list
+ * in `unless` blocks the rule when any condition does. The same vocabulary
+ * for pages and feeds, so a shop that is both scraped and fed can share its
+ * rules verbatim (`titleMatches` aside, which only a feed can test).
  */
 export interface CategoryMatchRule {
-  when: CategoryLookupCondition;
-  unless?: CategoryLookupCondition;
+  when: CategoryLookupCondition | CategoryLookupCondition[];
+  unless?: CategoryLookupCondition | CategoryLookupCondition[];
 }
 
 /**

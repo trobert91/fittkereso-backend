@@ -132,7 +132,12 @@ describe('hand-authored source configs', () => {
           }),
         );
 
-    const resolution = interpreter.resolveCategory(config.categories, label, attributes);
+    const resolution = interpreter.resolveCategory(
+      config.categories,
+      label,
+      attributes,
+      await readText(config, 'name', fields),
+    );
     if (resolution.status === 'ambiguous') return `ambiguous: ${resolution.slugs.join(', ')}`;
     return resolution.status === 'resolved' ? resolution.slug : undefined;
   }

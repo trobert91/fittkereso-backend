@@ -594,6 +594,11 @@ export type CategoryLookupCondition =
   | { equalsIgnoreCase: string }
   | { specValueIncludes: { label: string; anyOf: string[] } }
   | { specSectionTitleIn: string[] }
+  /**
+   * Feed sources only: a regex tested against the listing's title, ignoring
+   * case. A page reads its title only after its category is resolved.
+   */
+  | { titleMatches: string }
   | { always: true };
 
 /**

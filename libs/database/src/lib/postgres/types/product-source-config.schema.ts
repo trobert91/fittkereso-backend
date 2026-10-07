@@ -92,6 +92,46 @@ const categoryLookupCondition: JsonSchemaFragment = {
   minProperties: 1,
 };
 
+/** A feed's rules can also test the title, which a page has only later. */
+const feedCategoryLookupCondition: JsonSchemaFragment = {
+  ...categoryLookupCondition,
+  properties: {
+    ...(categoryLookupCondition['properties'] as JsonSchemaFragment),
+    titleMatches: {
+      type: 'string',
+      minLength: 1,
+      description:
+        "Matches when the listing's title matches this regular expression, ignoring case. Feed sources only: a page reads its title after its category is resolved.",
+    },
+  },
+};
+
+/** A category section's rules, over one source type's conditions. */
+function categoryRulesSchema(condition: JsonSchemaFragment): JsonSchemaFragment {
+  const conditionOrList = (description: string): JsonSchemaFragment => ({
+    description,
+    oneOf: [condition, { type: 'array', minItems: 1, items: condition }],
+  });
+  return {
+    type: 'array',
+    description:
+      'Which listings are in this category: one matching any rule is. A listing matching rules of two categories is ambiguous and skipped, so no rule order between categories decides. Without rules the section matches nothing.',
+    items: {
+      type: 'object',
+      properties: {
+        when: conditionOrList(
+          'Condition that selects this rule. A list holds when every condition in it does.',
+        ),
+        unless: conditionOrList(
+          'Condition that disqualifies this rule even when `when` matches. In a list, any one condition is enough.',
+        ),
+      },
+      required: ['when'],
+      additionalProperties: false,
+    },
+  };
+}
+
 /**
  * A run-size cap and a catalogue filter, shared by both config shapes.
  *
@@ -198,23 +238,7 @@ const categorySectionSchema: JsonSchemaFragment = {
       description:
         'Whether listings in this category are imported. On a feed, which is the whole catalog, the sections are what keep everything else out.',
     },
-    rules: {
-      type: 'array',
-      description:
-        'Which listings are in this category: one matching any rule is. A listing matching rules of two categories is ambiguous and skipped, so no rule order between categories decides. Without rules the section matches nothing.',
-      items: {
-        type: 'object',
-        properties: {
-          when: { ...categoryLookupCondition, description: 'Condition that selects this rule.' },
-          unless: {
-            ...categoryLookupCondition,
-            description: 'Condition that disqualifies this rule even when `when` matches.',
-          },
-        },
-        required: ['when'],
-        additionalProperties: false,
-      },
-    },
+    rules: categoryRulesSchema(categoryLookupCondition),
     specMapping: {
       $ref: '#/$defs/sourceSpecConfig',
       description: "How this source's raw spec labels map onto the category's spec keys.",
@@ -694,11 +718,13 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
 
   $defs: {
     ...(SCRAPING_SOURCE_CONFIG_SCHEMA['$defs'] as JsonSchemaFragment),
-    // A feed's sections also take extra spec rows read off its fields.
+    // A feed's sections also take extra spec rows read off its fields, and
+    // rules that test the title.
     categorySection: {
       ...categorySectionSchema,
       properties: {
         ...(categorySectionSchema['properties'] as JsonSchemaFragment),
+        rules: categoryRulesSchema(feedCategoryLookupCondition),
         extraSpecRows: {
           type: 'array',
           description:

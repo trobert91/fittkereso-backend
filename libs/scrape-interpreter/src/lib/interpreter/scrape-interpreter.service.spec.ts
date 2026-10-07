@@ -305,6 +305,42 @@ describe('ScrapeInterpreterService', () => {
         });
       });
 
+      // A feed row's title: what a frame set filed among bikes, or an e-bike
+      // filed among bikes, often says only there.
+      describe('titleMatches and condition lists', () => {
+        const bikePath = { equalsIgnoreCase: 'Kerékpárok' };
+        const electric = { titleMatches: '\\bElektromos\\b' };
+        const sections = {
+          bikes: { enabled: true, rules: [{ when: bikePath, unless: [electric, { titleMatches: 'vázszett' }] }] },
+          ebikes: { enabled: true, rules: [{ when: [bikePath, electric] }] },
+        };
+        const resolveTitle = (title: string | undefined) =>
+          interpreter.resolveCategory(sections, 'Kerékpárok', [], title);
+
+        it('tests the title as a regex, ignoring case', () => {
+          expect(resolveTitle('KTM Macina Fold 20 elektromos városi kerékpár')).toEqual({
+            status: 'resolved',
+            slug: 'ebikes',
+          });
+        });
+
+        it('holds a `when` list only when every condition does', () => {
+          expect(
+            interpreter.resolveCategory(sections, 'Elektromos Kerékpárok', [], 'Elektromos kerékpár'),
+          ).toEqual({ status: 'unidentified' });
+        });
+
+        it('blocks a rule when any condition of its `unless` list holds', () => {
+          expect(resolveTitle('Cube Litening Air C:68X vázszett 58 cm')).toEqual({ status: 'unidentified' });
+          expect(resolveTitle('Cube Attain Pro 58 cm')).toEqual({ status: 'resolved', slug: 'bikes' });
+        });
+
+        // A page resolves its category before it reads its title.
+        it('never holds without a title', () => {
+          expect(resolveTitle(undefined)).toEqual({ status: 'resolved', slug: 'bikes' });
+        });
+      });
+
       // A disabled section still claims its listings, so the caller can skip
       // them as not enabled rather than not recognised.
       it('resolves to a disabled section too, and matches nothing without rules', () => {

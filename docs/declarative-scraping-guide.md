@@ -61,8 +61,18 @@ categories?: Record<string, {
   `valuePatterns` read enums and booleans named in free text: `Aluminium Superlite…` → `Alumínium`, a named rack → `Alapfelszereltség`, `nincs` → `Nincs`. `extract: 'multiply'` reads a gear count as chainrings × sprockets (`2X12 SHIMANO` → 24, `1*10` → 10, `24 gears` → 24, `SHIMANO 105` → nothing).
 - **Several mappings may share a key; a later one wins only when it yields a value.** Put the general row first (a frame's free text) and the specific one after (a material row), so the specific one decides when present and the general one still fills in when it is missing.
 
-- **A listing is in a category when any of that section's rules matches** (`when` holds and `unless` does not). The rules test the label the source reads (`detailPage.category.breadcrumbOrSource` or a feed's `category.labelFrom`) and the listing's raw spec rows (`specValueIncludes`).
-- **A listing that two sections claim is skipped as `category_ambiguous`**, so no rule order between categories decides and adding a category can never silently take another's listings. A disabled section still claims its listings; they are skipped as `category_not_enabled`.
+- **A listing is in a category when any of that section's rules matches** (`when` holds and `unless` does not). The rules test:
+  - the label the source reads (`detailPage.category.breadcrumbOrSource` or a feed's `category.labelFrom`), with `equalsIgnoreCase`;
+  - the listing's raw spec rows, with `specValueIncludes`;
+  - on a feed only, the title, with `titleMatches` (a case-insensitive regex). A page reads its title after its category is resolved, so the schema refuses it there.
+- **`when` and `unless` also take a list.** A `when` list holds when every condition in it does; an `unless` list blocks the rule when any one does. Example: a frame set or an e-bike filed among a shop's bikes says so only in its title:
+
+  ```jsonc
+  "bikes":  { "rules": [{ "when": { "equalsIgnoreCase": "Kerékpárok" }, "unless": [{ "titleMatches": "\\bElektromos\\b" }, { "titleMatches": "vázszett" }] }] },
+  "ebikes": { "rules": [{ "when": [{ "equalsIgnoreCase": "Kerékpárok" }, { "titleMatches": "\\bElektromos\\b" }] }] }
+  ```
+- **A listing that two sections claim is skipped as `category_ambiguous`**, so no rule order between categories decides and adding a category can never silently take another's listings. A disabled section still claims its listings; they are skipped as `category_not_enabled`. On a source that lists its whole catalog, any ambiguous row makes the run incomplete, so the delisting sweep is skipped (`removalSkipped: 'ambiguous_categories'`).
+- **A product is one category's.** Every lookup that finds a product for a listing (its history, its siblings, its GTIN and MPN, and name matching) searches the listing's category only, and two products of different categories never merge. A listing the shop files under another category later leaves its old product: its record and the offers only it carried come off it, and it is identified afresh in the new category.
 - **The admin UI shows one accordion per section**, each validated against `$defs.categorySection`; MCP `update_product_source_category` saves one section without sending the whole config.
 - Configs written before this layout (a shared `slugLookup` list, `specMapping` keyed by slug, source-wide `identityExtraction.specRows`) are converted by `toCategorySections`: the stored ones by the migration `ProductSourceCategorySections1791000000000`, an old version when it is restored.
 

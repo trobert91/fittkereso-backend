@@ -341,10 +341,13 @@ export class ArukeresoProductMapperService {
     // The feed's attributes are passed in as raw specs so a rule can use
     // `specValueIncludes` exactly as it does against a page's spec table —
     // which is what lets a shop that is both scraped and fed share its rules.
+    // The title is for `titleMatches`: a row filed under the wrong path (a
+    // frame set among bikes) often says so only there.
     const resolution = this.interpreter.resolveCategory(
       config.categories,
       label,
       this.toRawSpecs(item),
+      this.asString(await this.resolveTarget(config, item, 'name')),
     );
     if (resolution.status === 'ambiguous') {
       return { status: 'skipped', reason: 'category_ambiguous' };

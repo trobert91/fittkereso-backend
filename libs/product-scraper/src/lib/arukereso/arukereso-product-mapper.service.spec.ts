@@ -380,6 +380,7 @@ describe('ArukeresoProductMapperService', () => {
         expect.anything(),
         expect.anything(),
         [{ name: 'Motor', values: ['Bosch'] }],
+        expect.anything(),
       );
     });
 
@@ -439,6 +440,19 @@ describe('ArukeresoProductMapperService', () => {
         expect.anything(),
         'Termékkategóriák > E-BIKE > Trekking',
         [{ name: 'Motor', values: ['Bosch'] }],
+        expect.anything(),
+      );
+    });
+
+    // A frame set filed among bikes often says so only in its title.
+    it("passes the row's title to the sections' rules, so titleMatches works", async () => {
+      await call();
+
+      expect(interpreter.resolveCategory).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        'KTM Macina Scarp SX Prestige Di2 M/43 Olive Pearl',
       );
     });
 
@@ -454,6 +468,7 @@ describe('ArukeresoProductMapperService', () => {
       expect(interpreter.resolveCategory).toHaveBeenCalledWith(
         expect.anything(),
         'E-BIKE',
+        expect.anything(),
         expect.anything(),
       );
     });

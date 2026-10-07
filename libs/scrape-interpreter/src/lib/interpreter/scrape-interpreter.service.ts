@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
+import { castArray } from 'lodash';
 import {
   CategoryLookupCondition,
   categoryRulesOf,
@@ -152,19 +153,23 @@ export class ScrapeInterpreterService {
    * Public because both page and feed paths need exactly these semantics: a
    * shop that is both scraped and fed can then share its rules verbatim, and
    * `specValueIncludes` works against a feed's attribute pairs just as it
-   * does against a page's spec table.
+   * does against a page's spec table. `title` is a feed row's: a page has
+   * none yet, so `titleMatches` never holds there (and its schema refuses it).
    */
   public resolveCategory(
     categories: Record<string, ProductSourceCategoryConfig> | undefined,
     rawLabel: string | undefined,
     rawSpecs: ScrapedProductSpec[] = [],
+    title?: string,
   ): CategoryResolution {
+    const holds = (condition: CategoryLookupCondition) =>
+      this.evaluateCondition(condition, rawLabel, rawSpecs, title);
     const slugs = categoryRulesOf({ categories })
       .filter(({ rules }) =>
         rules.some(
           (rule) =>
-            this.evaluateCondition(rule.when, rawLabel, rawSpecs) &&
-            !(rule.unless && this.evaluateCondition(rule.unless, rawLabel, rawSpecs)),
+            castArray(rule.when).every(holds) &&
+            !(rule.unless && castArray(rule.unless).some(holds)),
         ),
       )
       .map(({ slug }) => slug);
@@ -372,9 +377,13 @@ export class ScrapeInterpreterService {
     condition: CategoryLookupCondition,
     rawLabel: string | undefined,
     rawSpecs: ScrapedProductSpec[],
+    title: string | undefined,
   ): boolean {
     if ('always' in condition) {
       return true;
+    }
+    if ('titleMatches' in condition) {
+      return new RegExp(condition.titleMatches, 'i').test(title ?? '');
     }
     if ('equalsIgnoreCase' in condition) {
       return (
