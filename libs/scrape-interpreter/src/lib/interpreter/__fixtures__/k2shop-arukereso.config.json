@@ -1,0 +1,171 @@
+{
+  "baseUrl": "https://www.k2shop.hu",
+  "feedUrl": "https://www.k2shop.hu/feed/arukereso.xml",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Elektromos kerékpárok"
+          },
+          "unless": [
+            {
+              "titleMatches": "\\bteszt"
+            },
+            {
+              "titleMatches": "\\bdemo\\b"
+            },
+            {
+              "titleMatches": "bemutató"
+            },
+            {
+              "titleMatches": "\\bhasznált"
+            },
+            {
+              "titleMatches": "vázszett"
+            }
+          ]
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category"
+        },
+        {
+          "label": "Motor és akkumulátor",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "([^.]*\\b[Mm]otor[^.]*?[Aa]kkumul[aá]tor)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Motor nyomatéka",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(\\d{2,3}\\s*N[Mm])\\b",
+              "group": 1
+            }
+          ]
+        }
+      ]
+    },
+    "bikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpárok"
+          },
+          "unless": [
+            {
+              "titleMatches": "\\bteszt"
+            },
+            {
+              "titleMatches": "\\bdemo\\b"
+            },
+            {
+              "titleMatches": "bemutató"
+            },
+            {
+              "titleMatches": "\\bhasznált"
+            },
+            {
+              "titleMatches": "vázszett"
+            }
+          ]
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category"
+        }
+      ]
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "splitAndTake",
+        "separator": " / ",
+        "index": 0,
+        "trim": true
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "identifier"
+    },
+    "brand": {
+      "field": "manufacturer"
+    },
+    "name": {
+      "field": "name"
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "availability": {
+      "field": "delivery_time",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": {
+      "field": "category"
+    },
+    "mpn": {
+      "field": "identifier",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^((?:MY\\d{2}[_-])?\\d{6,7}(?:-2[79])?_(?:\\d{2}|XX?S|S|M|L|XX?L))$",
+          "group": 1
+        },
+        {
+          "op": "stripPattern",
+          "pattern": "^MY\\d{2}[_-]|-2[79](?=_)|_",
+          "flags": "g"
+        }
+      ]
+    }
+  },
+  "postProcess": {
+    "identityDescription": {
+      "mode": "evidence"
+    }
+  }
+}

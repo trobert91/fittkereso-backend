@@ -1,0 +1,215 @@
+{
+  "baseUrl": "https://www.bikecafe.hu",
+  "feedUrl": "https://www.bikecafe.hu/api/?route=export/feed&id=google_shopping",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "E-BIKE"
+          }
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "product_type"
+        },
+        {
+          "label": "Méret",
+          "field": "size"
+        },
+        {
+          "label": "Szín",
+          "field": "color"
+        },
+        {
+          "label": "Váz anyaga",
+          "field": "material"
+        }
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "frameSize",
+            "labels": ["Méret"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d+(?:[.,]\\d+)?)\\s*cm$"]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": ["Méret"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(XXL|XL|XS|S|M|L)$"]
+          },
+          {
+            "key": "color",
+            "labels": ["Szín"],
+            "skipValues": ["-", "–", "n/a", "na", "no", "none", "nincs", "0", "tbd", "#tbd"]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga"],
+            "valuePatterns": [
+              { "pattern": "carbon|karbon|composite|uhlík|\\bC:6\\d", "value": "Karbon" },
+              { "pattern": "titan", "value": "Titán" },
+              { "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b", "value": "Alumínium" },
+              { "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly", "value": "Acél" }
+            ]
+          }
+        ]
+      }
+    },
+    "bikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "KERÉKPÁR"
+          }
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "product_type"
+        },
+        {
+          "label": "Méret",
+          "field": "size"
+        },
+        {
+          "label": "Szín",
+          "field": "color"
+        },
+        {
+          "label": "Váz anyaga",
+          "field": "material"
+        }
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "frameSize",
+            "labels": ["Méret"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d+(?:[.,]\\d+)?)\\s*cm$"]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": ["Méret"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(XXL|XL|XS|S|M|L)$"]
+          },
+          {
+            "key": "color",
+            "labels": ["Szín"],
+            "skipValues": ["-", "–", "n/a", "na", "no", "none", "nincs", "0", "tbd", "#tbd"]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga"],
+            "valuePatterns": [
+              { "pattern": "carbon|karbon|composite|uhlík|\\bC:6\\d", "value": "Karbon" },
+              { "pattern": "titan", "value": "Titán" },
+              { "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b", "value": "Alumínium" },
+              { "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly", "value": "Acél" }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "mapping": {
+    "externalId": {
+      "field": "id"
+    },
+    "url": {
+      "field": "link"
+    },
+    "name": {
+      "field": "title"
+    },
+    "brand": {
+      "field": "brand"
+    },
+    "gtin": {
+      "field": "gtin"
+    },
+    "mpn": {
+      "field": "mpn"
+    },
+    "imageUrl": {
+      "field": "image_link"
+    },
+    "description": {
+      "field": "description"
+    },
+    "categoryLabel": [
+      {
+        "field": "product_type",
+        "pipeline": [{ "op": "regexCapture", "pattern": "^KERÉKPÁR > (Használt) kerékpár", "group": 1 }]
+      },
+      {
+        "field": "product_type",
+        "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE|KERÉKPÁR) > ", "group": 1 }]
+      },
+      {
+        "field": "product_type",
+        "pipeline": [{ "op": "regexCapture", "pattern": "^(?!AKCIÓINK > |arukereso > )([^>]+?)(?: > |$)", "group": 1 }]
+      },
+      { "field": "custom_label_0", "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE)$", "group": 1 }] },
+      { "field": "custom_label_1", "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE)$", "group": 1 }] },
+      { "field": "custom_label_2", "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE)$", "group": 1 }] },
+      { "field": "custom_label_3", "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE)$", "group": 1 }] },
+      { "field": "custom_label_4", "pipeline": [{ "op": "regexCapture", "pattern": "^(E-BIKE)$", "group": 1 }] },
+      { "field": "custom_label_0", "pipeline": [{ "op": "regexCapture", "pattern": "^(KERÉKPÁR)$", "group": 1 }] },
+      { "field": "custom_label_1", "pipeline": [{ "op": "regexCapture", "pattern": "^(KERÉKPÁR)$", "group": 1 }] },
+      { "field": "custom_label_2", "pipeline": [{ "op": "regexCapture", "pattern": "^(KERÉKPÁR)$", "group": 1 }] },
+      { "field": "custom_label_3", "pipeline": [{ "op": "regexCapture", "pattern": "^(KERÉKPÁR)$", "group": 1 }] },
+      { "field": "custom_label_4", "pipeline": [{ "op": "regexCapture", "pattern": "^(KERÉKPÁR)$", "group": 1 }] }
+    ],
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "price": [
+      {
+        "field": "sale_price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      },
+      {
+        "field": "price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      }
+    ],
+    "priceWithoutDiscount": {
+      "field": "price",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "\\s*[A-Z]{3}$"
+        }
+      ]
+    },
+    "availability": {
+      "field": "availability"
+    }
+  }
+}

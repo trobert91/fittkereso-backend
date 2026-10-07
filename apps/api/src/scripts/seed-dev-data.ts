@@ -87,6 +87,11 @@ const FIXTURES_DIR = path.resolve(
  * The second list is the regular-bike brands the feed shops sell (2026-10-07),
  * plus the e-bike brands they carry that were missing (Bulls, Pegasus, …).
  * bringaboard's `Norco` is the real Norco.
+ *
+ * The third list is the brands the next five feed shops (#11–#15, 2026-10-07)
+ * brought: downhillendurokerekpar's gravity/enduro makers (`BOLD` is how BOLD
+ * Cycles writes itself, the feed's `Santacruz` is Santa Cruz), tuttobici's
+ * Bottecchia, Tern and Montana, and k2shop's Bianchi and Trek.
  */
 const BRAND_NAMES = [
   'Bergamont',
@@ -113,6 +118,10 @@ const BRAND_NAMES = [
     'Orbea', 'Pells', 'Polar', 'Polisport', 'Raymon', 'Ridley', 'Rock Machine', 'Romet',
     'Sprint', 'Stevens', 'Superior', 'Torpado', 'Trans Montana', 'Woom',
     'Flyer', 'Husqvarna', 'Kettler', 'Levit', 'Lovelec', 'Momentum', 'MS Energy', 'My Esel', 'Myland', 'Pegasus',
+  ],
+  ...[
+    'Amflow', 'Bianchi', 'BOLD', 'Bottecchia', 'Commencal', 'Mondraker', 'Montana', 'Nukeproof', 'Pivot',
+    'Propain', 'Santa Cruz', 'Specialized', 'Tern', 'Trek', 'Unno', 'Yeti',
   ],
 ];
 
@@ -246,21 +255,39 @@ const SOURCES: SeedSourceSpec[] = [
   feedOnlySource('mangobike', 'direct'),
   // The feed is 89.7 MB.
   feedOnlySource('bringaboard', 'direct'),
+  // The next five (#11–#15, docs/webshops/plans/, 2026-10-07). Direct for
+  // the feeds over 10 MB, as the tickets plan; the full runs wait for #10.
+  //
+  // Google Shopping TSV (no Árukereső feed), 2.4 MB.
+  feedOnlySource('tuttobici', 'proxied', 'googleshop'),
+  // StartÜzlet, 8.2 MB.
+  feedOnlySource('downhillendurokerekpar', 'proxied'),
+  // Google Shopping TSV (the Árukereső XML has Árukereső's category tree and
+  // no old price), 28.9 MB, one row per colour × size.
+  feedOnlySource('bikecafe', 'direct', 'googleshop'),
+  // The feed is 17.6 MB.
+  feedOnlySource('biciklikk', 'direct'),
+  // The feed is 19.9 MB (a bike-and-ski shop).
+  feedOnlySource('k2shop', 'direct'),
 ];
 
 /**
- * A `<shop>.hu` read through its Árukereső-format feed alone, as speedbike-
- * arukereso is: the same low caps (one request a run), identifying, the whole
- * catalogue, nightly, and scheduling off until its dry run. The seller has no
- * caps of its own.
+ * A `<shop>.hu` read through one feed alone (Árukereső XML, or a Google
+ * Shopping TSV), as speedbike-arukereso is: the same low caps (one request a
+ * run), identifying, the whole catalogue, nightly, and scheduling off until
+ * its dry run. The seller has no caps of its own.
  */
-function feedOnlySource(shop: string, fetchMode: ProductSourceFetchMode): SeedSourceSpec {
-  const name = `${shop}-arukereso`;
+function feedOnlySource(
+  shop: string,
+  fetchMode: ProductSourceFetchMode,
+  type: 'arukereso' | 'googleshop' = 'arukereso',
+): SeedSourceSpec {
+  const name = `${shop}-${type}`;
   const domain = `${shop}.hu`;
 
   return {
     name,
-    type: 'arukereso',
+    type,
     configFile: `${name}.config.json`,
     maxConcurrent: 1,
     requestsPerHour: 10,

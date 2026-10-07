@@ -1,0 +1,250 @@
+{
+  "baseUrl": "https://downhillendurokerekpar.hu",
+  "feedUrl": "https://downhillendurokerekpar.hu/arukereso.xml",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "E-BIKE"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        },
+        {
+          "when": [
+            {
+              "equalsIgnoreCase": "GRAVEL"
+            },
+            {
+              "titleMatches": "\\bTurbo\\s+(?:Creo|Levo|Kenevo|Vado|Como|Tero)\\b"
+            }
+          ],
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category"
+        }
+      ]
+    },
+    "bikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "ALL-MOUNTAIN"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "DIRT"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "GRAVEL"
+          },
+          "unless": [
+            {
+              "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+            },
+            {
+              "titleMatches": "\\bTurbo\\s+(?:Creo|Levo|Kenevo|Vado|Como|Tero)\\b"
+            }
+          ]
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "DOWNHILL"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "ENDURO"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        },
+        {
+          "when": {
+            "equalsIgnoreCase": "GYEREK MTB"
+          },
+          "unless": {
+            "titleMatches": "V[aá]z\\s*szett|\\bV[aá]zak?\\b"
+          }
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "category"
+        }
+      ]
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "stripPattern",
+        "pattern": "\\s*>\\s*(?:Kerékpárok|\\d+(?:\"|&quot;)?)$"
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "identifier"
+    },
+    "brand": [
+      {
+        "field": "manufacturer"
+      },
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^\\s*(?:20\\d\\d\\s+)?(\\S+)",
+            "group": 1
+          }
+        ]
+      }
+    ],
+    "name": {
+      "field": "name",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "\\\\?&quot;",
+          "flags": "g"
+        },
+        {
+          "op": "stripPattern",
+          "pattern": "\\s+(?:Trail|XC|All-[Mm]ountain|All-mountiain)(?=\\s+[Kk]erékpár\\s*$)"
+        }
+      ]
+    },
+    "url": {
+      "field": "product_url"
+    },
+    "price": {
+      "field": "price"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "availability": {
+      "field": "delivery_time",
+      "pipeline": [
+        {
+          "op": "mapValue",
+          "cases": {
+            "NO": "out_of_stock"
+          },
+          "default": "in_stock"
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_url"
+    },
+    "description": {
+      "field": "description",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "^\\.{3}$"
+        }
+      ]
+    },
+    "categoryLabel": [
+      {
+        "field": "description",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "([Hh]aszn[aá]lati\\s+nyom|[ÚúUu]jszer[űuü]\\s+[aá]llapot|[Bb]izom[aá]nyi|\\d\\s*km-t\\s+futott|[Ss]z[eé]p\\s+[aá]llapot[uú])",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "cikkszam",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(7\\d{4}-\\d+)$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "category"
+      }
+    ],
+    "gtin": {
+      "field": "cikkszam",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "^(\\d{13})$",
+          "group": 1
+        }
+      ]
+    },
+    "mpn": [
+      {
+        "field": "cikkszam",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\d{5}-\\d{1,4})$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "cikkszam",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(\\d{5,6})[A-Z]?$",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "cikkszam",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(BT\\d[A-Z0-9]{5,})$",
+            "group": 1
+          }
+        ]
+      }
+    ]
+  }
+}

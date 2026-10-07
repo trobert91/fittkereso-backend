@@ -1,0 +1,197 @@
+{
+  "baseUrl": "https://tuttobici.hu",
+  "feedUrl": "https://tuttobici.hu/api/?route=export/feed&id=google_shopping",
+  "format": "auto",
+  "categories": {
+    "ebikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpár > Elektromos kerékpárok"
+          }
+        },
+        {
+          "when": [
+            {
+              "equalsIgnoreCase": "Kerékpár"
+            },
+            {
+              "titleMatches": "\\belektromos\\b"
+            }
+          ]
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "product_type",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^Kerékpár > Elektromos kerékpárok > (.+)$",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Modellév",
+          "field": "gtin",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^(20[2-3]\\d)$",
+              "group": 1
+            }
+          ]
+        }
+      ]
+    },
+    "bikes": {
+      "enabled": true,
+      "rules": [
+        {
+          "when": {
+            "equalsIgnoreCase": "Kerékpár"
+          },
+          "unless": [
+            {
+              "titleMatches": "\\belektromos\\b"
+            },
+            {
+              "titleMatches": "vázszett"
+            },
+            {
+              "titleMatches": "\\bLEGO\\b"
+            },
+            {
+              "titleMatches": "^(?:Küllőfogó|Agytest)"
+            }
+          ]
+        }
+      ],
+      "extraSpecRows": [
+        {
+          "label": "Webshop kategória",
+          "field": "product_type",
+          "pipeline": [
+            {
+              "op": "stripPattern",
+              "pattern": "^Kerékpár > "
+            }
+          ]
+        },
+        {
+          "label": "Modellév",
+          "field": "gtin",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^(20[2-3]\\d)$",
+              "group": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "category": {
+    "labelFrom": [
+      {
+        "op": "regexCapture",
+        "pattern": "^(Kerékpár > Elektromos kerékpárok|Kerékpár)(?: > |$)",
+        "group": 1
+      }
+    ]
+  },
+  "mapping": {
+    "externalId": {
+      "field": "id"
+    },
+    "url": {
+      "field": "link"
+    },
+    "name": {
+      "field": "title"
+    },
+    "brand": {
+      "field": "brand"
+    },
+    "gtin": {
+      "field": "gtin",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "^20\\d{2}$"
+        }
+      ]
+    },
+    "mpn": {
+      "field": "mpn"
+    },
+    "releaseYear": {
+      "field": "title",
+      "pipeline": [
+        {
+          "op": "regexCapture",
+          "pattern": "\\b(20[2-3]\\d)\\b",
+          "group": 1
+        }
+      ]
+    },
+    "imageUrl": {
+      "field": "image_link"
+    },
+    "categoryLabel": {
+      "field": "product_type"
+    },
+    "description": {
+      "field": "description"
+    },
+    "availability": {
+      "field": "availability"
+    },
+    "currency": {
+      "pipeline": [
+        {
+          "op": "literal",
+          "value": "HUF"
+        }
+      ]
+    },
+    "price": [
+      {
+        "field": "sale_price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      },
+      {
+        "field": "price",
+        "pipeline": [
+          {
+            "op": "stripPattern",
+            "pattern": "\\s*[A-Z]{3}$"
+          }
+        ]
+      }
+    ],
+    "priceWithoutDiscount": {
+      "field": "price",
+      "pipeline": [
+        {
+          "op": "stripPattern",
+          "pattern": "\\s*[A-Z]{3}$"
+        }
+      ]
+    }
+  },
+  "postProcess": {
+    "identityDescription": {
+      "mode": "evidence"
+    }
+  }
+}

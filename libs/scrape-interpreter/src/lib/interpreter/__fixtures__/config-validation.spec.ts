@@ -21,13 +21,18 @@ import { ProductValueMapperService } from '../services/product-value-mapper.serv
 import { registerOps } from '../ops/register-ops';
 import akosbikeArukeresoConfig from './akosbike-arukereso.config.json';
 import ambringaArukeresoConfig from './ambringa-arukereso.config.json';
+import biciklikkArukeresoConfig from './biciklikk-arukereso.config.json';
+import bikecafeGoogleshopConfig from './bikecafe-googleshop.config.json';
 import bikelifeArukeresoConfig from './bikelife-arukereso.config.json';
 import bringaboardArukeresoConfig from './bringaboard-arukereso.config.json';
+import downhillendurokerekparArukeresoConfig from './downhillendurokerekpar-arukereso.config.json';
 import ebikeshopConfig from './ebikeshop.config.json';
+import k2shopArukeresoConfig from './k2shop-arukereso.config.json';
 import mangobikeArukeresoConfig from './mangobike-arukereso.config.json';
 import speedbikeConfig from './speedbike.config.json';
 import speedbikeArukeresoConfig from './speedbike-arukereso.config.json';
 import speedbikeGoogleshopConfig from './speedbike-googleshop.config.json';
+import tuttobiciGoogleshopConfig from './tuttobici-googleshop.config.json';
 // The size specs are read against the category's real, current schema, as
 // speedbike-detail-page.spec.ts does, for the same reason.
 // eslint-disable-next-line @nx/enforce-module-boundaries
@@ -586,19 +591,26 @@ describe('hand-authored source configs', () => {
     });
   });
 
-  // Wave 1 of the e-bike shop onboarding (docs/webshops/plans/, 2026-10-02):
-  // five shops, each with one identifying Árukereső-format feed.
+  // Wave 1 of the e-bike shop onboarding (docs/webshops/plans/): five shops
+  // (2026-10-02), then the next five (#11–#15, 2026-10-07), each with one
+  // identifying feed. tuttobici and bikecafe identify from a Google Shopping
+  // TSV.
   describe.each([
-    ['ambringa-arukereso', ambringaArukeresoConfig],
-    ['akosbike-arukereso', akosbikeArukeresoConfig],
-    ['bikelife-arukereso', bikelifeArukeresoConfig],
-    ['mangobike-arukereso', mangobikeArukeresoConfig],
-    ['bringaboard-arukereso', bringaboardArukeresoConfig],
-  ])('wave-1 feed config %s', (name, json) => {
+    ['ambringa-arukereso', ambringaArukeresoConfig, 'arukereso'],
+    ['akosbike-arukereso', akosbikeArukeresoConfig, 'arukereso'],
+    ['bikelife-arukereso', bikelifeArukeresoConfig, 'arukereso'],
+    ['mangobike-arukereso', mangobikeArukeresoConfig, 'arukereso'],
+    ['bringaboard-arukereso', bringaboardArukeresoConfig, 'arukereso'],
+    ['tuttobici-googleshop', tuttobiciGoogleshopConfig, 'googleshop'],
+    ['downhillendurokerekpar-arukereso', downhillendurokerekparArukeresoConfig, 'arukereso'],
+    ['bikecafe-googleshop', bikecafeGoogleshopConfig, 'googleshop'],
+    ['biciklikk-arukereso', biciklikkArukeresoConfig, 'arukereso'],
+    ['k2shop-arukereso', k2shopArukeresoConfig, 'arukereso'],
+  ] as const)('wave-1 feed config %s', (name, json, type) => {
     const config = asFeedConfig(json);
 
-    it('validates against the Árukereső config schema', () => {
-      assertConfigValid(config, name, 'arukereso');
+    it(`validates against the ${type} config schema`, () => {
+      assertConfigValid(config, name, type);
     });
 
     // The test round's KTM/Cube/Scott `filter` and its `maxItems` go on the
@@ -618,8 +630,12 @@ describe('hand-authored source configs', () => {
     // Only where the measured excerpts added usage types (bikelife's and
     // akosbike's descriptions name them; ambringa's are brand talk, and
     // mangobike's titles already name them): plan vivid-skipping-hopper.md.
+    // tuttobici's descriptions are the bike type itself, and k2shop's titles
+    // name it on 39 of 225 e-bikes while its descriptions open with it.
     it('sends the identity extraction description excerpts only where they help', () => {
-      const evidence = ['akosbike-arukereso', 'bikelife-arukereso'].includes(name);
+      const evidence = ['akosbike-arukereso', 'bikelife-arukereso', 'tuttobici-googleshop', 'k2shop-arukereso'].includes(
+        name,
+      );
       expect(config.postProcess?.identityDescription).toEqual(
         evidence ? { mode: 'evidence' } : undefined,
       );
@@ -991,6 +1007,11 @@ describe('hand-authored source configs', () => {
     ['bikelife-arukereso', bikelifeArukeresoConfig],
     ['mangobike-arukereso', mangobikeArukeresoConfig],
     ['bringaboard-arukereso', bringaboardArukeresoConfig],
+    ['tuttobici-googleshop', tuttobiciGoogleshopConfig],
+    ['downhillendurokerekpar-arukereso', downhillendurokerekparArukeresoConfig],
+    ['bikecafe-googleshop', bikecafeGoogleshopConfig],
+    ['biciklikk-arukereso', biciklikkArukeresoConfig],
+    ['k2shop-arukereso', k2shopArukeresoConfig],
   ])('category sections of %s', (name, json) => {
     const config = asFeedConfig(json);
     const schemaKeys: Record<string, Set<string>> = {
@@ -1152,6 +1173,757 @@ describe('hand-authored source configs', () => {
           category: '-&nbsp;-&nbsp;start_nav&nbsp;-&nbsp;-  > Kerékpárok > Országúti és Gravel Kerékpárok > Országúti Kerékpár',
         }),
       ).toBe('Kerékpárok > Országúti és Gravel Kerékpárok > Országúti Kerékpár');
+    });
+  });
+
+  // tuttobici.hu (ticket #11): the first Google Shopping feed that identifies
+  // products on its own. Its feed has no attribute table and its descriptions
+  // are mostly a category phrase, so the gate, the identifiers and two extra
+  // rows are what the config adds to the titles.
+  describe("tuttobici's Google Shopping feed config", () => {
+    const config = asFeedConfig(tuttobiciGoogleshopConfig);
+    const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
+
+    it('validates against the feed config schema', () => {
+      assertConfigValid(config, 'tuttobici-googleshop', 'googleshop');
+    });
+
+    // The test round's id list and cap go on the live row only.
+    it('carries no test-round filter or cap', () => {
+      expect(pick(config, ['filter', 'maxItems'])).toEqual({});
+    });
+
+    // An identifying source: both LLM calls run. The descriptions are the
+    // shop's bike type ("Összteleszkópos elektromos MTB kerékpár"), which the
+    // excerpts pass on.
+    it('leaves both LLM calls on and sends description excerpts', () => {
+      expect(config.postProcess).toEqual({ identityDescription: { mode: 'evidence' } });
+    });
+
+    // E-bikes are the `Elektromos kerékpárok` branch, plus 22 e-bikes the shop
+    // filed among its other bikes, which say "elektromos" in the title. The
+    // bikes are the rest of `Kerékpár`, minus frame sets, a LEGO set and two
+    // DT Swiss tools filed there. Parts, clothing and accessories have their
+    // own top-level paths (`Kerékpár alkatrészek`, `Kerékpáros ruházat`, …).
+    it.each([
+      [
+        'Kerékpár > Elektromos kerékpárok > Trekking E-BIKE',
+        'KTM MACINA STYLE 820 FÉRFI Elektromos trekking- túra kerékpár - MACHINE GREY - több méretben',
+        'ebikes',
+      ],
+      ['Kerékpár > Elektromos kerékpárok', 'Liv Avail Advanced E+ EL 0  - női elektromos országúti kerékpár - 2025', 'ebikes'],
+      [
+        'Kerékpár > Férfi kerékpár > Összteleszkópos > 27.5"',
+        'KTM MACINA CROSS CX 820 L NŐI Elektromos crosstrekking kerékpár - FLAMING GREY - több méretben',
+        'ebikes',
+      ],
+      ['Kerékpár > Női kerékpár > MTB', 'LIV Lurra E+ 29" elektromos női MTB kerékpár - Lunar Eclipse', 'ebikes'],
+      [
+        'Kerékpár > Férfi kerékpár > Gravel',
+        'Bottecchia 47BE GRAVEL MONSTER Shimano GRX610 12s DISK Gravel kerékpár - 2026 MATT GREY',
+        'bikes',
+      ],
+      ['Kerékpár > Gyerek kerékpárok > 20" (7-9 éves korig)', 'GIANT ARX 20   gyermek cross/gravel kerékpár - Cobalt', 'bikes'],
+      ['Kerékpár > Cargo', 'Tern Link B7 összecsukható kerékpár', 'bikes'],
+      [
+        'Kerékpár > Férfi kerékpár > Férfi országúti kerékpár (700, 622, 28")',
+        'GIANT TCR Advanced Pro-FF férfi országúti kerékpár vázszett - Carnival',
+        undefined,
+      ],
+      ['Kerékpár > Női kerékpár > Országúti (700, 622, 28")', 'LEGO® Icons Országúti kerékpár #11380', undefined],
+      ['Kerékpár > Gyerek kerékpárok > 20" (7-9 éves korig)', 'Küllőfogó DT Swiss Aero küllőkhöz 0.8-1.0mm piros ÚJ', undefined],
+      ['Kerékpár > Extrém kerékpárok', 'Agytest bontó DT Swiss Ratchet DEG agyakhoz', undefined],
+      ['Kerékpár alkatrészek > Markolat', 'Markolat Ergon komfort GP1-S Gripshift fém bilincses szarv nélkül fekete', undefined],
+      [
+        'Kerékpáros ruházat > Bukósisak',
+        'Kerékpáros bukósisak THE WING WHITE S-M 55-58 - LASER BLACK LENCSÉVEL',
+        undefined,
+      ],
+    ])('gates the category %j (title %j) to %s', async (productType, title, slug) => {
+      expect(await slugOf(config, { product_type: productType, title })).toBe(slug);
+    });
+
+    // `id` is unique on all 3,435 rows; `item_group_id` is empty on the bikes.
+    it('keys offers on id', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'id' });
+    });
+
+    // Google's price is the list price; sale_price, when there is one, is what
+    // the shop charges. "2359000 HUF" is no number without the strip.
+    it('takes the sale price, else the price, and the price as the old price', async () => {
+      expect(config.mapping['price']).toEqual([
+        { field: 'sale_price', pipeline: stripCurrency },
+        { field: 'price', pipeline: stripCurrency },
+      ]);
+      expect(config.mapping['priceWithoutDiscount']).toEqual({ field: 'price', pipeline: stripCurrency });
+      expect(await readText(config, 'price', { sale_price: '559992 HUF', price: '699990 HUF' })).toBe('559992');
+      expect(await readText(config, 'price', { sale_price: '', price: '2359000 HUF' })).toBe('2359000');
+    });
+
+    // KTM's EAN and 10-digit article number (the category brand rules read its
+    // year and frame off the latter), Giant's article number with its W. The
+    // shop types the model year into `gtin` on its 2026 Giant and Liv rows:
+    // that is no GTIN.
+    it.each([
+      ['9008594506329', '9008594506329'],
+      ['4711291060708', '4711291060708'],
+      ['2026', undefined],
+      ['', undefined],
+    ])('reads the GTIN %j as %j', async (gtin, expected) => {
+      expect(await readText(config, 'gtin', { gtin })).toBe(expected);
+    });
+
+    it.each([
+      ['1260154106', '1260154106'],
+      ['5090000104W', '5090000104W'],
+      ['74A', '74A'],
+    ])('reads the MPN %j as published', async (mpn, expected) => {
+      expect(await readText(config, 'mpn', { mpn })).toBe(expected);
+    });
+
+    // The year the shop typed into `gtin` reaches the identity extraction as a
+    // row of its own, in both categories; a real GTIN gives no row.
+    it.each(['ebikes', 'bikes'])('turns the year in gtin into a Modellév row (%s)', async (slug) => {
+      expect(await extraRowOf(config, slug, 'Modellév', { gtin: '2026' })).toBe('2026');
+      expect(await extraRowOf(config, slug, 'Modellév', { gtin: '9008594506329' })).toBeUndefined();
+      expect(await extraRowOf(config, slug, 'Modellév', { gtin: '' })).toBeUndefined();
+    });
+
+    // Liv's 2025 and Bottecchia's 2026 titles state their year; KTM's never do
+    // (its article number does).
+    it.each([
+      ['Liv Amiti E+ 2 - női elektromos trekking kerékpár - 2025', '2025'],
+      ['Bottecchia 52BX GRAVEL TITAN SHIMANO GRX 610 24S - 2026', '2026'],
+      ['KTM MACINA GRAN 830 FÉRFI Elektromos trekking- túra kerékpár - MACHINE GREY MATT - több méretben', undefined],
+    ])('reads the model year off the title %j as %j', async (title, year) => {
+      expect(await readText(config, 'releaseYear', { title })).toBe(year);
+    });
+
+    // The e-bike branch's own sub-category only: an e-bike filed under a bike
+    // path ("Férfi kerékpár > Összteleszkópos > 27.5"" for a cross-trekking
+    // KTM) sends no row rather than a wrong one. Bikes keep the whole path
+    // below `Kerékpár`, gender included.
+    it('sends the shop category as a row', async () => {
+      expect(
+        await extraRowOf(config, 'ebikes', 'Webshop kategória', {
+          product_type: 'Kerékpár > Elektromos kerékpárok > Trekking E-BIKE',
+        }),
+      ).toBe('Trekking E-BIKE');
+      expect(
+        await extraRowOf(config, 'ebikes', 'Webshop kategória', {
+          product_type: 'Kerékpár > Férfi kerékpár > Összteleszkópos > 27.5"',
+        }),
+      ).toBeUndefined();
+      expect(
+        await extraRowOf(config, 'bikes', 'Webshop kategória', {
+          product_type: 'Kerékpár > Férfi kerékpár > Gravel',
+        }),
+      ).toBe('Férfi kerékpár > Gravel');
+    });
+
+    // Every row says in_stock and New: availability is read as Google writes
+    // it, and condition is left to the default.
+    it('reads availability as written and maps no condition', async () => {
+      expect(config.mapping['availability']).toEqual({ field: 'availability' });
+      expect(config.mapping['condition']).toBeUndefined();
+    });
+  });
+
+  describe("downhillendurokerekpar's Árukereső feed config", () => {
+    const config = asFeedConfig(downhillendurokerekparArukeresoConfig);
+    const newBike = 'A META SX V5-öt előbb vezetik, mielőtt megülne. A 165 mm-es rugóút…';
+
+    it('validates against the Árukereső config schema', () => {
+      assertConfigValid(config, 'downhillendurokerekpar-arukereso', 'arukereso');
+    });
+
+    // The test round's id filter and cap go on the live row only.
+    it('carries no test-round filter or cap, and leaves both LLM calls on', () => {
+      expect(pick(config, ['filter', 'maxItems'])).toEqual({});
+      expect(config.postProcess?.identity).not.toBe(false);
+      expect(config.postProcess?.specs).not.toBe(false);
+    });
+
+    // StartÜzlet's own category values, matched whole once a trailing
+    // "> Kerékpárok" or kids' wheel size is cut. Frame sets sit among the bikes
+    // (and once among the e-bikes) and say so only in the title; Specialized's
+    // Turbo e-bikes sit among the gravel bikes.
+    it.each([
+      ['E-BIKE', '2026 Specialized  Turbo Levo 4 Comp Ebike', 'ebikes'],
+      ['E-BIKE', 'COMMENCAL META HT 24 POWER GLITTERY WHITE Ebike Gyerek Kerékpár', 'ebikes'],
+      ['E-BIKE', 'UNNO MITH Vázszett', undefined],
+      ['GRAVEL', '2026 Specialized Turbo Creo 2 Comp E5 SRAM Apex Gravel Kerékpár', 'ebikes'],
+      ['GRAVEL', '2026 Specialized Diverge 4 Comp Alloy Sram Gravel Kerékpár', 'bikes'],
+      ['GRAVEL', '2026 Specialized Sirrus X 2.0 Step-Through', 'bikes'],
+      ['ALL-MOUNTAIN', '2026 SCOTT Spark 920 Trail Kerékpár', 'bikes'],
+      ['ALL-MOUNTAIN', '2026 Specialized Chisel Vázszett', undefined],
+      ['ALL-MOUNTAIN', '2025 Specialized Chisel Váz Szett', undefined],
+      ['ALL-MOUNTAIN', 'Unno Horn XC Kerékpár Vázszett', undefined],
+      ['DIRT', '2026 COMMENCAL ABSOLUT PURE WHITE Dirt Kerékpár', 'bikes'],
+      ['DOWNHILL > Kerékpárok', '2026 SCOTT Gambler 20 Downhill Kerékpár', 'bikes'],
+      ['DOWNHILL', '2027 Santa Cruz V10 Downhill Kerékpár', 'bikes'],
+      ['ENDURO > Kerékpárok', '2027 Santa Cruz Bronson 70 Enduro Kerékpár', 'bikes'],
+      // A shop typo in a title, not an e-bike: the category decides.
+      ['ENDURO > Kerékpárok', '2026 Ghost Riot Trail CF Dirt E-bike', 'bikes'],
+      ['ENDURO', '2027 Santa Cruz Megatower 70 Enduro Kerékpár', 'bikes'],
+      ['GYEREK MTB > 20"', '2026 COMMENCAL RAMONES 20 BLACK Gyerek Kerékpár', 'bikes'],
+      ['GYEREK MTB > 12"', '2026 COMMENCAL RAMONES 12 PUSH BIKE GREEN Gyerek Kerékpár', 'bikes'],
+      ['ENDURO > Vázak', '2023 COMMENCAL T.E.M.P.O. GLITTERY BLACK Enduro Vázak', undefined],
+      ['DOWNHILL > Vázak', '2025 COMMENCAL SUPREME DH V5 Váz', undefined],
+      ['ALKATRÉSZEK > E-bike', 'Bosch PowerTube 750 akkumulátor', undefined],
+      ['RUHÁZAT > Sisakok', 'Fox Rampage MIPS fullface bukósisak', undefined],
+    ])('gates the category %j (title %j) to %s', async (category, name, slug) => {
+      expect(await slugOf(config, { category, name, description: newBike, cikkszam: '95224-5' })).toBe(slug);
+    });
+
+    // The feed does not flag its used bikes; the shop's own wording for them in
+    // the description does, on the rows that have one. Marketing copy that
+    // merely mentions use ("használatra", "lelkiállapot") stays in.
+    it.each([
+      ['ENDURO > Kerékpárok', 'Nagyon szép állapotú enduro minimális használati nyomokkal.', undefined],
+      ['E-BIKE', 'Nagyon szép állapotú E-bike minimális használati nyomokkal.\n5310km-t futott a kerékpár', undefined],
+      ['ENDURO > Kerékpárok', 'Újszerű Norco szerviz után, minimális használati nyomokkal.', undefined],
+      ['ENDURO > Kerékpárok', 'Nagyon szép állapotú enduro kerékpár újszerű állapotban&amp;nbsp;', undefined],
+      ['DOWNHILL', 'Eladó rendszeresen karban tartott Santa Cruz Bizományi értékesités', undefined],
+      ['ENDURO > Kerékpárok', 'Teljes felfüggesztésű kerékpárjaink évekig tartó kemény használatra tervezték őket.', 'bikes'],
+      ['ALL-MOUNTAIN', 'A hardtail motorozás egy igazi lelkiállapot; a lovaglás örömét helyezi a középpontba.', 'bikes'],
+      ['E-BIKE', '...', 'ebikes'],
+    ])('gates %j with the description %j to %s', async (category, description, slug) => {
+      expect(await slugOf(config, { category, description, name: '2026 Test Bike', cikkszam: '425594' })).toBe(slug);
+    });
+
+    // Specialized numbers framesets 7xxxx; one sits among the e-bikes titled as
+    // a complete bike (S-Works Turbo Levo 4 at half the bike's price).
+    it.each([
+      ['75224-0', undefined],
+      ['70326-0', undefined],
+      ['95224-0', 'ebikes'],
+    ])('gates an E-BIKE row with cikkszam %j to %s', async (cikkszam, slug) => {
+      expect(
+        await slugOf(config, { category: 'E-BIKE', name: '2026 Specialized S-Works Turbo Levo 4 Ebike', description: '...', cikkszam }),
+      ).toBe(slug);
+    });
+
+    // `identifier` (= `code`) is unique on all 7,197 rows; `cikkszam` repeats.
+    it('keys offers on identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // `cikkszam` holds the maker's article number for Specialized, Scott,
+    // Kellys and Commencal (BT…), a 13-digit EAN on a few Kellys and Pells rows,
+    // and the shop's own codes for the rest (14–15-digit numbers on Ghost,
+    // Lapierre and Norco, invented codes on Santa Cruz, Unno, Amflow, Yeti).
+    it.each([
+      ['95224-5', '95224-5', undefined],
+      ['96526-8220', '96526-8220', undefined],
+      ['290558', '290558', undefined],
+      ['425080M', '425080', undefined],
+      ['76233', '76233', undefined],
+      ['BT5RMN20EU220', 'BT5RMN20EU220', undefined],
+      ['8585053849773', undefined, '8585053849773'],
+      ['54129472835149', undefined, undefined],
+      ['111883898062699', undefined, undefined],
+      ['27SCB90', undefined, undefined],
+      ['23tempoessfb', undefined, undefined],
+      ['22METAPWE1', undefined, undefined],
+      ['SBIMWCNKP00x', undefined, undefined],
+      ['AMF01', undefined, undefined],
+    ])('reads cikkszam %j as MPN %j and GTIN %j', async (cikkszam, mpn, gtin) => {
+      expect(await readText(config, 'mpn', { cikkszam })).toBe(mpn);
+      expect(await readText(config, 'gtin', { cikkszam })).toBe(gtin);
+    });
+
+    // StartÜzlet writes `&quot;` (sometimes `\&quot;`) inside CDATA, where no
+    // XML parser decodes it.
+    it('drops the undecoded inch marks from the title', async () => {
+      expect(
+        await readText(config, 'name', { name: ' 2023 KELLYS Theos F100 SH L 29\\&quot;/27.5\\&quot; 825Wh Ebike ' }),
+      ).toBe('2023 KELLYS Theos F100 SH L 29/27.5 825Wh Ebike');
+      expect(await readText(config, 'name', { name: 'COMMENCAL RAMONES 14&quot; PUSH BIKE Green' })).toBe(
+        'COMMENCAL RAMONES 14 PUSH BIKE Green',
+      );
+    });
+
+    // The shop ends every title with its category ("Trail Kerékpár"); the
+    // identity extraction kept "Trail" in 3 of 4 models of the test round
+    // (Spark 910 Trail, Epic 8 Expert Trail). The discipline words it never kept
+    // (Enduro, Downhill, Gravel, Dirt, MTB) stay, and so does a model's own
+    // "Trail" (Ghost Riot Trail, Pells Rocket Trail).
+    it.each([
+      ['2026 SCOTT Spark 910 Trail Kerékpár', '2026 SCOTT Spark 910 Kerékpár'],
+      ['2027 Specialized Epic 9 Comp XC Kerékpár', '2027 Specialized Epic 9 Comp Kerékpár'],
+      ['2023 KELLYS Thorx 50 M 29&quot; All-mountiain Kerékpár', '2023 KELLYS Thorx 50 M 29 Kerékpár'],
+      ['2025 Ghost Riot Trail CF Full Party Enduro Kerékpár', '2025 Ghost Riot Trail CF Full Party Enduro Kerékpár'],
+      ['PELLS Rocket Trail 24 Black Kerékpár', 'PELLS Rocket Trail 24 Black Kerékpár'],
+      ['2026 COMMENCAL RAMONES 20 BLACK Gyerek Kerékpár', '2026 COMMENCAL RAMONES 20 BLACK Gyerek Kerékpár'],
+    ])('reads the title %j as %j', async (name, title) => {
+      expect(await readText(config, 'name', { name })).toBe(title);
+    });
+
+    // 4 gated rows have an empty `manufacturer`; the importer skips a row
+    // without a brand, so the title's first word stands in (the identity
+    // extraction's brand wins either way).
+    it('falls back to the title for an empty manufacturer', async () => {
+      expect(await readText(config, 'brand', { manufacturer: 'Santacruz', name: '2027 Santa Cruz Vala 90 E-bike' })).toBe('Santacruz');
+      expect(
+        await readText(config, 'brand', { manufacturer: '', name: '2025 COMMENCAL T.E.M.P.O. POWER ESSENTIAL GLITTERY BLACK E-bike' }),
+      ).toBe('COMMENCAL');
+      expect(await readText(config, 'brand', { manufacturer: '', name: 'LAPIERRE Overvolt AM 7.8 Circular Grey Ebike' })).toBe('LAPIERRE');
+    });
+
+    it('blanks the "..." description placeholder', async () => {
+      expect(await readText(config, 'description', { description: '...' })).toBeUndefined();
+      expect(await readText(config, 'description', { description: newBike })).toBe(newBike);
+    });
+
+    // No delivery column: presence in the feed means in stock.
+    it('reads presence in the feed as in stock', async () => {
+      expect(config.mapping['availability']).toEqual({ field: 'delivery_time', pipeline: IN_STOCK_UNLESS_NO });
+      expect(await readText(config, 'availability', {})).toBe('in_stock');
+    });
+
+    it('sends the shop category path to the identity extraction', async () => {
+      for (const slug of ['ebikes', 'bikes']) {
+        expect(await extraRowOf(config, slug, 'Webshop kategória', { category: 'ENDURO > Kerékpárok' })).toBe(
+          'ENDURO > Kerékpárok',
+        );
+      }
+    });
+  });
+
+  describe("bikecafe's Google Shopping feed config", () => {
+    const config = asFeedConfig(bikecafeGoogleshopConfig);
+    const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
+    const schemaKeys: Record<string, Set<string>> = {
+      bikes: new Set(Object.keys(bikesJsonSchema.properties)),
+      ebikes: new Set(Object.keys(ebikesJsonSchema.properties)),
+    };
+    // The shop's category membership, as ShopRenter writes it into the custom
+    // labels: every category the product sits in, in no particular order.
+    const labels = (...values: string[]) =>
+      Object.fromEntries(values.map((value, index) => [`custom_label_${index}`, value]));
+
+    it('validates against the feed config schema', () => {
+      assertConfigValid(config, 'bikecafe-googleshop', 'googleshop');
+    });
+
+    // The test round's id `filter` and its `maxItems` go on the live row only.
+    it('carries no test-round filter or cap', () => {
+      expect(pick(config, ['filter', 'maxItems'])).toEqual({});
+    });
+
+    // The shop's only feed with its own categories and an old price, so it
+    // identifies products: both LLM calls run, and no description excerpts
+    // (its titles already name the usage type).
+    it('leaves both LLM calls on', () => {
+      expect(config.postProcess).toBeUndefined();
+    });
+
+    // One row per colour × size child; `id` is unique across all 19,863 rows.
+    // `mpn` is the manufacturer's article number of that child (KTM's 10 digits,
+    // Merida's 7, Stevens' 9), the same id space as the other shops' MPNs.
+    it('keys offers on id, and reads gtin and mpn as published', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'id' });
+      expect(config.mapping['gtin']).toEqual({ field: 'gtin' });
+      expect(config.mapping['mpn']).toEqual({ field: 'mpn' });
+      expect(config.mapping['releaseYear']).toBeUndefined();
+    });
+
+    it('takes the sale price, else the price, and the price as the old price', () => {
+      expect(config.mapping['price']).toEqual([
+        { field: 'sale_price', pipeline: stripCurrency },
+        { field: 'price', pipeline: stripCurrency },
+      ]);
+      expect(config.mapping['priceWithoutDiscount']).toEqual({ field: 'price', pipeline: stripCurrency });
+    });
+
+    // The feed lists out-of-stock children too (493 of 583 e-bike rows), and
+    // Google's values are OfferAvailability's own.
+    it('reads stock from the availability column', () => {
+      expect(config.mapping['availability']).toEqual({ field: 'availability' });
+    });
+
+    // Used bikes are kept out by the gate, not mapped as an offer condition.
+    it('maps no condition', () => {
+      expect(config.mapping['condition']).toBeUndefined();
+    });
+
+    it.each([
+      ['E-BIKE > MTB E-Bike > Összteleszkópos MTB E-Bike', labels('MTB E-Bike', 'Összteleszkópos MTB E-Bike', 'E-BIKE'), 'ebikes'],
+      ['E-BIKE > Trekking E-Bike > Női trekking E-Bike', labels('Trekking E-Bike', 'Női trekking E-Bike', 'E-BIKE'), 'ebikes'],
+      ['KERÉKPÁR > Gravel kerékpár', labels('Gravel kerékpár', 'KERÉKPÁR'), 'bikes'],
+      ['KERÉKPÁR > Gyerek kerékpár > 20" kerékpár', labels('Gyerek kerékpár', '20" kerékpár', 'KERÉKPÁR'), 'bikes'],
+      // The shop's two used bikes.
+      ['KERÉKPÁR > Használt kerékpár', labels('KERÉKPÁR', 'Használt kerékpár'), undefined],
+      // A promotion or the Árukereső export category as the main path: the bike's
+      // other categories decide, whatever their order.
+      [
+        'AKCIÓINK > MERIDA készletkisöprés',
+        labels('Gravel E-Bike', 'Elektromos kerékpár', 'MERIDA készletkisöprés', 'E-BIKE'),
+        'ebikes',
+      ],
+      ['AKCIÓINK > KTM készletkisöprés', labels('KTM készletkisöprés', 'Országúti E-Bike', 'E-BIKE'), 'ebikes'],
+      [
+        'AKCIÓINK > MERIDA készletkisöprés',
+        labels('Kerékpár', 'Gravel kerékpár', 'MERIDA készletkisöprés', 'KERÉKPÁR'),
+        'bikes',
+      ],
+      ['arukereso > Kerékpár', labels('Országúti kerékpár', 'Kerékpár', 'KERÉKPÁR'), 'bikes'],
+      ['arukereso > Kerékpár kitámasztó', labels('Kitámasztó', 'Kerékpár kitámasztó', 'KIEGÉSZÍTŐ'), undefined],
+      ['AKCIÓINK > Szuperakció', labels('Szuperakció', 'KIEGÉSZÍTŐ'), undefined],
+      // E-bike accessories sit outside the E-BIKE tree.
+      ['KIEGÉSZÍTŐ > Lakat, nyomkövető > E-Bike zár', labels('Lakat, nyomkövető', 'E-Bike zár', 'KIEGÉSZÍTŐ'), undefined],
+      ['KIEGÉSZÍTŐ > Pumpa > Elektromos pumpa', labels('Biciklipumpa', 'Pumpa', 'Elektromos pumpa', 'KIEGÉSZÍTŐ'), undefined],
+      // Only a promotion or export path falls back to the labels: a part stays a
+      // part even if the shop also files it among its bikes.
+      ['ALKATRÉSZ > Kerék > Külső gumi > MTB külső gumi', labels('Külső gumi', 'KERÉKPÁR'), undefined],
+    ])('gates %j with labels %j to %s', async (productType, customLabels, slug) => {
+      expect(await slugOf(config, { product_type: productType, title: 'X', ...customLabels })).toBe(slug);
+    });
+
+    it.each(['ebikes', 'bikes'] as const)('turns the %s columns into spec rows', async (slug) => {
+      const row = {
+        product_type: 'KERÉKPÁR > Trekking kerékpár > Női trekking kerékpár',
+        size: '46 cm',
+        color: 'Zöld',
+        material: 'Alumínium',
+      };
+      expect(await extraRowOf(config, slug, 'Webshop kategória', row)).toBe(row.product_type);
+      expect(await extraRowOf(config, slug, 'Méret', row)).toBe('46 cm');
+      expect(await extraRowOf(config, slug, 'Szín', row)).toBe('Zöld');
+      expect(await extraRowOf(config, slug, 'Váz anyaga', row)).toBe('Alumínium');
+    });
+
+    // The size column holds a letter, centimetres or (Stevens MTBs, Merida kids'
+    // bikes) inches; only the first two are read. Colour stays as the shop
+    // writes it.
+    it.each([
+      ['ebikes', 'Méret', 'M', 'frameSizeLabel', 'M'],
+      ['ebikes', 'Méret', 'XXL', 'frameSizeLabel', 'XXL'],
+      ['ebikes', 'Méret', '56 cm', 'frameSize', 56],
+      ['ebikes', 'Méret', '56 cm', 'frameSizeLabel', undefined],
+      ['ebikes', 'Méret', '18"', 'frameSize', undefined],
+      ['bikes', 'Méret', 'XS', 'frameSizeLabel', 'XS'],
+      ['bikes', 'Méret', '51 cm', 'frameSize', 51],
+      ['bikes', 'Méret', '11.5"', 'frameSize', undefined],
+      ['ebikes', 'Szín', 'Mohaszürke', 'color', 'Mohaszürke'],
+      ['bikes', 'Szín', 'Smaragd/Viola', 'color', 'Smaragd/Viola'],
+      ['ebikes', 'Váz anyaga', 'Karbon', 'frameMaterial', 'Karbon'],
+      ['bikes', 'Váz anyaga', 'Alumínium', 'frameMaterial', 'Alumínium'],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
+    it('maps only specs its category has, the same way in both', () => {
+      const ebikes = config.categories?.['ebikes']?.specMapping?.mappings ?? [];
+      const bikes = config.categories?.['bikes']?.specMapping?.mappings ?? [];
+      for (const [slug, mappings] of [['ebikes', ebikes], ['bikes', bikes]] as const) {
+        expect(mappings.map((mapping) => mapping.key).filter((key) => !schemaKeys[slug].has(key))).toEqual([]);
+      }
+      expect(bikes.filter((mapping) => schemaKeys['ebikes'].has(mapping.key))).toEqual(
+        ebikes.filter((mapping) => schemaKeys['bikes'].has(mapping.key)),
+      );
+    });
+  });
+
+  describe("k2shop's Árukereső feed config", () => {
+    const config = asFeedConfig(k2shopArukeresoConfig);
+
+    it('validates against the Árukereső config schema', () => {
+      assertConfigValid(config, 'k2shop-arukereso', 'arukereso');
+    });
+
+    // The test round's id filter and cap go on the live row only.
+    it('carries no test-round filter or cap', () => {
+      expect(pick(config, ['filter', 'maxItems'])).toEqual({});
+    });
+
+    // A bike-and-ski shop: the category path's first segment says e-bike or
+    // bike; parts, accessories, clothing and ski gear have their own first
+    // segment, even where their title says eBike. The demo bike ("teszt
+    // kerékpár") and the frame sets ("vázszett") sit among the bikes and are
+    // dropped by title. The two sections test different labels, so no row is
+    // claimed twice.
+    it.each([
+      ['Elektromos kerékpárok / eMTB, terepre', 'Scott Strike eRide 930 kerékpár 2021 XL', 'ebikes'],
+      ['Elektromos kerékpárok / eTúra, eVárosi', 'KTM Macina Fold kerékpár 2026 20', 'ebikes'],
+      ['Elektromos kerékpárok / eJunior', 'Cube Acid 240 Hybrid Rookie Pro 400X Actionteam E-kerékpár 2026', 'ebikes'],
+      ['Kerékpárok / MTB', 'Scott Scale 940 29 MTB kerékpár 2021 XL', 'bikes'],
+      ['Kerékpárok / Junior, gyerek', 'Kellys Alpina Tornado futóbicikli 2020 12', 'bikes'],
+      ['Kerékpárok / Városi', 'Electra Loft 7i Matte Hazel Ladies kerékpár 2019 S', 'bikes'],
+      ['Elektromos kerékpárok / eMTB, terepre', 'Scott Patron eRide 910 teszt kerékpár 2022 M', undefined],
+      ['Kerékpárok / MTB', 'Bold Linkin 150 29 MTB kerékpár vázszett 2025 L', undefined],
+      ['Kerékpárok / Országúti', 'Scott Addict RC Pro HMX vázszett 2025 L', undefined],
+      ['Alkatrészek / Nyereg / Nyereg', 'Selle Italia Lady eBike Gel Flow L nyereg', undefined],
+      ['Kiegészítők / Computerek, kijelzők / e Bike kijelzők', 'Bosch Kiox 300 (BHU3600) display computer', undefined],
+      ['Kiegészítők / Világítás / Világítás', 'Supernova M99 Pro 45 eBike első lámpa', undefined],
+      ['Ruházat / Cipők', 'Scott MTB RC Evo Boa kerékpáros cipő 2023 43', undefined],
+      ['Sí felszerelés / Sílécek', 'Völkl Junior Racetiger yellow síléc kötéssel 2011 70', undefined],
+    ])('gates the category %j (title %j) to %s', async (category, title, slug) => {
+      expect(await slugOf(config, { category, name: title })).toBe(slug);
+    });
+
+    // `identifier` is unique per row (16,049 of 16,049); the size rows of one
+    // bike share its URL.
+    it('keys offers on identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // Cube's identifiers are its item number plus the size, the form the other
+    // shops' Cube MPNs take (akosbike VLB_104020-M, speedbike 104020-M), behind
+    // k2shop's model-year prefix and its -27/-29 wheel note. A letter after the
+    // item number (L, E) marks k2shop's own frame variant, and no other brand's
+    // identifier carries the manufacturer's code with its size, so those give none.
+    it.each([
+      ['MY26_104020_M', '104020M'],
+      ['MY26-117510_L', '117510L'],
+      ['MY26_141200-29_XL', '141200XL'],
+      ['1140600-29_XL', '1140600XL'],
+      ['1140600-27_S', '1140600S'],
+      ['532761_50', '53276150'],
+      ['MY26_150120_12', '15012012'],
+      ['645100L_54', undefined],
+      ['1111112E_46', undefined],
+      ['1107272', undefined],
+      ['SC21280469_XL', undefined],
+      ['KTM2612601902_20', undefined],
+      ['22704281BLUMAT_S', undefined],
+      ['TR525868BLK_M', undefined],
+      ['K25182_S', undefined],
+    ])('reads the MPN off the identifier %j', async (identifier, mpn) => {
+      expect(await readText(config, 'mpn', { identifier })).toBe(mpn);
+    });
+
+    // productnumber is the page's "Gyártói cikkszám", but per model, not per
+    // size (KTM's 8-digit article base, Scott's 6-digit model number), and for
+    // other rows the shop's own code: it matches no other shop's MPN. The feed
+    // has no EAN, no old price, and states years only in its titles.
+    it('maps no GTIN, old price or year, and not productnumber', () => {
+      expect(pick(config.mapping, ['gtin', 'priceWithoutDiscount', 'releaseYear'])).toEqual({});
+      expect(JSON.stringify(config.mapping)).not.toMatch(/productnumber/i);
+    });
+
+    it('sends the category path to the identity extraction as it stands', async () => {
+      for (const slug of ['ebikes', 'bikes']) {
+        expect(
+          await extraRowOf(config, slug, 'Webshop kategória', { category: 'Kerékpárok / Junior, gyerek' }),
+        ).toBe('Kerékpárok / Junior, gyerek');
+      }
+    });
+
+    // The feed has no spec table, and unification never writes identity specs,
+    // so battery and torque reach the identity extraction only as rows. The
+    // descriptions name them: the first sentence with a motor and a battery
+    // (182 of 225 e-bike rows; never a range extender's Wh alone, which no
+    // such sentence names), and the first torque figure (118 rows).
+    it.each([
+      [
+        'Összteleszkópos 29"-es E-bike. Bosch Performance CX 250W motor és 625Wh akkumulátor. Marzocchi Z2 Air villával.',
+        'Bosch Performance CX 250W motor és 625Wh akkumulátor',
+        undefined,
+      ],
+      [
+        'Sőt, a vázra pluszban felszerelhetsz egy 250 Wh PowerMore kiegészítő akkumulátort. Az elegáns C:62 karbonváz a Bosch SX motorját és egy 400 Wh akkumulátort rejt, amely akár 60 Nm pedálrásegítést kínál.',
+        'Az elegáns C:62 karbonváz a Bosch SX motorját és egy 400 Wh akkumulátor',
+        '60 Nm',
+      ],
+      [
+        'Macina Trekking 6061 aluminium váz Bosch Performance Line CX BDU3840 - 25km/h / 85Nm motor Bosch Powertube 800wh akkumulátor SR Suntour villa',
+        'Macina Trekking 6061 aluminium váz Bosch Performance Line CX BDU3840 - 25km/h / 85Nm motor Bosch Powertube 800wh akkumulátor',
+        '85Nm',
+      ],
+      ['29"-es mountain bike. Shimano Deore váltóval.', undefined, undefined],
+    ])('reads the drive rows off the description %j', async (description, drive, torque) => {
+      expect(await extraRowOf(config, 'ebikes', 'Motor és akkumulátor', { description })).toBe(drive);
+      expect(await extraRowOf(config, 'ebikes', 'Motor nyomatéka', { description })).toBe(torque);
+    });
+
+    it('gives bikes no drive rows', () => {
+      const labels = (config.categories?.['bikes']?.extraSpecRows ?? []).map((row) => row.label);
+      expect(labels).toEqual(['Webshop kategória']);
+    });
+
+    // The titles rarely name the bike type (39 of 225 e-bike rows); the
+    // descriptions open with it ("Összteleszkópos 29"-es E-bike.", "Cross
+    // e-bike kerékpár.").
+    it('sends the identity extraction description excerpts', () => {
+      expect(config.postProcess?.identityDescription).toEqual({ mode: 'evidence' });
+    });
+  });
+
+  describe("biciklikk's Árukereső feed config", () => {
+    const config = asFeedConfig(biciklikkArukeresoConfig);
+
+    it('validates against the config schema', () => {
+      assertConfigValid(config as unknown as ProductSourceConfig, 'biciklikk-arukereso', 'arukereso');
+    });
+
+    // E-bikes under `Termékek > E-Bike`, bikes under `Termékek > Kerékpárok`
+    // (kids' and balance bikes included); the e-scooter tree holds only parts.
+    it.each([
+      ['Termékek > E-Bike > Túra, trekking, cross e-kerékpárok > Trekking, túra e-kerékpárok', 'ebikes'],
+      ['Termékek > E-Bike > MTB e-kerékpárok', 'ebikes'],
+      ['Termékek > E-Bike > Speciális e-bike > Elektromos teherszállító kerékpárok / e-cargo', 'ebikes'],
+      ['Termékek > Kerékpárok > MTB kerékpárok', 'bikes'],
+      ['Termékek > Kerékpárok > Gyerekkerékpárok', 'bikes'],
+      ['Termékek > Kerékpárok > Országúti és fitnesz kerékpárok > Gravel kerékpárok', 'bikes'],
+      ['Termékek > E-Roller > E-roller alkatrészek > Xiaomi alkatrészek', undefined],
+      ['Termékek > Alkatrészek > Kerék > Külső gumi', undefined],
+      ['Termékek > Kiegészítők > Szállítás és tárolás > Kerékpárszállító', undefined],
+      ['Szolgáltatások', undefined],
+    ])('gates the category %j to %s', async (category, slug) => {
+      expect(await slugOf(config, { category, name: 'KELLYS Physio 50 28" fitness kerékpár, M (170-185cm)' })).toBe(slug);
+    });
+
+    // The adult trike, the one cosmetically damaged bike, and any used or demo
+    // bike stay out of both trees.
+    it.each([
+      ['Termékek > Kerékpárok > Speciális kerékpárok > Háromkerekű kerékpár, tricikli', 'CSEPEL Camping 3 20" háromkerekű kerékpár / tricikli, 3 seb. agyváltós, kontrás, fehér', undefined],
+      ['Termékek > Kerékpárok > MTB kerékpárok', 'GT Aggressor Expert Shimano 2021 29" MTB hardtail kerékpár, Silver, S (esztétikai hibás)', undefined],
+      ['Termékek > E-Bike > Városi e-kerékpárok', 'NEUZER Genova 26" női városi elektromos kerékpár, bemutató darab, 17"', undefined],
+      ['Termékek > Kerékpárok > Gyerekkerékpárok', 'KELLYS Kite 12" gyermek tanulókerékpár / futóbicikli, Red', 'bikes'],
+      ['Termékek > Kerékpárok > Speciális kerékpárok > Tandem kerékpárok', 'CSEPEL Tandem 28" kerékpár', 'bikes'],
+    ])('gates %j with the title %j to %s', async (category, name, slug) => {
+      expect(await slugOf(config, { category, name })).toBe(slug);
+    });
+
+    // `identifier` (the distributor prefix + sku) is unique on all 4,049 rows;
+    // `sku` repeats on the shop's "-másolata-1" copies.
+    it('keys offers on identifier', () => {
+      expect(config.mapping['externalId']).toEqual({ field: 'identifier' });
+    });
+
+    // Kellys' and Alpina's sku is the size's EAN-13. ean_code is never read: it
+    // holds the shop's own 1xxxxx000000c numbers on every row that fills it.
+    it.each([
+      ['KLS_8585053831143', '1006940000000', '8585053831143'],
+      ['KLS_8585019397096-másolata-1', '', undefined],
+      ['KRO_KRTR1Z28X17M002483', '1115420000000', undefined],
+      ['NZR_NE2201001014', '', undefined],
+    ])('reads the GTIN of identifier %j (ean_code %j) as %j', async (identifier, eanCode, gtin) => {
+      expect(await readText(config, 'gtin', { identifier, ean_code: eanCode })).toBe(gtin);
+    });
+
+    // The manufacturer's code behind the distributor prefix, for Kross and its
+    // Le Grand line, Csepel, Neuzer and Koliken, the codes other shops write too.
+    it.each([
+      ['KRO_KRTR2Z28X19M002501', 'KRTR2Z28X19M002501'],
+      ['KRO_LGLHZ328X19W001447', 'LGLHZ328X19W001447'],
+      ['CSP_94400403B2', '94400403B2'],
+      ['CSP_93814121OR', '93814121OR'],
+      ['NZR_NE2201001014', 'NE2201001014'],
+      ['KLK_KP1611B2', 'KP1611B2'],
+      // A copy row keeps its original's code under another colour.
+      ['NZR_NE2200602034-másolata-1', undefined],
+      // Cannondale's ASP_ code is the importer's, and Kellys' sku is an EAN.
+      ['ASP_00077549_2_1', undefined],
+      ['KLS_8585053831143', undefined],
+      ['DEM_B21243', undefined],
+    ])('reads the MPN of identifier %j as %j', async (identifier, mpn) => {
+      expect(await readText(config, 'mpn', { identifier })).toBe(mpn);
+    });
+
+    it.each([
+      ['Le Grand Bikes', 'Le Grand'],
+      ['Kellys', 'Kellys'],
+    ])('reads the brand %j as %j', async (manufacturer, brand) => {
+      expect(await readText(config, 'brand', { manufacturer })).toBe(brand);
+    });
+
+    it('drops the Árukereső tracking query from the URL', async () => {
+      const page = 'https://www.biciklikk.hu/kellys-physio-50-28-fitness-kerekpar-m-170-185cm';
+      expect(
+        await readText(config, 'url', { product_url: `${page}?utm_source=arukereso&utm_medium=cpp&utm_campaign=direct_link` }),
+      ).toBe(page);
+    });
+
+    it('sends the category path to the identity extraction', async () => {
+      const category = 'Termékek > E-Bike > Városi e-kerékpárok';
+      expect(await extraRowOf(config, 'ebikes', 'Webshop kategória', { category })).toBe(category);
+      for (const section of Object.values(config.categories ?? {})) {
+        expect(section.identitySpecRows).toContain('Webshop kategória');
+      }
+    });
+
+    // What the shared "category sections" block checks for the other feeds,
+    // until this config joins its list.
+    it('maps each spec only where its category has it, and the same way in both', () => {
+      const keys = {
+        bikes: new Set(Object.keys(bikesJsonSchema.properties)),
+        ebikes: new Set(Object.keys(ebikesJsonSchema.properties)),
+      };
+      const ebikes = config.categories?.['ebikes']?.specMapping?.mappings ?? [];
+      const bikes = config.categories?.['bikes']?.specMapping?.mappings ?? [];
+      expect(ebikes.filter((m) => !keys.ebikes.has(m.key))).toEqual([]);
+      expect(bikes.filter((m) => !keys.bikes.has(m.key))).toEqual([]);
+      expect(bikes.filter((m) => keys.ebikes.has(m.key))).toEqual(ebikes.filter((m) => keys.bikes.has(m.key)));
+    });
+  });
+
+  describe("biciklikk's spec rows", () => {
+    const config = asFeedConfig(biciklikkArukeresoConfig);
+
+    it.each([
+      ['ebikes', 'Akkumulátor', 'Kellys K2 AMXXPRO Carbon 725 Wh - superhigh energy density 213 Wh/kg, weight 3.4 kg', 'batteryCapacity', 725],
+      ['ebikes', 'Akkumulátor', 'MXUS 36V 11 Ah (396 Wh)', 'batteryCapacity', 396],
+      ['ebikes', 'Akkumulátor', 'Samsung 36V 10,4 Ah (374 Wh), vázba integrált', 'batteryPosition', 'Vázba integrált'],
+      ['ebikes', 'Motor', 'Bafang H300, 36V/250W/45Nm', 'torque', 45],
+      ['ebikes', 'Motor', 'Bafang H300, 36V/250W/45Nm', 'motorPower', 250],
+      ['ebikes', 'Motor', 'MXUS XF06 első agymotor, 250W, 30 Nm', 'motorPosition', 'Első kerékagy motor'],
+      ['ebikes', 'Motor', 'Panasonic GXM, max torque 100 Nm', 'motorPosition', 'Középmotor'],
+      ['ebikes', 'Rásegítés', '3 fokozatú, kormányról vezérelhető, pedálszenzoros', 'sensorType', 'Fordulatszám-szenzor'],
+      ['ebikes', 'Hatótáv', '60-70 km', 'range', 70],
+      ['ebikes', 'Kijelző', 'MXUS LED890', 'display', true],
+      ['ebikes', 'Hátsó rugóstag', 'Rock Shox Deluxe Select, DebonAir+ / R damper (210x55 mm)', 'suspension', 'Első teleszkóp, hátsó rugóstag'],
+      ['bikes', 'Modell év', '2022', 'modelYear', 2022],
+      ['bikes', 'Modellév', '2024', 'modelYear', 2024],
+      ['bikes', 'Kerék', '27,5"', 'wheelSize', 27.5],
+      ['bikes', 'Kerék', "28''", 'wheelSize', 28],
+      ['bikes', 'Kerék', '16 col', 'wheelSize', 16],
+      // Two wheel sizes in one row give none.
+      ['bikes', 'Kerék', '27,5" (XS, S) / 29" (M, L, XL)', 'wheelSize', undefined],
+      ['ebikes', 'Kerék', '29"/27.5" (mullet)', 'wheelSize', undefined],
+      ['bikes', 'Váltófokozat', '21 (3x7)', 'gearCount', 21],
+      ['bikes', 'Váltófokozat', '1x6', 'gearCount', 6],
+      ['bikes', 'Váltófokozat', '-', 'gearCount', undefined],
+      ['bikes', 'Súly', '11,8 kg', 'weight', 11.8],
+      ['bikes', 'Tömeg', '27.5" 13.0 kg | 29" 13.2 kg', 'weight', 13],
+      ['bikes', 'Váz anyaga', 'rozsdamentes acél', 'frameMaterial', 'Acél'],
+      ['bikes', 'Váz anyaga', 'AL-6061 alumínium ötvözet', 'frameMaterial', 'Alumínium'],
+      // Kellys Theos F's carbon-aramid frame, as the shop words it.
+      ['ebikes', 'Váz anyaga', 'acél-karbon kompozit', 'frameMaterial', 'Karbon'],
+      ['bikes', 'Villa', 'merev acél 28"', 'suspension', 'Rugózatlan'],
+      ['bikes', 'Villa', 'SR Suntour M3010 26", 63 mm', 'suspension', 'Első teleszkóp'],
+      ['bikes', 'Villa', 'Kross, 80mm', 'suspension', 'Első teleszkóp'],
+      ['bikes', 'Villa', 'Kellys Carbon Disc - 1.5 tapered steerer, flat mount disc brake, 12 mm thru axle', 'suspension', 'Rugózatlan'],
+      ['bikes', 'Hátsó váltó', 'Shimano Nexus 3 SPD', 'gearType', 'Agyváltó'],
+      ['bikes', 'Hátsó váltó', 'Shimano TY300 7 SPD', 'gearType', 'Láncváltó'],
+      ['bikes', 'Első váltó', '-', 'frontDerailleur', 'Nincs'],
+      ['bikes', 'Első fék', 'Alhonga V-fék', 'brakeType', 'Racker (Felni)'],
+      ['bikes', 'Fékek', 'Shimano MT200 Hydraulic Disc', 'brakeType', 'Tárcsa'],
+      ['bikes', 'Féktárcsák', '180mm front / 160mm rear', 'rotorSizeFront', 180],
+      ['bikes', 'Külső gumik', 'Schwalbe Smart Sam 60-622 (29"x2.35) K-Guard', 'tireSize', '60-622'],
+      ['bikes', 'Felszerelés', 'első-hátsó világítás, első-hátsó sárvédő, csomagtartó, kitámasztó', 'rack', 'Alapfelszereltség'],
+      ['bikes', 'Felszerelés', 'első-hátsó világítás, első-hátsó sárvédő, csomagtartó, kitámasztó', 'lighting', 'Alapfelszereltség'],
+      ['bikes', 'Felszerelés', 'első-hátsó világítás, első-hátsó sárvédő, csomagtartó, kitámasztó', 'kickstand', true],
+      ['bikes', 'Felszerelés', 'kitámasztó', 'rack', undefined],
+      ['bikes', 'Kiegészítők', 'sárvédő és csomagtartó utólag felszerelhető', 'rack', 'Opcionális'],
+      ['bikes', 'Pedálok', 'PEDÁL NÉLKÜL!', 'pedals', undefined],
+      ['bikes', 'Ajánlott életkor', '2-4 év között', 'recommendedAge', '2-4 év'],
+      ['bikes', 'Ajánlott magasság', '119-135 cm között', 'recommendedRiderHeight', '119-135 cm'],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
+    // Colour and size stay with the title: these rows list every colour and
+    // size of the model, not this row's.
+    it('maps no colour or size from the list rows', () => {
+      const specs = specsOf(config, 'bikes', {
+        Szín: 'blue / white, glossy; grey / black matte; black / grey glossy',
+        Vázméret: 'S (160-175 cm), M (170-185cm), L (180-195cm)',
+        Méretválaszték: '17", 19"',
+      });
+      expect(pick(specs, ['color', 'frameSize', 'frameSizeLabel'])).toEqual({});
     });
   });
 });
