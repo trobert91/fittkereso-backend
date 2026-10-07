@@ -81,11 +81,12 @@ const FIXTURES_DIR = path.resolve(
  *
  * Giant through Moustache were added by hand for speedbike's feed, whose rows
  * of an unknown brand are skipped after their LLM calls. Its `Mavic` and
- * `Norco` rows are Moustache bikes; the feed's `EGYÉB` ("other") row is a
- * Corratec. Neither label is a brand here.
+ * `Norco` rows are Moustache bikes (its configs read Moustache off the title);
+ * the feed's `EGYÉB` ("other") row is a Corratec.
  *
  * The second list is the regular-bike brands the feed shops sell (2026-10-07),
- * plus Bulls for their e-bikes. bringaboard's `Norco` is the real Norco.
+ * plus the e-bike brands they carry that were missing (Bulls, Pegasus, …).
+ * bringaboard's `Norco` is the real Norco.
  */
 const BRAND_NAMES = [
   'Bergamont',
@@ -111,6 +112,7 @@ const BRAND_NAMES = [
     'Lapierre', 'Le Grand', 'LOOK', 'M-Bike', 'Marin', 'Merida', 'Mongoose', 'Neuzer', 'Norco',
     'Orbea', 'Pells', 'Polar', 'Polisport', 'Raymon', 'Ridley', 'Rock Machine', 'Romet',
     'Sprint', 'Stevens', 'Superior', 'Torpado', 'Trans Montana', 'Woom',
+    'Flyer', 'Husqvarna', 'Kettler', 'Levit', 'Lovelec', 'Momentum', 'MS Energy', 'My Esel', 'Myland', 'Pegasus',
   ],
 ];
 

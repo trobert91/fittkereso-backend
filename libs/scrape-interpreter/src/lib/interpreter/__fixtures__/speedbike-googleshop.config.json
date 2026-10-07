@@ -38,9 +38,21 @@
     "name": {
       "field": "title"
     },
-    "brand": {
-      "field": "brand"
-    },
+    "brand": [
+      {
+        "field": "title",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(MOUSTACHE|Moustache)\\b",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "brand"
+      }
+    ],
     "gtin": {
       "field": "gtin"
     },

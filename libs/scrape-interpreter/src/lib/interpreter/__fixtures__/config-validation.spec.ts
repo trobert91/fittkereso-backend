@@ -429,12 +429,23 @@ describe('hand-authored source configs', () => {
       expect(specsOf(config, 'bikes', { 'Webshop kategória': path })['wheelSize']).toBe(wheelSize);
     });
 
-    it('sends the shop category path, without its root, as a spec row', async () => {
-      expect(
-        await extraRowOf(config, 'bikes', 'Webshop kategória', {
-          category: 'Termékkategóriák > KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"',
-        }),
-      ).toBe('KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"');
+    // Without its gender branch: "Női" holds men's KTM frames (H) and unisex
+    // road bikes, and the identity call took a wrong gender from it (test
+    // round 3, 2026-10-07). The titles still state a gender where it is one.
+    it.each([
+      ['Termékkategóriák > KERÉKPÁR > MTB > Hardtail MTB > Férfi > 27.5"', 'KERÉKPÁR > MTB > Hardtail MTB > 27.5"'],
+      ['Termékkategóriák > KERÉKPÁR > Trekking > Női', 'KERÉKPÁR > Trekking'],
+      ['Termékkategóriák > E-BIKE > Trekking E-BIKE', 'E-BIKE > Trekking E-BIKE'],
+    ])('sends the shop category path %j without its root and gender, as %j', async (category, row) => {
+      expect(await extraRowOf(config, 'bikes', 'Webshop kategória', { category })).toBe(row);
+    });
+
+    // The feed names its Moustache bikes "Norco" or "Mavic".
+    it.each([
+      ['MOUSTACHE SAMEDI DIMANCHE 28.4 ROAD PEBBLE GREY 2025 FÉRFI ELEKTROMOS KERÉKPÁR', 'Norco', 'MOUSTACHE'],
+      ['KTM MACINA STYLE 830 H 51 Férfi elektromos kerékpár', 'KTM', 'KTM'],
+    ])('reads the brand of %j (manufacturer %j) as %j', async (name, manufacturer, brand) => {
+      expect(await readText(config, 'brand', { name, manufacturer })).toBe(brand);
     });
 
     // The distinct shapes of the 2026-09-24 feed's size values: centimetres
@@ -1087,13 +1098,14 @@ describe('hand-authored source configs', () => {
       expect(specsOf(config, 'ebikes', { 'Váz kialakítás': frame })['frameType']).toBe(frame);
     });
 
-    it("reads the description's motor lines, never a weight or the capacity", async () => {
+    // Never the torque: the description template says 85 Nm on every Bosch CX
+    // bike, where the other shops give 100 or 120 (test round 3, 2026-10-07).
+    it("reads the description's motor lines, never the torque, a weight or the capacity", async () => {
       const description =
         '<em>Működési elv:</em> Nyomatékszenzor<br />\n\t\t<em>Csúcsnyomatéka:</em> 85Nm<br />\n\t\t<em>Tömege:</em> 2,9 kg</span>';
 
-      expect(await extraRowOf(config, 'ebikes', 'Motor csúcsnyomatéka', { description })).toBe('85Nm');
       expect(await extraRowOf(config, 'ebikes', 'Motor működési elve', { description })).toBe('Nyomatékszenzor');
-      expect(JSON.stringify(config.categories?.['ebikes']?.extraSpecRows)).not.toMatch(/Kapacitás|Tömeg/);
+      expect(JSON.stringify(config.categories?.['ebikes']?.extraSpecRows)).not.toMatch(/Kapacitás|Tömeg|Csúcsnyomaték/);
     });
   });
 

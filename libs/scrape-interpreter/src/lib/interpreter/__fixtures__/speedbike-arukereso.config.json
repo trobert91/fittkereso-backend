@@ -1344,6 +1344,10 @@
             {
               "op": "stripPattern",
               "pattern": "^Termékkategóriák > "
+            },
+            {
+              "op": "stripPattern",
+              "pattern": " > (?:Férfi|Női)(?= > |$)"
             }
           ]
         }
@@ -2418,6 +2422,10 @@
             {
               "op": "stripPattern",
               "pattern": "^Termékkategóriák > "
+            },
+            {
+              "op": "stripPattern",
+              "pattern": " > (?:Férfi|Női)(?= > |$)"
             }
           ]
         }
@@ -2438,9 +2446,21 @@
     "externalId": {
       "field": "identifier"
     },
-    "brand": {
-      "field": "manufacturer"
-    },
+    "brand": [
+      {
+        "field": "name",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^(MOUSTACHE|Moustache)\\b",
+            "group": 1
+          }
+        ]
+      },
+      {
+        "field": "manufacturer"
+      }
+    ],
     "name": {
       "field": "name"
     },

@@ -80,17 +80,6 @@
           ]
         },
         {
-          "label": "Motor csúcsnyomatéka",
-          "field": "description",
-          "pipeline": [
-            {
-              "op": "regexCapture",
-              "pattern": "<em>Csúcsnyomatéka:\\s*</em>\\s*([^<]+?)\\s*<",
-              "group": 1
-            }
-          ]
-        },
-        {
           "label": "Motor névleges teljesítménye",
           "field": "description",
           "pipeline": [
