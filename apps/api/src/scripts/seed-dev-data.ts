@@ -83,6 +83,9 @@ const FIXTURES_DIR = path.resolve(
  * of an unknown brand are skipped after their LLM calls. Its `Mavic` and
  * `Norco` rows are Moustache bikes; the feed's `EGYÉB` ("other") row is a
  * Corratec. Neither label is a brand here.
+ *
+ * The second list is the regular-bike brands the feed shops sell (2026-10-07),
+ * plus Bulls for their e-bikes. bringaboard's `Norco` is the real Norco.
  */
 const BRAND_NAMES = [
   'Bergamont',
@@ -101,6 +104,14 @@ const BRAND_NAMES = [
   'Scott',
   'Victoria',
   'Winora',
+  ...[
+    'Academy', 'Adriatica', 'Alpina', 'BeFly', 'Bellelli', 'Bikesport', 'BMC', 'Bobike', 'Brera',
+    'Bulls', 'Cannondale', 'Cardamo', 'Cross', 'Csepel', 'CTM', 'Dema', 'Disney', 'Eddy Merckx',
+    'Electra', 'Esperia', 'Gepida', 'GT', 'Hauser', 'Kellys', 'Koliken', 'Kona', 'Kross',
+    'Lapierre', 'Le Grand', 'LOOK', 'M-Bike', 'Marin', 'Merida', 'Mongoose', 'Neuzer', 'Norco',
+    'Orbea', 'Pells', 'Polar', 'Polisport', 'Raymon', 'Ridley', 'Rock Machine', 'Romet',
+    'Sprint', 'Stevens', 'Superior', 'Torpado', 'Trans Montana', 'Woom',
+  ],
 ];
 
 interface SeedCategorySpec {
