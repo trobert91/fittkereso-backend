@@ -43,6 +43,12 @@
             ]
           },
           {
+            "key": "frameType",
+            "labels": [
+              "Vázkód (cím)"
+            ]
+          },
+          {
             "key": "gender",
             "labels": [
               "Váztípus"
@@ -1334,7 +1340,8 @@
         "Méret",
         "size",
         "HAJTÁSRENDSZER",
-        "NETTÓ TÖMEG"
+        "NETTÓ TÖMEG",
+        "Vázkód (cím)"
       ],
       "extraSpecRows": [
         {
@@ -1348,6 +1355,25 @@
             {
               "op": "stripPattern",
               "pattern": " > (?:Férfi|Női)(?= > |$)"
+            }
+          ]
+        },
+        {
+          "label": "Vázkód (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|\\s)(H|D|US)\\s\\d{2}(?=\\s|$|/)",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "H": "Magas",
+                "D": "Trapéz",
+                "US": "Alacsony"
+              }
             }
           ]
         }
@@ -1392,6 +1418,12 @@
               "0",
               "tbd",
               "#tbd"
+            ]
+          },
+          {
+            "key": "frameType",
+            "labels": [
+              "Vázkód (cím)"
             ]
           },
           {
@@ -2412,7 +2444,8 @@
         "Méret",
         "size",
         "HAJTÁSRENDSZER",
-        "NETTÓ TÖMEG"
+        "NETTÓ TÖMEG",
+        "Vázkód (cím)"
       ],
       "extraSpecRows": [
         {
@@ -2426,6 +2459,25 @@
             {
               "op": "stripPattern",
               "pattern": " > (?:Férfi|Női)(?= > |$)"
+            }
+          ]
+        },
+        {
+          "label": "Vázkód (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|\\s)(H|D|US)\\s\\d{2}(?=\\s|$|/)",
+              "group": 1
+            },
+            {
+              "op": "mapValue",
+              "cases": {
+                "H": "Magas",
+                "D": "Trapéz",
+                "US": "Alacsony"
+              }
             }
           ]
         }

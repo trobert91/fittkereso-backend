@@ -440,6 +440,24 @@ describe('hand-authored source configs', () => {
       expect(await extraRowOf(config, 'bikes', 'Webshop kategória', { category })).toBe(row);
     });
 
+    // KTM's frame code before the size: men's diamond, women's trapeze, low
+    // step. It agreed with KTM's article-number frame digit on all 705 rows
+    // carrying both (2026-10-07); without it a men's "H 51" listing stated no
+    // frame and joined the women's product by name.
+    it.each([
+      ['KTM LIFE SPACE trekking kerékpár - H 51 méretben, GREEN PURPLE FLIP MATT színben - 2027', 'Magas'],
+      ['KTM MACINA STYLE 820 TRAPÉZ WHITE (BLACK+RED) D 46 NŐI ELEKTROMOS TREKKING KERÉKPÁR 2025', 'Trapéz'],
+      ['KTM MACINA AERA 871 LFC Di2  US 46 Unisex elektromos MTB kerékpár MARBLE WHITE színben 2026', 'Alacsony'],
+      ['KTM PENNY LANE 291 - 29" MTB kerékpár - M/43 méretben, MUTED ROSE MATT színben - 2027', undefined],
+      ['Cube Aim SLX  slateblack´n´chrome M  MTB kerékpár - 2027', undefined],
+    ])('reads the frame code of %j as %j', async (name, frameType) => {
+      for (const slug of ['bikes', 'ebikes']) {
+        const row = await extraRowOf(config, slug, 'Vázkód (cím)', { name });
+        expect(row).toBe(frameType);
+        if (row) expect(specsOf(config, slug as 'bikes' | 'ebikes', { 'Vázkód (cím)': row })['frameType']).toBe(frameType);
+      }
+    });
+
     // The feed names its Moustache bikes "Norco" or "Mavic".
     it.each([
       ['MOUSTACHE SAMEDI DIMANCHE 28.4 ROAD PEBBLE GREY 2025 FÉRFI ELEKTROMOS KERÉKPÁR', 'Norco', 'MOUSTACHE'],
