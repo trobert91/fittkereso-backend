@@ -648,6 +648,17 @@ describe('ArukeresoImportService', () => {
       expect(summary.removalSkipped).toBe('mapping_failures');
     });
 
+    // So would the offer of a row two category sections both claimed.
+    it('removes nothing when a row was ambiguous between categories', async () => {
+      givenFeed([1, 2]);
+      mapper.map.mockResolvedValueOnce({ status: 'skipped', reason: 'category_ambiguous' });
+
+      const summary = await service.import(complete());
+
+      expect(completeSourceRemoval.removeUnseen).not.toHaveBeenCalled();
+      expect(summary.removalSkipped).toBe('ambiguous_categories');
+    });
+
     it('removes nothing when the run is abandoned', async () => {
       givenFeed(Array.from({ length: MAX_CONSECUTIVE_ITEM_FAILURES }, (_, i) => i));
       mapper.map.mockRejectedValue(new Error('config rot'));

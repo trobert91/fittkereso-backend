@@ -11,6 +11,8 @@ export type RemovalSkipReason =
   | 'filtered'
   | 'narrowed'
   | 'mapping_failures'
+  /** Rows two category sections both claimed: they were not seen either. */
+  | 'ambiguous_categories'
   | 'disabled'
   | 'share_exceeded';
 

@@ -200,6 +200,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
           config,
           requestedSlugs,
           capped,
+          ambiguous: skips.category_ambiguous ?? 0,
           seenExternalIds,
           summary,
         });
@@ -263,19 +264,21 @@ export class ArukeresoImportService implements ProductSourceImporter {
    * see are gone from the shop — but only a complete run knows that: not
    * capped, not filtered, over every enabled category, and with every eligible
    * row mapped (a row that failed to map was not seen either, and its offer
-   * would go). Anything less saw part of the catalog, and says nothing about
-   * the rest. The removal itself, and its share guard, are
-   * CompleteSourceRemovalService's.
+   * would go — as would a row two category sections both claimed). Anything
+   * less saw part of the catalog, and says nothing about the rest. The
+   * removal itself, and its share guard, are CompleteSourceRemovalService's.
    */
   private async removeUnseen(params: {
     source: ProductSource;
     config: ArukeresoSourceConfig;
     requestedSlugs: string[] | undefined;
     capped: boolean;
+    /** Rows skipped as category_ambiguous. */
+    ambiguous: number;
     seenExternalIds: Set<string>;
     summary: ImportRunSummary;
   }): Promise<void> {
-    const { source, config, requestedSlugs, capped, seenExternalIds, summary } = params;
+    const { source, config, requestedSlugs, capped, ambiguous, seenExternalIds, summary } = params;
     const enabledSlugs = enabledCategorySlugs(config);
     const incomplete: RemovalSkipReason | undefined = capped
       ? 'capped'
@@ -285,7 +288,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
           ? 'narrowed'
           : summary.failed > 0
             ? 'mapping_failures'
-            : undefined;
+            : ambiguous > 0
+              ? 'ambiguous_categories'
+              : undefined;
 
     summary.offersRemoved = 0;
     if (incomplete) {

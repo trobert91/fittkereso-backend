@@ -55,8 +55,8 @@ export const PRODUCT_SOURCE_ACTION_TYPES = [
    * unattachedRecords on feed runs only; offersRemoved and removalSkipped only
    * for a source that lists the whole catalog (hasAllProducts), where
    * removalSkipped says why a run removed nothing it did not see: capped,
-   * filtered, narrowed, mapping_failures, disabled, or share_exceeded (a
-   * truncated feed, most likely).
+   * filtered, narrowed, mapping_failures, ambiguous_categories, disabled, or
+   * share_exceeded (a truncated feed, most likely).
    *
    * A run only queues tasks, so this is its own trace: what it read, what it
    * confirmed in place, and what it queued. Per-item failures are counted

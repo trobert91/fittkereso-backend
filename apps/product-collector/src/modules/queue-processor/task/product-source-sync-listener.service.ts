@@ -50,6 +50,15 @@ export class ProductSourceSyncListener {
         entity,
         message.categoryIds,
       );
+      // Asked for categories of which none is enabled: the importer reads an
+      // empty list as every enabled category, a full run with its sweep.
+      if (!isEmpty(message.categoryIds) && isEmpty(categorySlugs)) {
+        this.logger.warn('Import skipped: none of the requested categories is enabled', {
+          categoryIds: message.categoryIds,
+          source: entity.name,
+        });
+        return;
+      }
 
       // Deliberately NOT inside a transaction. It used to be, which was
       // harmless while every importer merely enqueued tasks and returned in
@@ -202,17 +211,8 @@ export class ProductSourceSyncListener {
       }
     }
 
-    const slugs = enabledCategorySlugs(source.config).filter(
+    return enabledCategorySlugs(source.config).filter(
       (slug) => !requested || requested.includes(slug),
     );
-
-    if (!isEmpty(requested) && isEmpty(slugs)) {
-      this.logger.warn('Import: none of the requested categories are enabled', {
-        requested,
-        source: source.name,
-      });
-    }
-
-    return slugs;
   }
 }
