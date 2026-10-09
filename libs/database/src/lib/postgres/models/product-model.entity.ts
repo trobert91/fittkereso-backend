@@ -64,7 +64,9 @@ export class ProductModel extends BasePostgresEntity {
     cascade: true,
     eager: false,
   })
-  @Expose({ groups: [SerializeGroup.adminDetails] })
+  // adminList: the admin product search can attach them, trimmed to each
+  // listing's source (ProductSearchParams.includeSources).
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   sources: ProductSourceRecord[];
 
   /**

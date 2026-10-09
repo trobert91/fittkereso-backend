@@ -5,6 +5,8 @@ import {
   ProductCategory,
   ProductModel,
   ProductModelRepository,
+  ProductSource,
+  ProductSourceRecord,
 } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { OfferFreshnessService } from '@fittkereso-backend/dynamic-config';
@@ -60,7 +62,41 @@ export class ProductSearchService {
     // Execute query (returns [items, totalCount])
     const [items, totalItems] = await query.getManyAndCount();
 
+    if (finalParams.includeSources) {
+      await this.attachSources(items);
+    }
+
     return this.mapToSearchResult([items, totalItems], finalParams);
+  }
+
+  /**
+   * Sets `sources` on each product: its listings, each with only the source it
+   * comes from. A separate query rather than a join in buildQuery, which would
+   * make skip/take page joined rows. Admin-entered listings (no source) are
+   * left out.
+   */
+  private async attachSources(products: ProductModel[]): Promise<void> {
+    if (isEmpty(products)) return;
+
+    const withSources = await this.productRepo.repo
+      .createQueryBuilder('product')
+      .innerJoin(`product.${nameOf<ProductModel>('sources')}`, 'record')
+      .innerJoin(`record.${nameOf<ProductSourceRecord>('source')}`, 'source')
+      .select([
+        `product.${nameOf<ProductModel>('id')}`,
+        `record.${nameOf<ProductSourceRecord>('id')}`,
+        `source.${nameOf<ProductSource>('id')}`,
+        `source.${nameOf<ProductSource>('name')}`,
+      ])
+      .whereInIds(products.map((product) => product.id))
+      .getMany();
+
+    const sourcesByProduct = new Map(
+      withSources.map((product) => [product.id, product.sources]),
+    );
+    for (const product of products) {
+      product.sources = sourcesByProduct.get(product.id) ?? [];
+    }
   }
 
   private buildQuery(

@@ -105,6 +105,16 @@ export class ProductSearchParams {
   includeImages?: boolean;
 
   /**
+   * Attach each product's listings, carrying only the source each comes from
+   * (id and name), so a list can show where a product is sold. Loaded by one
+   * extra query for the page's products, after paging.
+   */
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  includeSources?: boolean;
+
+  /**
    * Spec filters, keyed by canonical spec field name (e.g. "frameSize",
    * "wheelSize"). Value is either an exact match (string/number) or a
    * [min, max] range. Keys flagged as offer-level in the relevant

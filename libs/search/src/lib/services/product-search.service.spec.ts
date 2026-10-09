@@ -45,7 +45,7 @@ function fakeQueryBuilder() {
     skip: () => query,
     take: () => query,
     subQuery,
-    getManyAndCount: async () => [[], 0],
+    getManyAndCount: async (): Promise<[unknown[], number]> => [[], 0],
   };
 
   return { query, wheres, joins };
@@ -199,5 +199,65 @@ describe('ProductSearchService', () => {
       expect.stringMatching(/^EXISTS /),
       expect.stringMatching(/^EXISTS /),
     ]);
+  });
+
+  describe('with includeSources', () => {
+    const listing = (sourceName: string) => ({
+      id: `record-${sourceName}`,
+      source: { id: `source-${sourceName}`, name: sourceName },
+    });
+
+    /** The page query returns `page`; the follow-up sources query returns
+     *  `withSources` and records the ids it was asked for. */
+    function serviceReturning(
+      page: { id: string }[],
+      withSources: { id: string; sources: unknown[] }[],
+    ) {
+      // Overridden in place: every chained call returns this same builder.
+      const pageQuery = recorded.query;
+      pageQuery.getManyAndCount = async () => [page, page.length];
+      const sourcesQuery = {
+        innerJoin: () => sourcesQuery,
+        select: () => sourcesQuery,
+        whereInIds: (ids: string[]) => {
+          sourcesQuery.askedIds = ids;
+          return sourcesQuery;
+        },
+        getMany: async () => withSources,
+        askedIds: undefined as string[] | undefined,
+      };
+      const builders = [pageQuery, sourcesQuery];
+      const searchService = new ProductSearchService(
+        { repo: { createQueryBuilder: () => builders.shift() } } as never,
+        { getAllSlugs: () => [], getConfig: () => undefined } as never,
+        { visibleCutoff: () => new Date() } as never,
+      );
+      return { searchService, sourcesQuery };
+    }
+
+    it("attaches each product's listings, and none to a product without", async () => {
+      const { searchService, sourcesQuery } = serviceReturning(
+        [{ id: 'a' }, { id: 'b' }],
+        [{ id: 'a', sources: [listing('speedbike'), listing('akosbike')] }],
+      );
+
+      const result = await searchService.searchProducts({
+        includeSources: true,
+      });
+
+      expect(sourcesQuery.askedIds).toEqual(['a', 'b']);
+      expect(result.items).toEqual([
+        { id: 'a', sources: [listing('speedbike'), listing('akosbike')] },
+        { id: 'b', sources: [] },
+      ]);
+    });
+
+    it('skips the sources query for an empty page', async () => {
+      const { searchService, sourcesQuery } = serviceReturning([], []);
+
+      await searchService.searchProducts({ includeSources: true });
+
+      expect(sourcesQuery.askedIds).toBeUndefined();
+    });
   });
 });
