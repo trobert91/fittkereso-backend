@@ -103,8 +103,37 @@ describe('ProductKeyLookupService', () => {
         ['1260040103', '1260040113'],
         'category-ebikes',
       );
-      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(['09008594503199'], 'category-ebikes');
-      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith('ktm', ['1260040108'], 'category-ebikes');
+      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(
+        ['09008594503199'],
+        'category-ebikes',
+        undefined,
+      );
+      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith(
+        'ktm',
+        ['1260040108'],
+        'category-ebikes',
+        undefined,
+      );
+    });
+
+    // A listing identified again where it sits would find that product by its
+    // own GTIN.
+    it("leaves a listing's own offers out of the GTIN and MPN tiers", async () => {
+      const ownOffers = { sellerId: 'seller-1', externalIds: ['24384'] };
+
+      await service.lookup({ ...identifiers, ownOffers });
+
+      expect(offerRepo.findModelIdsByGtins).toHaveBeenCalledWith(
+        ['09008594503199'],
+        'category-ebikes',
+        ownOffers,
+      );
+      expect(offerRepo.findModelIdsByMpns).toHaveBeenCalledWith(
+        'ktm',
+        ['1260040108'],
+        'category-ebikes',
+        ownOffers,
+      );
     });
 
     // An article number is only unique inside its manufacturer's numbering.
@@ -213,6 +242,27 @@ describe('ProductKeyLookupService', () => {
       expect(decision.verdict).toEqual({ kind: 'attach', via: 'gtin', productId: 'p1' });
       expect(decision.failedGates['p1']).toEqual([
         expect.objectContaining({ spec: 'torque', queryValue: 85, candidateValue: 100 }),
+      ]);
+    });
+
+    // A listing identified again where it sits: its own old year must not
+    // stand against it, so its product is compared by its other listings.
+    it('checks the product a listing sits on by its specs without the listing', async () => {
+      givenProducts({
+        p1: { brandId: 'ktm', specs: { modelYear: 2025 } },
+        p2: { brandId: 'ktm', specs: { modelYear: 2025 } },
+      });
+
+      const decision = await service.decide([match('gtin', 'p1'), match('mpn', 'p2')], {
+        ...listing({ modelYear: 2026 }),
+        exclusion: { productId: 'p1', productSpecs: { modelYear: 2026 } },
+      });
+
+      expect(decision.verdict).toEqual({ kind: 'attach', via: 'gtin', productId: 'p1' });
+      expect(decision.failedGates['p1']).toEqual([]);
+      // Any other product is compared as stored.
+      expect(decision.failedGates['p2']).toEqual([
+        expect.objectContaining({ spec: 'modelYear', queryValue: 2026, candidateValue: 2025 }),
       ]);
     });
 

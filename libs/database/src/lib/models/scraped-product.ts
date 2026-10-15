@@ -147,6 +147,32 @@ export interface ScrapedProduct {
    * ProductSourceRecord.inputHashes. Not kept in the stored JSON.
    */
   inputHashes?: ListingInputHashes;
+  /**
+   * What the listing was identified by when its product was last decided
+   * (ListingIdentityKey). A later import whose key differs is checked
+   * against its product, and identified again if it no longer fits. Absent
+   * on records written before it existed: their key is read off the record.
+   */
+  identityKey?: ListingIdentityKey;
+}
+
+/**
+ * What decides which product a listing is: its brand, its normalizedModel,
+ * its identifiers and its category's primary and matcher specs. A title
+ * reworded without changing these leaves it equal.
+ */
+export interface ListingIdentityKey {
+  /** The definition it was made under; a key of another is read off the record again. */
+  version: number;
+  /** The brand as the listing names it, normalized. */
+  brand: string;
+  normalizedModel: string | null;
+  /** Each sorted, in stored form (GTIN-14, normalized MPN). */
+  gtins: string[];
+  mpns: string[];
+  siblingIds: string[];
+  /** The category's primarySpecs and matcherSpecs the listing states. */
+  specs: ProductSpecs;
 }
 
 /**

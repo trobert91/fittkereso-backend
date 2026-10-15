@@ -20,6 +20,10 @@ export interface TranslationConfig {
   dictionary?: Record<string, Record<string, string>>;
 }
 
+/** import.reidentifyOnIdentityChange: whether a changed identity key moves a listing. */
+export const REIDENTIFY_MODES = ['off', 'shadow', 'on'] as const;
+export type ReidentifyMode = (typeof REIDENTIFY_MODES)[number];
+
 export interface DynamicConfigData {
   /** Resolution-input enrichment configuration. */
   enrichment?: {
@@ -77,7 +81,7 @@ export interface DynamicConfigData {
     completeSourceRemovalEnabled?: boolean;
   };
 
-  /** Import behaviour shared across every scraping source. Read from `import.json`. */
+  /** Import behaviour shared across every source. Read from `import.json`. */
   import?: {
     /**
      * Which ScrapedListProduct fields a list card must carry before an
@@ -99,6 +103,16 @@ export interface DynamicConfigData {
      * Default: ['url', 'price', 'availability']
      */
     listRefreshRequiredFields?: string[];
+    /**
+     * What happens when a feed listing's identity key (brand, model,
+     * identifiers, primary and matcher specs) changes and its product no
+     * longer fits it: `off` — nothing, it stays; `shadow` — it stays, the
+     * decision it would get is logged and counted, and it is marked to be
+     * decided once the mode is `on`; `on` — it is identified again, and
+     * moved when it is another product. Default: 'off'. Read at startup, as
+     * every file here is: a change takes effect on the next restart.
+     */
+    reidentifyOnIdentityChange?: ReidentifyMode;
   };
 
   // Scheduling configuration
@@ -430,6 +444,13 @@ export const dynamicConfigSchema = {
           description:
             'ScrapedListProduct fields a list card must carry before an already-known listing is refreshed from it instead of re-scraping its detail page. Every item that satisfies this set is a paid fetch not spent. Default: ["url","price","availability"]',
           default: ['url', 'price', 'availability'],
+        },
+        reidentifyOnIdentityChange: {
+          type: 'string',
+          enum: [...REIDENTIFY_MODES],
+          description:
+            'When a feed listing\'s identity key changes and its product no longer fits it: "off" leaves it; "shadow" leaves it, logs and counts what would happen, and marks it to be decided once "on"; "on" identifies it again and moves it when it is another product. Default: "off"',
+          default: 'off',
         },
       },
     },

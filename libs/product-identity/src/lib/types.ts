@@ -2,6 +2,7 @@ import type {
   CandidateMatchedOn,
   ListingMatchFailedGate,
   NameSimilarity,
+  OwnOffers,
   ProductSpecs,
 } from '@fittkereso-backend/database';
 
@@ -33,6 +34,22 @@ export interface ProductMatchQuery {
   /** The model as written (else the title): what the model-number check reads. */
   model: string;
   specs?: ProductSpecs;
+  /** Set for a listing identified again where it sits: its own traces left out. */
+  exclusion?: ListingExclusion;
+}
+
+/**
+ * A listing identified again while it sits on a product: what of it must not
+ * vouch for itself. Its own record is no candidate's listing, its product is
+ * compared by what its other listings say, and its own offers' identifiers
+ * find nothing.
+ */
+export interface ListingExclusion {
+  recordId: string;
+  /** The product it sits on, and that product's specs merged without it. */
+  productId: string;
+  productSpecs: ProductSpecs;
+  ownOffers: OwnOffers;
 }
 
 /**

@@ -52,6 +52,8 @@ export class ProductSourceRecordUpdaterService {
     feedRowHash?: string;
     /** A feed listing's page bookkeeping; undefined keeps it as stored. */
     pageRead?: ListingPageRead;
+    /** Whether its identity is still to be decided again; undefined keeps it as stored. */
+    reidentifyPending?: boolean;
   }): Promise<ProductSourceRecord | undefined> {
     const { model, source: newSource, scrapedProduct } = params;
     // Trimmed/trailing-slash-stripped once here so every ProductSourceRecord.url
@@ -269,6 +271,7 @@ export class ProductSourceRecordUpdaterService {
       normalizedModel?: string | null;
       feedRowHash?: string;
       pageRead?: ListingPageRead;
+      reidentifyPending?: boolean;
       processedSpecs: NonNullable<ScrapedProduct['specs']>;
       validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
     },
@@ -346,6 +349,9 @@ export class ProductSourceRecordUpdaterService {
     }
     if (params.pageRead?.failedAt !== undefined && !params.pageRead.fetchedAt) {
       source.pageFailedAt = params.pageRead.failedAt;
+    }
+    if (params.reidentifyPending !== undefined) {
+      source.reidentifyPending = params.reidentifyPending;
     }
   }
 

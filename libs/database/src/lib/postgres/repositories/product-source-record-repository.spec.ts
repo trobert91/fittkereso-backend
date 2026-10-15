@@ -52,6 +52,7 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
           lastSeenAt: seen,
           product: { id: 'model-1' },
           pageFetchedAt: seen,
+          reidentifyPending: true,
         },
         { externalId: '1104300-XL', feedRowHash: 'h2', lastUpdated: seen, product: null },
       ],
@@ -73,6 +74,7 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
       modelId: 'model-1',
       pageFetchedAt: seen,
       pageFailedAt: null,
+      reidentifyPending: true,
     });
     expect(states.get('1104300-XL')).toEqual({
       feedRowHash: 'h2',
@@ -80,6 +82,7 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
       modelId: null,
       pageFetchedAt: null,
       pageFailedAt: null,
+      reidentifyPending: false,
     });
   });
 });

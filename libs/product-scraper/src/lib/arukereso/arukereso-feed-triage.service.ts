@@ -7,6 +7,7 @@ import {
   isArukeresoConfig,
 } from '@fittkereso-backend/database';
 import type { ScrapedProduct } from '@fittkereso-backend/product';
+import { DynamicConfigService } from '@fittkereso-backend/dynamic-config';
 import { listingExternalIdOf, offerExternalIdOf } from '@fittkereso-backend/utils';
 import type { ArukeresoFeedItem } from './arukereso-feed-item';
 import { feedRowHash } from './feed-row-hash';
@@ -73,7 +74,11 @@ export interface UnchangedFeedRow {
 export interface FeedTriage {
   /** Same row as last imported, and nothing to attach or detach: confirm it in place. */
   unchanged: UnchangedFeedRow[];
-  /** New, changed, missing its offer, or due for its page: a task imports it. */
+  /**
+   * New, changed, missing its offer, due for its page, or left to be
+   * identified again (reidentifyPending, once the mode is on): a task
+   * imports it.
+   */
   toImport: FeedRow[];
   /**
    * The listing ids among toImport whose product page is to be read with
@@ -107,6 +112,7 @@ export class ArukeresoFeedTriageService {
   constructor(
     private readonly sourceRecordRepo: ProductSourceRecordRepository,
     private readonly offerRepo: OfferRepository,
+    private readonly dynamicConfig: DynamicConfigService,
   ) {}
 
   async triage(source: ProductSource, rows: FeedRow[], now = new Date()): Promise<FeedTriage> {
@@ -126,6 +132,9 @@ export class ArukeresoFeedTriageService {
     const toImport: FeedRow[] = [];
     const needsPage = new Set<string>();
     const pageDue = this.pageDue(source, now);
+    // Listings left pending while re-identification ran in shadow are
+    // decided once it is on — from their row and stored page, nothing fetched.
+    const decidesPending = this.dynamicConfig.import?.reidentifyOnIdentityChange === 'on';
     for (const row of rows) {
       const state = states.get(row.listingId);
       if (pageDue(row, state)) {
@@ -133,7 +142,7 @@ export class ArukeresoFeedTriageService {
         toImport.push(row);
         continue;
       }
-      if (!state || !isSameRow(row)) {
+      if (!state || !isSameRow(row) || (decidesPending && state.reidentifyPending)) {
         toImport.push(row);
         continue;
       }

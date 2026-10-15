@@ -148,7 +148,8 @@ export class ProductDuplicateService {
     pairId?: string,
   ): Promise<ProductModel> {
     const { product, movedSourceRecordIds } =
-      await this.mergeService.mergeProducts({ sourceId, targetId });
+      // A person decided this: no import moves the listings away again.
+      await this.mergeService.mergeProducts({ sourceId, targetId, pinRecords: true });
     this.logger.log('Products merged', {
       sourceId,
       targetId,

@@ -152,6 +152,7 @@ describe('ProductScrapeUpdaterService', () => {
   let mockContributorDetach: jest.Mocked<ContributorDetachService>;
   let mockMatchQuery: { normalizedModelOf: jest.Mock };
   let mockTaskConfig: { maxAttempts: number };
+  let mockReidentification: { mode: string; check: jest.Mock };
 
   beforeEach(() => {
     knownModels = [];
@@ -320,6 +321,12 @@ describe('ProductScrapeUpdaterService', () => {
       normalizedModelOf: jest.fn((listing: ScrapedProduct) => (listing.model ? `key:${listing.model}` : undefined)),
     };
     mockTaskConfig = { maxAttempts: 3 };
+    // Re-identification has its own spec; here, nothing to re-identify unless
+    // a test says so.
+    mockReidentification = {
+      mode: 'off',
+      check: jest.fn().mockResolvedValue({ kind: 'none' }),
+    };
 
     service = new ProductScrapeUpdaterService(
       mockListingMatch,
@@ -344,6 +351,7 @@ describe('ProductScrapeUpdaterService', () => {
       mockContributorDetach,
       mockMatchQuery as unknown as ProductMatchQueryService,
       mockTaskConfig as never,
+      mockReidentification as never,
     );
   });
 
@@ -1972,6 +1980,415 @@ describe('ProductScrapeUpdaterService', () => {
         expect(params.create).toBe(false);
       }
       expect(mockOfferComposer.writeUnkeyed).not.toHaveBeenCalled();
+    });
+  });
+
+  // A listing its own history found, whose identity key changed so that its
+  // product no longer fits it (ListingReidentificationService.check), is
+  // identified again with its own traces left out.
+  describe('re-identification', () => {
+    const KEY = {
+      version: 1,
+      brand: 'logitech',
+      normalizedModel: 'key:MX Keys',
+      gtins: [],
+      mpns: [],
+      siblingIds: [],
+      specs: { layout: 'US' },
+    };
+    const BEFORE = { ...KEY, specs: { layout: 'UK' } };
+    const change = { anchorsChanged: false, addedIdentifiers: [], changedSpecs: ['layout'] };
+    const exclusion = {
+      recordId: 'record-own',
+      productId: 'model-1',
+      productSpecs: {},
+      ownOffers: { sellerId: 'seller-arukereso', externalIds: ['sku-1'] },
+    };
+    const listing = () =>
+      makeScrapedProduct({
+        externalId: 'sku-1',
+        offers: [{ price: 100, currency: 'HUF', externalId: 'sku-1' }],
+      } as Partial<ScrapedProduct>);
+
+    let from: ProductModel;
+    let own: Record<string, unknown>;
+
+    /**
+     * The listing sits on model-1 through its own record, with its offer
+     * sku-1; `alone: false` puts another identifying listing beside it.
+     */
+    const givenOnProduct = ({ alone = false, pending = false } = {}) => {
+      from = makeExistingModel();
+      own = {
+        id: 'record-own',
+        externalId: 'sku-1',
+        source: { id: 'source-arukereso', identifiesProducts: true },
+        scrapedProduct: { offers: [{ externalId: 'sku-1', price: 100 }] },
+        product: from,
+        reidentifyPending: pending,
+      };
+      const other = {
+        id: 'record-other',
+        externalId: 'other-1',
+        source: { id: 'source-other', identifiesProducts: true },
+        scrapedProduct: { offers: [] },
+      };
+      from.sources = (alone ? [own] : [own, other]) as never;
+      mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations.mockResolvedValue(own as never);
+      // Once taken off its product, the record waits to be adopted.
+      mockSourceRecordRepo.findBySourceAndExternalId.mockResolvedValue({ ...own, product: null } as never);
+      mockOfferRepo.findBySellerAndExternalIds.mockResolvedValue([
+        { id: 'offer-1', externalId: 'sku-1', model: { id: 'model-1' } },
+      ] as never);
+    };
+
+    const contradicts = (alone = false) =>
+      mockReidentification.check.mockResolvedValue({
+        kind: 'contradicts',
+        key: KEY,
+        before: BEFORE,
+        change,
+        from,
+        record: own,
+        exclusion,
+        alone,
+      });
+
+    const givenTarget = () => {
+      const target = makeExistingModel();
+      target.id = 'model-2';
+      mockListingMatch.match.mockResolvedValueOnce({
+        productId: 'model-2',
+        decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+      } as never);
+      return target;
+    };
+
+    const written = () => mockSourceRecordUpdater.upsertSourceRecord.mock.calls[0][0];
+    const lockIds = () =>
+      mockLocks.withLocks.mock.calls.flatMap(([keys]) =>
+        (keys as { namespace: number; id: string }[]).map((key) => `${key.namespace}:${key.id}`),
+      );
+
+    beforeEach(() => {
+      mockReidentification.mode = 'on';
+      Object.assign(mockOfferRepo, { moveToModel: jest.fn().mockResolvedValue(undefined) });
+      Object.assign(mockMergeService, {
+        mergeProducts: jest.fn().mockResolvedValue({ movedSourceRecordIds: [] }),
+        mergeSources: jest.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    it('asks about the product its own history found, with the key inputs', async () => {
+      givenOnProduct();
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(mockReidentification.check).toHaveBeenCalledWith(
+        expect.objectContaining({
+          product: from,
+          ownRecord: own,
+          normalizedModel: 'key:MX Keys',
+          externalIds: ['sku-1'],
+          brandId: 'brand-1',
+        }),
+      );
+    });
+
+    it('asks about no product for a task an admin pinned to one', async () => {
+      const task = makeTask();
+      task.product = { id: 'model-1' } as never;
+      makeExistingModel();
+
+      await service.createOrUpdateProduct(contextFromTask(task), listing());
+
+      expect(mockReidentification.check).toHaveBeenCalledWith(
+        expect.objectContaining({ product: undefined }),
+      );
+    });
+
+    it('keeps the key it was told to on the record', async () => {
+      givenOnProduct();
+      mockReidentification.check.mockResolvedValue({ kind: 'fits', key: KEY });
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(written().scrapedProduct?.identityKey).toEqual(KEY);
+      expect(written().model).toBe(from);
+      // Fitting needs no decision.
+      expect(mockListingMatch.match).not.toHaveBeenCalled();
+    });
+
+    it('keeps the key decided before when blocked, and stays', async () => {
+      givenOnProduct();
+      mockReidentification.check.mockResolvedValue({ kind: 'blocked', key: BEFORE });
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(written().scrapedProduct?.identityKey).toEqual(BEFORE);
+      expect(written().model).toBe(from);
+      expect(mockListingMatch.match).not.toHaveBeenCalled();
+    });
+
+    it('decides again with its own traces left out', async () => {
+      givenOnProduct();
+      contradicts();
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(mockKeyLookup.lookup).toHaveBeenLastCalledWith(
+        expect.objectContaining({ ownOffers: exclusion.ownOffers }),
+      );
+      expect(mockKeyLookup.decide).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ exclusion }),
+      );
+      expect(mockListingMatch.match).toHaveBeenCalledWith(
+        expect.anything(),
+        { taskId: 'task-1' },
+        { exclusion },
+      );
+    });
+
+    it('stays when identified again as its own product', async () => {
+      givenOnProduct();
+      contradicts();
+      mockListingMatch.match.mockResolvedValueOnce({
+        productId: 'model-1',
+        decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+      } as never);
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(result).toBe(from);
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'reidentified_stayed',
+      );
+      expect(written().scrapedProduct?.identityKey).toEqual(KEY);
+      expect(mockContributorDetach.detachRecords).not.toHaveBeenCalled();
+    });
+
+    // Nothing else identifies the product: it is the listing's to keep.
+    it('stays on a product it alone identifies when nothing else is it', async () => {
+      givenOnProduct({ alone: true });
+      contradicts(true);
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(result).toBe(from);
+      expect(mockModelFactory.createShell).not.toHaveBeenCalled();
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'reidentified_stayed',
+      );
+    });
+
+    it('moves onto another product with its offers, keeping their ids', async () => {
+      givenOnProduct();
+      contradicts();
+      const target = givenTarget();
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(result).toBe(target);
+      expect(mockContributorDetach.detachRecords).toHaveBeenCalledWith(from, [own]);
+      expect(written().model).toBe(target);
+      // Adopted, not inserted again.
+      expect(target.sources).toEqual([expect.objectContaining({ id: 'record-own' })]);
+      expect(mockOfferRepo.moveToModel).toHaveBeenCalledWith(['offer-1'], 'model-2');
+      // The seller's contributing listings of that offer follow it.
+      expect(mockContributorDetach.detach).toHaveBeenCalledWith({
+        model: from,
+        sellerId: 'seller-arukereso',
+        externalIds: ['sku-1'],
+      });
+      expect(mockOfferComposer.compose).toHaveBeenCalledWith(
+        expect.objectContaining({ model: target, externalIds: ['sku-1'] }),
+      );
+      expect(mockMergeService.recomputePrice).toHaveBeenCalledWith(from);
+      expect(mockProductRepo.save).toHaveBeenCalledWith(from);
+      expect(lockIds()).toEqual(
+        expect.arrayContaining(['1:model-1', '1:model-2', '4:seller-arukereso:sku-1']),
+      );
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'reidentified_moved',
+      );
+      expect(mockMergeService.mergeProducts).not.toHaveBeenCalled();
+    });
+
+    it('brings the contributing listings that joined its offer along', async () => {
+      givenOnProduct();
+      contradicts();
+      const target = givenTarget();
+      const follower = { id: 'record-google', product: null };
+      mockContributorDetach.detach.mockResolvedValueOnce([follower as never]);
+
+      await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(follower.product).toBe(target);
+      expect(target.sources).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'record-google' })]),
+      );
+      expect(mockMergeService.mergeSources).toHaveBeenCalledWith(target, 'keyboards');
+    });
+
+    // Alone on its product, the listing takes the product along: a merge.
+    it('merges a product it alone identified into the one it is identified as', async () => {
+      givenOnProduct({ alone: true });
+      contradicts(true);
+      const target = givenTarget();
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(mockMergeService.mergeProducts).toHaveBeenCalledWith({
+        sourceId: 'model-1',
+        targetId: 'model-2',
+      });
+      expect(result).toBe(target);
+      expect(written().model).toBe(target);
+      expect(mockContributorDetach.detachRecords).not.toHaveBeenCalled();
+      expect(mockOfferRepo.moveToModel).not.toHaveBeenCalled();
+    });
+
+    it("splits onto a new product its product's other listings do not follow", async () => {
+      givenOnProduct();
+      contradicts();
+      mockRandomUUID.mockReturnValue('model-split');
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(result?.id).toBe('model-split');
+      expect(mockContributorDetach.detachRecords).toHaveBeenCalledWith(from, [own]);
+      expect(mockOfferRepo.moveToModel).toHaveBeenCalledWith(['offer-1'], 'model-split');
+      // The re-check under the brand lock does not read its history again,
+      // and leaves its own traces out too.
+      expect(mockSourceRecordRepo.findBySourceAndExternalIdWithModelRelations).toHaveBeenCalledTimes(1);
+      expect(mockListingMatch.match).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { taskId: 'task-1' },
+        { llm: false, exclusion },
+      );
+      expect(lockIds()).toEqual(
+        expect.arrayContaining(['2:brand-1', '1:model-1', '1:model-split']),
+      );
+      expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+        'arukereso',
+        'reidentified_split',
+      );
+      expect(mockMetricsService.newProductCreated).toHaveBeenCalledWith('arukereso');
+    });
+
+    it('stays when the re-check under the brand lock finds its own product', async () => {
+      givenOnProduct();
+      contradicts();
+      mockListingMatch.match
+        .mockResolvedValueOnce(createdDecision() as never)
+        .mockResolvedValueOnce({
+          productId: 'model-1',
+          decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+        } as never);
+
+      const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+      expect(result).toBe(from);
+      expect(mockOfferRepo.moveToModel).not.toHaveBeenCalled();
+      expect(mockContributorDetach.detachRecords).not.toHaveBeenCalled();
+    });
+
+    it('fails the task when its record left the product meanwhile', async () => {
+      givenOnProduct();
+      contradicts();
+      givenTarget();
+      const without = makeExistingModel();
+      without.sources = [];
+      const loadById = mockProductRepo.findOneOrFail.getMockImplementation();
+      mockProductRepo.findOneOrFail.mockImplementation(async (options) =>
+        (options.where as { id: string }).id === 'model-1'
+          ? without
+          : (loadById?.(options) as Promise<ProductModel>),
+      );
+
+      await expect(
+        service.createOrUpdateProduct(contextFromTask(makeTask()), listing()),
+      ).rejects.toThrow('left product model-1');
+      expect(mockOfferRepo.moveToModel).not.toHaveBeenCalled();
+    });
+
+    describe('in shadow mode', () => {
+      beforeEach(() => {
+        mockReidentification.mode = 'shadow';
+      });
+
+      it('only counts a move, keeps the key decided before, and marks it pending', async () => {
+        givenOnProduct();
+        contradicts();
+        givenTarget();
+
+        const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+        expect(result).toBe(from);
+        expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+          'arukereso',
+          'reidentify_would_move',
+        );
+        expect(written()).toEqual(
+          expect.objectContaining({ model: from, reidentifyPending: true }),
+        );
+        expect(written().scrapedProduct?.identityKey).toEqual(BEFORE);
+        expect(mockContributorDetach.detachRecords).not.toHaveBeenCalled();
+        expect(mockOfferRepo.moveToModel).not.toHaveBeenCalled();
+        expect(mockMergeService.mergeProducts).not.toHaveBeenCalled();
+      });
+
+      it('only counts a split', async () => {
+        givenOnProduct();
+        contradicts();
+
+        const result = await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+        expect(result).toBe(from);
+        expect(mockModelFactory.createShell).not.toHaveBeenCalled();
+        expect(mockMetricsService.scrapeResolutionOutcome).toHaveBeenCalledWith(
+          'arukereso',
+          'reidentify_would_split',
+        );
+      });
+
+      it('settles a stay as it is, with the key now', async () => {
+        givenOnProduct({ pending: true });
+        contradicts();
+        mockListingMatch.match.mockResolvedValueOnce({
+          productId: 'model-1',
+          decision: { outcome: 'identified', nameKey: 'mx keys', candidates: [] },
+        } as never);
+
+        await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+        expect(written()).toEqual(expect.objectContaining({ reidentifyPending: false }));
+        expect(written().scrapedProduct?.identityKey).toEqual(KEY);
+      });
+    });
+
+    describe('a listing left pending', () => {
+      it('is settled by whatever is decided once the mode is on', async () => {
+        givenOnProduct({ pending: true });
+        mockReidentification.check.mockResolvedValue({ kind: 'none', key: KEY });
+
+        await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+        expect(written()).toEqual(expect.objectContaining({ reidentifyPending: false }));
+      });
+
+      it('waits while the mode is off', async () => {
+        mockReidentification.mode = 'off';
+        givenOnProduct({ pending: true });
+
+        await service.createOrUpdateProduct(contextFromTask(makeTask()), listing());
+
+        expect(written().reidentifyPending).toBeUndefined();
+      });
     });
   });
 

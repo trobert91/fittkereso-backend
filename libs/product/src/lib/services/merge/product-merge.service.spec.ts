@@ -191,9 +191,25 @@ describe('ProductMergeService.moveProductSourceRecords', () => {
     );
   });
 
-  function callMove(source: any, target: any) {
-    return (service as any).moveProductSourceRecords(manager, source, target);
+  function callMove(source: any, target: any, pin = false) {
+    return (service as any).moveProductSourceRecords(manager, source, target, pin);
   }
+
+  // A person decided the merge: no import moves the listings away again.
+  it('pins the moved listings when the merge is a person\'s', async () => {
+    await callMove({ id: 'source-1', sources: [{ id: 'record-1' }] }, { id: 'target-1' }, true);
+
+    expect(queryBuilder.set).toHaveBeenCalledWith({
+      product: { id: 'target-1' },
+      identityPinned: true,
+    });
+  });
+
+  it('pins nothing otherwise', async () => {
+    await callMove({ id: 'source-1', sources: [{ id: 'record-1' }] }, { id: 'target-1' });
+
+    expect(queryBuilder.set).toHaveBeenCalledWith({ product: { id: 'target-1' } });
+  });
 
   it('returns nothing when the source product has no listings', async () => {
     const moved = await callMove({ id: 'source-1', sources: [] }, { id: 'target-1' });
@@ -701,6 +717,31 @@ describe('ProductMergeService.mergeSources', () => {
       await service.mergeSources(model);
 
       expect(model.description).toBeNull();
+    });
+  });
+
+  // A listing identified again is compared with what its product says
+  // without it, so its own old values never vouch for it.
+  describe('specsWithout', () => {
+    it('merges the product specs of its other records, changing nothing', async () => {
+      categoryConfigService.getConfig.mockReturnValue({ offerLevelSpecs: ['frameSize'] });
+      const own = { id: 'own', source: { id: 'source-1' } } as any;
+      const other = { id: 'other', source: { id: 'source-2' } } as any;
+      const model = { sources: [own, other], productCategory: category, specs: { weight: 30 } } as any;
+
+      const specs = await service.specsWithout(model, ['own']);
+
+      expect(specMergeService.mergeSpecs).toHaveBeenCalledWith([other], 'ebikes');
+      expect(specs).toEqual({ weight: 22 });
+      expect(model.specs).toEqual({ weight: 30 });
+      expect(model.sources).toEqual([own, other]);
+    });
+
+    it('is empty when no other record is left', async () => {
+      const model = { sources: [{ id: 'own' }], productCategory: category } as any;
+
+      expect(await service.specsWithout(model, ['own'])).toEqual({});
+      expect(specMergeService.mergeSpecs).not.toHaveBeenCalled();
     });
   });
 

@@ -17,6 +17,7 @@ import {
   ProductSource,
   ProductSourceRecord,
   ProductSourceRepository,
+  ProductSpecs,
   ProductImportTask,
   productLock,
 } from '@fittkereso-backend/database';
@@ -42,6 +43,12 @@ import { ProductDescriptionService } from '../product-description/product-descri
 interface MergeProductsParams {
   sourceId: string;
   targetId: string;
+  /**
+   * A person decided the merge: the moved listings are pinned
+   * (ProductSourceRecord.identityPinned), so no import identifies them
+   * elsewhere again.
+   */
+  pinRecords?: boolean;
 }
 
 export interface MergeProductsResult {
@@ -138,26 +145,10 @@ export class ProductMergeService {
       return model;
     }
 
-    // Specs vote once per seller; within a seller, priority decides.
-    await this.loadSellers(model.sources);
-    model.specs = await this.specMergeService.mergeSpecs(
-      groupRecordsBySeller(model.sources),
-      categorySlug,
-    );
-    model.specs = getProductLevelSpecs(
-      this.categoryConfigService,
-      model.specs,
-      categorySlug,
-    );
+    model.specs = await this.mergedSpecsOf(model.sources, categorySlug);
     const jsonSchema = categorySlug
       ? this.categoryConfigService.getJsonSchema(categorySlug)
       : undefined;
-    // These specs are what every later listing's years are compared against,
-    // and a manual record or one stored before years were normalised never
-    // went through an import's normalisation.
-    if (jsonSchema) {
-      model.specs = normalizeYearSpecs(model.specs, jsonSchema);
-    }
     model.orderedSpecs = await this.specSortService.sortSpecs(
       categorySlug,
       model.specs,
@@ -183,6 +174,41 @@ export class ProductMergeService {
     model.description = this.descriptionService.pick(model.sources);
 
     return model;
+  }
+
+  /**
+   * The specs the product would have without these records: what a listing
+   * sitting on it is compared against when its own identity is in question,
+   * so its own old values do not vouch for it. Changes nothing.
+   */
+  public async specsWithout(
+    model: ProductModel,
+    recordIds: string[],
+  ): Promise<ProductSpecs> {
+    const others = (model.sources ?? []).filter((record) => !recordIds.includes(record.id));
+    if (isEmpty(others)) return {};
+    return this.mergedSpecsOf(others, model.productCategory?.slug);
+  }
+
+  /** The product-level specs these records merge to, years normalised. */
+  private async mergedSpecsOf(
+    records: ProductSourceRecord[],
+    categorySlug: string | undefined,
+  ): Promise<ProductSpecs> {
+    // Specs vote once per seller; within a seller, priority decides.
+    await this.loadSellers(records);
+    const merged = getProductLevelSpecs(
+      this.categoryConfigService,
+      await this.specMergeService.mergeSpecs(groupRecordsBySeller(records), categorySlug),
+      categorySlug,
+    );
+    const jsonSchema = categorySlug
+      ? this.categoryConfigService.getJsonSchema(categorySlug)
+      : undefined;
+    // These specs are what every later listing's years are compared against,
+    // and a manual record or one stored before years were normalised never
+    // went through an import's normalisation.
+    return jsonSchema ? normalizeYearSpecs(merged, jsonSchema) : merged;
   }
 
   /**
@@ -213,7 +239,7 @@ export class ProductMergeService {
   public async mergeProducts(
     params: MergeProductsParams,
   ): Promise<MergeProductsResult> {
-    const { sourceId, targetId } = params;
+    const { sourceId, targetId, pinRecords = false } = params;
 
     if (sourceId === targetId) {
       throw new BadRequestException(
@@ -229,7 +255,7 @@ export class ProductMergeService {
     await this.locks.withLocks(
       [productLock(sourceId), productLock(targetId)],
       async () => {
-        movedSourceRecordIds = await this.mergeLocked(sourceId, targetId);
+        movedSourceRecordIds = await this.mergeLocked(sourceId, targetId, pinRecords);
         await this.postMergeUpdates(targetId);
       },
     );
@@ -240,7 +266,11 @@ export class ProductMergeService {
     };
   }
 
-  private async mergeLocked(sourceId: string, targetId: string): Promise<string[]> {
+  private async mergeLocked(
+    sourceId: string,
+    targetId: string,
+    pinRecords: boolean,
+  ): Promise<string[]> {
     let movedSourceRecordIds: string[] = [];
 
     await this.productRepo.repo.manager.connection.transaction(
@@ -273,6 +303,7 @@ export class ProductMergeService {
           manager,
           source,
           target,
+          pinRecords,
         );
         await this.moveProductImages(manager, source, target);
         await this.moveOffers(manager, sourceId, targetId);
@@ -338,6 +369,7 @@ export class ProductMergeService {
     manager: EntityManager,
     source: ProductModel,
     target: ProductModel,
+    pin: boolean,
   ): Promise<string[]> {
     const sourceSources = source.sources ?? [];
     if (isEmpty(sourceSources)) {
@@ -349,7 +381,7 @@ export class ProductMergeService {
     await manager
       .createQueryBuilder()
       .update(ProductSourceRecord)
-      .set({ product: { id: target.id } })
+      .set({ product: { id: target.id }, ...(pin ? { identityPinned: true } : {}) })
       .where('id IN (:...ids)', { ids: movedIds })
       .execute();
 

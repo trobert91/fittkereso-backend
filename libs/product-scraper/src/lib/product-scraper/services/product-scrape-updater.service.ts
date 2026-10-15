@@ -22,11 +22,12 @@ import {
   ProductImportTaskRepository,
   Seller,
 } from '@fittkereso-backend/database';
-import type { ListingMatchDecision } from '@fittkereso-backend/database';
+import type { ListingIdentityKey, ListingMatchDecision } from '@fittkereso-backend/database';
 import {
   FailedGate,
   IdentifierTier,
   KeyMatch,
+  ListingExclusion,
   ListingMatchService,
   NEAR_MISS_SCORE,
   ProductDuplicateService,
@@ -62,10 +63,12 @@ import { ProductImportContext } from '../../interfaces/product-import-context.in
 import { compact, difference, isEmpty, minBy, pick, uniq } from 'lodash';
 import { SpecPostProcessService } from './spec-post-process.service';
 import { storedInputHashesOf } from './listing-input-hashes';
+import { ListingReidentificationService } from './listing-reidentification.service';
 import {
   IdentityRecheckVia,
   IdentityResolvedVia,
   ProductMetricsService,
+  ScrapeResolutionOutcome,
 } from '@fittkereso-backend/metrics';
 
 interface ResolvedIdentity {
@@ -127,6 +130,25 @@ interface ListingWrite {
   identifiers: OfferIdentifiers[];
   /** Each offer's Offer.externalId, index-aligned; undefined where ids collided. */
   externalIds: (string | undefined)[];
+  /**
+   * Set when the listing was identified again as another product than the
+   * one it sits on (re-identification): that product, and what of the
+   * listing must not vouch for itself when the decision is checked again.
+   */
+  from?: { productId: string; exclusion: ListingExclusion };
+  /** ProductSourceRecord.reidentifyPending to write; undefined keeps it. */
+  reidentifyPending?: boolean;
+}
+
+/** Which product the listing is, once its re-identification had its say. */
+interface IdentityOutcome {
+  identity: ResolvedIdentity;
+  brand?: Brand;
+  /** The key its record keeps (ScrapedProduct.identityKey). */
+  key?: ListingIdentityKey;
+  reidentifyPending?: boolean;
+  /** Set when it leaves the product it sits on. */
+  move?: { from: ProductModel; exclusion: ListingExclusion; alone: boolean };
 }
 
 /** The product a listing was written to, and the identity it was written under. */
@@ -150,6 +172,21 @@ interface Recheck {
 
 /** Used only when the collector's config sets no task.max_attempts. */
 const FALLBACK_MAX_ATTEMPTS = 3;
+
+type ReidentifyOutcome = 'stayed' | 'moved' | 'split';
+
+const REIDENTIFIED: Record<ReidentifyOutcome, ScrapeResolutionOutcome> = {
+  stayed: 'reidentified_stayed',
+  moved: 'reidentified_moved',
+  split: 'reidentified_split',
+};
+
+/** Shadow mode: what a move or split would have been. A stay is one either way. */
+const WOULD_REIDENTIFY: Record<ReidentifyOutcome, ScrapeResolutionOutcome> = {
+  stayed: 'reidentified_stayed',
+  moved: 'reidentify_would_move',
+  split: 'reidentify_would_split',
+};
 
 @Injectable()
 export class ProductScrapeUpdaterService {
@@ -178,6 +215,7 @@ export class ProductScrapeUpdaterService {
     private readonly contributorDetach: ContributorDetachService,
     private readonly matchQuery: ProductMatchQueryService,
     private readonly taskConfig: TaskConfigService,
+    private readonly reidentification: ListingReidentificationService,
   ) {}
 
   public async createOrUpdateProduct(
@@ -244,12 +282,26 @@ export class ProductScrapeUpdaterService {
 
       // The decision reads what the extraction produced: the sanity check
       // compares its specs, and name matching its cleaned name.
-      const { identity, brand } = await this.resolveProductIdentity(
+      const resolved = await this.resolveProductIdentity(
         context,
         extracted,
         identifiers,
         history,
       );
+      const normalizedModel =
+        this.matchQuery.normalizedModelOf(extracted, resolved.brand?.name) ?? null;
+      // A listing its own history found is checked against that product
+      // when what it is identified by changed.
+      const { identity, brand, key, reidentifyPending, move } = await this.reidentifyIfDue({
+        context,
+        extracted,
+        identifiers,
+        externalIds,
+        normalizedModel,
+        history,
+        ownRecord,
+        resolved,
+      });
       const listing = await this.unifyForNewSource(
         context,
         extracted,
@@ -264,15 +316,15 @@ export class ProductScrapeUpdaterService {
         context,
         listingId,
         extracted,
-        listing: this.withStoredOffers(listing, externalIds),
+        listing: this.withStoredOffers(key ? { ...listing, identityKey: key } : listing, externalIds),
         brand: brand ?? null,
-        normalizedModel: this.matchQuery.normalizedModelOf(listing, brand?.name) ?? null,
+        normalizedModel,
         identifiers,
         externalIds,
+        reidentifyPending,
+        ...(move ? { from: { productId: move.from.id, exclusion: move.exclusion } } : {}),
       };
-      const written = identity.model
-        ? await this.attachToProduct(write, identity, identity.model.id)
-        : await this.createProduct(write, identity);
+      const written = await this.writeIdentified(write, identity, move);
 
       // Outside the locks: both only add pair rows, with ON CONFLICT.
       if (written.identity.decision) {
@@ -294,6 +346,217 @@ export class ProductScrapeUpdaterService {
     }
   }
 
+  /**
+   * A listing its own history found, identified again when what it is
+   * identified by changed and its product no longer fits it
+   * (ListingReidentificationService.check). The decision is made as for a
+   * new listing, with the listing's own traces left out: its record recalls
+   * nothing, its product is compared by what its other listings say, and its
+   * own offers' identifiers find nothing.
+   *
+   * - **Stays**: the decision is its own product, or a new one while no other
+   *   listing identifies its product (the product is the listing's to keep).
+   * - **Moves**: another product.
+   * - **Splits**: a new product, which its product's other listings do not
+   *   follow.
+   *
+   * In `shadow` mode a move or split is only logged and counted: the listing
+   * stays, keeps the key it was decided under, and is marked pending, to be
+   * decided once the mode is `on`.
+   */
+  private async reidentifyIfDue(params: {
+    context: ProductImportContext;
+    extracted: ScrapedProduct;
+    identifiers: OfferIdentifiers[];
+    externalIds: (string | undefined)[];
+    normalizedModel: string | null;
+    history: HistoryHit | undefined;
+    ownRecord: ProductSourceRecord | undefined;
+    resolved: { identity: ResolvedIdentity; brand?: Brand };
+  }): Promise<IdentityOutcome> {
+    const { context, extracted, identifiers, history, ownRecord, resolved } = params;
+    const check = await this.reidentification.check({
+      context,
+      extracted,
+      normalizedModel: params.normalizedModel,
+      identifiers,
+      externalIds: params.externalIds,
+      brandId: resolved.brand?.id,
+      // An admin's resync pinned to a product says which product it is.
+      product: history?.via === 'pinned' ? undefined : history?.model,
+      ownRecord,
+    });
+    // Whatever is decided now settles a listing left pending in shadow mode,
+    // unless the mode is off: then it waits for the mode to come back.
+    const mode = this.reidentification.mode;
+    const settled = mode !== 'off' && ownRecord?.reidentifyPending ? false : undefined;
+    if (check.kind !== 'contradicts') {
+      return { ...resolved, key: check.key, reidentifyPending: settled };
+    }
+
+    const decided = await this.resolveProductIdentity(
+      context,
+      extracted,
+      identifiers,
+      undefined,
+      check.exclusion,
+    );
+    const targetId = decided.identity.model?.id;
+    const outcome =
+      targetId === check.from.id || (!targetId && check.alone)
+        ? 'stayed'
+        : targetId
+          ? 'moved'
+          : 'split';
+    const shadow = mode === 'shadow' && outcome !== 'stayed';
+    this.productMetricsService.scrapeResolutionOutcome(
+      context.source.name,
+      shadow ? WOULD_REIDENTIFY[outcome] : REIDENTIFIED[outcome],
+    );
+    this.logger.log(
+      shadow
+        ? 'Shadow mode: a listing identified again would leave its product — it stays'
+        : 'A listing was identified again',
+      {
+        taskId: context.task?.id,
+        url: context.url,
+        source: context.source.name,
+        outcome,
+        from: check.from.id,
+        to: targetId ?? null,
+        change: check.change,
+      },
+    );
+
+    if (outcome === 'stayed') {
+      return { ...resolved, key: check.key, reidentifyPending: settled };
+    }
+    if (shadow) return { ...resolved, key: check.before, reidentifyPending: true };
+    return {
+      identity: decided.identity,
+      brand: decided.brand,
+      key: check.key,
+      reidentifyPending: settled,
+      move: { from: check.from, exclusion: check.exclusion, alone: check.alone },
+    };
+  }
+
+  /**
+   * The write for a decided identity: onto its product, a new one, or —
+   * re-identified — off the product it sat on. A listing alone on the
+   * product it leaves for another takes that product along: the two are
+   * merged, which moves everything the listing brought it.
+   */
+  private async writeIdentified(
+    write: ListingWrite,
+    identity: ResolvedIdentity,
+    move: IdentityOutcome['move'],
+  ): Promise<WrittenListing> {
+    if (!identity.model) return this.createProduct(write, identity);
+    if (!move) return this.attachToProduct(write, identity, identity.model.id);
+    if (move.alone) {
+      await this.mergeService.mergeProducts({
+        sourceId: move.from.id,
+        targetId: identity.model.id,
+      });
+      return this.attachToProduct(write, identity, identity.model.id);
+    }
+    return this.moveListing(write, identity, move.from.id, { id: identity.model.id });
+  }
+
+  /**
+   * Moves a listing off the product it sits on (`fromId`) onto the one it
+   * was identified again as: an existing product, or `target.shell`,
+   * inserted as `target.id`. Under both products' locks and its offer keys:
+   * 1. its record leaves the product it sat on;
+   * 2. it is written onto the target, as any listing is;
+   * 3. its offers follow it, keeping their ids and price history;
+   * 4. its seller's contributing listings that joined only those offers
+   *    follow them;
+   * 5. the offers are composed on the target, and the product it left is
+   *    priced again without them.
+   */
+  private async moveListing(
+    write: ListingWrite,
+    identity: ResolvedIdentity,
+    fromId: string,
+    target: { id: string; shell?: ProductModel },
+  ): Promise<WrittenListing> {
+    const { context } = write;
+    const seller = context.source.seller;
+
+    return this.locks.withLocks(
+      [productLock(fromId), ...this.writeLocks(write, target.id)],
+      async () => {
+        const from = await this.productRepo.findOneOrFail({
+          where: { id: fromId },
+          relations: this.getProductRelations(),
+        });
+        const record = this.ownRecordOf(context, write.listingId, from);
+        if (!record) {
+          throw new Error(
+            `Listing ${write.listingId} of ${context.source.name} left product ${fromId} while it was identified again; the task retries it`,
+          );
+        }
+        const movedKeys = this.storedKeysOf(record);
+        const offerIds = await this.offerIdsOf(record, fromId, movedKeys, seller.id);
+        await this.contributorDetach.detachRecords(from, [record]);
+
+        const model =
+          target.shell ??
+          (await this.productRepo.findOneOrFail({
+            where: { id: target.id },
+            relations: this.getProductRelations(),
+          }));
+        const written = await this.writeListing(
+          write,
+          model,
+          identity,
+          target.shell ? target.id : undefined,
+        );
+        await this.offerRepo.moveToModel(offerIds, model.id);
+
+        const followers = await this.contributorDetach.detach({
+          model: from,
+          sellerId: seller.id,
+          externalIds: movedKeys,
+        });
+        if (!isEmpty(followers)) {
+          for (const follower of followers) follower.product = model;
+          model.sources = [...(model.sources ?? []), ...followers];
+          await this.mergeService.mergeSources(model, write.listing.category.slug);
+          await this.productRepo.save(model);
+        }
+
+        if (!target.shell) await this.copyFirstImage(write, model);
+        await this.createOrUpdateOffers({
+          write,
+          model,
+          sourceRecord: written.sourceRecord,
+          previousExternalIds: movedKeys,
+        });
+        await this.mergeService.recomputePrice(from);
+        await this.productRepo.save(from);
+        return { model, identity, created: !!target.shell };
+      },
+    );
+  }
+
+  /** The offers a record carries on a product: under its keys, and its own unkeyed ones. */
+  private async offerIdsOf(
+    record: ProductSourceRecord,
+    productId: string,
+    keys: string[],
+    sellerId: string,
+  ): Promise<string[]> {
+    const keyed = (await this.offerRepo.findBySellerAndExternalIds(sellerId, keys)).filter(
+      (offer) => offer.model?.id === productId,
+    );
+    const unkeyed = (
+      await this.offerRepo.findAllByModelAndSource(productId, record.source?.id ?? '')
+    ).filter((offer) => !offer.externalId && offer.sourceRecord?.id === record.id);
+    return uniq([...keyed, ...unkeyed].map((offer) => offer.id));
+  }
 
   /**
    * A listing of a source that does not identify products — a shop's Google
@@ -687,13 +950,16 @@ export class ProductScrapeUpdaterService {
    * The identifier tiers are evaluated even when the listing's history
    * resolves it, because an identifier pointing at a DIFFERENT product is how a
    * duplicate created before the identifier was known comes to light. Those
-   * become pairs after the save (recordKeyPairs); the listing never moves.
+   * become pairs after the save (recordKeyPairs); the listing never moves
+   * for them. What moves a listing is re-identification (reidentifyIfDue),
+   * which decides again with no history and its own traces excluded.
    */
   private async resolveProductIdentity(
     context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
     identifiers: OfferIdentifiers[],
     history: HistoryHit | undefined,
+    exclusion?: ListingExclusion,
   ): Promise<{ identity: ResolvedIdentity; brand?: Brand }> {
     const brand = await this.brandResolution.resolve(scrapedProduct.brand, scrapedProduct.originalName);
     const brandId = brand?.entity?.id;
@@ -703,6 +969,7 @@ export class ProductScrapeUpdaterService {
       scrapedProduct,
       identifiers,
       brandId,
+      exclusion,
     );
 
     if (history) {
@@ -754,12 +1021,12 @@ export class ProductScrapeUpdaterService {
     // ProductSourceRecords on one ProductModel (one per variant URL; see
     // §2.1a's offerLinks dispatch), so a same-source hit here is not
     // inherently a false positive.
-    const { productId, decision } = await this.listingMatch.match(
-      scrapedProduct,
-      // Omitted rather than blank without a task (scripts, simulations): an
-      // empty taskId in the logs would read as a lost one.
-      context.task ? { taskId: context.task.id } : {},
-    );
+    // Omitted rather than blank without a task (scripts, simulations): an
+    // empty taskId in the logs would read as a lost one.
+    const logContext: Record<string, string> = context.task ? { taskId: context.task.id } : {};
+    const { productId, decision } = exclusion
+      ? await this.listingMatch.match(scrapedProduct, logContext, { exclusion })
+      : await this.listingMatch.match(scrapedProduct, logContext);
 
     if (productId) {
       const model = await this.productRepo.findOneOrFail({
@@ -838,6 +1105,7 @@ export class ProductScrapeUpdaterService {
     scrapedProduct: ScrapedProduct,
     identifiers: OfferIdentifiers[],
     brandId: string | undefined,
+    exclusion?: ListingExclusion,
   ) {
     const keyMatches = await this.keyLookup.lookup({
       sourceId: context.source.id,
@@ -849,6 +1117,7 @@ export class ProductScrapeUpdaterService {
       mpns: compact(identifiers.map((identifier) => identifier.mpn)),
       brandId,
       categoryId: scrapedProduct.category.id,
+      ...(exclusion ? { ownOffers: exclusion.ownOffers } : {}),
     });
     const { verdict, failedGates: keyGates } = await this.keyLookup.decide(
       keyMatches,
@@ -856,6 +1125,7 @@ export class ProductScrapeUpdaterService {
         brandId,
         specs: scrapedProduct.specs,
         categorySlug: scrapedProduct.category.slug,
+        ...(exclusion ? { exclusion } : {}),
       },
     );
     return { keyMatches, verdict, keyGates };
@@ -1046,12 +1316,16 @@ export class ProductScrapeUpdaterService {
    * deterministic tiers and no LLM: the second finds what the first created
    * and attaches to it. The lock is held until the offers are written,
    * because the GTIN and MPN tiers find a product through its offers.
+   *
+   * A listing re-identified off the product it sits on (`write.from`) splits
+   * from it: it moves onto the new product, or onto the one the re-check
+   * found — where that is its own product, it stays.
    */
   private async createProduct(
     write: ListingWrite,
     identity: ResolvedIdentity,
   ): Promise<WrittenListing> {
-    const { context } = write;
+    const { context, from } = write;
     // Before any lock: the shell costs an embedding call, thrown away when
     // the re-check attaches.
     const shell = await this.newProductModel(context, write.listing);
@@ -1066,7 +1340,9 @@ export class ProductScrapeUpdaterService {
           keyGates: recheck.keyGates,
         };
         if (!recheck.found) {
-          return this.insertProduct(write, rechecked, shell);
+          return from
+            ? this.moveListing(write, rechecked, from.productId, { id: randomUUID(), shell })
+            : this.insertProduct(write, rechecked, shell);
         }
 
         this.productMetricsService.identityRecheckAttached(
@@ -1083,15 +1359,14 @@ export class ProductScrapeUpdaterService {
             via: recheck.found.via,
           },
         );
-        return this.attachToProduct(
-          write,
-          {
-            ...rechecked,
-            isExistingMatch: true,
-            decision: recheck.found.decision,
-          },
-          recheck.found.productId,
-        );
+        const found: ResolvedIdentity = {
+          ...rechecked,
+          isExistingMatch: true,
+          decision: recheck.found.decision,
+        };
+        return from && from.productId !== recheck.found.productId
+          ? this.moveListing(write, found, from.productId, { id: recheck.found.productId })
+          : this.attachToProduct(write, found, recheck.found.productId);
       },
     );
 
@@ -1120,18 +1395,18 @@ export class ProductScrapeUpdaterService {
     write: ListingWrite,
     brandId: string,
   ): Promise<Recheck> {
-    const { context, extracted, identifiers } = write;
-    const history = await this.resolveFromHistory(
-      context,
-      write.listingId,
-      extracted,
-      context.source.seller,
-    );
+    const { context, extracted, identifiers, from } = write;
+    // A listing re-identified off its product would find that product again
+    // by its own history.
+    const history = from
+      ? undefined
+      : await this.resolveFromHistory(context, write.listingId, extracted, context.source.seller);
     const { keyMatches, verdict, keyGates } = await this.lookupKeys(
       context,
       extracted,
       identifiers,
       brandId,
+      from?.exclusion,
     );
 
     if (history) {
@@ -1156,7 +1431,7 @@ export class ProductScrapeUpdaterService {
     const { productId, decision } = await this.listingMatch.match(
       extracted,
       context.task ? { taskId: context.task.id } : {},
-      { llm: false },
+      { llm: false, ...(from ? { exclusion: from.exclusion } : {}) },
     );
     if (!productId) {
       return { keyMatches, keyGates };
@@ -1235,6 +1510,7 @@ export class ProductScrapeUpdaterService {
       normalizedModel,
       feedRowHash: context.feedRowHash,
       pageRead: context.pageRead,
+      reidentifyPending: write.reidentifyPending,
     });
 
     // model.productCategory may only be the { id } stub set by

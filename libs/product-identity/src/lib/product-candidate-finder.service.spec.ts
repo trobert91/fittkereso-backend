@@ -181,6 +181,36 @@ describe('ProductCandidateFinderService.findCandidates', () => {
     ]);
   });
 
+  // A listing identified again where it sits: its own old year must not stand
+  // against it, so that product is compared by what its other listings say.
+  it('compares the product a listing sits on by its specs without the listing', async () => {
+    categoryConfigService.getConfig.mockReturnValue({
+      primarySpecs: ['modelYear'],
+      matchingConfig: { specTolerances: { modelYear: { absolute: 0 } } },
+    });
+    recall.fuzzy.mockResolvedValue([row('sits-on', '140 hybrid stereo'), row('other', '140 hybrid stereo')]);
+    productRepo.find.mockResolvedValue([
+      product('sits-on', { modelYear: 2023 }),
+      product('other', { modelYear: 2023 }),
+    ]);
+
+    const candidates = await finder.findCandidates({
+      ...listing,
+      exclusion: {
+        recordId: 'record-own',
+        productId: 'sits-on',
+        productSpecs: { modelYear: 2024 },
+        ownOffers: { sellerId: 'seller-1', externalIds: [] },
+      },
+    });
+
+    expect(candidates.map(({ productId, score }) => [productId, score])).toEqual([
+      ['sits-on', 100],
+      ['other', 70],
+    ]);
+    expect(candidates[0].specs).toEqual({ modelYear: 2024 });
+  });
+
   it('checks model numbers on the names as written, and leaves them out of keyScore', async () => {
     categoryConfigService.getConfig.mockReturnValue({ primarySpecs: ['modelYear'] });
     recall.fuzzy.mockResolvedValue([row('p1', '830 cx tour', 'Tour CX830')]);

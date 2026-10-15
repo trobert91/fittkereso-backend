@@ -43,6 +43,7 @@ describe('ArukeresoImportService', () => {
   let offerComposer: { compose: jest.Mock };
   let locks: { withLocks: jest.Mock };
   let completeSourceRemoval: { removeUnseen: jest.Mock };
+  let dynamicConfig: { import: { reidentifyOnIdentityChange?: string } };
   let metrics: {
     fullSyncCompleted: jest.Mock;
     fullSyncFailed: jest.Mock;
@@ -157,6 +158,7 @@ describe('ArukeresoImportService', () => {
       withLocks: jest.fn(async (_keys: unknown, work: () => Promise<unknown>) => work()),
     };
     completeSourceRemoval = { removeUnseen: jest.fn().mockResolvedValue({ removed: 0 }) };
+    dynamicConfig = { import: {} };
     metrics = {
       fullSyncCompleted: jest.fn(),
       fullSyncFailed: jest.fn(),
@@ -169,7 +171,7 @@ describe('ArukeresoImportService', () => {
       // task queue, and stubs would test the wiring against nothing.
       new ArukeresoFeedParserService(),
       mapper as never,
-      new ArukeresoFeedTriageService(sourceRecordRepo as never, offerRepo as never),
+      new ArukeresoFeedTriageService(sourceRecordRepo as never, offerRepo as never, dynamicConfig as never),
       new ArukeresoFeedConfirmService(
         offerRepo as never,
         sourceRecordRepo as never,
@@ -1085,6 +1087,53 @@ describe('ArukeresoImportService', () => {
         'waiting',
         expect.objectContaining({ kind: ProductImportTaskKind.DetailPage }),
       );
+    });
+  });
+
+  // A listing re-identification evaluated in shadow mode is decided once the
+  // mode is on: its row is imported even though it is unchanged.
+  describe('listings left to be identified again', () => {
+    const givenPending = (id: string) => {
+      sourceRecordRepo.findFeedRowStates.mockResolvedValue(
+        new Map([
+          [
+            `sku-${id}`,
+            {
+              feedRowHash: feedRowHash(urlOf(id), productOf(id)),
+              seenAt: new Date(),
+              modelId: `model-${id}`,
+              pageFetchedAt: null,
+              pageFailedAt: null,
+              reidentifyPending: true,
+            },
+          ],
+        ]),
+      );
+      offerRepo.findSyncStates.mockResolvedValue([
+        { id: `offer-${id}`, externalId: `sku-${id}`, modelId: `model-${id}`, lastSynced: new Date() },
+      ]);
+    };
+
+    it('imports an unchanged pending row as a feed_entry once the mode is on', async () => {
+      givenFeed(['1']);
+      givenPending('1');
+      dynamicConfig.import.reidentifyOnIdentityChange = 'on';
+
+      const summary = await service.import(source);
+
+      expect(summary.offersUpdated).toBe(0);
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.FeedEntry })]);
+    });
+
+    it.each(['shadow', 'off', undefined])('leaves an unchanged pending row alone in mode %s', async (mode) => {
+      givenFeed(['1']);
+      givenPending('1');
+      dynamicConfig.import.reidentifyOnIdentityChange = mode;
+
+      const summary = await service.import(source);
+
+      expect(summary.offersUpdated).toBe(1);
+      expect(queuedTasks()).toEqual([]);
     });
   });
 });

@@ -4,9 +4,20 @@ import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import { BasePostgresRepository } from './base-postgres-repository';
 import { countByRelationIds } from './grouped-count';
 import { Offer } from '../models/offer.entity';
+import { PriceHistory } from '../models/price-history.entity';
 import { ProductModel } from '../models/product-model.entity';
 import { Seller } from '../models/seller.entity';
 import { nameOf } from '@fittkereso-backend/utils';
+
+/**
+ * A listing's own offers: one seller's, under these externalIds. Left out of
+ * an identifier lookup made for that listing, which would otherwise find the
+ * product it sits on by its own GTIN.
+ */
+export interface OwnOffers {
+  sellerId: string;
+  externalIds: string[];
+}
 
 /** Two listings whose offers share an identifier (findRecordPairsSharingIdentifier). */
 export interface RecordIdentifierPair {
@@ -98,6 +109,27 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
   }
 
   /**
+   * Moves these offers onto another product with their price history: a
+   * listing identified again as that product takes them along. Their ids —
+   * and every link and record pointing at them — stay.
+   */
+  async moveToModel(ids: string[], modelId: string): Promise<void> {
+    if (ids.length === 0) return;
+    await this.repo
+      .createQueryBuilder()
+      .update(Offer)
+      .set({ model: { id: modelId } })
+      .where({ id: In(ids) })
+      .execute();
+    await this.repo.manager
+      .createQueryBuilder()
+      .update(PriceHistory)
+      .set({ model: { id: modelId } })
+      .where(`"${nameOf<PriceHistory>('offer')}Id" IN (:...ids)`, { ids })
+      .execute();
+  }
+
+  /**
    * What a feed run needs to refresh a seller's offers in place: which of
    * these externalIds already have an offer, on which product, and when each
    * was last confirmed.
@@ -163,20 +195,24 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
    * Across sellers on purpose: a GTIN names one sellable item everywhere, so
    * this is how one shop's listing finds the product another shop's listing
    * already created. Within one category, because a listing never joins a
-   * product of another. Pass normalized values (normalizeGtin).
+   * product of another. Pass normalized values (normalizeGtin). `exclude`
+   * leaves the asking listing's own offers out.
    */
   async findModelIdsByGtins(
     gtins: string[],
     categoryId: string,
+    exclude?: OwnOffers,
   ): Promise<{ modelId: string; gtin: string }[]> {
     if (gtins.length === 0) return [];
     const offers = await this.repo.find({
       where: { gtin: In(gtins), model: { productCategory: { id: categoryId } } },
-      relations: { model: true },
-      select: { id: true, gtin: true, model: { id: true } },
+      relations: { model: true, seller: true },
+      select: { id: true, gtin: true, externalId: true, model: { id: true }, seller: { id: true } },
     });
     return offers.flatMap((offer) =>
-      offer.gtin ? [{ modelId: offer.model.id, gtin: offer.gtin }] : [],
+      offer.gtin && !isOwnOffer(offer, exclude)
+        ? [{ modelId: offer.model.id, gtin: offer.gtin }]
+        : [],
     );
   }
 
@@ -222,11 +258,13 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
    * Brand-scoped because an article number is only unique within its
    * manufacturer's own numbering; category-scoped because a listing never
    * joins a product of another category. Pass normalized values (normalizeMpn).
+   * `exclude` leaves the asking listing's own offers out.
    */
   async findModelIdsByMpns(
     brandId: string,
     mpns: string[],
     categoryId: string,
+    exclude?: OwnOffers,
   ): Promise<{ modelId: string; mpn: string }[]> {
     if (mpns.length === 0) return [];
     const offers = await this.repo.find({
@@ -234,11 +272,13 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
         mpn: In(mpns),
         model: { brand: { id: brandId }, productCategory: { id: categoryId } },
       },
-      relations: { model: true },
-      select: { id: true, mpn: true, model: { id: true } },
+      relations: { model: true, seller: true },
+      select: { id: true, mpn: true, externalId: true, model: { id: true }, seller: { id: true } },
     });
     return offers.flatMap((offer) =>
-      offer.mpn ? [{ modelId: offer.model.id, mpn: offer.mpn }] : [],
+      offer.mpn && !isOwnOffer(offer, exclude)
+        ? [{ modelId: offer.model.id, mpn: offer.mpn }]
+        : [],
     );
   }
 
@@ -382,4 +422,14 @@ export class OfferRepository extends BasePostgresRepository<Offer> {
       WHERE fresh.${sellerId} = offer.${sellerId}
         AND fresh."${nameOf<Offer>('lastSynced')}" >= :freshnessCutoff)`;
   }
+}
+
+/** Whether an offer is one of the asking listing's own (OwnOffers). */
+function isOwnOffer(offer: Offer, own: OwnOffers | undefined): boolean {
+  return (
+    !!own &&
+    offer.seller?.id === own.sellerId &&
+    !!offer.externalId &&
+    own.externalIds.includes(offer.externalId)
+  );
 }

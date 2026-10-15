@@ -93,11 +93,15 @@ export class ProductCandidateFinderService {
         const product = products[row.productId];
         if (!product) return undefined;
 
+        // The product a listing is identified again from is compared by what
+        // its other listings say.
+        const specs =
+          product.id === query.exclusion?.productId ? query.exclusion.productSpecs : product.specs;
         const failedGates = applyGates({
           queryModel: query.model,
           candidateModel: row.model ?? product.model,
           querySpecs: query.specs,
-          candidateSpecs: product.specs,
+          candidateSpecs: specs,
           categoryConfig,
         });
 
@@ -111,7 +115,7 @@ export class ProductCandidateFinderService {
           matchedValue: row.normalizedModel,
           nameSimilarity: similarity,
           failedGates,
-          specs: product.specs,
+          specs,
           normalizedModelMatch: keyed ? keyMatch : undefined,
           keyScore: keyScoreOf(failedGates),
         };

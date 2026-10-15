@@ -241,6 +241,25 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     });
   });
 
+  // Set in shadow mode for a listing re-identification would move, cleared by
+  // the decision once the mode is on; an import that decided nothing keeps it.
+  it('writes whether the listing is to be identified again, and keeps it when not told', async () => {
+    const model = makeModel();
+    const upsert = (reidentifyPending?: boolean) =>
+      service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        externalId: 'product-1',
+        sourceUrl: 'https://speedbike.hu/product-1',
+        reidentifyPending,
+      });
+
+    expect((await upsert(true))?.reidentifyPending).toBe(true);
+    expect((await upsert(undefined))?.reidentifyPending).toBe(true);
+    expect((await upsert(false))?.reidentifyPending).toBe(false);
+  });
+
   it('re-writes the row when the caller supplies a new productSpecsHash, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,

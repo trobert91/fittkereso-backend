@@ -62,14 +62,23 @@ export class CandidateRecallService {
     const brandId = `"${nameOf<ProductModel>('brand')}Id"`;
     const categoryId = `"${nameOf<ProductModel>('productCategory')}Id"`;
 
+    // A listing identified again where it sits is no candidate's listing: its
+    // product is found only through its other listings.
     return this.sourceRecordRepo.repo.query(
       `SELECT DISTINCT r.${productId} AS "productId", r.${key} AS "normalizedModel", r.${model} AS model
          FROM ${records} AS r
          JOIN ${products} AS pm ON pm.id = r.${productId}
         WHERE r.${key} ${condition}
           AND pm.${brandId} = $2 AND pm.${categoryId} = $3 AND pm.id IS DISTINCT FROM $4::uuid
+          AND r.id IS DISTINCT FROM $5::uuid
         ORDER BY "productId", "normalizedModel", model`,
-      [value, query.brandId, query.categoryId, query.productId ?? null],
+      [
+        value,
+        query.brandId,
+        query.categoryId,
+        query.productId ?? null,
+        query.exclusion?.recordId ?? null,
+      ],
     );
   }
 }

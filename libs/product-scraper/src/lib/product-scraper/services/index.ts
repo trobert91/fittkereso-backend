@@ -17,3 +17,5 @@ export * from './product-source-import-simulation.service';
 export * from './source-item-filter';
 export * from './identifier-preview';
 export * from './listing-input-hashes';
+export * from './listing-identity-key';
+export * from './listing-reidentification.service';

@@ -154,6 +154,26 @@ export class ProductSourceRecord extends BasePostgresEntity {
   inputHashes: ListingInputHashes;
 
   /**
+   * Set when a person decided which product this listing is (an admin
+   * merge): its identity is never decided again by an import, however its
+   * identity key changes (ProductScrapeUpdaterService's re-identification).
+   */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  identityPinned: boolean;
+
+  /**
+   * The listing's identity key changed in a way its product does not fit,
+   * while re-identification ran in `shadow` (dynamic config
+   * import.reidentifyOnIdentityChange): it stayed put, and is to be decided
+   * once the mode is `on`. A feed run then imports it even when its row is
+   * unchanged; the decision clears it.
+   */
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  reidentifyPending: boolean;
+
+  /**
    * The listing's key within its source (listingExternalIdOf): its
    * source-native id (SKU, product code, feed identifier), or the slug of its
    * URL when the source has none. Names exactly one listing, so it is unique

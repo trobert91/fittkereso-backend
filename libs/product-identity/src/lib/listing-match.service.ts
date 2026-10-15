@@ -16,7 +16,7 @@ import {
 } from './product-identity.constants';
 import { ProductCandidateFinderService } from './product-candidate-finder.service';
 import { ProductMatchQueryService } from './product-match-query.service';
-import type { ProductCandidate, ProductMatchQuery } from './types';
+import type { ListingExclusion, ProductCandidate, ProductMatchQuery } from './types';
 
 export interface ListingMatchResult {
   /** The product to attach this listing to; absent means create one. */
@@ -27,6 +27,8 @@ export interface ListingMatchResult {
 export interface ListingMatchOptions {
   /** False: never ask the LLM about near-misses; they become a new product. */
   llm?: boolean;
+  /** A listing identified again where it sits: its own traces left out. */
+  exclusion?: ListingExclusion;
 }
 
 /**
@@ -68,7 +70,10 @@ export class ListingMatchService {
       return { decision: { outcome: 'created', candidates: [] } };
     }
 
-    const query = this.queryService.ofListing(scrapedProduct, brand.entity);
+    const query: ProductMatchQuery = {
+      ...this.queryService.ofListing(scrapedProduct, brand.entity),
+      ...(options.exclusion ? { exclusion: options.exclusion } : {}),
+    };
     if (query.keyed) {
       const exact = await this.finder.findCandidates(query, { fuzzy: false });
       const choice = decideListingMatch(exact);

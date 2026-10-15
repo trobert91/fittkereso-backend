@@ -193,9 +193,11 @@ describe('ProductDuplicateService', () => {
 
       await expect(service.mergePair('pair-1', OTHER_ID)).resolves.toEqual({ id: OTHER_ID });
 
+      // A person decided it: the moved listings are pinned there.
       expect(mergeService.mergeProducts).toHaveBeenCalledWith({
         sourceId: PRODUCT_ID,
         targetId: OTHER_ID,
+        pinRecords: true,
       });
       expect(queryService.ofProduct).toHaveBeenCalled(); // re-detected the survivor
     });

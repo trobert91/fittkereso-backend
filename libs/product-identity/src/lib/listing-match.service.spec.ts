@@ -166,6 +166,22 @@ describe('ListingMatchService', () => {
     expect(result.decision.normalizedModel).toBeUndefined();
   });
 
+  // Re-identification: the finder leaves the listing's own traces out.
+  it('searches with the exclusion of a listing identified again where it sits', async () => {
+    const exclusion = {
+      recordId: 'record-own',
+      productId: MATCH_ID,
+      productSpecs: {},
+      ownOffers: { sellerId: 'seller-1', externalIds: ['24384'] },
+    };
+    found([], []);
+
+    await service.match(SCRAPED, {}, { exclusion });
+
+    expect(finder.findCandidates).toHaveBeenCalledWith({ ...QUERY, exclusion }, { fuzzy: false });
+    expect(finder.findCandidates).toHaveBeenLastCalledWith({ ...QUERY, exclusion });
+  });
+
   it('keeps only the best few candidates on the decision, the chosen one first', async () => {
     const full = Array.from({ length: LISTING_DECISION_CANDIDATES + 2 }, (_, index) =>
       nearOf(`product-${index}`, 60 - index),

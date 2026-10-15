@@ -25,6 +25,8 @@ export interface FeedRowState {
   pageFetchedAt: Date | null;
   /** When reading its page last failed for good; null after a successful read. */
   pageFailedAt: Date | null;
+  /** Its identity is to be decided again (ProductSourceRecord.reidentifyPending). */
+  reidentifyPending: boolean;
 }
 
 /** A listing of an identifying source, as findIdentifyingListingsInCategory reads it. */
@@ -216,6 +218,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         `record.${nameOf<ProductSourceRecord>('lastUpdated')}`,
         `record.${nameOf<ProductSourceRecord>('pageFetchedAt')}`,
         `record.${nameOf<ProductSourceRecord>('pageFailedAt')}`,
+        `record.${nameOf<ProductSourceRecord>('reidentifyPending')}`,
       ])
       .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model')
       .addSelect('model.id')
@@ -235,6 +238,7 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
           modelId: record.product?.id ?? null,
           pageFetchedAt: record.pageFetchedAt ?? null,
           pageFailedAt: record.pageFailedAt ?? null,
+          reidentifyPending: record.reidentifyPending ?? false,
         },
       ]),
     );

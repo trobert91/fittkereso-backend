@@ -65,7 +65,22 @@ export type ScrapeResolutionOutcome =
   /** This source's record of the listing sat on a product of another
    *  category: taken off it, so the listing is identified afresh in its own.
    *  Counted beside the outcome of that identification. */
-  | 'left_other_category';
+  | 'left_other_category'
+  /** The listing's identity key changed, and what changed still agrees with
+   *  its product: it stays, with no matching. */
+  | 'reidentify_fits'
+  /** Its identity key changed so its product no longer fits, and it was
+   *  identified again: onto the same product, onto another, or onto a new
+   *  one its product's other listings did not follow. */
+  | 'reidentified_stayed'
+  | 'reidentified_moved'
+  | 'reidentified_split'
+  /** It no longer fits, but another current listing of its seller on the
+   *  product carries the same offer: nothing moves. */
+  | 'reidentify_blocked'
+  /** In shadow mode: what re-identification would have done. */
+  | 'reidentify_would_move'
+  | 'reidentify_would_split';
 
 /**
  * How two things came to claim one offer identity.

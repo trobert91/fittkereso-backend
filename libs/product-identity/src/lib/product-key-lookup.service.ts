@@ -5,6 +5,7 @@ import {
   DuplicateDetectedBy,
   DuplicatePairRow,
   OfferRepository,
+  OwnOffers,
   ProductDuplicatePairRepository,
   ProductModel,
   ProductModelRepository,
@@ -14,7 +15,7 @@ import {
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { keyPairRowOf } from './duplicate-pairs';
 import { primarySpecMismatches } from './gates';
-import type { FailedGate } from './types';
+import type { FailedGate, ListingExclusion } from './types';
 
 /**
  * The identifiers a listing can be found by, in the order they decide: the
@@ -42,6 +43,8 @@ export interface ListingIdentifiers {
   brandId?: string;
   /** The listing's category: only its products are looked up. */
   categoryId: string;
+  /** A listing identified again where it sits: its own offers find nothing. */
+  ownOffers?: OwnOffers;
 }
 
 /** The listing side of the sanity check. */
@@ -49,6 +52,11 @@ export interface ListingIdentity {
   brandId?: string;
   specs?: ProductSpecs;
   categorySlug: string;
+  /**
+   * A listing identified again where it sits: that product is checked
+   * against its specs merged without the listing.
+   */
+  exclusion?: Pick<ListingExclusion, 'productId' | 'productSpecs'>;
 }
 
 export type KeyConflictReason = 'ambiguous' | 'brand_mismatch' | 'spec_mismatch';
@@ -102,15 +110,15 @@ export class ProductKeyLookupService {
    * is never a candidate, however its identifiers agree.
    */
   public async lookup(identifiers: ListingIdentifiers): Promise<KeyMatch[]> {
-    const { sourceId, brandId, categoryId } = identifiers;
+    const { sourceId, brandId, categoryId, ownOffers } = identifiers;
     const siblingIds = uniq(identifiers.siblingIds);
     const gtins = uniq(identifiers.gtins);
     const mpns = uniq(identifiers.mpns);
 
     const [siblings, byGtin, byMpn] = await Promise.all([
       this.sourceRecordRepo.findModelIdsBySourceAndExternalIds(sourceId, siblingIds, categoryId),
-      this.offerRepo.findModelIdsByGtins(gtins, categoryId),
-      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns, categoryId) : [],
+      this.offerRepo.findModelIdsByGtins(gtins, categoryId, ownOffers),
+      brandId ? this.offerRepo.findModelIdsByMpns(brandId, mpns, categoryId, ownOffers) : [],
     ]);
 
     return this.matchesOf(siblings, byGtin, byMpn);
@@ -219,7 +227,10 @@ export class ProductKeyLookupService {
     for (const productId of productIds) {
       failedGates[productId] = primarySpecMismatches({
         querySpecs: listing.specs,
-        candidateSpecs: products[productId]?.specs,
+        candidateSpecs:
+          productId === listing.exclusion?.productId
+            ? listing.exclusion.productSpecs
+            : products[productId]?.specs,
         categoryConfig,
       });
     }
