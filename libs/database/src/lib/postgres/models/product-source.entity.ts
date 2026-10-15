@@ -14,8 +14,17 @@ import { ProductSourceVersion } from './product-source-version.entity';
 import { ProductSourceAction } from './product-source-action.entity';
 import ms from 'ms';
 
-/** ProductSource.detailRefreshInterval of a source that never set one. */
-export const DEFAULT_DETAIL_REFRESH_INTERVAL = '60 days' satisfies ms.StringValue;
+/**
+ * ProductSource.detailRefreshInterval meaning "read a listing's detail page
+ * once, and never again for its age" — the value of a source that never set one.
+ */
+export const DETAIL_REFRESH_ONCE = 'once';
+
+/** ProductSource.detailRefreshInterval: 'once', or an `ms` interval ('1d', '60 days'). */
+export type DetailRefreshInterval = typeof DETAIL_REFRESH_ONCE | ms.StringValue;
+
+/** What an interval that cannot be read counts as. */
+export const FALLBACK_DETAIL_REFRESH_INTERVAL = '60 days' satisfies ms.StringValue;
 
 @Entity()
 // A seller's sources overwrite each other field by field in priority order
@@ -158,20 +167,24 @@ export class ProductSource extends BasePostgresEntity {
   frequency?: ms.StringValue | null;
 
   /**
-   * How old a known listing's detail import may get — an `ms`-compatible
-   * string ('60 days', '8w') — before the listing is fetched in full again,
-   * even though its list card alone could refresh its price and stock.
+   * How old a listing's detail page may get before it is read again: `'once'`
+   * (the default — read it once, never again for its age) or an
+   * `ms`-compatible string ('1d', '60 days', '8w').
    *
-   * A card never shows a new GTIN, spec, description or store list, so
-   * without this a listing refreshed from its cards would keep what its first
-   * detail scrape found forever. Acts on scraping sources' list cards (see
-   * ListProductRefreshService); a feed row is the whole listing, and is
-   * re-imported whenever it changes. A column rather than a `config` key for
-   * the same reason as `frequency`.
+   * A list card or a feed row never shows everything a detail page does (a
+   * new GTIN, specs, a description, stores), so this decides when a known
+   * listing's page is fetched in full again:
+   * - scraping sources: a card that could refresh its price and stock in place
+   *   still sends its listing to the detail page once due (see
+   *   ListProductRefreshService);
+   * - feed sources with a `detailPage`: a row's page is read again once due
+   *   (see ArukeresoFeedTriageService); the feed itself is re-read every run.
+   *
+   * A column rather than a `config` key for the same reason as `frequency`.
    */
   @Expose({ groups: [SerializeGroup.adminDetails] })
-  @Column({ type: 'text', nullable: false, default: DEFAULT_DETAIL_REFRESH_INTERVAL })
-  detailRefreshInterval: ms.StringValue;
+  @Column({ type: 'text', nullable: false, default: DETAIL_REFRESH_ONCE })
+  detailRefreshInterval: DetailRefreshInterval;
 
   /**
    * When this source is next due. Always lands inside the nightly 02:00–06:00

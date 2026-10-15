@@ -1,13 +1,10 @@
 import {
-  ListingExternalIdMismatchError,
   ProductImportTaskKind,
   ProductImportTask,
-  SourceSpecConfig,
+  ScrapingSourceConfig,
   asScrapingConfig,
-  categorySectionOf,
+  isFeedSourceType,
 } from '@fittkereso-backend/database';
-import { ScraperService } from '@fittkereso-backend/scraper';
-import * as cheerio from 'cheerio';
 import { Injectable } from '@nestjs/common';
 import { ProductScrapeUpdaterService } from './product-scrape-updater.service';
 import { contextFromTask } from '../../interfaces/product-import-context.interface';
@@ -16,14 +13,7 @@ import { ProductScrapingMetricsService } from '@fittkereso-backend/metrics';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { normalizeUrl } from '@fittkereso-backend/utils';
-import {
-  ProductSourceImage,
-  ScrapedProduct,
-  ScrapedProductSpec,
-  SpecExtractionService,
-  SpecTranslationSelectorService,
-  getVerbatimSpecKeys,
-} from '@fittkereso-backend/product';
+import { ProductSourceImage, ScrapedProduct } from '@fittkereso-backend/product';
 import {
   foldBrandIdentifierSpecs,
   foldReleaseYear,
@@ -31,12 +21,9 @@ import {
 } from './deterministic-specs';
 import { toScrapedOffers } from './scraped-offers';
 import { DetailPageResult } from '@fittkereso-backend/scrape-interpreter';
-import { TranslationService } from '@fittkereso-backend/translation';
-import {
-  RuntimeDataProviderService,
-  ScrapeInterpreterService,
-} from '@fittkereso-backend/scrape-interpreter';
-import { compact, uniq, uniqBy } from 'lodash';
+import { PageInterpretation, ProductPageReaderService } from './product-page-reader.service';
+import { ArukeresoFeedEntryService } from '../../arukereso/arukereso-feed-entry.service';
+import { uniqBy } from 'lodash';
 import ms from 'ms';
 
 interface ExtractedPage {
@@ -51,19 +38,22 @@ export class ProductDetailsPageScraperService {
   );
 
   constructor(
-    private readonly scraperService: ScraperService,
+    private readonly pageReader: ProductPageReaderService,
     private readonly productUpdaterService: ProductScrapeUpdaterService,
     private readonly scrapingMetrics: ProductScrapingMetricsService,
-    private readonly interpreter: ScrapeInterpreterService,
-    private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
-    private readonly specExtraction: SpecExtractionService,
-    private readonly translationSelector: SpecTranslationSelectorService,
-    private readonly translationService: TranslationService,
     private readonly importTaskPublisher: ProductImportTaskPublisherService,
+    private readonly feedEntries: ArukeresoFeedEntryService,
   ) {}
 
   public async scrapeProductDetailsPage(task: ProductImportTask): Promise<void> {
+    // A feed source's page task carries its feed rows: the page is read
+    // once with the same reader, and fills what the rows lack.
+    if (isFeedSourceType(task.source.type)) {
+      await this.feedEntries.importEntry(task, { fetchPage: true });
+      return;
+    }
+
     const sourceName = task.source.name;
     const startTime = Date.now();
 
@@ -74,12 +64,19 @@ export class ProductDetailsPageScraperService {
     });
 
     try {
-      const primaryUrl = normalizeUrl(task.url);
-      const html = await this.scraperService.getHtml(primaryUrl, task.source.fetchMode);
-      const $ = cheerio.load(html);
+      // The page, read by the service a feed source reads its rows' pages
+      // with too: fetched (detailPage.fetchMode, else the source's),
+      // interpreted, and refused when it shows another product than the
+      // card that queued the task (a delisted URL redirected elsewhere).
+      const config = asScrapingConfig(task.source.config, task.source.name);
+      const interpretation = await this.pageReader.interpret({
+        task,
+        config,
+        expectedExternalIds: [task.externalId],
+      });
 
       const extractionStart = Date.now();
-      const extracted = await this.extractProduct(task, $);
+      const extracted = await this.extractProduct(task, config, interpretation);
       this.scrapingMetrics.recordExtractionDuration(
         sourceName,
         (Date.now() - extractionStart) / 1000,
@@ -209,68 +206,26 @@ export class ProductDetailsPageScraperService {
     }
   }
 
-  /**
-   * Refuses a page that shows another product than the list card that queued
-   * this task (ProductImportTask.externalId).
-   *
-   * A shop that never answers a product URL with a 404 (ebikeshop) redirects a
-   * delisted product's URL to some other product, and the fetch follows the
-   * redirect: importing that page would file the other product under this
-   * card's URL. Checked before anything is written or sent to an LLM. The error
-   * fails the task terminally, since every retry fetches the same page.
-   *
-   * The card's id is matched against the page's own and its offers', since a
-   * source's card may carry either (a product code, or a size's). A page that
-   * states no id at all is left to the checks after this one: it may be a
-   * block page, which a retry can get past.
-   */
-  private assertCardsProduct(task: ProductImportTask, detail: DetailPageResult): void {
-    const expected = toExternalId(task.externalId);
-    if (!expected) return;
-
-    const onPage = uniq(
-      compact([detail.externalId, ...detail.rawOffers.map((offer) => offer.externalId)].map(toExternalId)),
-    );
-    if (onPage.length === 0 || onPage.includes(expected)) return;
-
-    const url = normalizeUrl(task.url);
-    this.logger.warn('The page shows another product than the list card that queued it', {
-      taskId: task.id,
-      url,
-      expectedExternalId: expected,
-      pageExternalIds: onPage,
-    });
-    this.scrapingMetrics.recordExtractionSkipReason(task.source.name, 'external_id_mismatch');
-    throw new ListingExternalIdMismatchError({
-      source: task.source,
-      url,
-      expectedExternalId: expected,
-      pageExternalIds: onPage,
-    });
-  }
-
   private async extractProduct(
     task: ProductImportTask,
-    $: cheerio.CheerioAPI,
+    config: ScrapingSourceConfig,
+    interpretation: PageInterpretation,
   ): Promise<ExtractedPage | null> {
-    const config = asScrapingConfig(task.source.config, task.source.name);
-    const detail = await this.interpreter.runDetailPage(task, $, config);
+    const { detail, categoryProblem } = interpretation;
 
-    this.assertCardsProduct(task, detail);
-
-    if (detail.ambiguousCategorySlugs?.length) {
+    if (categoryProblem?.reason === 'ambiguous') {
       this.logger.warn('Category is ambiguous, skipping product creation', {
         taskId: task.id,
         url: task.url,
-        categorySlugs: detail.ambiguousCategorySlugs,
+        categorySlugs: categoryProblem.slugs,
       });
       this.scrapingMetrics.recordExtractionSkipReason(task.source.name, 'category_ambiguous');
       throw new Error(
-        `Category is ambiguous: the rules of ${detail.ambiguousCategorySlugs.join(', ')} all match`,
+        `Category is ambiguous: the rules of ${categoryProblem.slugs.join(', ')} all match`,
       );
     }
 
-    if (!detail.categorySlug) {
+    if (categoryProblem?.reason === 'not_identified' && !categoryProblem.slug) {
       this.logger.warn(
         'Category could not be identified, skipping product creation',
         { taskId: task.id, url: task.url },
@@ -282,10 +237,9 @@ export class ProductDetailsPageScraperService {
       throw new Error('Category could not be identified');
     }
 
-    const categoryEnabled = categorySectionOf(config, detail.categorySlug)?.enabled ?? false;
-    if (!categoryEnabled) {
+    if (categoryProblem?.reason === 'not_enabled') {
       this.logger.debug(
-        `Skipping product — category '${detail.categorySlug}' not enabled for ${task.source.name}`,
+        `Skipping product — category '${categoryProblem.slug}' not enabled for ${task.source.name}`,
         { taskId: task.id, url: task.url },
       );
       this.scrapingMetrics.recordExtractionSkipReason(
@@ -295,12 +249,11 @@ export class ProductDetailsPageScraperService {
       return null;
     }
 
-    const category = await this.runtime.getCategoryBySlug(detail.categorySlug);
-    if (!category) {
+    if (categoryProblem?.reason === 'not_identified') {
       this.logger.warn('Category slug not found in database', {
         taskId: task.id,
         url: task.url,
-        categorySlug: detail.categorySlug,
+        categorySlug: categoryProblem.slug,
       });
       this.scrapingMetrics.recordExtractionSkipReason(
         task.source.name,
@@ -309,11 +262,10 @@ export class ProductDetailsPageScraperService {
       throw new Error('Category could not be identified');
     }
 
-    const jsonSchema = this.categoryConfigService.getJsonSchema(category.slug);
-    if (!jsonSchema) {
+    if (categoryProblem?.reason === 'no_schema') {
       this.logger.warn(
         'Category has no associated JSON schema, skipping product creation',
-        { taskId: task.id, url: task.url, categorySlug: category.slug },
+        { taskId: task.id, url: task.url, categorySlug: categoryProblem.slug },
       );
       this.scrapingMetrics.recordExtractionSkipReason(
         task.source.name,
@@ -321,6 +273,9 @@ export class ProductDetailsPageScraperService {
       );
       throw new Error('Category has no associated JSON schema');
     }
+
+    const { category, schema: jsonSchema } = interpretation;
+    if (!category || !jsonSchema) throw new Error('Category could not be identified');
 
     // `detail.model` is only required to be present, not already clean — some
     // sources (e.g. speedbike.hu) only expose the full marketing title as
@@ -341,28 +296,11 @@ export class ProductDetailsPageScraperService {
 
     const categoryConfig = this.categoryConfigService.getConfig(category.slug);
     const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
-    const sourceConfig = categorySectionOf(config, category.slug)?.specMapping;
-    const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
-
     // Deterministic mapping runs unconditionally and unconditionally cheap
     // (no LLM) — its output is the canonical object both hashes and both
-    // post-process calls are built from, split once by offerLevelKeys.
-    const translator = await this.buildTranslator(
-      task,
-      detail.rawSpecs,
-      sourceConfig,
-      category.name,
-      untranslatedKeys,
-    );
-    const deterministicSpecs = sourceConfig
-      ? this.specExtraction.extractSpecs({
-          scrapedSpecs: detail.rawSpecs,
-          schema: jsonSchema,
-          sourceConfig,
-          translator,
-          untranslatedKeys,
-        })
-      : {};
+    // post-process calls are built from, split once by offerLevelKeys. Read
+    // by the page reader, which a feed's page task maps rows with too.
+    const deterministicSpecs = await this.pageReader.mapSpecs({ task, config, interpretation });
     foldReleaseYear(deterministicSpecs, detail.releaseYear);
     const offers = toScrapedOffers(detail.rawOffers);
     foldBrandIdentifierSpecs(
@@ -420,54 +358,4 @@ export class ProductDetailsPageScraperService {
     return imageUrls.map((url, order) => ({ url, order }));
   }
 
-  private async buildTranslator(
-    task: ProductImportTask,
-    rawSpecs: ScrapedProductSpec[],
-    sourceConfig: SourceSpecConfig | undefined,
-    categoryName: string,
-    untranslatedKeys: string[],
-  ) {
-    const translationConfig = asScrapingConfig(
-      task.source.config,
-      task.source.name,
-    ).detailPage.translation;
-    if (!translationConfig?.enabled) {
-      return undefined;
-    }
-
-    const rawValues = this.translationSelector.collectTranslatableValues(
-      rawSpecs,
-      sourceConfig,
-      untranslatedKeys,
-    );
-    if (rawValues.length === 0) {
-      return undefined;
-    }
-
-    const context = translationConfig.contextTemplate.replace(
-      /\{\{\s*categoryName\s*\}\}/g,
-      categoryName,
-    );
-
-    const { lookup, stats } = await this.translationService.translateBatch({
-      texts: rawValues,
-      sourceLanguage: translationConfig.sourceLanguage,
-      targetLanguage: translationConfig.targetLanguage,
-      context,
-    });
-
-    this.logger.debug('Spec translation completed', {
-      url: task.url,
-      ...stats,
-    });
-
-    return lookup;
-  }
-}
-
-/** An externalId as text, or undefined when there is none: a page's JSON may hold a number. */
-function toExternalId(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  const text = String(value).trim();
-  return text || undefined;
 }

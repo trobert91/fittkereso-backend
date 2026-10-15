@@ -26,6 +26,7 @@ import {
   GtinOutcome,
   inspectGtin,
   normalizeMpn,
+  urlGroupKey,
 } from '@fittkereso-backend/utils';
 import { compact, countBy } from 'lodash';
 import { selectIdentitySpecRows } from '@fittkereso-backend/product';
@@ -117,7 +118,11 @@ export interface SimulatedArukeresoImport {
    * is stored as new. Undefined when the config does not map `condition`.
    */
   conditions?: Partial<Record<OfferCondition | 'none', number>>;
-  /** Eligible rows sharing a URL with an earlier row: only the last is imported. */
+  /**
+   * Eligible rows sharing a product page (urlGroupKey) with an earlier row.
+   * Each is still its own listing: a page is one task carrying all its rows,
+   * and one page read.
+   */
   duplicateUrls: number;
   wouldSkip: number;
   skipReasons: Partial<Record<FeedSkipReason, number>>;
@@ -361,7 +366,9 @@ export class ProductSourceImportSimulationService {
       incomplete: `known listing, but the card is missing ${missingFields.join(', ')}`,
       stale: `known listing whose detail page was due again on ${dueOn} (detailRefreshInterval: ${source.detailRefreshInterval})`,
       no_offer: 'known listing with no offer to refresh yet',
-      refresh: `refreshed in place from the card — no detail fetch spent; detail page due again on ${dueOn}`,
+      refresh: `refreshed in place from the card — no detail fetch spent; ${
+        dueOn ? `detail page due again on ${dueOn}` : "detail page read once, never due again (detailRefreshInterval: 'once')"
+      }`,
     };
     let reason = reasons[outcome];
     if (movedFrom) {
@@ -500,8 +507,9 @@ export class ProductSourceImportSimulationService {
           const firstUrl = listingUrls.get(row.listingId);
           if (firstUrl === undefined || firstUrl === row.url) {
             listingUrls.set(row.listingId, row.url);
-            if (seenUrls.has(mapped.url)) duplicateUrls += 1;
-            seenUrls.add(mapped.url);
+            const pageKey = urlGroupKey(mapped.url);
+            if (seenUrls.has(pageKey)) duplicateUrls += 1;
+            seenUrls.add(pageKey);
             const offer = mapped.scrapedProduct.offers?.[0];
             if (offer?.priceWithoutDiscount && offer.priceWithoutDiscount > offer.price) {
               rowsWithOldPrice += 1;
@@ -551,11 +559,6 @@ export class ProductSourceImportSimulationService {
     if (mappingFailures > 0) {
       result.warnings.push(
         `${mappingFailures} eligible items failed to map; a run would count them as failed and skip them.`,
-      );
-    }
-    if (duplicateUrls > 0) {
-      result.warnings.push(
-        `${duplicateUrls} eligible items share a URL with an earlier one, so a run imports only the last row of each. Is mapping.url unique per variant?`,
       );
     }
 

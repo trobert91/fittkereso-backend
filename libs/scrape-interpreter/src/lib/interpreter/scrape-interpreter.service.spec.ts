@@ -171,6 +171,82 @@ describe('ScrapeInterpreterService', () => {
   });
 
   describe('runDetailPage', () => {
+    // A feed's detailPage has only the parts it wants from the page: the rest
+    // are skipped, never run, and come back empty.
+    describe('with only some parts configured (a feed source)', () => {
+      const html = `
+        <div id="tab1-pane"><div class="row props">
+          <div class="spec"><span>Neme:</span><span class="fw-bold"> Férfi </span></div>
+          <div class="spec"><span>Motor típusa:</span><span class="fw-bold">Bosch Performance Line PX (90 Nm)</span></div>
+        </div></div>
+        <div id="leiras"><p>QUALITY. COMFORT.</p></div>
+        <nav class="crumb">Elektromos Kerékpárok</nav>
+        <span class="brand">KTM</span>
+      `;
+      const rawSpecs = [
+        {
+          op: 'extractSpecTableV2' as const,
+          rowSelector: '#tab1-pane .props > div',
+          sectionHeaderRowClass: 'section-header',
+          nameSelector: 'span:first-child',
+          descriptionSelector: '.hint',
+          descriptionAttr: 'data-content',
+          valueContainerSelector: 'span.fw-bold',
+          dedupeBy: 'name' as const,
+        },
+      ];
+      const feedLike = (detailPage: Record<string, unknown>) => ({
+        baseUrl: 'https://www.mangobike.hu',
+        categories: { ebikes: { enabled: true, rules: [{ when: { always: true as const } }] } },
+        detailPage,
+      });
+
+      it('reads the configured parts and leaves every other one empty', async () => {
+        const result = await interpreter.runDetailPage(
+          makeTask('https://www.mangobike.hu/ktm-macina-tour'),
+          cheerio.load(html),
+          feedLike({ rawSpecs, description: [{ op: 'selectText', selector: '#leiras', first: true, trim: true }] }),
+        );
+
+        expect(result.rawSpecs.map((row) => [row.name, row.values])).toEqual([
+          ['Neme:', ['Férfi']],
+          ['Motor típusa:', ['Bosch Performance Line PX (90 Nm)']],
+        ]);
+        expect(result.description).toBe('QUALITY. COMFORT.');
+        expect(result.brand).toBeUndefined();
+        expect(result.model).toBeUndefined();
+        expect(result.imageUrls).toEqual([]);
+        expect(result.rawOffers).toEqual([]);
+        expect(result.offerLinks).toEqual([]);
+      });
+
+      // The feed decides the category: without a category part the sections'
+      // rules are not run against the page, even an `always` rule.
+      it('resolves no category without a category part', async () => {
+        const result = await interpreter.runDetailPage(makeTask(), cheerio.load(html), feedLike({ rawSpecs }));
+
+        expect(result.categorySlug).toBeUndefined();
+        expect(result.ambiguousCategorySlugs).toBeUndefined();
+      });
+
+      it('runs a part once it is configured', async () => {
+        const result = await interpreter.runDetailPage(
+          makeTask(),
+          cheerio.load(html),
+          feedLike({ brand: [{ op: 'selectText', selector: '.brand', first: true, trim: true }] }),
+        );
+
+        expect(result.brand).toBe('KTM');
+        expect(result.rawSpecs).toEqual([]);
+      });
+
+      it('reads nothing from an empty detailPage, without throwing', async () => {
+        const result = await interpreter.runDetailPage(makeTask(), cheerio.load(html), feedLike({}));
+
+        expect(result).toMatchObject({ rawSpecs: [], imageUrls: [], rawOffers: [], offerLinks: [] });
+      });
+    });
+
     it('resolves brand/model from an embedded dataLayerHG script and picks the V1 spec table', async () => {
       const html = `
         <script>

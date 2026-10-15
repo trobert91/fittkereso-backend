@@ -48,6 +48,49 @@ export const canonicalizeProductUrl = (url: string): string => {
 };
 
 /**
+ * The key a feed's rows are grouped by, and their import tasks matched on:
+ * rows whose keys are equal are one product page.
+ *
+ * Looser than `canonicalizeProductUrl`, which is a stored identity: on top of
+ * the query, fragment and trailing slashes it also ignores the scheme, a
+ * leading `www.`, the host's case, repeated slashes and how the path's
+ * characters are percent-encoded — differences one shop's feed can have
+ * between two rows of the same page. Never stored and never fetched (a shop
+ * may need its `www.`), only compared. The path's case is kept: paths are
+ * case-sensitive.
+ */
+export const urlGroupKey = (url: string): string => {
+  const canonical = canonicalizeProductUrl(url);
+  try {
+    const parsed = new URL(canonical);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const port = parsed.port ? `:${parsed.port}` : '';
+    return `https://${host}${port}${groupKeyPath(parsed.pathname)}`;
+  } catch {
+    return groupKeyPath(canonical);
+  }
+};
+
+/** A path with repeated slashes collapsed, each segment encoded one way, no trailing slash. */
+function groupKeyPath(path: string): string {
+  return path
+    .replace(/\/{2,}/g, '/')
+    .split('/')
+    .map(reencodeSegment)
+    .join('/')
+    .replace(/\/+$/, '');
+}
+
+/** `á`, `%C3%A1` and `%c3%a1` all become `%C3%A1`; a malformed escape is left as written. */
+function reencodeSegment(segment: string): string {
+  try {
+    return encodeURIComponent(decodeURIComponent(segment));
+  } catch {
+    return segment;
+  }
+}
+
+/**
  * The whole path of the canonical URL, with leading and trailing slashes
  * removed — the `Offer.externalId` fallback for a source that emits no
  * source-native id.

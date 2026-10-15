@@ -164,7 +164,8 @@ export class ListProductRefreshService {
       lastUpdated: record.lastUpdated,
       intervalMs: detailRefreshIntervalMs(source),
     });
-    if (now > detailDueAt) return { ...known, detailDueAt, outcome: 'stale' };
+    // No due date: 'once', so age alone never sends it back to its page.
+    if (detailDueAt && now > detailDueAt) return { ...known, detailDueAt, outcome: 'stale' };
 
     const externalId = record.product ? this.pickExternalId(record, item) : undefined;
     if (!externalId) return { ...known, detailDueAt, outcome: 'no_offer' };

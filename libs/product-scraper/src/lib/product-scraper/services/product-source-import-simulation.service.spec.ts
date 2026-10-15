@@ -289,13 +289,14 @@ describe('ProductSourceImportSimulationService', () => {
       expect(offerRepo.findSyncStates).not.toHaveBeenCalled();
     });
 
-    it('warns about rows that share a URL, since a run keeps only the last', async () => {
+    // Rows sharing a page are each their own listing now: counted, not warned about.
+    it('counts rows that share a product page, without a warning', async () => {
       givenFeed(feed(['a', 'b']));
 
       const result = await service.simulate(feedSource);
 
       expect(result.feed?.duplicateUrls).toBe(1);
-      expect(result.warnings.join(' ')).toMatch(/share a URL/);
+      expect(result.warnings.join(' ')).not.toMatch(/share a URL|only the last/);
     });
 
     it('tallies why items were skipped rather than only how many', async () => {

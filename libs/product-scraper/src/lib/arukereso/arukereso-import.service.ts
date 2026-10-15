@@ -36,7 +36,13 @@ import {
   toFeedRow,
 } from './arukereso-feed-triage.service';
 import { ArukeresoFeedConfirmService } from './arukereso-feed-confirm.service';
-import { FeedEntryPayload } from './feed-row-hash';
+import {
+  FeedEntryPayload,
+  FeedEntryRow,
+  asFeedEntryPayload,
+  feedPayloadHash,
+} from './feed-row-hash';
+import { urlGroupKey } from '@fittkereso-backend/utils';
 
 /**
  * How many consecutive per-item failures end the run.
@@ -64,9 +70,14 @@ const FALLBACK_MAX_ATTEMPTS = 3;
  * - an unchanged row only has its offer confirmed in place (lastSynced), in
  *   one statement per batch — or, for a source that does not identify
  *   products, only its listing when it waits unattached;
- * - a new or changed row becomes a feed_entry task, which the collector's
- *   scheduler imports in parallel with everything else. A row whose task is
- *   still pending replaces that task's row instead.
+ * - a new or changed row becomes a task, which the collector's scheduler
+ *   imports in parallel with everything else. Rows of one product page (a
+ *   bike's sizes can share a URL) go in one task, every row its own listing;
+ *   a page whose task is still waiting takes the new rows instead;
+ * - with a detailPage, a page whose rows need it read (new rows, a page
+ *   never read or due by detailRefreshInterval) becomes a detail_page task,
+ *   paced like any page fetch (maxConcurrent, requestsPerHour); everything
+ *   else a feed_entry task, which is not.
  *
  * A source that lists the shop's whole catalog (hasAllProducts) also removes,
  * after a complete run, the seller's offers the run did not see.
@@ -107,6 +118,9 @@ export class ArukeresoImportService implements ProductSourceImporter {
     }
 
     const startTime = Date.now();
+    // Tags this run's tasks: a later batch of the same run adds its rows of a
+    // page to the page's waiting task, a later run replaces them.
+    const runStartedAt = new Date(startTime).toISOString();
     const summary = emptyImportRunSummary();
     const config = asArukeresoConfig(source.config, source.name);
     const requestedSlugs = options?.categorySlugs;
@@ -171,10 +185,11 @@ export class ArukeresoImportService implements ProductSourceImporter {
           listingUrls.set(row.listingId, row.url);
 
           eligible += 1;
-          if (seenUrls.has(mapped.url)) {
+          const pageKey = urlGroupKey(mapped.url);
+          if (seenUrls.has(pageKey)) {
             summary.duplicateUrls += 1;
           } else {
-            seenUrls.add(mapped.url);
+            seenUrls.add(pageKey);
           }
           if (row.externalId) seenExternalIds.add(row.externalId);
           batch.push(row);
@@ -182,7 +197,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
           if (batch.length >= FEED_FLUSH_SIZE) {
             const rows = batch;
             batch = [];
-            await this.flush(source, rows, requestedSlugs, summary);
+            await this.flush(source, rows, requestedSlugs, runStartedAt, summary);
           }
         },
         {
@@ -191,7 +206,7 @@ export class ArukeresoImportService implements ProductSourceImporter {
           contentType,
         },
       );
-      await this.flush(source, batch, requestedSlugs, summary);
+      await this.flush(source, batch, requestedSlugs, runStartedAt, summary);
 
       summary.itemsSeen = parsed.itemsParsed;
       if (source.hasAllProducts) {
@@ -233,10 +248,12 @@ export class ArukeresoImportService implements ProductSourceImporter {
         durationMs: Date.now() - startTime,
       });
       if (summary.duplicateUrls > 0) {
-        this.logger.warn(
-          'Feed rows share a URL — only the last row of each is imported. Is the URL mapping per variant?',
-          { source: source.name, duplicateUrls: summary.duplicateUrls },
-        );
+        // Not a problem: every row is still its own listing. Worth a line,
+        // since it is one task — and one page read — for several rows.
+        this.logger.debug('Feed rows share a product page; each page is one task with all its rows', {
+          source: source.name,
+          rowsSharingAPage: summary.duplicateUrls,
+        });
       }
       if (summary.duplicateExternalIds > 0) {
         this.logger.warn(
@@ -338,47 +355,75 @@ export class ArukeresoImportService implements ProductSourceImporter {
     source: ProductSource,
     rows: FeedRow[],
     requestedSlugs: string[] | undefined,
+    runStartedAt: string,
     summary: ImportRunSummary,
   ): Promise<void> {
     if (rows.length === 0) return;
-    // A URL repeated in the feed: the last row wins (the repeat was counted
-    // where it was read). A repeat in a later batch replaces the earlier
-    // row's still-pending task the same way.
-    const unique = [...new Map(rows.map((row) => [row.url, row])).values()];
+    // A listing repeated in the feed: its last row wins. Rows of different
+    // listings on one page all stay — each is its own listing.
+    const unique = [...new Map(rows.map((row) => [row.listingId, row])).values()];
 
-    const { unchanged, toImport } = await this.triage.triage(source, unique);
+    const { unchanged, toImport, needsPage } = await this.triage.triage(source, unique);
     summary.offersUpdated += await this.feedConfirm.confirm(source, unchanged);
 
-    const queued = await this.queue(source, toImport, requestedSlugs);
+    const queued = await this.queue(source, toImport, needsPage, requestedSlugs, runStartedAt);
     summary.feedTasksEnqueued += queued.enqueued;
     summary.tasksReplaced += queued.replaced;
   }
 
   /**
-   * A task per row to import, unless one is already waiting for it:
-   * - pending, or failed with retries left: it gets this row instead, and
-   *   runs at once;
-   * - already running this very row: nothing to add;
-   * - otherwise (none, finished, or running an older row): a new task.
+   * A task per product page to import, carrying every row of it, unless one is
+   * already waiting for that page. Rows are grouped by urlGroupKey, so two
+   * spellings of one URL are one page. For each page:
+   * - a task waiting for it (pending, or failed with retries left) takes the
+   *   rows: added to its own when this run queued it (a page's rows can fall
+   *   in two batches), instead of them when an earlier run did — and runs at
+   *   once;
+   * - a task already running these very rows: nothing to add;
+   * - otherwise (none, finished, or running other rows): a new task.
+   *
+   * A page any of whose rows needs it read is a detail_page task — gated like
+   * every page fetch — and stays one; every other page a feed_entry task.
    */
   private async queue(
     source: ProductSource,
     rows: FeedRow[],
+    needsPage: Set<string>,
     requestedSlugs: string[] | undefined,
+    runStartedAt: string,
   ): Promise<{ enqueued: number; replaced: number }> {
     if (rows.length === 0) return { enqueued: 0, replaced: 0 };
 
-    const open = await this.taskRepo.findOpenFeedEntries(
+    const pages = new Map<string, { url: string; rows: FeedRow[]; readsPage: boolean }>();
+    for (const row of rows) {
+      const key = urlGroupKey(row.url);
+      const page = pages.get(key) ?? { url: row.url, rows: [], readsPage: false };
+      page.rows.push(row);
+      page.readsPage ||= needsPage.has(row.listingId);
+      pages.set(key, page);
+    }
+
+    const open = await this.taskRepo.findOpenFeedTasks(
       source.id,
-      rows.map((row) => row.url),
+      [...pages.keys()],
+      [...new Set(rows.map((row) => row.url))],
     );
+    const openByKey = new Map<string, ProductImportTask[]>();
+    for (const task of open) {
+      const key = task.urlKey ?? urlGroupKey(task.url);
+      openByKey.set(key, [...(openByKey.get(key) ?? []), task]);
+    }
     const maxAttempts = this.taskConfig.maxAttempts ?? FALLBACK_MAX_ATTEMPTS;
     const inserts: ProductImportTask[] = [];
     let replaced = 0;
 
-    for (const row of rows) {
-      const tasks = open.filter((task) => task.url === row.url);
-      const payload: FeedEntryPayload = { item: row.item, requestedSlugs };
+    for (const [key, page] of pages) {
+      const tasks = openByKey.get(key) ?? [];
+      const fresh: FeedEntryRow[] = page.rows.map((row) => ({
+        item: row.item,
+        listingId: row.listingId,
+        rowHash: row.rowHash,
+      }));
 
       const waiting = tasks.find(
         (task) =>
@@ -386,34 +431,51 @@ export class ArukeresoImportService implements ProductSourceImporter {
           (task.status === TaskStatus.FAILED && task.attempts < maxAttempts),
       );
       if (waiting) {
-        if (waiting.payloadHash !== row.rowHash) {
+        const stored = asFeedEntryPayload(waiting.payload);
+        // This run's own task: its rows stay, the new ones join (a listing's
+        // newer row replacing its older one). An earlier run's: replaced.
+        const merged =
+          stored && stored.runStartedAt === runStartedAt ? mergeRows(stored.rows, fresh) : fresh;
+        const payloadHash = feedPayloadHash(merged);
+        const kind =
+          page.readsPage || waiting.kind === ProductImportTaskKind.DetailPage
+            ? ProductImportTaskKind.DetailPage
+            : ProductImportTaskKind.FeedEntry;
+        if (payloadHash !== waiting.payloadHash || kind !== waiting.kind) {
+          const payload: FeedEntryPayload = { rows: merged, requestedSlugs, runStartedAt };
           await this.taskRepo.repo.update(waiting.id, {
             // Cast: TypeORM's update typing rejects a nested interface in jsonb.
             payload: payload as unknown as Record<string, never>,
-            payloadHash: row.rowHash,
+            payloadHash,
+            kind,
+            urlKey: key,
+            externalId: externalIdOf(merged),
             scheduledAt: null,
           });
           replaced += 1;
         }
         continue;
       }
+
+      const payloadHash = feedPayloadHash(fresh);
       if (
         tasks.some(
-          (task) =>
-            task.status === TaskStatus.PROCESSING && task.payloadHash === row.rowHash,
+          (task) => task.status === TaskStatus.PROCESSING && task.payloadHash === payloadHash,
         )
       ) {
         continue;
       }
 
       const task = new ProductImportTask();
-      task.kind = ProductImportTaskKind.FeedEntry;
+      task.kind = page.readsPage ? ProductImportTaskKind.DetailPage : ProductImportTaskKind.FeedEntry;
       task.source = source;
-      task.url = row.url;
+      task.url = page.url;
+      task.urlKey = key;
+      task.externalId = externalIdOf(fresh);
       task.status = TaskStatus.PENDING;
       task.priority = DEFAULT_IMPORT_TASK_PRIORITY;
-      task.payload = payload;
-      task.payloadHash = row.rowHash;
+      task.payload = { rows: fresh, requestedSlugs, runStartedAt } satisfies FeedEntryPayload;
+      task.payloadHash = payloadHash;
       inserts.push(task);
     }
 
@@ -429,4 +491,20 @@ export class ArukeresoImportService implements ProductSourceImporter {
       (Date.now() - startTime) / 1000,
     );
   }
+}
+
+/**
+ * A page's waiting rows with this batch's added: a listing already waiting is
+ * replaced by its newer row, in its place; new listings go last.
+ */
+function mergeRows(stored: FeedEntryRow[], fresh: FeedEntryRow[]): FeedEntryRow[] {
+  const freshById = new Map(fresh.map((row) => [row.listingId, row]));
+  const kept = stored.map((row) => (row.listingId && freshById.get(row.listingId)) || row);
+  const storedIds = new Set(stored.map((row) => row.listingId));
+  return [...kept, ...fresh.filter((row) => !storedIds.has(row.listingId))];
+}
+
+/** A one-row task's listing id, as a card's task carries its id; none for a page of several rows. */
+function externalIdOf(rows: FeedEntryRow[]): string | null {
+  return rows.length === 1 ? (rows[0].listingId ?? null) : null;
 }

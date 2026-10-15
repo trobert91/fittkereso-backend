@@ -133,6 +133,59 @@ export interface ScrapedProduct {
   identityInputHash?: string;
   images?: ProductSourceImage[];
   offers?: ScrapedOffer[];
+  /**
+   * A feed listing's product page as last read (the source's `detailPage`):
+   * what it said, kept so every later feed-only import merges it in again
+   * without fetching it. The feed is primary — these only fill what the row
+   * lacks (mergeFeedAndPage). Absent on a feed listing whose page was never
+   * read, and on scraped listings, whose page is the listing itself.
+   */
+  page?: ScrapedPage;
+}
+
+/** What a feed listing's product page said (ScrapedProduct.page). */
+export interface ScrapedPage {
+  /** The URL it was read from. */
+  url: string;
+  rawSpecs: ScrapedProductSpec[];
+  description?: string;
+  /** The rows mapped onto the category's specs when the page was read, before any fold. */
+  specs?: ProductSpecs;
+  images?: ProductSourceImage[];
+  aliases?: string[];
+  siblingExternalIds?: string[];
+  /** The page's own id, when its detailPage reads one. */
+  externalId?: string;
+  /** The offers the page showed: only their identifiers and old price are ever used. */
+  offers?: ScrapedPageOffer[];
+  /**
+   * How many feed rows the page was read for. A page several rows share
+   * (a bike's sizes) says nothing about one of them: its offer-level values
+   * are then left out.
+   */
+  rowCount: number;
+  /** pageContentHash: its rows and description. */
+  contentHash: string;
+}
+
+/**
+ * A feed listing's page bookkeeping, as an import writes it onto the record
+ * (ProductSourceRecord.pageFetchedAt / pageFailedAt): read now — `fetchedAt`,
+ * with `failedAt` cleared — or failed for good, `failedAt`.
+ */
+export interface ListingPageRead {
+  fetchedAt?: Date;
+  failedAt?: Date | null;
+}
+
+/** One offer a feed listing's page showed (ScrapedPage.offers). */
+export interface ScrapedPageOffer {
+  externalId?: string;
+  price?: number;
+  priceWithoutDiscount?: number | null;
+  gtin?: string | null;
+  mpn?: string | null;
+  specs?: ProductSpecs;
 }
 
 /**

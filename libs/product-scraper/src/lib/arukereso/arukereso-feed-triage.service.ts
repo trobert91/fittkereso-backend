@@ -4,11 +4,23 @@ import {
   OfferRepository,
   ProductSource,
   ProductSourceRecordRepository,
+  isArukeresoConfig,
 } from '@fittkereso-backend/database';
 import type { ScrapedProduct } from '@fittkereso-backend/product';
 import { listingExternalIdOf, offerExternalIdOf } from '@fittkereso-backend/utils';
 import type { ArukeresoFeedItem } from './arukereso-feed-item';
 import { feedRowHash } from './feed-row-hash';
+import {
+  detailRefreshDueAt,
+  detailRefreshIntervalMs,
+} from '../product-scraper/services/detail-refresh-schedule';
+
+/**
+ * How long after reading a row's page failed for good (every attempt of its
+ * task) the page is left alone: a broken or vanished page is not fetched on
+ * every nightly run, and the row is imported from the feed alone meanwhile.
+ */
+export const PAGE_RETRY_BACKOFF_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** One mapped feed row, ready to triage. */
 export interface FeedRow {
@@ -61,8 +73,15 @@ export interface UnchangedFeedRow {
 export interface FeedTriage {
   /** Same row as last imported, and nothing to attach or detach: confirm it in place. */
   unchanged: UnchangedFeedRow[];
-  /** New, changed, or missing its offer: a feed_entry task imports it. */
+  /** New, changed, missing its offer, or due for its page: a task imports it. */
   toImport: FeedRow[];
+  /**
+   * The listing ids among toImport whose product page is to be read with
+   * them (the source has a detailPage): new rows — page first — and rows whose
+   * page was never read or is due by detailRefreshInterval. Such a row is
+   * imported even when it is unchanged.
+   */
+  needsPage: Set<string>;
 }
 
 /**
@@ -90,7 +109,7 @@ export class ArukeresoFeedTriageService {
     private readonly offerRepo: OfferRepository,
   ) {}
 
-  async triage(source: ProductSource, rows: FeedRow[]): Promise<FeedTriage> {
+  async triage(source: ProductSource, rows: FeedRow[], now = new Date()): Promise<FeedTriage> {
     const states = await this.sourceRecordRepo.findFeedRowStates(
       source.id,
       rows.map((row) => row.listingId),
@@ -105,8 +124,15 @@ export class ArukeresoFeedTriageService {
 
     const unchanged: UnchangedFeedRow[] = [];
     const toImport: FeedRow[] = [];
+    const needsPage = new Set<string>();
+    const pageDue = this.pageDue(source, now);
     for (const row of rows) {
       const state = states.get(row.listingId);
+      if (pageDue(row, state)) {
+        needsPage.add(row.listingId);
+        toImport.push(row);
+        continue;
+      }
       if (!state || !isSameRow(row)) {
         toImport.push(row);
         continue;
@@ -130,7 +156,32 @@ export class ArukeresoFeedTriageService {
         unchanged.push({ row, recordSeenAt: state.seenAt });
       }
     }
-    return { unchanged, toImport };
+    return { unchanged, toImport, needsPage };
+  }
+
+  /**
+   * Whether a row's product page is to be read with it: only for a source
+   * with a detailPage. A new row is read page first. A known row's page is
+   * read when it never was, or once due by detailRefreshInterval ('once':
+   * never again) — but not within PAGE_RETRY_BACKOFF_MS of its last failure.
+   */
+  private pageDue(
+    source: ProductSource,
+    now: Date,
+  ): (row: FeedRow, state: FeedRowState | undefined) => boolean {
+    const readsPages = isArukeresoConfig(source.config) && !!source.config.detailPage;
+    if (!readsPages) return () => false;
+    const intervalMs = detailRefreshIntervalMs(source);
+
+    return (row, state) => {
+      if (!state) return true;
+      if (state.pageFailedAt && now.getTime() - state.pageFailedAt.getTime() < PAGE_RETRY_BACKOFF_MS) {
+        return false;
+      }
+      if (!state.pageFetchedAt) return true;
+      const dueAt = detailRefreshDueAt({ url: row.url, lastUpdated: state.pageFetchedAt, intervalMs });
+      return !!dueAt && now > dueAt;
+    };
   }
 
   /** A contributing listing on its offer's product, or unattached with no offer to join. */

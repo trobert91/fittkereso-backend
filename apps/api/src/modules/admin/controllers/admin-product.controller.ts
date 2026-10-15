@@ -27,6 +27,7 @@ import {
   ProductImportTaskKind,
   ProductImportTask,
   ProductImportTaskRepository,
+  isArukeresoConfig,
   isFeedSourceType,
   productLock,
   UserRole,
@@ -40,7 +41,7 @@ import {
   ProductMergeService,
   ProductUpdateService,
 } from '@fittkereso-backend/product';
-import { nameOf, SerializeGroup } from '@fittkereso-backend/utils';
+import { nameOf, SerializeGroup, urlGroupKey } from '@fittkereso-backend/utils';
 import { ProductModelUpdateDto } from '@fittkereso-backend/product';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Express } from 'express';
@@ -432,19 +433,27 @@ export class AdminProductController {
     task.force = body.force ?? false;
     task.priority = body.priority ?? MANUAL_IMPORT_TASK_PRIORITY;
 
-    // A feed has no page to fetch: its listing is imported again from the row
-    // its last feed run stored.
+    // A feed listing is imported again from the row its last feed run stored —
+    // its own row, also off a page several rows share. Its product page is
+    // read again when the source reads pages (a detailPage); else there is no
+    // page to fetch.
     if (isFeedSourceType(modelSource.source.type)) {
-      const stored = await this.importTaskRepo.latestFeedPayload(
-        modelSource.source.id,
-        modelSource.url,
-      );
+      const stored = await this.importTaskRepo.latestFeedPayload({
+        sourceId: modelSource.source.id,
+        url: modelSource.url,
+        urlKey: urlGroupKey(modelSource.url),
+        listingId: modelSource.externalId,
+      });
       if (!stored) {
         throw new BadRequestException(
           'No feed row is stored for this listing yet — run the source sync to import it.',
         );
       }
-      task.kind = ProductImportTaskKind.FeedEntry;
+      const readsPages =
+        isArukeresoConfig(modelSource.source.config) && !!modelSource.source.config.detailPage;
+      task.kind = readsPages ? ProductImportTaskKind.DetailPage : ProductImportTaskKind.FeedEntry;
+      task.urlKey = urlGroupKey(modelSource.url);
+      task.externalId = modelSource.externalId ?? null;
       task.payload = stored.payload;
       task.payloadHash = stored.payloadHash;
     }

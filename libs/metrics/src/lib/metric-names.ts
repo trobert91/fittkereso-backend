@@ -80,6 +80,9 @@ export const PRODUCT_IMPORT_TASK_QUEUE_DEPTH = 'product_import_task_queue_depth'
  * tightened). A steady rate means runs queue rows the config then rejects.
  */
 export const FEED_ENTRY_SKIPPED_TOTAL = 'feed_entry_skipped_total';
+// A feed row's product page that could not be read on its task's last attempt:
+// the rows were imported from the feed alone. By reason (error, mismatch).
+export const FEED_PAGE_FAILED_TOTAL = 'feed_page_failed_total';
 
 // List page scraper metrics
 export const LIST_PAGE_PRODUCTS_FOUND_TOTAL =

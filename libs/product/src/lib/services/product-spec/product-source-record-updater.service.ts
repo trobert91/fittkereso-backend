@@ -3,6 +3,7 @@ import {
   Brand,
   ProductModel,
   ProductSource,
+  ListingPageRead,
   ProductSourceRecord,
   ScrapedOffer,
   ScrapedProduct,
@@ -48,6 +49,8 @@ export class ProductSourceRecordUpdaterService {
     normalizedModel?: string | null;
     /** A feed row's hash, stored so the next feed run can tell it unchanged. */
     feedRowHash?: string;
+    /** A feed listing's page bookkeeping; undefined keeps it as stored. */
+    pageRead?: ListingPageRead;
   }): Promise<ProductSourceRecord | undefined> {
     const { model, source: newSource, scrapedProduct } = params;
     // Trimmed/trailing-slash-stripped once here so every ProductSourceRecord.url
@@ -193,6 +196,7 @@ export class ProductSourceRecordUpdaterService {
     brand?: Brand | null;
     normalizedModel?: string | null;
     feedRowHash?: string;
+    pageRead?: ListingPageRead;
   }): ProductSourceRecord {
     const record = params.existing ?? new ProductSourceRecord();
     if (params.existing) this.moveUrl(record, params.sourceUrl, params.source.name);
@@ -263,6 +267,7 @@ export class ProductSourceRecordUpdaterService {
       brand?: Brand | null;
       normalizedModel?: string | null;
       feedRowHash?: string;
+      pageRead?: ListingPageRead;
       processedSpecs: NonNullable<ScrapedProduct['specs']>;
       validation: ReturnType<ProductSpecValidatorService['validateSpecs']>;
     },
@@ -329,6 +334,13 @@ export class ProductSourceRecordUpdaterService {
     if (brand !== undefined) source.brand = brand;
     if (normalizedModel !== undefined) source.normalizedModel = normalizedModel;
     if (params.feedRowHash !== undefined) source.feedRowHash = params.feedRowHash;
+    if (params.pageRead?.fetchedAt) {
+      source.pageFetchedAt = params.pageRead.fetchedAt;
+      source.pageFailedAt = null;
+    }
+    if (params.pageRead?.failedAt !== undefined && !params.pageRead.fetchedAt) {
+      source.pageFailedAt = params.pageRead.failedAt;
+    }
   }
 
   /**

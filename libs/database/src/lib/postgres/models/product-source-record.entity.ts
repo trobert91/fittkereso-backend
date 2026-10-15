@@ -124,6 +124,25 @@ export class ProductSourceRecord extends BasePostgresEntity {
   feedRowHash?: string | null;
 
   /**
+   * When a feed listing's product page was last read (its source's
+   * `detailPage`), the page's values then kept in `scrapedProduct.page`. Null
+   * while it never was: a feed run queues such a row for its page, and again
+   * once `ProductSource.detailRefreshInterval` says it is due ('once': never).
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  pageFetchedAt?: Date | null;
+
+  /**
+   * When reading a feed listing's page last failed for good (every attempt of
+   * its task): the row was imported from the feed alone, and its page is not
+   * tried again before a backoff has passed. Cleared by a successful read.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
+  pageFailedAt?: Date | null;
+
+  /**
    * The listing's key within its source (listingExternalIdOf): its
    * source-native id (SKU, product code, feed identifier), or the slug of its
    * URL when the source has none. Names exactly one listing, so it is unique

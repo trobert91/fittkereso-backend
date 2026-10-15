@@ -10,7 +10,7 @@ import type { ProductModel } from '../models/product-model.entity';
 import type { Seller } from '../models/seller.entity';
 import type { Brand } from '../models/brand.entity';
 import type { Offer } from '../models/offer.entity';
-import type { ScrapedOffer, ScrapedProduct } from '../../models/scraped-product';
+import type { ScrapedOffer, ScrapedPage, ScrapedProduct } from '../../models/scraped-product';
 import type { ProductSpecs } from '../../models/product-spec';
 import { nameOf, productDisplayNameSql } from '@fittkereso-backend/utils';
 
@@ -21,6 +21,10 @@ export interface FeedRowState {
   seenAt: Date;
   /** The product it sits on; null while it is unattached. */
   modelId: string | null;
+  /** When its product page was last read; null while it never was (a feed with a detailPage). */
+  pageFetchedAt: Date | null;
+  /** When reading its page last failed for good; null after a successful read. */
+  pageFailedAt: Date | null;
 }
 
 /** A listing of an identifying source, as findIdentifyingListingsInCategory reads it. */
@@ -141,6 +145,26 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
    * ProductSources can cover one webshop, and a bare match would hand one
    * source another source's row.
    */
+  /**
+   * The product pages these feed listings of one source last read
+   * (scrapedProduct.page), by listing key: what a feed-only import merges in
+   * again without fetching. Listings without one are left out.
+   */
+  async findStoredPages(sourceId: string, externalIds: string[]): Promise<Map<string, ScrapedPage>> {
+    if (externalIds.length === 0) return new Map();
+    const rows = await this.repo
+      .createQueryBuilder('record')
+      .select(`record."${nameOf<ProductSourceRecord>('externalId')}"`, 'externalId')
+      .addSelect(`record."${nameOf<ProductSourceRecord>('scrapedProduct')}"->'page'`, 'page')
+      .where(`record."${nameOf<ProductSourceRecord>('source')}Id" = :sourceId`, { sourceId })
+      .andWhere(`record."${nameOf<ProductSourceRecord>('externalId')}" IN (:...externalIds)`, {
+        externalIds,
+      })
+      .andWhere(`record."${nameOf<ProductSourceRecord>('scrapedProduct')}"->'page' IS NOT NULL`)
+      .getRawMany<{ externalId: string; page: ScrapedPage }>();
+    return new Map(rows.map((row) => [row.externalId, row.page]));
+  }
+
   async findBySourceAndExternalId(
     sourceId: string,
     externalId: string,
@@ -190,6 +214,8 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
         `record.${nameOf<ProductSourceRecord>('feedRowHash')}`,
         `record.${nameOf<ProductSourceRecord>('lastSeenAt')}`,
         `record.${nameOf<ProductSourceRecord>('lastUpdated')}`,
+        `record.${nameOf<ProductSourceRecord>('pageFetchedAt')}`,
+        `record.${nameOf<ProductSourceRecord>('pageFailedAt')}`,
       ])
       .leftJoin(`record.${nameOf<ProductSourceRecord>('product')}`, 'model')
       .addSelect('model.id')
@@ -207,6 +233,8 @@ export class ProductSourceRecordRepository extends BasePostgresRepository<Produc
           feedRowHash: record.feedRowHash ?? null,
           seenAt: record.lastSeenAt ?? record.lastUpdated,
           modelId: record.product?.id ?? null,
+          pageFetchedAt: record.pageFetchedAt ?? null,
+          pageFailedAt: record.pageFailedAt ?? null,
         },
       ]),
     );

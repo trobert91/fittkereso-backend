@@ -1,22 +1,29 @@
 import { getMetadataArgsStorage } from 'typeorm';
 import ms from 'ms';
-import { DEFAULT_DETAIL_REFRESH_INTERVAL, ProductSource } from './product-source.entity';
+import {
+  DETAIL_REFRESH_ONCE,
+  FALLBACK_DETAIL_REFRESH_INTERVAL,
+  ProductSource,
+} from './product-source.entity';
 
 // The schema is synchronized from the entities (no migrations), so the column
-// options are what every existing and new row gets.
+// options are what every new row gets.
 const column = (propertyName: keyof ProductSource) =>
   getMetadataArgsStorage().columns.find(
     (candidate) => candidate.target === ProductSource && candidate.propertyName === propertyName,
   );
 
 describe('ProductSource.detailRefreshInterval', () => {
-  it('defaults to 60 days on every source that never set it', () => {
+  it("defaults to 'once' on every source that never set it", () => {
     expect(column('detailRefreshInterval')?.options).toMatchObject({
       type: 'text',
       nullable: false,
-      default: DEFAULT_DETAIL_REFRESH_INTERVAL,
+      default: DETAIL_REFRESH_ONCE,
     });
-    expect(ms(DEFAULT_DETAIL_REFRESH_INTERVAL)).toBe(ms('60d'));
+  });
+
+  it('falls back to 60 days for an interval that cannot be read', () => {
+    expect(ms(FALLBACK_DETAIL_REFRESH_INTERVAL)).toBe(ms('60d'));
   });
 });
 

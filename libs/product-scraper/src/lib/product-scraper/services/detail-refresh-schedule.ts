@@ -1,6 +1,10 @@
 import { createHash } from 'crypto';
 import ms from 'ms';
-import { DEFAULT_DETAIL_REFRESH_INTERVAL, ProductSource } from '@fittkereso-backend/database';
+import {
+  DETAIL_REFRESH_ONCE,
+  FALLBACK_DETAIL_REFRESH_INTERVAL,
+  ProductSource,
+} from '@fittkereso-backend/database';
 
 /**
  * The share of the interval, at its end, over which listings fall due.
@@ -13,16 +17,25 @@ import { DEFAULT_DETAIL_REFRESH_INTERVAL, ProductSource } from '@fittkereso-back
  */
 const SPREAD_SHARE = 0.25;
 
-/** The source's detailRefreshInterval in ms, or the default when unreadable. */
+/** Whether an interval says "read once, never again for its age". */
+export function isDetailRefreshOnce(interval: string | null | undefined): boolean {
+  return interval?.trim().toLowerCase() === DETAIL_REFRESH_ONCE;
+}
+
+/**
+ * The source's detailRefreshInterval in ms; undefined for `'once'`, which is
+ * never due. An interval it cannot read counts as the 60-day fallback.
+ */
 export function detailRefreshIntervalMs(
   source: Pick<ProductSource, 'detailRefreshInterval'>,
-): number {
+): number | undefined {
+  if (isDetailRefreshOnce(source.detailRefreshInterval)) return undefined;
   const parsed = source.detailRefreshInterval
-    ? ms(source.detailRefreshInterval)
+    ? ms(source.detailRefreshInterval as ms.StringValue)
     : undefined;
   return parsed !== undefined && Number.isFinite(parsed) && parsed > 0
     ? parsed
-    : ms(DEFAULT_DETAIL_REFRESH_INTERVAL);
+    : ms(FALLBACK_DETAIL_REFRESH_INTERVAL);
 }
 
 /**
@@ -34,13 +47,17 @@ export function detailRefreshLead(url: string, intervalMs: number): number {
   return (hash / 2 ** 32) * intervalMs * SPREAD_SHARE;
 }
 
-/** When a listing whose detail page was last imported at `lastUpdated` falls due again. */
+/**
+ * When a listing whose detail page was last read at `lastUpdated` falls due
+ * again; undefined when it never does (`intervalMs` undefined, i.e. 'once').
+ */
 export function detailRefreshDueAt(params: {
   url: string;
   lastUpdated: Date;
-  intervalMs: number;
-}): Date {
+  intervalMs: number | undefined;
+}): Date | undefined {
   const { url, lastUpdated, intervalMs } = params;
+  if (intervalMs === undefined) return undefined;
   return new Date(
     lastUpdated.getTime() + intervalMs - detailRefreshLead(url, intervalMs),
   );

@@ -6,6 +6,7 @@ import {
   CategoryLookupCondition,
   categoryRulesOf,
   ProductSourceCategoryConfig,
+  ProductSourceDetailPageConfig,
   ScrapingSourceConfig,
   ProductSpecs,
   ScrapeOperation,
@@ -51,6 +52,18 @@ export type CategoryResolution =
   | { status: 'unidentified' }
   | { status: 'ambiguous'; slugs: string[] };
 
+/**
+ * What runDetailPage needs of a source's config: its base URL, its category
+ * sections and the detailPage to read. A scraping config has every part of a
+ * detailPage; a feed's (FeedDetailPageConfig) only the ones it wants from the
+ * page, which is why every part is optional here.
+ */
+export interface DetailPageSourceConfig {
+  baseUrl: string;
+  categories?: Record<string, ProductSourceCategoryConfig>;
+  detailPage: Partial<ProductSourceDetailPageConfig>;
+}
+
 export interface DetailPageResult {
   rawSpecs: ScrapedProductSpec[];
   description?: string;
@@ -81,7 +94,7 @@ export class ScrapeInterpreterService {
   private makeContext(
     task: ProductImportTask,
     $: CheerioAPI,
-    config: ScrapingSourceConfig,
+    config: Pick<ScrapingSourceConfig, 'baseUrl'>,
     opts: Record<string, unknown> = {},
   ): ScrapeExecutionContext {
     return {
@@ -214,96 +227,71 @@ export class ScrapeInterpreterService {
     return { categoryName, products };
   }
 
+  /**
+   * Read a detail page with the parts its config has. A scraping source's
+   * detailPage has every required part; a feed's (FeedDetailPageConfig) only
+   * the ones it wants from the page, so a part that is not configured is
+   * skipped rather than run: no category part means no category resolved
+   * here (the feed decides it), no brand part means no brand, and so on.
+   */
   public async runDetailPage(
     task: ProductImportTask,
     $: CheerioAPI,
-    config: ScrapingSourceConfig,
+    config: DetailPageSourceConfig,
   ): Promise<DetailPageResult> {
     const ctx = this.makeContext(task, $, config);
+    const page = config.detailPage;
+    const run = async <T>(pipeline: ScrapeOperation[] | undefined): Promise<T | undefined> =>
+      pipeline ? ((await this.runner.run(pipeline, ctx)) as T | undefined) : undefined;
 
     // 1. raw specs first — category rules may need to inspect them.
-    const rawSpecs =
-      ((await this.runner.run(
-        config.detailPage.rawSpecs,
-        ctx,
-      )) as ScrapedProductSpec[]) ?? [];
+    const rawSpecs = (await run<ScrapedProductSpec[]>(page.rawSpecs)) ?? [];
     ctx.vars['rawSpecs'] = rawSpecs;
 
     // 2. raw category label (breadcrumb text, etc.)
-    const rawCategoryLabel = (await this.runner.run(
-      config.detailPage.category.breadcrumbOrSource,
-      ctx,
-    )) as string | undefined;
+    const rawCategoryLabel = await run<string>(page.category?.breadcrumbOrSource);
     ctx.vars['categoryName'] = rawCategoryLabel;
 
     // Free-text marketing description, only run when configured — see
     // ProductSourceDetailPageConfig.description's doc comment.
-    const description = config.detailPage.description
-      ? ((await this.runner.run(
-          config.detailPage.description,
-          ctx,
-        )) as string | undefined)
-      : undefined;
+    const description = await run<string>(page.description);
 
-    // 3. resolve the category from the sections' rules.
-    const resolution = this.resolveCategory(config.categories, rawCategoryLabel, rawSpecs);
+    // 3. resolve the category from the sections' rules — only when the page
+    // has a category part to resolve it by.
+    const resolution: CategoryResolution = page.category
+      ? this.resolveCategory(config.categories, rawCategoryLabel, rawSpecs)
+      : { status: 'unidentified' };
     const categorySlug = resolution.status === 'resolved' ? resolution.slug : undefined;
 
     // 4. brand/model/aliases/releaseYear/images — may reference vars.categoryName.
     // releaseYear here is a raw deterministic extraction, distinct from the
     // ProductModel.specs.modelYear it ultimately feeds — see
     // ProductDetailsPageScraperService, which folds it into deterministicSpecs.
-    const brand = (await this.runner.run(
-      config.detailPage.brand,
-      ctx,
-    )) as string | undefined;
+    const brand = await run<string>(page.brand);
     ctx.vars['brand'] = brand;
 
-    const model = (await this.runner.run(
-      config.detailPage.model,
-      ctx,
-    )) as string | undefined;
+    const model = await run<string>(page.model);
     ctx.vars['model'] = model;
 
-    const aliases = config.detailPage.aliases
-      ? ((await this.runner.run(
-          config.detailPage.aliases,
-          ctx,
-        )) as string[] | undefined)
-      : undefined;
-
-    const releaseYear = config.detailPage.releaseYear
-      ? ((await this.runner.run(
-          config.detailPage.releaseYear,
-          ctx,
-        )) as number | undefined)
-      : undefined;
+    const aliases = await run<string[]>(page.aliases);
+    const releaseYear = await run<number>(page.releaseYear);
 
     // Text, trimmed: a page's JSON can carry its id as a number, and the id
     // is the key of the listing's record.
-    const externalId = config.detailPage.externalId
-      ? this.toId(await this.runner.run(config.detailPage.externalId, ctx))
+    const externalId = page.externalId
+      ? this.toId(await this.runner.run(page.externalId, ctx))
       : undefined;
     ctx.vars['externalId'] = externalId;
 
-    const siblingIds = config.detailPage.siblingIds
-      ? this.toIdList(await this.runner.run(config.detailPage.siblingIds, ctx))
+    const siblingIds = page.siblingIds
+      ? this.toIdList(await this.runner.run(page.siblingIds, ctx))
       : undefined;
 
-    const imageUrls =
-      ((await this.runner.run(
-        config.detailPage.images,
-        ctx,
-      )) as string[]) ?? [];
+    const imageUrls = (await run<string[]>(page.images)) ?? [];
 
     const rawOffers = await this.runDetailPageOffers(ctx, config);
 
-    const offerLinks = config.detailPage.offerLinks
-      ? ((await this.runner.run(
-          config.detailPage.offerLinks,
-          ctx,
-        )) as WebLink[] | undefined) ?? []
-      : [];
+    const offerLinks = (await run<WebLink[]>(page.offerLinks)) ?? [];
 
     return {
       rawSpecs,
@@ -330,7 +318,7 @@ export class ScrapeInterpreterService {
   // multi-seller aggregator page).
   private async runDetailPageOffers(
     ctx: ScrapeExecutionContext,
-    config: ScrapingSourceConfig,
+    config: DetailPageSourceConfig,
   ): Promise<RawOfferRecord[]> {
     const offersConfig = config.detailPage.offers;
     if (!offersConfig || !offersConfig.offerList?.length) return [];

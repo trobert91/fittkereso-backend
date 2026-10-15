@@ -163,7 +163,9 @@ export class ProductSourceSimulateImportTools {
       L.push('  - condition: _not mapped_ (new, unless another source of the seller says otherwise)');
     }
     if (feed.duplicateUrls > 0) {
-      L.push(`  - ${feed.duplicateUrls} rows share a URL with an earlier row; only the last of each is imported`);
+      L.push(
+        `  - ${feed.duplicateUrls} rows share a product page with an earlier row; each is its own listing, and a page is one task (one page read) carrying all its rows`,
+      );
     }
     L.push(`- **would skip**: ${feed.wouldSkip}`);
     for (const [reason, count] of Object.entries(feed.skipReasons).sort(

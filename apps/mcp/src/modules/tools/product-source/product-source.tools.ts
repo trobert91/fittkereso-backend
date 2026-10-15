@@ -284,7 +284,7 @@ export class ProductSourceTools {
   @Tool({
     name: 'update_product_source',
     description:
-      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority (unique per seller), identifiesProducts / hasAllProducts, fetchMode (Zyte or direct), throttling (maxConcurrent, requestsPerHour), the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear), and detailRefreshInterval (how old a known listing\'s detail import may get, default "60 days"). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
+      'Update an existing ProductSource — name, scraping config (full replace), scheduling/processing enabled flags, priority (unique per seller), identifiesProducts / hasAllProducts, fetchMode (Zyte or direct), throttling (maxConcurrent, requestsPerHour), the full sync interval (an ms-compatible string like "6h", "30m"; pass null or empty string to clear), and detailRefreshInterval ("once" — the default, read a listing\'s detail page once — or how old it may get, e.g. "1d", "60 days"). Only fields provided are changed. A `config` is validated against the product source config schema and the whole update is refused if it does not match — use get_product_source_config_schema and validate_product_source_config while drafting.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to update'),
       name: z.string().min(1).optional(),
@@ -331,7 +331,7 @@ export class ProductSourceTools {
         .string()
         .optional()
         .describe(
-          'ms-compatible interval, e.g. "60 days" (the default) or "8w": how old a known listing\'s detail import may get before its detail page is fetched again, even though its list card could refresh it in place. Acts on scraping sources\' list cards. Cannot be cleared.',
+          '"once" (the default: read a listing\'s detail page once, never again for its age) or an ms-compatible interval, e.g. "1d", "60 days" or "8w": how old a known listing\'s detail page may get before it is read again. Acts on scraping sources\' list cards (a card that could refresh in place still goes to its page once due) and on feed sources with a detailPage (a row\'s page is read again once due). Cannot be cleared.',
         ),
     }),
     annotations: { destructiveHint: false, idempotentHint: true },

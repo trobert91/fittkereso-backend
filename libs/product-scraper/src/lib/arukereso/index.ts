@@ -8,3 +8,4 @@ export * from './arukereso-feed-triage.service';
 export * from './arukereso-feed-entry.service';
 export * from './feed-row-hash';
 export * from './arukereso-feed-confirm.service';
+export * from './merge-feed-and-page';

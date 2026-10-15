@@ -93,6 +93,17 @@ export class ProductImportTask extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.list] })
   externalId?: string | null;
 
+  /**
+   * A feed task's product page, as urlGroupKey spells it: the key its rows were
+   * grouped by and the next run finds the task again by, however a row spells
+   * the URL (`www.` or not, a trailing slash, an encoded accent). `url` keeps
+   * the spelling it is fetched with. Null on scraping tasks, and on feed tasks
+   * queued before the key existed (matched by `url` then).
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Index()
+  urlKey?: string | null;
+
   @Index()
   @Column({
     type: 'enum',

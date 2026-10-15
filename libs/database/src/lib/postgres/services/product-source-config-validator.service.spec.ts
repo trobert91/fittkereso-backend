@@ -495,5 +495,97 @@ describe('ProductSourceConfigValidatorService', () => {
       ).not.toBeNull();
       expect(validator.problems('googleshop', feedConfig({ price: [{ field: 'price' }, {}] }))).not.toBeNull();
     });
+
+    // A feed's detailPage is the scraping detailPage's parts and ops, narrowed:
+    // none required, and no category, offerLinks or postProcess.
+    describe('detailPage', () => {
+      const offers = {
+        offerList: [{ op: 'selectAll', selector: '.offer' }],
+        itemMode: 'cheerio',
+        itemPipeline: [{ op: 'assembleOffer', price: [{ op: 'trim' }] }],
+      };
+      const withDetailPage = (detailPage: Record<string, unknown>) => ({
+        ...feedConfig(),
+        detailPage,
+      });
+
+      it('takes the same parts a scraping detailPage takes, none of them required', () => {
+        const config = withDetailPage({
+          rawSpecs: MINIMAL_CONFIG.detailPage.rawSpecs,
+          description: [{ op: 'selectText', selector: '#leiras' }],
+          brand: MINIMAL_CONFIG.detailPage.brand,
+          model: MINIMAL_CONFIG.detailPage.model,
+          images: MINIMAL_CONFIG.detailPage.images,
+          externalId: [{ op: 'selectText', selector: '.sku' }],
+          siblingIds: [{ op: 'selectAll', selector: '.size' }],
+          offers,
+          fetchMode: 'direct',
+        });
+
+        expect(validator.problems('arukereso', config)).toBeNull();
+        expect(validator.problems('googleshop', config)).toBeNull();
+        expect(validator.problems('arukereso', withDetailPage({ rawSpecs: MINIMAL_CONFIG.detailPage.rawSpecs }))).toBeNull();
+        expect(validator.problems('arukereso', withDetailPage({}))).toBeNull();
+      });
+
+      it('validates its ops exactly as a scraping source does', () => {
+        const message = (detailPage: Record<string, unknown>) => {
+          const problems = validator.problems('arukereso', withDetailPage(detailPage));
+          return problems ? validator.format(problems) : '';
+        };
+
+        expect(message({ rawSpecs: [{ op: 'bogus' }] })).toContain('/detailPage/rawSpecs/0/op');
+        expect(
+          message({ offers: { ...offers, itemPipeline: [{ op: 'assembleOffer', price: [{ op: 'bogus' }] }] } }),
+        ).toContain('/detailPage/offers/itemPipeline/0/price/0/op');
+        expect(message({ offers: { ...offers, itemPipeline: [{ op: 'trim' }] } })).toContain(
+          '/detailPage/offers/itemPipeline',
+        );
+      });
+
+      it.each([
+        ['category', { breadcrumbOrSource: [{ op: 'selectText', selector: '.crumb' }] }],
+        ['offerLinks', [{ op: 'selectAll', selector: '.variant' }]],
+        ['postProcess', { identity: true }],
+        ['listPage', {}],
+      ])('rejects %s, which a feed decides elsewhere', (key, value) => {
+        expect(validator.problems('arukereso', withDetailPage({ [key]: value }))).not.toBeNull();
+      });
+
+      it('rejects a fetch mode other than proxied or direct', () => {
+        expect(validator.problems('arukereso', withDetailPage({ fetchMode: 'proxied' }))).toBeNull();
+        expect(validator.problems('arukereso', withDetailPage({ fetchMode: 'zyte' }))).not.toBeNull();
+      });
+    });
+  });
+
+  // The shared property list also gives scraping sources a page fetch mode,
+  // and leaves their required parts as they were.
+  describe('scraping detailPage', () => {
+    it('takes a fetch mode for its detail pages', () => {
+      const config = configWith((c) => {
+        c.detailPage.fetchMode = 'direct';
+      });
+      expect(validator.problems('scraping', config)).toBeNull();
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => {
+            c.detailPage.fetchMode = 'zyte';
+          }),
+        ),
+      ).not.toBeNull();
+    });
+
+    it.each(['rawSpecs', 'category', 'brand', 'model', 'images'])('still requires %s', (key) => {
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => {
+            delete c.detailPage[key];
+          }),
+        ),
+      ).not.toBeNull();
+    });
   });
 });

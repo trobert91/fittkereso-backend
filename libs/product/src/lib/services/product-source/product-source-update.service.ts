@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  DETAIL_REFRESH_ONCE,
+  DetailRefreshInterval,
   isProductSourceFetchMode,
   PRODUCT_SOURCE_FETCH_MODES,
   ProductCategoryRepository,
@@ -171,9 +173,8 @@ export class ProductSourceUpdateService {
     }
 
     if (params.detailRefreshInterval !== undefined) {
-      source.detailRefreshInterval = this.parseRequiredInterval(
+      source.detailRefreshInterval = this.parseDetailRefreshInterval(
         params.detailRefreshInterval,
-        'detailRefreshInterval',
       );
     }
 
@@ -418,6 +419,12 @@ export class ProductSourceUpdateService {
       throw new BadRequestException(`${fieldName} must be a positive interval`);
     }
     return interval.trim() as ms.StringValue;
+  }
+
+  // 'once' (any case) or a positive `ms` interval; clearing is refused.
+  private parseDetailRefreshInterval(value: string | null): DetailRefreshInterval {
+    if (value?.trim().toLowerCase() === DETAIL_REFRESH_ONCE) return DETAIL_REFRESH_ONCE;
+    return this.parseRequiredInterval(value, 'detailRefreshInterval');
   }
 
   // Clearing a next-sync timestamp is meaningful — ProductSourceSyncScheduler

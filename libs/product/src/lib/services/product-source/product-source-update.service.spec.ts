@@ -165,8 +165,25 @@ describe('ProductSourceUpdateService', () => {
       );
     });
 
+    it.each([['once'], ['Once '], ['ONCE']])("stores 'once' written as %p", async (value) => {
+      await service.updateProductSource(arukereso().id, { detailRefreshInterval: value });
+
+      expect(sourceRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ detailRefreshInterval: 'once' }),
+      );
+    });
+
+    it.each([['1d'], ['2d'], ['60 days']])('stores %p', async (value) => {
+      await service.updateProductSource(arukereso().id, { detailRefreshInterval: value });
+
+      expect(sourceRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ detailRefreshInterval: value }),
+      );
+    });
+
     it.each([
       ['a string ms cannot read', '60 napig', /Invalid detailRefreshInterval format/],
+      ['a word other than once', 'soha', /Invalid detailRefreshInterval format/],
       ['an empty string', ' ', /cannot be cleared/],
       ['null', null, /cannot be cleared/],
       ['a negative interval', '-1d', /must be a positive interval/],

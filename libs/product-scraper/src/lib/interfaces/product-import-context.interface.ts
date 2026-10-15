@@ -1,4 +1,4 @@
-import { ProductModel, ProductSource, ProductImportTask } from '@fittkereso-backend/database';
+import { ListingPageRead, ProductModel, ProductSource, ProductImportTask } from '@fittkereso-backend/database';
 
 /**
  * Everything the persistence path needs about "where this product came from",
@@ -42,6 +42,14 @@ export interface ProductImportContext {
    * feed run can tell the row unchanged. Unset on the scrape path.
    */
   feedRowHash?: string;
+
+  /**
+   * A feed listing's page bookkeeping, stored on its record: when its product
+   * page was read (`fetchedAt`, which clears `failedAt`), or when reading it
+   * failed for good (`failedAt`). Unset on the scrape path and on a feed-only
+   * import, which leave both as stored.
+   */
+  pageRead?: ListingPageRead;
 }
 
 /** The scrape path's context: everything derives from the task itself. */

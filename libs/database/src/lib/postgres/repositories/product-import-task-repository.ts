@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { ProductImportTask } from '../models/product-import-task.entity';
 import { TaskStatus } from '../models/task.entity';
 import { BasePostgresRepository } from './base-postgres-repository';
@@ -216,25 +216,48 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
   }
 
   /**
-   * A source's feed_entry tasks for these URLs that have not settled: pending,
-   * processing, or failed with retries still to come. Only the columns a feed
-   * run needs to decide between replacing one and queuing another.
+   * A feed source's tasks for these product pages that have not settled:
+   * pending, processing, or failed with retries still to come — feed_entry and
+   * detail_page alike, since a page's task is one or the other. Found by
+   * `urlKey` (urlGroupKey of the page), and by `url` for a task queued
+   * before the key existed. With their payloads: a feed run adds this run's
+   * rows of a page to the page's waiting task.
    */
-  async findOpenFeedEntries(
+  async findOpenFeedTasks(
     sourceId: string,
+    urlKeys: string[],
     urls: string[],
   ): Promise<ProductImportTask[]> {
-    if (isEmpty(urls)) return [];
+    if (isEmpty(urlKeys) && isEmpty(urls)) return [];
     const t = (field: keyof ProductImportTask) =>
       `task.${nameOf<ProductImportTask>(field)}`;
     return this.repo
       .createQueryBuilder('task')
-      .select([t('id'), t('url'), t('status'), t('attempts'), t('payloadHash')])
+      .select([
+        t('id'),
+        t('url'),
+        t('urlKey'),
+        t('kind'),
+        t('status'),
+        t('attempts'),
+        t('payloadHash'),
+      ])
+      .addSelect(t('payload'))
       .where(`task."${nameOf<ProductImportTask>('source')}Id" = :sourceId`, {
         sourceId,
       })
-      .andWhere(`${t('kind')} = :kind`, { kind: ProductImportTaskKind.FeedEntry })
-      .andWhere(`${t('url')} IN (:...urls)`, { urls })
+      .andWhere(`${t('kind')} IN (:...kinds)`, {
+        kinds: [ProductImportTaskKind.FeedEntry, ProductImportTaskKind.DetailPage],
+      })
+      .andWhere(
+        new Brackets((match) => {
+          match.where('1 = 0');
+          if (!isEmpty(urlKeys)) match.orWhere(`${t('urlKey')} IN (:...urlKeys)`, { urlKeys });
+          if (!isEmpty(urls)) {
+            match.orWhere(`(${t('urlKey')} IS NULL AND ${t('url')} IN (:...urls))`, { urls });
+          }
+        }),
+      )
       .andWhere(`${t('status')} IN (:...statuses)`, {
         statuses: [TaskStatus.PENDING, TaskStatus.PROCESSING, TaskStatus.FAILED],
       })
@@ -276,29 +299,53 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
 
   /**
    * The newest feed row stored for a listing: what a resync of a feed listing
-   * imports again, since a feed has no page to fetch.
+   * imports again. Found by its page (`urlKey`, or `url` for a task queued
+   * before the key existed), and narrowed to the listing's own row — a page's
+   * task may carry several (a bike's sizes). A one-row payload of before rows
+   * were grouped (`{ item }`) is the listing's row. Null when none is stored.
    */
-  async latestFeedPayload(
-    sourceId: string,
-    url: string,
-  ): Promise<{ payload: Record<string, any>; payloadHash?: string | null } | null> {
+  async latestFeedPayload(params: {
+    sourceId: string;
+    url: string;
+    urlKey: string;
+    listingId?: string | null;
+  }): Promise<{ payload: Record<string, any>; payloadHash?: string | null } | null> {
+    const { sourceId, url, urlKey, listingId } = params;
     const t = (field: keyof ProductImportTask) =>
       `task.${nameOf<ProductImportTask>(field)}`;
-    const task = await this.repo
+    const tasks = await this.repo
       .createQueryBuilder('task')
       .select([t('id'), t('payloadHash')])
       .addSelect(t('payload'))
       .where(`task."${nameOf<ProductImportTask>('source')}Id" = :sourceId`, {
         sourceId,
       })
-      .andWhere(`${t('kind')} = :kind`, { kind: ProductImportTaskKind.FeedEntry })
-      .andWhere(`${t('url')} = :url`, { url })
+      .andWhere(`${t('kind')} IN (:...kinds)`, {
+        kinds: [ProductImportTaskKind.FeedEntry, ProductImportTaskKind.DetailPage],
+      })
+      .andWhere(`(${t('urlKey')} = :urlKey OR ${t('url')} = :url)`, { urlKey, url })
       .andWhere(`${t('payload')} IS NOT NULL`)
       .orderBy(t('createdAt'), 'DESC')
-      .getOne();
-    return task?.payload
-      ? { payload: task.payload, payloadHash: task.payloadHash }
-      : null;
+      .take(20)
+      .getMany();
+
+    for (const task of tasks) {
+      const payload = task.payload ?? {};
+      const rows: { item?: unknown; listingId?: string; rowHash?: string }[] = Array.isArray(payload['rows'])
+        ? payload['rows']
+        : payload['item']
+          ? [{ item: payload['item'] }]
+          : [];
+      const row =
+        (listingId ? rows.find((candidate) => candidate.listingId === listingId) : undefined) ??
+        (rows.length === 1 ? rows[0] : undefined);
+      if (!row?.item) continue;
+      return {
+        payload: { rows: [row], requestedSlugs: payload['requestedSlugs'] },
+        payloadHash: rows.length === 1 ? task.payloadHash : (row.rowHash ?? null),
+      };
+    }
+    return null;
   }
 
   /**

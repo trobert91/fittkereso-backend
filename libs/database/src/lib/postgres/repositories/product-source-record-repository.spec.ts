@@ -46,7 +46,13 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
     const seen = new Date('2026-09-20');
     const builder = makeQueryBuilder({
       getMany: [
-        { externalId: '1260042108', feedRowHash: 'h1', lastSeenAt: seen, product: { id: 'model-1' } },
+        {
+          externalId: '1260042108',
+          feedRowHash: 'h1',
+          lastSeenAt: seen,
+          product: { id: 'model-1' },
+          pageFetchedAt: seen,
+        },
         { externalId: '1104300-XL', feedRowHash: 'h2', lastUpdated: seen, product: null },
       ],
     });
@@ -61,8 +67,20 @@ describe('ProductSourceRecordRepository.findFeedRowStates', () => {
       'record."sourceId" = :sourceId',
       'record."externalId" IN (:...externalIds)',
     ]);
-    expect(states.get('1260042108')).toEqual({ feedRowHash: 'h1', seenAt: seen, modelId: 'model-1' });
-    expect(states.get('1104300-XL')).toEqual({ feedRowHash: 'h2', seenAt: seen, modelId: null });
+    expect(states.get('1260042108')).toEqual({
+      feedRowHash: 'h1',
+      seenAt: seen,
+      modelId: 'model-1',
+      pageFetchedAt: seen,
+      pageFailedAt: null,
+    });
+    expect(states.get('1104300-XL')).toEqual({
+      feedRowHash: 'h2',
+      seenAt: seen,
+      modelId: null,
+      pageFetchedAt: null,
+      pageFailedAt: null,
+    });
   });
 });
 

@@ -3,6 +3,7 @@ import * as client from 'prom-client';
 import { PrometheusService } from '../prometheus.service';
 import {
   FEED_ENTRY_SKIPPED_TOTAL,
+  FEED_PAGE_FAILED_TOTAL,
   FULL_SYNC_CATEGORIES_DISCOVERED_TOTAL,
   FULL_SYNC_DURATION_SECONDS,
   FULL_SYNC_LIST_TASKS_CREATED_TOTAL,
@@ -24,8 +25,15 @@ export class ProductCollectionMetricsService {
   private readonly listPageDetailTasksCreated: client.Counter<string>;
   private readonly queueDepthGauge: client.Gauge<string>;
   private readonly feedEntrySkipped: client.Counter<string>;
+  private readonly feedPageFailedCounter: client.Counter<string>;
 
   constructor(private readonly prometheusService: PrometheusService) {
+    this.feedPageFailedCounter = new client.Counter({
+      name: FEED_PAGE_FAILED_TOTAL,
+      help: "Feed rows' product pages not read on their task's last attempt (imported from the feed alone), by reason",
+      labelNames: ['source_type', 'reason'],
+      registers: [this.prometheusService.register],
+    });
     this.feedEntrySkipped = new client.Counter({
       name: FEED_ENTRY_SKIPPED_TOTAL,
       help: 'Queued feed rows their task skipped under the current config, by reason',
@@ -116,6 +124,10 @@ export class ProductCollectionMetricsService {
 
   feedEntrySkippedAt(sourceType: string, reason: string): void {
     this.feedEntrySkipped.inc({ source_type: sourceType, reason });
+  }
+
+  feedPageFailed(sourceType: string, reason: 'error' | 'mismatch'): void {
+    this.feedPageFailedCounter.inc({ source_type: sourceType, reason });
   }
 
   productSkipped(sourceType: string, reason: string): void {

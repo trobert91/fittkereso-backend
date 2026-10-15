@@ -416,6 +416,7 @@ export class ProductScrapeUpdaterService {
         brand,
         normalizedModel,
         feedRowHash: context.feedRowHash,
+        pageRead: context.pageRead,
       });
       await this.mergeService.mergeSources(model);
       // Before the offers: an offer's sourceRecord must be saved first.
@@ -484,6 +485,7 @@ export class ProductScrapeUpdaterService {
           brand: write.brand,
           normalizedModel: write.normalizedModel,
           feedRowHash: context.feedRowHash,
+          pageRead: context.pageRead,
         });
         await this.sourceRecordRepo.save(record);
         this.productMetricsService.scrapeResolutionOutcome(context.source.name, 'unattached');
@@ -1230,6 +1232,7 @@ export class ProductScrapeUpdaterService {
       brand,
       normalizedModel,
       feedRowHash: context.feedRowHash,
+      pageRead: context.pageRead,
     });
 
     // model.productCategory may only be the { id } stub set by

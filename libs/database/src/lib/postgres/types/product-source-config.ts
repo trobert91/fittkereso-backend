@@ -1,4 +1,5 @@
 import { SourceSpecConfig } from './product-category-config';
+import { ProductSourceFetchMode } from './product-source-fetch-mode';
 import { CategoryLookupCondition, ScrapeOperation } from './scrape-operation';
 
 /**
@@ -255,6 +256,32 @@ export interface ProductSourceDetailPageConfig {
   offerLinks?: ScrapeOperation[];
   translation?: ProductSourceTranslationConfig;
   postProcess?: ProductSourcePostProcessConfig;
+  /**
+   * How detail pages are fetched, overriding `ProductSource.fetchMode` for
+   * them only — e.g. `direct` for a shop that agreed to be read while its feed
+   * still comes through the scraping API. A feed itself, and a scraping
+   * source's list pages, keep the source's mode. See pageFetchModeOf.
+   */
+  fetchMode?: ProductSourceFetchMode;
+}
+
+/**
+ * A feed source's `detailPage`: each row's product page, read with the same
+ * parts and ops as a scraping source's, to fill what the row lacks — the feed
+ * is primary (mergeFeedAndPage). No part is required. Not here: `category`
+ * (the feed decides it), `offerLinks` (a feed's rows are the variants) and
+ * `postProcess` (a feed's is top-level).
+ */
+export type FeedDetailPageConfig = Partial<
+  Omit<ProductSourceDetailPageConfig, 'category' | 'offerLinks' | 'postProcess'>
+>;
+
+/** Where a source's detail pages come from: `detailPage.fetchMode`, else the source's own. */
+export function pageFetchModeOf(
+  source: { fetchMode: ProductSourceFetchMode },
+  detailPage: Pick<ProductSourceDetailPageConfig, 'fetchMode'> | undefined,
+): ProductSourceFetchMode {
+  return detailPage?.fetchMode ?? source.fetchMode;
 }
 
 /**
@@ -493,6 +520,12 @@ export interface ArukeresoSourceConfig {
    * identity resolution is worst at.
    */
   postProcess?: ProductSourcePostProcessConfig;
+  /**
+   * Each row's product page, read to fill what the feed row lacks (specs,
+   * a description, images…). Unset: the feed is the whole listing, as before.
+   * See FeedDetailPageConfig.
+   */
+  detailPage?: FeedDetailPageConfig;
 }
 
 /**

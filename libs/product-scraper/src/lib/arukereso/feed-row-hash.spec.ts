@@ -1,6 +1,7 @@
 import {
   asFeedEntryPayload,
   FEED_HASH_VERSION,
+  feedPayloadHash,
   feedRowHash,
   stableStringify,
 } from './feed-row-hash';
@@ -65,11 +66,67 @@ describe('stableStringify', () => {
 });
 
 describe('asFeedEntryPayload', () => {
-  it('accepts a stored row and rejects anything else', () => {
-    const payload = { item: { fields: { identifier: '1' }, attributes: [] }, requestedSlugs: ['ebikes'] };
+  const item = (identifier: string) => ({ fields: { identifier }, attributes: [] });
 
-    expect(asFeedEntryPayload(payload)).toBe(payload);
+  // A page's rows: every row of one product page, a bike's sizes say.
+  it('reads the rows of a page, its narrowing and its run', () => {
+    const payload = {
+      rows: [
+        { item: item('SC_M'), listingId: 'SC_M', rowHash: 'h1' },
+        { item: item('SC_L'), listingId: 'SC_L', rowHash: 'h2' },
+      ],
+      requestedSlugs: ['ebikes'],
+      runStartedAt: '2026-10-09T02:00:00.000Z',
+    };
+
+    expect(asFeedEntryPayload(payload)).toEqual(payload);
+  });
+
+  // A task queued before rows were grouped by page carries its one row as `item`.
+  it('reads a one-row payload of before rows were grouped', () => {
+    expect(asFeedEntryPayload({ item: item('1'), requestedSlugs: ['ebikes'] })).toEqual({
+      rows: [{ item: item('1') }],
+      requestedSlugs: ['ebikes'],
+      runStartedAt: undefined,
+    });
+  });
+
+  it('drops a malformed row, and refuses a payload with none left', () => {
+    expect(asFeedEntryPayload({ rows: [{ item: item('1') }, { item: { fields: {} } }, {}] })?.rows).toEqual([
+      { item: item('1') },
+    ]);
+    expect(asFeedEntryPayload({ rows: [{ item: { fields: {} } }] })).toBeUndefined();
+    expect(asFeedEntryPayload({ rows: [] })).toBeUndefined();
+  });
+
+  it('refuses anything else', () => {
     expect(asFeedEntryPayload(null)).toBeUndefined();
+    expect(asFeedEntryPayload(undefined)).toBeUndefined();
     expect(asFeedEntryPayload({ item: { fields: {} } })).toBeUndefined();
+    expect(asFeedEntryPayload({ rows: 'not rows' })).toBeUndefined();
+  });
+});
+
+describe('feedPayloadHash', () => {
+  // What a task carried before rows were grouped: an existing task still matches.
+  it("is a one-row page's own row hash", () => {
+    expect(feedPayloadHash([{ rowHash: 'h1' }])).toBe('h1');
+  });
+
+  it("ignores the order of a page's rows", () => {
+    expect(feedPayloadHash([{ rowHash: 'h1' }, { rowHash: 'h2' }])).toBe(
+      feedPayloadHash([{ rowHash: 'h2' }, { rowHash: 'h1' }]),
+    );
+  });
+
+  it('changes with any row, or another row', () => {
+    const base = feedPayloadHash([{ rowHash: 'h1' }, { rowHash: 'h2' }]);
+    expect(feedPayloadHash([{ rowHash: 'h1' }, { rowHash: 'h3' }])).not.toBe(base);
+    expect(feedPayloadHash([{ rowHash: 'h1' }, { rowHash: 'h2' }, { rowHash: 'h3' }])).not.toBe(base);
+    expect(feedPayloadHash([{ rowHash: 'h1' }, { rowHash: 'h2' }])).not.toBe('h1');
+  });
+
+  it('is undefined for a lone row without a hash', () => {
+    expect(feedPayloadHash([{}])).toBeUndefined();
   });
 });

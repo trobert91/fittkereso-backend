@@ -172,6 +172,56 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
+  // A feed listing's page bookkeeping: when its page was read, or reading it
+  // failed for good — what the feed run's triage reads to queue its page.
+  describe('page bookkeeping', () => {
+    const upsertWith = (model: ReturnType<typeof makeModel>, pageRead?: { fetchedAt?: Date; failedAt?: Date | null }) =>
+      service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 } } as any,
+        externalId: 'product-1',
+        sourceUrl: 'https://speedbike.hu/product-1',
+        pageRead,
+      });
+
+    it('stores when the page was read, clearing an earlier failure', async () => {
+      const model = makeModel();
+      const failedAt = new Date('2026-10-01');
+      await upsertWith(model, { failedAt });
+      const fetchedAt = new Date('2026-10-09');
+
+      const record = await upsertWith(model, { fetchedAt });
+
+      expect(record?.pageFetchedAt).toBe(fetchedAt);
+      expect(record?.pageFailedAt).toBeNull();
+    });
+
+    it('stores a failure without touching when the page was last read', async () => {
+      const model = makeModel();
+      const fetchedAt = new Date('2026-09-01');
+      await upsertWith(model, { fetchedAt });
+      const failedAt = new Date('2026-10-09');
+
+      const record = await upsertWith(model, { failedAt });
+
+      expect(record?.pageFetchedAt).toBe(fetchedAt);
+      expect(record?.pageFailedAt).toBe(failedAt);
+    });
+
+    // A scrape, or a feed-only import, says nothing about the page.
+    it('keeps both as stored when the import passes none', async () => {
+      const model = makeModel();
+      const fetchedAt = new Date('2026-09-01');
+      await upsertWith(model, { fetchedAt });
+
+      const record = await upsertWith(model, undefined);
+
+      expect(record?.pageFetchedAt).toBe(fetchedAt);
+      expect(record?.pageFailedAt).toBeNull();
+    });
+  });
+
   it('re-writes the row when the caller supplies a new productSpecsHash, even if scrapedProduct is present', async () => {
     const existingSource: Partial<ProductSourceRecord> = {
       source,

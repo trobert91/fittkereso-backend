@@ -23,7 +23,9 @@ import {
   SCRAPE_OPERATION_SCHEMA,
   SCRAPE_PIPELINE_SCHEMA,
 } from './scrape-operation.schema';
+import { omit } from 'lodash';
 import { ARUKERESO_MAPPING_TARGETS } from './product-source-config';
+import { PRODUCT_SOURCE_FETCH_MODES } from './product-source-fetch-mode';
 
 const pipelineRef = (description: string): JsonSchemaFragment => ({
   $ref: '#/$defs/pipeline',
@@ -324,6 +326,91 @@ const postProcessConfigSchema: JsonSchemaFragment = {
   additionalProperties: false,
 };
 
+/**
+ * The parts a product detail page is read with, shared by the scraping
+ * schema's `detailPage` (every part, most required) and a feed's (a subset,
+ * none required). One definition, so both validate the same ops the same way.
+ */
+const DETAIL_PAGE_PROPERTIES: Record<string, JsonSchemaFragment> = {
+  rawSpecs: pipelineRef(
+    'Pipeline producing the raw label/value spec pairs. Runs first, because category resolution can inspect them.',
+  ),
+  description: pipelineRef(
+    'Pipeline producing free-text marketing copy. Optional and lower-confidence than rawSpecs by nature, but some sources state values only here.',
+  ),
+  category: {
+    type: 'object',
+    description: "How this page's category label is read; the category sections' rules test it.",
+    properties: {
+      breadcrumbOrSource: pipelineRef(
+        "Pipeline producing the text the category sections' rules are matched against.",
+      ),
+    },
+    required: ['breadcrumbOrSource'],
+    additionalProperties: false,
+  },
+  brand: pipelineRef('Pipeline producing the brand name.'),
+  model: pipelineRef('Pipeline producing the model name.'),
+  aliases: pipelineRef('Pipeline producing alternative names for this product.'),
+  releaseYear: pipelineRef('Pipeline producing the model year.'),
+  externalId: pipelineRef(
+    "Pipeline producing the page's source-native id (SKU, product code) — stable across URL changes, and the key of the listing's record, so it must name exactly this page within the source. A size group's shared id belongs in siblingIds. Without it, the record is keyed by the URL slug, and a URL change leaves the old record behind.",
+  ),
+  siblingIds: pipelineRef(
+    "Optional. Pipeline producing the ids of this product's other sizes, as the shop itself declares them (e.g. a frame-size variation list), in the same id space as externalId. May include this page's own id. Identity resolution looks them up within this source only, so every size the shop groups lands on one product. Configure it only from a list the shop declares — groupings inferred from shared images or article-number prefixes put different bikes together.",
+  ),
+  images: pipelineRef('Pipeline producing image URLs.'),
+  offers: {
+    type: 'object',
+    description:
+      'How offers are read off the page. Omit to opt this source out of offers entirely.',
+    properties: {
+      offerList: pipelineRef('Pipeline producing the collection of offers to iterate.'),
+      itemMode: {
+        enum: ['cheerio', 'json'],
+        description:
+          'How each entry of offerList is exposed to itemPipeline — as a single-element selection, or as a raw JSON value.',
+      },
+      itemPipeline: {
+        allOf: [
+          { $ref: '#/$defs/pipeline' },
+          {
+            contains: { properties: { op: { const: 'assembleOffer' } }, required: ['op'] },
+          },
+        ],
+        description:
+          'Pipeline run once per offerList entry. Must terminate in an assembleOffer op, or it produces no offer.',
+      },
+    },
+    required: ['offerList', 'itemMode', 'itemPipeline'],
+    additionalProperties: false,
+  },
+  offerLinks: pipelineRef(
+    'Pipeline producing links to sibling detail pages for the SAME product under a different URL — size/colour variants. These are fetched within the same scrape and folded into one product; no separate task is queued.',
+  ),
+  translation: {
+    type: 'object',
+    description: 'Per-source LLM translation of spec values.',
+    properties: {
+      enabled: { type: 'boolean', description: 'Whether translation runs.' },
+      sourceLanguage: { type: 'string', description: 'ISO code of the source language.' },
+      targetLanguage: { type: 'string', description: 'ISO code of the target language.' },
+      contextTemplate: {
+        type: 'string',
+        description: 'Context given to the translator, with {{var}} interpolation.',
+      },
+    },
+    required: ['enabled', 'sourceLanguage', 'targetLanguage', 'contextTemplate'],
+    additionalProperties: false,
+  },
+  postProcess: postProcessConfigSchema,
+  fetchMode: {
+    enum: [...PRODUCT_SOURCE_FETCH_MODES],
+    description:
+      'Optional. How detail pages are fetched, overriding the source\'s fetchMode for them only: "direct" for a shop that agreed to be read, "proxied" through the scraping API. A feed itself, and a scraping source\'s list pages, keep the source\'s fetchMode.',
+  },
+};
+
 export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
   // NO `$schema` DECLARATION, deliberately — do not add one back.
   //
@@ -420,80 +507,7 @@ export const SCRAPING_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     detailPage: {
       type: 'object',
       description: 'How a product detail page is parsed.',
-      properties: {
-        rawSpecs: pipelineRef(
-          'Pipeline producing the raw label/value spec pairs. Runs first, because category resolution can inspect them.',
-        ),
-        description: pipelineRef(
-          'Pipeline producing free-text marketing copy. Optional and lower-confidence than rawSpecs by nature, but some sources state values only here.',
-        ),
-        category: {
-          type: 'object',
-          description: "How this page's category label is read; the category sections' rules test it.",
-          properties: {
-            breadcrumbOrSource: pipelineRef(
-              "Pipeline producing the text the category sections' rules are matched against.",
-            ),
-          },
-          required: ['breadcrumbOrSource'],
-          additionalProperties: false,
-        },
-        brand: pipelineRef('Pipeline producing the brand name.'),
-        model: pipelineRef('Pipeline producing the model name.'),
-        aliases: pipelineRef('Pipeline producing alternative names for this product.'),
-        releaseYear: pipelineRef('Pipeline producing the model year.'),
-        externalId: pipelineRef(
-          "Pipeline producing the page's source-native id (SKU, product code) — stable across URL changes, and the key of the listing's record, so it must name exactly this page within the source. A size group's shared id belongs in siblingIds. Without it, the record is keyed by the URL slug, and a URL change leaves the old record behind.",
-        ),
-        siblingIds: pipelineRef(
-          "Optional. Pipeline producing the ids of this product's other sizes, as the shop itself declares them (e.g. a frame-size variation list), in the same id space as externalId. May include this page's own id. Identity resolution looks them up within this source only, so every size the shop groups lands on one product. Configure it only from a list the shop declares — groupings inferred from shared images or article-number prefixes put different bikes together.",
-        ),
-        images: pipelineRef('Pipeline producing image URLs.'),
-        offers: {
-          type: 'object',
-          description:
-            'How offers are read off the page. Omit to opt this source out of offers entirely.',
-          properties: {
-            offerList: pipelineRef('Pipeline producing the collection of offers to iterate.'),
-            itemMode: {
-              enum: ['cheerio', 'json'],
-              description:
-                'How each entry of offerList is exposed to itemPipeline — as a single-element selection, or as a raw JSON value.',
-            },
-            itemPipeline: {
-              allOf: [
-                { $ref: '#/$defs/pipeline' },
-                {
-                  contains: { properties: { op: { const: 'assembleOffer' } }, required: ['op'] },
-                },
-              ],
-              description:
-                'Pipeline run once per offerList entry. Must terminate in an assembleOffer op, or it produces no offer.',
-            },
-          },
-          required: ['offerList', 'itemMode', 'itemPipeline'],
-          additionalProperties: false,
-        },
-        offerLinks: pipelineRef(
-          'Pipeline producing links to sibling detail pages for the SAME product under a different URL — size/colour variants. These are fetched within the same scrape and folded into one product; no separate task is queued.',
-        ),
-        translation: {
-          type: 'object',
-          description: 'Per-source LLM translation of spec values.',
-          properties: {
-            enabled: { type: 'boolean', description: 'Whether translation runs.' },
-            sourceLanguage: { type: 'string', description: 'ISO code of the source language.' },
-            targetLanguage: { type: 'string', description: 'ISO code of the target language.' },
-            contextTemplate: {
-              type: 'string',
-              description: 'Context given to the translator, with {{var}} interpolation.',
-            },
-          },
-          required: ['enabled', 'sourceLanguage', 'targetLanguage', 'contextTemplate'],
-          additionalProperties: false,
-        },
-        postProcess: postProcessConfigSchema,
-      },
+      properties: DETAIL_PAGE_PROPERTIES,
       required: ['rawSpecs', 'category', 'brand', 'model', 'images'],
       additionalProperties: false,
     },
@@ -714,6 +728,14 @@ export const ARUKERESO_SOURCE_CONFIG_SCHEMA: JsonSchemaFragment = {
     },
 
     postProcess: postProcessConfigSchema,
+
+    detailPage: {
+      type: 'object',
+      description:
+        "Optional. Each row's product page (its url mapping), read with the same parts and ops as a scraping source's detailPage, to fill what the feed row lacks: the feed is primary, and a page value only fills a gap. No part is required. Not here: category (the feed decides it), offerLinks (the feed's rows are the variants) and postProcess (a feed's is top-level). A row's page is read when the row is new, has never been read, or is due by the source's detailRefreshInterval ('once' by default).",
+      properties: omit(DETAIL_PAGE_PROPERTIES, ['category', 'offerLinks', 'postProcess']),
+      additionalProperties: false,
+    },
   },
 
   $defs: {

@@ -1,4 +1,5 @@
 export * from './product-details-page-scraper.service';
+export * from './product-page-reader.service';
 export * from './product-list-page-scraper.service';
 export * from './scrape-url-deduplication.service';
 export * from './list-product-refresh.service';

@@ -1,5 +1,6 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ProductDetailsPageScraperService } from './services/product-details-page-scraper.service';
+import { ProductPageReaderService } from './services/product-page-reader.service';
 import { ProductListPageScraperService } from './services/product-list-page-scraper.service';
 import { ScraperModule } from '@fittkereso-backend/scraper';
 import { ProductScrapeUpdaterService } from './services/product-scrape-updater.service';
@@ -48,6 +49,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
   ],
   providers: [
     ProductDetailsPageScraperService,
+    ProductPageReaderService,
     ProductListPageScraperService,
     ProductScrapeUpdaterService,
     ScrapeUrlDeduplicationService,

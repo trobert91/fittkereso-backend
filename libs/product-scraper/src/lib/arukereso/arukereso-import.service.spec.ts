@@ -34,7 +34,7 @@ describe('ArukeresoImportService', () => {
   };
   let offerRepo: { findSyncStates: jest.Mock; stampSynced: jest.Mock };
   let taskRepo: {
-    findOpenFeedEntries: jest.Mock;
+    findOpenFeedTasks: jest.Mock;
     saveAll: jest.Mock;
     repo: { update: jest.Mock };
   };
@@ -143,7 +143,7 @@ describe('ArukeresoImportService', () => {
       stampSynced: jest.fn().mockResolvedValue(undefined),
     };
     taskRepo = {
-      findOpenFeedEntries: jest.fn().mockResolvedValue([]),
+      findOpenFeedTasks: jest.fn().mockResolvedValue([]),
       saveAll: jest.fn().mockImplementation(async (tasks) => tasks),
       repo: { update: jest.fn().mockResolvedValue(undefined) },
     };
@@ -206,9 +206,16 @@ describe('ArukeresoImportService', () => {
       status: TaskStatus.PENDING,
       priority: 50,
       payloadHash: feedRowHash(urlOf(1), productOf(1)),
-      payload: { requestedSlugs: ['ebikes'] },
+      payload: { requestedSlugs: ['ebikes'], runStartedAt: expect.any(String) },
     });
-    expect(task.payload?.['item']).toMatchObject({ fields: { identifier: '1' } });
+    expect(task.payload?.['rows']).toEqual([
+      {
+        item: expect.objectContaining({ fields: expect.objectContaining({ identifier: '1' }) }),
+        listingId: 'sku-1',
+        rowHash: feedRowHash(urlOf(1), productOf(1)),
+      },
+    ]);
+    expect(task.urlKey).toBe(urlOf(1));
     expect(task.source).toBe(source);
   });
 
@@ -364,8 +371,16 @@ describe('ArukeresoImportService', () => {
 
   describe('a row with a task already open', () => {
     const openTask = (status: TaskStatus, fields: Record<string, unknown> = {}) =>
-      taskRepo.findOpenFeedEntries.mockResolvedValue([
-        { id: 'task-open', url: urlOf(1), status, attempts: 0, payloadHash: 'old', ...fields },
+      taskRepo.findOpenFeedTasks.mockResolvedValue([
+        {
+          id: 'task-open',
+          url: urlOf(1),
+          kind: ProductImportTaskKind.FeedEntry,
+          status,
+          attempts: 0,
+          payloadHash: 'old',
+          ...fields,
+        },
       ]);
 
     it('gives a pending task the new row instead of queuing another', async () => {
@@ -726,6 +741,350 @@ describe('ArukeresoImportService', () => {
 
       expect(summary.feedTasksEnqueued).toBe(5);
       expect(summary.skipped).toBe(20);
+    });
+  });
+
+  // k2shop: a bike's sizes are separate feed rows on one product page. Every
+  // row is its own listing; the page is one task carrying all of them.
+  describe('rows that share a product page', () => {
+    /** Open tasks as the database would keep them across the run's batches. */
+    let store: ProductImportTask[];
+
+    /** Ids mapped to a URL of their own, or a shared one: `page` maps id → URL. */
+    const givenPages = (page: Record<string, string>) =>
+      mapper.map.mockImplementation(async ({ item }) => {
+        const id = item.fields['identifier'];
+        return { status: 'mapped', url: page[id] ?? urlOf(id), scrapedProduct: productOf(id) };
+      });
+    const rowsOf = (task: ProductImportTask) =>
+      ((task.payload?.['rows'] ?? []) as { listingId: string }[]).map((row) => row.listingId);
+    const scale = 'https://www.k2shop.hu/scott-scale-940';
+
+    beforeEach(() => {
+      store = [];
+      let next = 0;
+      taskRepo.saveAll.mockImplementation(async (tasks: ProductImportTask[]) => {
+        for (const task of tasks) store.push(Object.assign(task, { id: `task-${(next += 1)}`, attempts: 0 }));
+        return tasks;
+      });
+      taskRepo.repo.update.mockImplementation(async (id: string, fields: Partial<ProductImportTask>) => {
+        Object.assign(store.find((task) => task.id === id) ?? {}, fields);
+      });
+      taskRepo.findOpenFeedTasks.mockImplementation(async (_sourceId, keys: string[], urls: string[]) =>
+        store.filter(
+          (task) =>
+            [TaskStatus.PENDING, TaskStatus.PROCESSING, TaskStatus.FAILED].includes(task.status) &&
+            (task.urlKey ? keys.includes(task.urlKey) : urls.includes(task.url)),
+        ),
+      );
+    });
+
+    it('queues one task per page, carrying every row of it', async () => {
+      givenFeed(['SC_M', 'SC_L', 'SC_XL', 'OTHER']);
+      givenPages({ SC_M: scale, SC_L: scale, SC_XL: scale });
+
+      const summary = await service.import(source);
+
+      expect(summary.feedTasksEnqueued).toBe(2);
+      expect(summary.duplicateUrls).toBe(2);
+      const [page, other] = store;
+      expect(page).toMatchObject({ url: scale, urlKey: 'https://k2shop.hu/scott-scale-940', externalId: null });
+      expect(rowsOf(page)).toEqual(['sku-SC_M', 'sku-SC_L', 'sku-SC_XL']);
+      expect(other).toMatchObject({ url: urlOf('OTHER'), externalId: 'sku-OTHER' });
+      expect(rowsOf(other)).toEqual(['sku-OTHER']);
+    });
+
+    // The rows of one page may spell its URL differently.
+    it('groups the rows however each spells the page’s URL', async () => {
+      givenFeed(['SC_M', 'SC_L', 'SC_XL', 'SC_XXL']);
+      givenPages({
+        SC_M: 'https://www.k2shop.hu/scott-scale-940',
+        SC_L: 'https://k2shop.hu/scott-scale-940/',
+        SC_XL: 'http://WWW.k2shop.hu/scott-scale-940',
+        SC_XXL: 'https://k2shop.hu//scott-scale-940',
+      });
+
+      await service.import(source);
+
+      expect(store).toHaveLength(1);
+      expect(rowsOf(store[0])).toEqual(['sku-SC_M', 'sku-SC_L', 'sku-SC_XL', 'sku-SC_XXL']);
+      // Fetched as the first row spells it: the shop may need its www.
+      expect(store[0].url).toBe('https://www.k2shop.hu/scott-scale-940');
+    });
+
+    it('keeps two pages apart', async () => {
+      givenFeed(['A', 'B']);
+      givenPages({ A: `${scale}`, B: `${scale}-2` });
+
+      await service.import(source);
+
+      expect(store.map(rowsOf)).toEqual([['sku-A'], ['sku-B']]);
+    });
+
+    it('gives the same rows in another order the same payload hash', async () => {
+      givenFeed(['SC_M', 'SC_L']);
+      givenPages({ SC_M: scale, SC_L: scale });
+      await service.import(source);
+      const forward = store[0].payloadHash;
+
+      store = [];
+      givenFeed(['SC_L', 'SC_M']);
+      await service.import(source);
+
+      expect(store[0].payloadHash).toBe(forward);
+    });
+
+    // A run flushes every FEED_FLUSH_SIZE rows: a page's rows can fall in two.
+    it('adds a later batch’s rows of a page to the task this run queued for it', async () => {
+      const filler = Array.from({ length: FEED_FLUSH_SIZE - 1 }, (_, i) => `f${i}`);
+      givenFeed([...filler, 'SC_M', 'SC_L']);
+      givenPages({ SC_M: scale, SC_L: scale });
+
+      const summary = await service.import(source);
+
+      const page = store.find((task) => task.url === scale);
+      expect(rowsOf(page as ProductImportTask)).toEqual(['sku-SC_M', 'sku-SC_L']);
+      expect(store.filter((task) => task.url === scale)).toHaveLength(1);
+      expect(summary.tasksReplaced).toBe(1);
+    });
+
+    it('replaces an earlier run’s waiting rows of the page instead of adding to them', async () => {
+      store.push({
+        id: 'old',
+        kind: ProductImportTaskKind.FeedEntry,
+        url: scale,
+        urlKey: 'https://k2shop.hu/scott-scale-940',
+        status: TaskStatus.PENDING,
+        attempts: 0,
+        payloadHash: 'old',
+        payload: {
+          rows: [{ item: { fields: {}, attributes: [] }, listingId: 'sku-GONE', rowHash: 'x' }],
+          runStartedAt: '2026-10-01T02:00:00.000Z',
+        },
+      } as unknown as ProductImportTask);
+      givenFeed(['SC_M', 'SC_L']);
+      givenPages({ SC_M: scale, SC_L: scale });
+
+      const summary = await service.import(source);
+
+      expect(summary).toMatchObject({ tasksReplaced: 1, feedTasksEnqueued: 0 });
+      expect(rowsOf(store[0])).toEqual(['sku-SC_M', 'sku-SC_L']);
+    });
+
+    // A task queued before rows were grouped is found by its URL.
+    it('finds a waiting task of before the URL key by its URL', async () => {
+      store.push({
+        id: 'legacy',
+        kind: ProductImportTaskKind.FeedEntry,
+        url: scale,
+        urlKey: null,
+        status: TaskStatus.PENDING,
+        attempts: 0,
+        payloadHash: 'old',
+        payload: { item: { fields: {}, attributes: [] } },
+      } as unknown as ProductImportTask);
+      givenFeed(['SC_M']);
+      givenPages({ SC_M: scale });
+
+      await service.import(source);
+
+      expect(store).toHaveLength(1);
+      expect(store[0]).toMatchObject({ id: 'legacy', urlKey: 'https://k2shop.hu/scott-scale-940' });
+      expect(rowsOf(store[0])).toEqual(['sku-SC_M']);
+    });
+
+    // A task busy with the page does not swallow this run's rows.
+    it('queues a second task for the page while one is importing other rows of it', async () => {
+      store.push({
+        id: 'busy',
+        kind: ProductImportTaskKind.FeedEntry,
+        url: scale,
+        urlKey: 'https://k2shop.hu/scott-scale-940',
+        status: TaskStatus.PROCESSING,
+        attempts: 0,
+        payloadHash: 'other-rows',
+        payload: { rows: [] },
+      } as unknown as ProductImportTask);
+      givenFeed(['SC_M', 'SC_L']);
+      givenPages({ SC_M: scale, SC_L: scale });
+
+      const summary = await service.import(source);
+
+      expect(summary.feedTasksEnqueued).toBe(1);
+      expect(rowsOf(store[1])).toEqual(['sku-SC_M', 'sku-SC_L']);
+    });
+
+    it('keeps the last row of a listing repeated on one page', async () => {
+      givenFeed(['SC_M', 'SC_M']);
+      let call = 0;
+      mapper.map.mockImplementation(async () => {
+        call += 1;
+        return { status: 'mapped', url: scale, scrapedProduct: productOf('SC_M', call * 100) };
+      });
+
+      await service.import(source);
+
+      expect(rowsOf(store[0])).toEqual(['sku-SC_M']);
+      expect(store[0].payloadHash).toBe(feedRowHash(scale, productOf('SC_M', 200)));
+    });
+
+    // Each row of a page is triaged on its own: only what changed is imported.
+    it('carries only the changed rows of a page, and confirms the rest in place', async () => {
+      givenFeed(['SC_M', 'SC_L', 'SC_XL']);
+      givenPages({ SC_M: scale, SC_L: scale, SC_XL: scale });
+      sourceRecordRepo.findFeedRowStates.mockResolvedValue(
+        new Map(
+          ['SC_M', 'SC_XL'].map((id) => [
+            `sku-${id}`,
+            { feedRowHash: feedRowHash(scale, productOf(id)), seenAt: new Date(), modelId: 'model-1', pageFetchedAt: null, pageFailedAt: null },
+          ]),
+        ),
+      );
+      offerRepo.findSyncStates.mockResolvedValue([
+        { id: 'offer-M', externalId: 'sku-SC_M', modelId: 'model-1', lastSynced: new Date() },
+        { id: 'offer-XL', externalId: 'sku-SC_XL', modelId: 'model-1', lastSynced: new Date() },
+      ]);
+
+      const summary = await service.import(source);
+
+      expect(summary.offersUpdated).toBe(2);
+      expect(store).toHaveLength(1);
+      expect(rowsOf(store[0])).toEqual(['sku-SC_L']);
+    });
+  });
+
+  // A source with a detailPage reads a row's product page when the row is new,
+  // its page was never read, or the page is due by detailRefreshInterval.
+  describe('rows whose product page is to be read', () => {
+    const pageSource = (detailRefreshInterval = 'once') =>
+      ({ ...sourceWith({ detailPage: { rawSpecs: [] } }), detailRefreshInterval }) as ProductSource;
+    const day = 24 * 60 * 60 * 1000;
+
+    /** One stored listing whose feed row is unchanged, with these page timestamps. */
+    const givenUnchanged = (id: string, page: { pageFetchedAt?: Date | null; pageFailedAt?: Date | null }) => {
+      sourceRecordRepo.findFeedRowStates.mockResolvedValue(
+        new Map([
+          [
+            `sku-${id}`,
+            {
+              feedRowHash: feedRowHash(urlOf(id), productOf(id)),
+              seenAt: new Date(),
+              modelId: `model-${id}`,
+              pageFetchedAt: page.pageFetchedAt ?? null,
+              pageFailedAt: page.pageFailedAt ?? null,
+            },
+          ],
+        ]),
+      );
+      offerRepo.findSyncStates.mockResolvedValue([
+        { id: `offer-${id}`, externalId: `sku-${id}`, modelId: `model-${id}`, lastSynced: new Date() },
+      ]);
+    };
+
+    it('reads a new row’s page first: a detail_page task', async () => {
+      givenFeed(['1']);
+
+      await service.import(pageSource());
+
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.DetailPage })]);
+    });
+
+    it('queues an unchanged row whose page was never read', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: null });
+
+      const summary = await service.import(pageSource());
+
+      expect(summary.offersUpdated).toBe(0);
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.DetailPage })]);
+    });
+
+    it("never reads a page again for its age under 'once'", async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: new Date(Date.now() - 400 * day) });
+
+      const summary = await service.import(pageSource('once'));
+
+      expect(summary.offersUpdated).toBe(1);
+      expect(queuedTasks()).toEqual([]);
+    });
+
+    it('reads a page again once due by the interval', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: new Date(Date.now() - 2 * day) });
+
+      await service.import(pageSource('1d'));
+
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.DetailPage })]);
+    });
+
+    it('leaves a page read recently alone', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: new Date(Date.now() - 60 * 60 * 1000) });
+
+      await service.import(pageSource('7d'));
+
+      expect(queuedTasks()).toEqual([]);
+    });
+
+    it('backs off a page whose reading failed for good within the last week', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: null, pageFailedAt: new Date(Date.now() - 2 * day) });
+
+      await service.import(pageSource());
+
+      expect(queuedTasks()).toEqual([]);
+    });
+
+    it('tries the page again once the backoff has passed', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: null, pageFailedAt: new Date(Date.now() - 8 * day) });
+
+      await service.import(pageSource());
+
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.DetailPage })]);
+    });
+
+    // Prices stay fresh: a changed row whose page is not due skips the fetch.
+    it('imports a changed row whose page is not due as a feed_entry', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: new Date() });
+      mapper.map.mockResolvedValue({ status: 'mapped', url: urlOf('1'), scrapedProduct: productOf('1', 999) });
+
+      await service.import(pageSource());
+
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.FeedEntry })]);
+    });
+
+    it('reads the page of a source without a detailPage never', async () => {
+      givenFeed(['1']);
+
+      await service.import(sourceWith());
+
+      expect(queuedTasks()).toEqual([expect.objectContaining({ kind: ProductImportTaskKind.FeedEntry })]);
+    });
+
+    it('makes a waiting feed_entry a detail_page once its page is due', async () => {
+      givenFeed(['1']);
+      givenUnchanged('1', { pageFetchedAt: null });
+      taskRepo.findOpenFeedTasks.mockResolvedValue([
+        {
+          id: 'waiting',
+          url: urlOf('1'),
+          urlKey: urlOf('1').replace('https://', 'https://'),
+          kind: ProductImportTaskKind.FeedEntry,
+          status: TaskStatus.PENDING,
+          attempts: 0,
+          payloadHash: feedRowHash(urlOf('1'), productOf('1')),
+        },
+      ]);
+
+      await service.import(pageSource());
+
+      expect(taskRepo.repo.update).toHaveBeenCalledWith(
+        'waiting',
+        expect.objectContaining({ kind: ProductImportTaskKind.DetailPage }),
+      );
     });
   });
 });

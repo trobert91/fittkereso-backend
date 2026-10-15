@@ -1,4 +1,5 @@
 import { ProductDetailsPageScraperService } from './product-details-page-scraper.service';
+import { ProductPageReaderService } from './product-page-reader.service';
 import type {
   ProductCategory,
   ProductImportTask,
@@ -8,6 +9,8 @@ import { ListingExternalIdMismatchError, asScrapingConfig } from '@fittkereso-ba
 
 describe('ProductDetailsPageScraperService.extractProduct', () => {
   let service: ProductDetailsPageScraperService;
+  let pageReader: ProductPageReaderService;
+  let scraperService: { getHtml: jest.Mock };
   let interpreter: { runDetailPage: jest.Mock };
   let runtime: { getCategoryBySlug: jest.Mock };
   let categoryConfigService: { getJsonSchema: jest.Mock; getConfig: jest.Mock };
@@ -65,26 +68,43 @@ describe('ProductDetailsPageScraperService.extractProduct', () => {
     };
     specExtraction = { extractSpecs: jest.fn().mockReturnValue({}) };
     scrapingMetrics = { recordExtractionSkipReason: jest.fn() };
+    scraperService = { getHtml: jest.fn().mockResolvedValue('<html></html>') };
 
     // No LLM service and no record repository among the dependencies: this
     // importer cannot spend a call or decide to skip one. The updater does
     // both, once identity resolution knows whether the listing is new.
-    service = new ProductDetailsPageScraperService(
-      {} as any, // scraperService
-      {} as any, // productUpdaterService
-      scrapingMetrics as any,
+    // The page is read by the service a feed's page task reads pages with
+    // too; only its fetch is stubbed, so these cases run the real reading.
+    pageReader = new ProductPageReaderService(
+      scraperService as any,
       interpreter as any,
       runtime as any,
       categoryConfigService as any,
       specExtraction as any,
       {} as any, // translationSelector
       {} as any, // translationService
+      scrapingMetrics as any,
+    );
+    service = new ProductDetailsPageScraperService(
+      pageReader,
+      {} as any, // productUpdaterService
+      scrapingMetrics as any,
+      categoryConfigService as any,
       {} as any, // importTaskPublisher
+      {} as any, // feedEntries
     );
   });
 
-  function callExtractProduct(task: ProductImportTask) {
-    return (service as any).extractProduct(task, {} as any);
+  // What scrapeProductDetailsPage does before handing over: read the page,
+  // then build the listing from it.
+  async function callExtractProduct(task: ProductImportTask) {
+    const config = asScrapingConfig(task.source.config);
+    const interpretation = await pageReader.interpret({
+      task,
+      config,
+      expectedExternalIds: [task.externalId],
+    });
+    return (service as any).extractProduct(task, config, interpretation);
   }
 
   // A page title is not a model name: only the identity extraction sets one.
@@ -310,16 +330,12 @@ describe('ProductDetailsPageScraperService.dispatchVariantTasks', () => {
     };
 
     service = new ProductDetailsPageScraperService(
-      {} as any, // scraperService
+      {} as any, // pageReader
       {} as any, // productUpdaterService
       {} as any, // scrapingMetrics
-      {} as any, // interpreter
-      {} as any, // runtime
       {} as any, // categoryConfigService
-      {} as any, // specExtraction
-      {} as any, // translationSelector
-      {} as any, // translationService
       importTaskPublisher as any,
+      {} as any, // feedEntries
     );
   });
 

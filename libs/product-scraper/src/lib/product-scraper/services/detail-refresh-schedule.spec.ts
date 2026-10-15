@@ -2,6 +2,7 @@ import {
   detailRefreshDueAt,
   detailRefreshIntervalMs,
   detailRefreshLead,
+  isDetailRefreshOnce,
 } from './detail-refresh-schedule';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -45,6 +46,13 @@ function ebikeshopLikeUrls(count: number): string[] {
 describe('detailRefreshIntervalMs', () => {
   it("reads the source's interval", () => {
     expect(detailRefreshIntervalMs({ detailRefreshInterval: '8w' })).toBe(56 * DAY);
+    expect(detailRefreshIntervalMs({ detailRefreshInterval: '1d' })).toBe(DAY);
+    expect(detailRefreshIntervalMs({ detailRefreshInterval: '2d' })).toBe(2 * DAY);
+  });
+
+  it("has no interval for 'once', however it is written", () => {
+    expect(detailRefreshIntervalMs({ detailRefreshInterval: 'once' })).toBeUndefined();
+    expect(detailRefreshIntervalMs({ detailRefreshInterval: ' Once ' as never })).toBeUndefined();
   });
 
   it('falls back to 60 days for an interval it cannot read', () => {
@@ -53,8 +61,30 @@ describe('detailRefreshIntervalMs', () => {
   });
 });
 
+describe('isDetailRefreshOnce', () => {
+  it("is true only for 'once'", () => {
+    expect(isDetailRefreshOnce('once')).toBe(true);
+    expect(isDetailRefreshOnce('ONCE')).toBe(true);
+    expect(isDetailRefreshOnce('1d')).toBe(false);
+    expect(isDetailRefreshOnce(undefined)).toBe(false);
+    expect(isDetailRefreshOnce(null)).toBe(false);
+  });
+});
+
 describe('detailRefreshDueAt', () => {
   const lastUpdated = new Date('2026-09-26T03:00:00Z');
+  const dueAt = (url: string): Date => {
+    const due = detailRefreshDueAt({ url, lastUpdated, intervalMs: SIXTY_DAYS });
+    if (!due) throw new Error('a 60-day interval always has a due date');
+    return due;
+  };
+
+  // 'once': a page read once is never due again for its age.
+  it('is never due without an interval', () => {
+    expect(
+      detailRefreshDueAt({ url: 'https://shop.hu/a', lastUpdated, intervalMs: undefined }),
+    ).toBeUndefined();
+  });
 
   it('gives a URL the same due date on every run', () => {
     const url = 'https://ebikeshop.hu/termek/ktm-macina-style-820-46-cm';
@@ -64,7 +94,7 @@ describe('detailRefreshDueAt', () => {
   // Never later than the interval, provided a run sees the card.
   it('makes every listing due between 75% and 100% of the interval', () => {
     for (const url of ebikeshopLikeUrls(605)) {
-      const age = detailRefreshDueAt({ url, lastUpdated, intervalMs: SIXTY_DAYS }).getTime() - lastUpdated.getTime();
+      const age = dueAt(url).getTime() - lastUpdated.getTime();
       expect(age).toBeGreaterThan(45 * DAY);
       expect(age).toBeLessThanOrEqual(SIXTY_DAYS);
     }
@@ -75,7 +105,7 @@ describe('detailRefreshDueAt', () => {
   it('spreads a first import of 605 listings evenly over days 45–60', () => {
     const perDay = new Map<number, number>();
     for (const url of ebikeshopLikeUrls(605)) {
-      const due = detailRefreshDueAt({ url, lastUpdated, intervalMs: SIXTY_DAYS });
+      const due = dueAt(url);
       const day = Math.floor((due.getTime() - lastUpdated.getTime()) / DAY);
       perDay.set(day, (perDay.get(day) ?? 0) + 1);
     }
