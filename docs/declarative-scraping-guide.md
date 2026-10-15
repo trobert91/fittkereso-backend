@@ -139,8 +139,18 @@ interface ArukeresoSourceConfig {
   category?: { labelFrom?: ScrapeOperation[] };    // turns the raw category value into the label the rules test
   mapping: Record<ArukeresoMappingTarget, FieldMapping | FieldMapping[]>;  // FieldMapping = { field?: string; pipeline?: ScrapeOperation[] }
   postProcess?: ProductSourcePostProcessConfig;    // the same block ({ identity, specs, … }), read by the same service
+  detailPage?: FeedDetailPageConfig;               // optional: read each row's product page too — see below
 }
 ```
+
+**Reading a feed's product pages (`detailPage`).** A feed often carries no specs while the shop's product page has a full table (mangobike: 11 columns, no gender, weight or torque). A feed source with a `detailPage` reads each row's page **once** and keeps it:
+
+- **The same schema, ops and reader as scraping.** `detailPage` takes the scraping `detailPage` parts (`rawSpecs`, `description`, `images`, `offers`, `externalId`, `siblingIds`, `translation`, …), less `category` (the feed decides), `offerLinks` (the feed's rows are the variants) and `postProcess` (a feed keeps its own at the top level). No part is required. The page's labels are mapped by the same category section's `specMapping`, beside the feed's.
+- **`detailPage.fetchMode`** overrides the source's `fetchMode` for pages: a shop that agreed to be read is fetched `direct`, while its feed may stay as it is.
+- **The feed is primary.** Every value the row has wins: category, brand, title, price, stock, and each spec it maps. The page only fills what the row lacks (`mergeFeedAndPage`): missing spec keys, description, images, aliases, GTIN/MPN; the old price only when the feed maps none and the feed's price is still the one the page showed. A page read once can never switch a listing's category or flip its price.
+- **When.** The feed run queues a row as a `detail_page` task when it has no record (page first), its page was never read, or the page is due by `detailRefreshInterval` (`'once'`: never). Otherwise a changed row is a `feed_entry` task, which merges the row with the page its record keeps (`scrapedProduct.page`) — no fetch. A page that cannot be read is retried; the last attempt imports the row from the feed alone and sets `pageFailedAt`, and the page is left alone for a week.
+- **Rows sharing a page** (a bike's sizes): one task per page (`urlGroupKey`, the URL sanitised), carrying all its rows; the page is read once and each row is its own listing.
+- **Check it** with `simulate_product_source_scrape` (a feed source, `categorySlug`) and `simulate_product_source_import`, whose previews read their page and merge it in.
 
 Small on purpose: `field` does the addressing and the op pipeline does the transforming, which is why this type needs **no scrape ops of its own**. The mapping targets are a closed set (`ARUKERESO_MAPPING_TARGETS`) asserted by the schema, so a typo'd target is refused rather than silently ignored. A feed is the whole catalogue, so its category sections' rules are what keep everything else out: a feed source with no section imports nothing at all.
 
@@ -339,6 +349,33 @@ A shop may have several sources: speedbike has its Árukereső feed and its Goog
 - **A contributing source's names:** it never names a product, and its record stores no match key (`normalizedSourceName` null), since nothing matches on it. With `postProcess.identity` on, its listings still get the identity extraction: that names the record and reads its listing-level specs (size, colour), which fill the offer's keys the seller's higher sources lack. With it off, a record has only its title (`originalName`), flagged `identity_off`.
 - **Speedbike's setup:** `speedbike-arukereso` (priority 60, identifying, complete) and `speedbike-googleshop` (priority 40, contributing, `postProcess: { identity: false, specs: false }`, so its rows make no LLM call). Google brings the old price and real descriptions where the Árukereső feed carries only an article number. Its titles are the same as Árukereső's and it has no spec table, so an extraction there would add nothing but the colour a few descriptions state (Giant/Liv), which also needs `postProcess.identityDescription` in `full` mode.
 - **Checked by** `apps/product-collector/scripts/verify-multi-source.ts` on `fittkereso_e2e`: A then G, G then A and both at once end in the same state, plus the removal and admin-description scenarios.
+
+---
+
+## 12. When the LLM is called again, and when a listing changes product
+
+**Files:** `libs/product-scraper/src/lib/product-scraper/services/listing-input-hashes.ts`, `spec-post-process.service.ts`, `listing-reidentification.service.ts`, `product-scrape-updater.service.ts`
+
+**Input hashes, by part.** A record keeps one hash per part of its input (`ProductSourceRecord.inputHashes`): `feedIdentity` / `pageIdentity` (what the identity extraction is given from the feed row, and from its page) and `feedSpecs` / `pageSpecs` (what spec unification reads: the rows and mapped values, normalised — sorted, whitespace collapsed, no offer-level values, no description). An import compares **only the parts it read**: a `feed_entry` import the feed's, a page import both, a scraping import its page's. The identity extraction runs again only when one of those changed or is missing; its input still holds the stored page values. A record written before the parts existed reads its old single hash as its feed part (or page part, for a scraping source), so a deploy calls nothing.
+
+**Spec unification** runs once per product per source, as before. With **`postProcess.rerunSpecsOnChange`** (off by default) it also runs when the listing's spec content (`feedSpecs` + `pageSpecs`) differs from what its stored unification was made from (`unifiedSpecs`): once per content per product and source, as a sibling size of the same content gives its result instead of a call. While it is off, a would-be call is counted (`spec_unification_total{trigger="input_changed",result="would_run"}`), so a shop's cost is known before switching it on.
+
+**Re-identification.** A listing's product is decided when it is first imported; its own history (its record, its offer) finds it again after that. What can move it is a change of its **identity key** (`ListingIdentityKey`, kept as `scrapedProduct.identityKey`): its brand, normalizedModel, GTINs, MPNs, declared siblings, and its category's primary and matcher specs. A reworded title leaves it equal; a page read for the first time, or a shop correcting its feed, may not.
+
+- **The switch** is the dynamic config `import.reidentifyOnIdentityChange` (`libs/config/src/lib/configs/import.json`, read at startup): `off` (default), `shadow`, `on`. Feed sources only (`isFeedSourceType`): a scraping source's variant pages share offers too freely to move one alone.
+- **Not checked:** a pinned task (an admin resync), a pinned record (`identityPinned`, set by an admin merge), a failed extraction (the key decided before is kept), a model asked again under a new rule, a forced resync of an unchanged input.
+- **The fit check comes first**, with no LLM and no candidate search (`ListingReidentificationService.check`). Enrichment keeps the listing where it is (`reidentify_fits`):
+  - its brand or model changed, or an identifier it had is gone: it no longer fits;
+  - an identifier it gained points at another product (its own offers left out): it no longer fits;
+  - a key spec it changed is compared with what the product's **other** listings say (`ProductMergeService.specsWithout`), by the matcher's gates — the identifier tier's when one of its identifiers finds the product through another listing's offer (primary specs, less `identifierGateExcludes`), the name tier's otherwise (primary and matcher specs). A spec only one side states fits.
+- **Blocked:** another current identifying listing of the same seller on the product carries the same offer. Nothing moves (`reidentify_blocked`).
+- **Otherwise it is identified again** as a new listing would be, with its own traces left out (`ListingExclusion`): its record is no candidate's listing, its product is compared without it, and its own offers' GTIN/MPN find nothing. Then:
+  - **stays** — its own product again, or a new one while no other listing identifies its product (`reidentified_stayed`);
+  - **moves** — another product, under both products' locks: its record, its offers (same ids, with their price history) and the contributing listings that joined only those offers go along; the product it left is merged and priced again (`reidentified_moved`). A listing alone on its product takes the product along: the two are merged (`ProductMergeService.mergeProducts`);
+  - **splits** — a new product its product's other listings do not follow (`reidentified_split`).
+- **Shadow mode** decides, logs and counts (`reidentify_would_move` / `_would_split`) but moves nothing: the listing keeps the key decided before and is marked `reidentifyPending`. Once the mode is `on`, a feed run imports pending rows even when unchanged (`feed_entry`, no fetch), and their decision clears the mark.
+- **Seeing it:** `simulate_product_source_import` says per preview whether its key would change; `get_product_detail` and the admin's listing card show `Pinned`, `Re-identification pending` and the page timestamps.
+- **Checked by** `apps/product-collector/scripts/verify-reidentify.ts` on `fittkereso_e2e`: fits, move (offer id and price history kept), split, merge, shadow then on, pinned, blocked, off.
 
 ---
 

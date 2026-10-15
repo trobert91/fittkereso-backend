@@ -1,33 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import * as cheerio from 'cheerio';
 import {
   ProductCategory,
   ProductSource,
   ProductSourceFetchMode,
   ScrapedProduct,
   ScrapedProductFlag,
-  ScrapingSourceConfig,
   ProductImportTask,
-  SourceSpecConfig,
   categorySectionOf,
 } from '@fittkereso-backend/database';
-import { ScraperService } from '@fittkereso-backend/scraper';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   BrandResolutionService,
   ScrapedOffer,
   ScrapedProductSpec,
-  SpecExtractionService,
-  SpecTranslationSelectorService,
-  getVerbatimSpecKeys,
 } from '@fittkereso-backend/product';
-import { RawOfferRecord } from '@fittkereso-backend/scrape-interpreter';
-import { TranslationService } from '@fittkereso-backend/translation';
 import {
+  DetailPageSourceConfig,
+  RawOfferRecord,
   RuntimeDataProviderService,
-  ScrapeInterpreterService,
 } from '@fittkereso-backend/scrape-interpreter';
 import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
+import { PageInterpretation, ProductPageReaderService } from './product-page-reader.service';
 import { isEqual, omitBy, pick } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import {
@@ -97,13 +90,22 @@ export interface ProductSourceSimulationResult {
   };
   specs?: {
     deterministic: Record<string, unknown>;
-    /** The identity fields after the identity extraction (deterministic values merged in). */
-    identity: Record<string, unknown>;
+    /**
+     * The identity fields after the identity extraction (deterministic values
+     * merged in). Absent for a feed's page, which only fills its rows' gaps.
+     */
+    identity?: Record<string, unknown>;
     /** What full spec unification added or corrected on top of that. */
-    unification: Record<string, unknown>;
+    unification?: Record<string, unknown>;
     /** Everything a product created from this page would carry. */
-    merged: Record<string, unknown>;
+    merged?: Record<string, unknown>;
   };
+  /**
+   * Set for a feed source's page: the category its rows map it for. The page
+   * fills what a row lacks; category, price and stock, and every value the row
+   * has, stay the feed's (simulate_product_source_import previews the merge).
+   */
+  feedPage?: { categorySlug: string };
   brandResolution?: SimulatedBrandResolution;
   productPreview?: SimulatedProductPreview;
   warnings: string[];
@@ -123,36 +125,54 @@ export interface ProductSourceSimulationResult {
 @Injectable()
 export class ProductSourceSimulationService {
   constructor(
-    private readonly scraperService: ScraperService,
-    private readonly interpreter: ScrapeInterpreterService,
+    private readonly pageReader: ProductPageReaderService,
     private readonly runtime: RuntimeDataProviderService,
     private readonly categoryConfigService: CategoryConfigService,
-    private readonly specExtraction: SpecExtractionService,
     private readonly specPostProcess: SpecPostProcessService,
-    private readonly translationSelector: SpecTranslationSelectorService,
-    private readonly translationService: TranslationService,
     private readonly brandResolution: BrandResolutionService,
     private readonly matchQuery: ProductMatchQueryService,
   ) {}
 
+  /**
+   * `fetchMode` is the one the page is fetched in, resolved by the caller:
+   * the tool's argument, else `detailPage.fetchMode`, else the source's.
+   *
+   * A feed source's page (`feedCategorySlug` set) is read as its page task
+   * reads it, for the category its rows bring: its rows mapped onto that
+   * category's specs, and nothing more — no identity extraction or brand,
+   * which a feed row's own values decide.
+   */
   public async simulateDetailPageScrape(
     url: string,
-    config: ScrapingSourceConfig,
+    config: DetailPageSourceConfig,
     fetchMode: ProductSourceFetchMode,
+    feedCategorySlug?: string,
   ): Promise<ProductSourceSimulationResult> {
     const warnings: string[] = [];
     const errors: string[] = [];
+    const feedCategory = feedCategorySlug ? await this.tryGetCategory(feedCategorySlug) : undefined;
+    if (feedCategorySlug && !feedCategory) {
+      throw new Error(`No category "${feedCategorySlug}" in the database`);
+    }
 
-    const html = await this.scraperService.getHtml(url, fetchMode);
-    const $ = cheerio.load(html);
-
-    const task = this.buildFakeTask(url, config);
-    const detail = await this.interpreter.runDetailPage(task, $, config);
+    const pageConfig: DetailPageSourceConfig = {
+      ...config,
+      detailPage: { ...config.detailPage, fetchMode },
+    };
+    const task = this.buildFakeTask(url, pageConfig, fetchMode);
+    const interpretation = await this.pageReader.interpret({
+      task,
+      config: pageConfig,
+      category: feedCategory
+        ? { id: feedCategory.id, slug: feedCategory.slug, name: feedCategory.name }
+        : undefined,
+    });
+    const { detail } = interpretation;
 
     const result: ProductSourceSimulationResult = {
       url,
       fetchMode,
-      html: { length: html.length },
+      html: { length: interpretation.htmlLength },
       extraction: {
         rawSpecs: detail.rawSpecs,
         brand: detail.brand,
@@ -171,46 +191,53 @@ export class ProductSourceSimulationService {
           mpn: offer.mpn,
           siblingIds: detail.siblingIds,
           rawSpecs: detail.rawSpecs,
-          specRows: categorySectionOf(config, detail.categorySlug)?.identitySpecRows,
+          specRows: categorySectionOf(config, feedCategory?.slug ?? detail.categorySlug)
+            ?.identitySpecRows,
         }),
       ),
       warnings,
       errors,
     };
 
-    if (detail.ambiguousCategorySlugs?.length) {
+    if (feedCategory) {
+      return this.feedPageResult(result, task, pageConfig, interpretation, feedCategory.slug);
+    }
+
+    const problem = interpretation.categoryProblem;
+    if (problem?.reason === 'ambiguous') {
       errors.push(
-        `Category is ambiguous: the rules of ${detail.ambiguousCategorySlugs.join(', ')} all match — the real pipeline would abort product creation here.`,
+        `Category is ambiguous: the rules of ${problem.slugs.join(', ')} all match — the real pipeline would abort product creation here.`,
       );
       return result;
     }
 
-    if (!detail.categorySlug) {
+    const slug = interpretation.category?.slug ?? (problem && 'slug' in problem ? problem.slug : undefined);
+    if (!slug) {
       errors.push(
         "Category could not be identified (no category section's rules matched) — the real pipeline would abort product creation here.",
       );
       return result;
     }
 
-    const categoryEnabled = categorySectionOf(config, detail.categorySlug)?.enabled ?? false;
-    const category = await this.tryGetCategory(detail.categorySlug);
+    const categoryEnabled = categorySectionOf(config, slug)?.enabled ?? false;
+    const category = await this.tryGetCategory(slug);
 
     result.category = {
-      slug: detail.categorySlug,
+      slug,
       found: !!category,
       enabled: categoryEnabled,
-      hasJsonSchema: !!this.categoryConfigService.getJsonSchema(detail.categorySlug),
+      hasJsonSchema: !!this.categoryConfigService.getJsonSchema(slug),
     };
 
     if (!category) {
       errors.push(
-        `Category slug "${detail.categorySlug}" was resolved by its section's rules but does not exist in the database — the real pipeline would abort product creation here.`,
+        `Category slug "${slug}" was resolved by its section's rules but does not exist in the database — the real pipeline would abort product creation here.`,
       );
       return result;
     }
     if (!categoryEnabled) {
       warnings.push(
-        `Category "${detail.categorySlug}" is not enabled in its config.categories section — the real pipeline would skip product creation (no error, just a silent skip) for this page.`,
+        `Category "${slug}" is not enabled in its config.categories section — the real pipeline would skip product creation (no error, just a silent skip) for this page.`,
       );
     }
 
@@ -238,24 +265,18 @@ export class ProductSourceSimulationService {
 
     const categoryConfig = this.categoryConfigService.getConfig(category.slug);
     const offerLevelKeys = categoryConfig?.offerLevelSpecs ?? [];
-    const untranslatedKeys = getVerbatimSpecKeys(jsonSchema, offerLevelKeys);
-    const translator = await this.buildTranslator(
-      config,
-      detail.rawSpecs,
-      sourceConfig,
-      category.name,
-      untranslatedKeys,
-    );
-
-    const deterministicSpecs = sourceConfig
-      ? this.specExtraction.extractSpecs({
-          scrapedSpecs: detail.rawSpecs,
-          schema: jsonSchema,
-          sourceConfig,
-          translator,
-          untranslatedKeys,
-        })
-      : {};
+    // Mapped by the reader, as a real scrape maps them — also for a category
+    // not enabled, which the reader alone would stop at.
+    const deterministicSpecs = await this.pageReader.mapSpecs({
+      task,
+      config: pageConfig,
+      interpretation: {
+        ...interpretation,
+        category: { id: category.id, slug: category.slug, name: category.name },
+        schema: jsonSchema,
+        categoryProblem: undefined,
+      },
+    });
     // As ProductDetailsPageScraperService does, so this preview matches what
     // the real pipeline would persist to specs.
     foldReleaseYear(deterministicSpecs, detail.releaseYear);
@@ -352,53 +373,60 @@ export class ProductSourceSimulationService {
     return result;
   }
 
+  /**
+   * A feed source's page, read for its rows' category: what its rows map to.
+   * A feed row brings its own category, brand, title, price and stock, so
+   * nothing else is asked of the page.
+   */
+  private async feedPageResult(
+    result: ProductSourceSimulationResult,
+    task: ProductImportTask,
+    config: DetailPageSourceConfig,
+    interpretation: PageInterpretation,
+    slug: string,
+  ): Promise<ProductSourceSimulationResult> {
+    result.feedPage = { categorySlug: slug };
+    result.category = {
+      slug,
+      found: true,
+      enabled: categorySectionOf(config, slug)?.enabled ?? false,
+      hasJsonSchema: !!interpretation.schema,
+    };
+    if (interpretation.categoryProblem) {
+      result.errors.push(
+        `Category "${slug}" has no associated JSON schema on disk (libs/config categories) — a page import could not map its rows.`,
+      );
+      return result;
+    }
+    if (!categorySectionOf(config, slug)?.specMapping) {
+      result.warnings.push(
+        `No specMapping in the "${slug}" category section — the page's rows would map to no spec. Add the page's labels there, beside the feed's.`,
+      );
+    }
+    result.specs = {
+      deterministic: await this.pageReader.mapSpecs({ task, config, interpretation }),
+    };
+    return result;
+  }
+
   private async tryGetCategory(slug: string): Promise<ProductCategory | undefined> {
     return (await this.runtime.getCategoryBySlug(slug)) ?? undefined;
   }
 
-  private buildFakeTask(url: string, config: ScrapingSourceConfig): ProductImportTask {
-    // Only `task.url` is read by the interpreter ops (see link-ops buildBaseUrl);
-    // task.force/task.source/task.product are irrelevant here since we never
-    // call ProductScrapeUpdaterService. Cast rather than constructing a real
+  private buildFakeTask(
+    url: string,
+    config: DetailPageSourceConfig,
+    fetchMode: ProductSourceFetchMode,
+  ): ProductImportTask {
+    // The interpreter ops read `task.url` (see link-ops buildBaseUrl), the
+    // reader the source's name and mode. Nothing reaches
+    // ProductScrapeUpdaterService. Cast rather than constructing a real
     // ProductImportTask entity — this object is never persisted or passed to a
     // repository.
     return {
       url,
       force: true,
-      source: { name: 'simulation', config },
+      source: { name: 'simulation', fetchMode, config },
     } as unknown as ProductImportTask;
-  }
-
-  private async buildTranslator(
-    config: ScrapingSourceConfig,
-    rawSpecs: ScrapedProductSpec[],
-    sourceConfig: SourceSpecConfig | undefined,
-    categoryName: string,
-    untranslatedKeys: string[],
-  ) {
-    const translationConfig = config.detailPage.translation;
-    if (!translationConfig?.enabled) {
-      return undefined;
-    }
-
-    const rawValues = this.translationSelector.collectTranslatableValues(
-      rawSpecs,
-      sourceConfig,
-      untranslatedKeys,
-    );
-    if (rawValues.length === 0) {
-      return undefined;
-    }
-
-    const context = translationConfig.contextTemplate.replace(/\{\{\s*categoryName\s*\}\}/g, categoryName);
-
-    const { lookup } = await this.translationService.translateBatch({
-      texts: rawValues,
-      sourceLanguage: translationConfig.sourceLanguage,
-      targetLanguage: translationConfig.targetLanguage,
-      context,
-    });
-
-    return lookup;
   }
 }

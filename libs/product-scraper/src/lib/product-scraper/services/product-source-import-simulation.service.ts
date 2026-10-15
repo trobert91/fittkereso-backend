@@ -18,18 +18,32 @@ import {
   isFeedSourceType,
   categorySectionOf,
   ProductSourceCategoryConfig,
+  ArukeresoSourceConfig,
+  ListingPageRead,
+  pageFetchModeOf,
+  ProductSourceRecordRepository,
 } from '@fittkereso-backend/database';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { ScraperService } from '@fittkereso-backend/scraper';
-import { ScrapeInterpreterService } from '@fittkereso-backend/scrape-interpreter';
+import {
+  DetailPageSourceConfig,
+  ScrapeInterpreterService,
+} from '@fittkereso-backend/scrape-interpreter';
+import { CategoryConfigService } from '@fittkereso-backend/config';
 import {
   GtinOutcome,
   inspectGtin,
+  listingExternalIdOf,
   normalizeMpn,
   urlGroupKey,
 } from '@fittkereso-backend/utils';
-import { compact, countBy } from 'lodash';
-import { selectIdentitySpecRows } from '@fittkereso-backend/product';
+import { compact, countBy, difference } from 'lodash';
+import { BrandResolutionService, selectIdentitySpecRows } from '@fittkereso-backend/product';
+import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
+import { ProductPageReaderService, ProductPageRead } from './product-page-reader.service';
+import { ListingReidentificationService } from './listing-reidentification.service';
+import { IdentityKeyChange, isNamed } from './listing-identity-key';
+import { mergeFeedAndPage, toScrapedPage } from '../../arukereso/merge-feed-and-page';
 import { ScrapingImportService } from './scraping-import.service';
 import {
   ListItemDecision,
@@ -103,6 +117,13 @@ export interface SimulatedArukeresoImport {
   wouldQueue: number;
   wouldRefresh: number;
   /**
+   * Of wouldQueue, the rows a run would read the product page of (a source
+   * with a detailPage): new rows, and rows whose page was never read or is
+   * due by detailRefreshInterval. Each page is one fetch however many rows
+   * share it.
+   */
+  wouldFetchPage: number;
+  /**
    * For a source that does not identify products: eligible rows whose
    * externalId the seller already has an offer under, which they would join.
    * The rest would wait unattached. Undefined for an identifying source.
@@ -138,9 +159,46 @@ export interface SimulatedArukeresoImport {
   products: ScrapedProduct[];
   /** Per preview, aligned with `products`: what identity resolution would look up. */
   productIdentifiers: SimulatedListingIdentifiers[];
+  /**
+   * Per preview, aligned with `products`, for a source with a detailPage: its
+   * product page, read and merged in as its page import would — the previews
+   * are the merged listings.
+   */
+  pages?: SimulatedPreviewPage[];
+  /**
+   * Per preview, aligned with `products`: whether its identity key differs
+   * from the one its stored listing was decided under — what puts a listing's
+   * product in question (re-identification). Undefined for a source that
+   * does not identify products.
+   */
+  identityKeys: (SimulatedIdentityKeyChange | undefined)[];
   /** Across every eligible item, not just the previews — free either way. */
   identifiers: SimulatedFeedIdentifiers;
 }
+
+/** A preview row's product page, as its page import would read it. */
+export interface SimulatedPreviewPage {
+  url: string;
+  /** `detailPage.fetchMode`, else the source's — or the simulation's override. */
+  fetchMode: ProductSourceFetchMode;
+  /** Why it could not be read: a run retries, then imports the row from the feed alone. */
+  error?: string;
+  /** The spec rows the page showed. */
+  rows: number;
+  /** The mapped specs the page filled the row's gaps with: the feed's own stay. */
+  filledSpecs: string[];
+  /** Whether it gave a row without one its description. */
+  filledDescription: boolean;
+}
+
+/**
+ * A preview row's identity key against the one its stored listing was
+ * decided under: `new` without a stored listing, `not_comparable` when either
+ * side has no model (an unnamed listing, or a failed extraction).
+ */
+export type SimulatedIdentityKeyChange =
+  | { status: 'new' | 'not_comparable' | 'unchanged' }
+  | { status: 'changed'; change: IdentityKeyChange };
 
 /** How a feed's identifiers would fare, counted over every eligible item. */
 export interface SimulatedFeedIdentifiers {
@@ -224,6 +282,12 @@ export class ProductSourceImportSimulationService {
     private readonly specPostProcess: SpecPostProcessService,
     private readonly feedTriage: ArukeresoFeedTriageService,
     private readonly offerRepo: OfferRepository,
+    private readonly pageReader: ProductPageReaderService,
+    private readonly categoryConfigService: CategoryConfigService,
+    private readonly sourceRecordRepo: ProductSourceRecordRepository,
+    private readonly brandResolution: BrandResolutionService,
+    private readonly matchQuery: ProductMatchQueryService,
+    private readonly reidentification: ListingReidentificationService,
   ) {}
 
   /**
@@ -395,11 +459,16 @@ export class ProductSourceImportSimulationService {
 
   private async simulateFeed(
     source: ProductSource,
-    options: { limit?: number; categorySlugs?: string[] },
+    options: { limit?: number; categorySlugs?: string[]; fetchMode?: ProductSourceFetchMode },
     result: ProductSourceImportSimulationResult,
   ): Promise<SimulatedArukeresoImport> {
     const config = asArukeresoConfig(source.config, source.name);
     const limit = options.limit ?? DEFAULT_PREVIEW_LIMIT;
+    const pageConfig = this.pageConfigOf(config, options.fetchMode);
+    const pageReads = new Map<string, Promise<ProductPageRead>>();
+    const pages: SimulatedPreviewPage[] = [];
+    const identityKeys: (SimulatedIdentityKeyChange | undefined)[] = [];
+    let wouldFetchPage = 0;
 
     const { stream, contentType } = await this.scraperService.stream(
       config.feedUrl,
@@ -414,8 +483,8 @@ export class ProductSourceImportSimulationService {
     const productIdentifiers: SimulatedListingIdentifiers[] = [];
     const identifiers = new FeedIdentifierTally(config.mapping, config.categories);
     // What a run would do with each eligible row, triaged in batches as the
-    // run does (last row wins for a repeated URL, the first for a repeated
-    // listing id under another URL).
+    // run does: one row per listing id, the last for a repeated one, and the
+    // first URL a repeated listing id came under.
     const seenUrls = new Set<string>();
     const listingUrls = new Map<string, string>();
     let batch: FeedRow[] = [];
@@ -428,12 +497,13 @@ export class ProductSourceImportSimulationService {
     let rowsWithOldPrice = 0;
     const conditions: Partial<Record<OfferCondition | 'none', number>> = {};
     const triageBatch = async () => {
-      const unique = [...new Map(batch.map((row) => [row.url, row])).values()];
+      const unique = [...new Map(batch.map((row) => [row.listingId, row])).values()];
       batch = [];
       if (unique.length === 0) return;
       const triage = await this.feedTriage.triage(source, unique);
       wouldQueue += triage.toImport.length;
       wouldRefresh += triage.unchanged.length;
+      wouldFetchPage += triage.needsPage?.size ?? 0;
       if (contributes) {
         matchingOffers += (
           await this.offerRepo.findSyncStates(
@@ -525,15 +595,30 @@ export class ProductSourceImportSimulationService {
 
         if (products.length < limit) {
           if (mapped.status === 'mapped') {
-            // The mapping itself is free; the preview then runs the identity
-            // extraction a first import would, which is the part that costs —
-            // unless the source's `postProcess.identity` is off, contributing
-            // or not. `force` rules out reusing a stored result.
+            // The mapping itself is free; the preview then reads the row's
+            // page, when the source has a detailPage, and runs the identity
+            // extraction a first import would — the parts that cost, unless
+            // the source's `postProcess.identity` is off, contributing or not.
+            // `force` rules out reusing a stored result.
+            const { listing, page, pageRead } = await this.previewPage(
+              source,
+              pageConfig,
+              mapped,
+              pageReads,
+            );
+            if (page) pages.push(page);
             const extracted = await this.specPostProcess.extractIdentity({
-              context: { source, url: mapped.url, force: true },
-              scrapedProduct: mapped.scrapedProduct,
+              context: {
+                source,
+                url: mapped.url,
+                force: true,
+                feedListing: mapped.scrapedProduct,
+                pageRead,
+              },
+              scrapedProduct: listing,
             });
             products.push(extracted);
+            identityKeys.push(await this.identityKeyChangeOf(source, mapped.url, extracted));
             const offer = extracted.offers?.[0];
             productIdentifiers.push(
               previewListingIdentifiers({
@@ -619,6 +704,7 @@ export class ProductSourceImportSimulationService {
       wouldImport,
       wouldQueue,
       wouldRefresh,
+      wouldFetchPage,
       matchingOffers: contributes ? matchingOffers : undefined,
       rowsWithOldPrice,
       conditions: this.mapper.isMapped(config, 'condition') ? conditions : undefined,
@@ -630,8 +716,125 @@ export class ProductSourceImportSimulationService {
       itemsWithoutExternalId,
       products,
       productIdentifiers,
+      ...(pageConfig ? { pages } : {}),
+      identityKeys,
       identifiers: identifierSummary,
     };
+  }
+
+  /**
+   * What a feed's product pages are read with, as its page tasks read them:
+   * the detailPage, in the simulation's fetch mode when it overrides the
+   * source's — the tool's argument wins over `detailPage.fetchMode` too.
+   * Undefined for a feed without a detailPage.
+   */
+  private pageConfigOf(
+    config: ArukeresoSourceConfig,
+    fetchMode: ProductSourceFetchMode | undefined,
+  ): DetailPageSourceConfig | undefined {
+    if (!config.detailPage) return undefined;
+    return {
+      baseUrl: config.baseUrl,
+      categories: config.categories,
+      detailPage: { ...config.detailPage, ...(fetchMode ? { fetchMode } : {}) },
+    };
+  }
+
+  /**
+   * A preview row with its product page merged in, as its page import would
+   * make it — the feed primary, the page filling its gaps — and what the page
+   * gave. A page read once serves every preview row of it. A page that cannot
+   * be read leaves the row as the feed has it, as a run's last attempt would.
+   */
+  private async previewPage(
+    source: ProductSource,
+    pageConfig: DetailPageSourceConfig | undefined,
+    mapped: { url: string; scrapedProduct: ScrapedProduct },
+    pageReads: Map<string, Promise<ProductPageRead>>,
+  ): Promise<{ listing: ScrapedProduct; page?: SimulatedPreviewPage; pageRead?: ListingPageRead }> {
+    const row = mapped.scrapedProduct;
+    if (!pageConfig) return { listing: row };
+
+    const fetchMode = pageFetchModeOf(source, pageConfig.detailPage);
+    const key = `${urlGroupKey(mapped.url)} ${row.category.slug}`;
+    if (!pageReads.has(key)) {
+      pageReads.set(
+        key,
+        this.pageReader.read({
+          task: { url: mapped.url, force: true, source } as unknown as ProductImportTask,
+          config: pageConfig,
+          category: row.category,
+          expectedExternalIds: [
+            row.externalId,
+            ...(row.offers ?? []).flatMap((offer) => [offer.externalId, offer.mpn, offer.gtin]),
+          ],
+        }),
+      );
+    }
+
+    try {
+      const read = (await pageReads.get(key)) as ProductPageRead;
+      const offerLevelKeys =
+        this.categoryConfigService.getConfig(row.category.slug)?.offerLevelSpecs ?? [];
+      const listing = mergeFeedAndPage(row, toScrapedPage(read, 1), offerLevelKeys);
+      return {
+        listing,
+        pageRead: { fetchedAt: new Date() },
+        page: {
+          url: read.url,
+          fetchMode,
+          rows: read.detail.rawSpecs.length,
+          filledSpecs: difference(
+            Object.keys(listing.extractedSpecs ?? {}),
+            Object.keys(row.extractedSpecs ?? {}),
+          ).sort(),
+          filledDescription: !row.description?.trim() && !!listing.description?.trim(),
+        },
+      };
+    } catch (error: unknown) {
+      return {
+        listing: row,
+        page: {
+          url: mapped.url,
+          fetchMode,
+          error: error instanceof Error ? error.message : String(error),
+          rows: 0,
+          filledSpecs: [],
+          filledDescription: false,
+        },
+      };
+    }
+  }
+
+  /**
+   * Whether a preview's identity key differs from the one its stored listing
+   * was decided under: what would put its product in question.
+   */
+  private async identityKeyChangeOf(
+    source: ProductSource,
+    url: string,
+    extracted: ScrapedProduct,
+  ): Promise<SimulatedIdentityKeyChange | undefined> {
+    if (source.identifiesProducts === false) return undefined;
+    const record = await this.sourceRecordRepo.findBySourceAndExternalId(
+      source.id,
+      listingExternalIdOf(extracted, url),
+    );
+    if (!record) return { status: 'new' };
+    if (!isNamed(extracted)) return { status: 'not_comparable' };
+
+    const brand = await this.brandResolution.resolve(extracted.brand, extracted.originalName);
+    const change = this.reidentification.keyChangeOf({
+      extracted,
+      normalizedModel: this.matchQuery.normalizedModelOf(extracted, brand?.entity?.name) ?? null,
+      identifiers: (extracted.offers ?? []).map((offer) => ({
+        gtin: inspectGtin(offer.gtin).gtin,
+        mpn: normalizeMpn(offer.mpn),
+      })),
+      record,
+    });
+    if (change === null) return { status: 'not_comparable' };
+    return change ? { status: 'changed', change } : { status: 'unchanged' };
   }
 
   /**

@@ -3,16 +3,18 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import {
   DEFAULT_PRODUCT_SOURCE_FETCH_MODE,
+  isArukeresoConfig,
   isScrapingConfig,
   PRODUCT_SOURCE_FETCH_MODES,
+  ProductSourceConfig,
   ProductSourceFetchMode,
   ProductSourceRepository,
-  ScrapingSourceConfig,
 } from '@fittkereso-backend/database';
 import {
   ProductSourceSimulationResult,
   ProductSourceSimulationService,
 } from '@fittkereso-backend/product-scraper';
+import type { DetailPageSourceConfig } from '@fittkereso-backend/scrape-interpreter';
 import { formatListingIdentifiers } from './identifier-format';
 
 @Injectable()
@@ -25,7 +27,7 @@ export class ProductSourceSimulateScrapeTools {
   @Tool({
     name: 'simulate_product_source_scrape',
     description:
-      "Dry-run a product detail page scrape against a real URL, using the generic scraper to fetch the page and the same interpreter/spec-extraction/post-process/brand-resolution pipeline the real scraper uses for detailPage — WITHOUT persisting anything (no ProductModel/Offer/ProductSourceRecord rows, no brand creation, no image copying). Returns the raw scrape-op extraction (rawSpecs, brand, model, images, offers), the resolved category, deterministic vs LLM-merged specs, brand-resolution outcome, and a preview of what the final product model would look like — plus warnings/errors explaining anything that would cause the real pipeline to skip or abort. Use this to validate/tune a ProductSourceConfig's detailPage pipeline (e.g. while drafting a new ProductSource) before saving it via update_product_source or create_product_source_for_seller.",
+      "Dry-run a product detail page scrape against a real URL, using the generic scraper to fetch the page and the same interpreter/spec-extraction/post-process/brand-resolution pipeline the real scraper uses for detailPage — WITHOUT persisting anything (no ProductModel/Offer/ProductSourceRecord rows, no brand creation, no image copying). Returns the raw scrape-op extraction (rawSpecs, brand, model, images, offers), the resolved category, deterministic vs LLM-merged specs, brand-resolution outcome, and a preview of what the final product model would look like — plus warnings/errors explaining anything that would cause the real pipeline to skip or abort. Use this to validate/tune a ProductSourceConfig's detailPage pipeline (e.g. while drafting a new ProductSource) before saving it via update_product_source or create_product_source_for_seller. Also takes a feed source (\"arukereso\"/\"googleshop\") with a detailPage: its product page is read as its page task reads it, for the category its rows bring (categorySlug), and only its extraction and mapped specs are shown — the page fills what a feed row lacks.",
     parameters: z
       .object({
         url: z.string().url().describe('A real product detail page URL to scrape'),
@@ -45,7 +47,13 @@ export class ProductSourceSimulateScrapeTools {
           .enum(PRODUCT_SOURCE_FETCH_MODES)
           .optional()
           .describe(
-            "How to fetch the page: 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent). Defaults to the source's own fetchMode with productSourceId, 'proxied' with an inline config. Pass 'direct' to check a shop before switching it to direct.",
+            "How to fetch the page: 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent). Wins over everything; otherwise the config's detailPage.fetchMode, else the source's own fetchMode with productSourceId, else 'proxied' with an inline config. Pass 'direct' to check a shop before switching it to direct.",
+          ),
+        categorySlug: z
+          .string()
+          .optional()
+          .describe(
+            "Feed sources only: the category the page's rows are mapped for — a feed row brings its own. Defaults to the feed config's only enabled category section; required when it has several.",
           ),
       })
       .refine((args) => !!args.config !== !!args.productSourceId, {
@@ -58,32 +66,46 @@ export class ProductSourceSimulateScrapeTools {
     config?: Record<string, unknown>;
     productSourceId?: string;
     fetchMode?: ProductSourceFetchMode;
+    categorySlug?: string;
   }): Promise<string> {
-    let config: ScrapingSourceConfig;
-    let fetchMode = args.fetchMode ?? DEFAULT_PRODUCT_SOURCE_FETCH_MODE;
+    let config: ProductSourceConfig;
+    let sourceFetchMode: ProductSourceFetchMode = DEFAULT_PRODUCT_SOURCE_FETCH_MODE;
     if (args.productSourceId) {
       const source = await this.productSourceRepo.findOneOrFail({
         where: { id: args.productSourceId },
       });
-      // This tool simulates DETAIL-PAGE scraping, which only a scraping source
-      // has. An Árukereső source maps feed rows instead and has no page to run.
-      if (!isScrapingConfig(source.config) || !source.config.detailPage) {
-        return `Product source ${args.productSourceId} is not a scraping source with a detailPage config — nothing to simulate.`;
-      }
       config = source.config;
-      fetchMode = args.fetchMode ?? source.fetchMode;
+      sourceFetchMode = source.fetchMode;
     } else {
-      config = args.config as unknown as ScrapingSourceConfig;
-      if (!config?.detailPage) {
-        return 'The given config has no detailPage pipeline — nothing to simulate.';
+      config = args.config as unknown as ProductSourceConfig;
+    }
+
+    // A scraping source's detail pages, or — once it has a detailPage — a
+    // feed source's product pages.
+    const feed = isArukeresoConfig(config);
+    const detailPage = feed || isScrapingConfig(config) ? config.detailPage : undefined;
+    if (!detailPage) {
+      return `${args.productSourceId ? `Product source ${args.productSourceId}` : 'The given config'} has no detailPage — nothing to simulate. A feed source reads its product pages once it has one.`;
+    }
+    const fetchMode = args.fetchMode ?? detailPage.fetchMode ?? sourceFetchMode;
+
+    let feedCategorySlug: string | undefined;
+    if (feed) {
+      const enabled = Object.entries(config.categories ?? {})
+        .filter(([, section]) => section?.enabled)
+        .map(([slug]) => slug);
+      feedCategorySlug = args.categorySlug ?? (enabled.length === 1 ? enabled[0] : undefined);
+      if (!feedCategorySlug) {
+        return `A feed's product page is read for the category its rows bring: pass categorySlug, one of ${enabled.join(', ') || '(no enabled category section)'}.`;
       }
     }
 
     try {
       const result = await this.simulationService.simulateDetailPageScrape(
         args.url,
-        config,
+        config as DetailPageSourceConfig,
         fetchMode,
+        feedCategorySlug,
       );
       return this.formatResult(result);
     } catch (error: unknown) {
@@ -96,6 +118,11 @@ export class ProductSourceSimulateScrapeTools {
     const L: string[] = [];
     L.push(`# Scrape Simulation: ${result.url}`);
     L.push(`- **HTML fetched**: ${result.html.length} chars (${result.fetchMode})`);
+    if (result.feedPage) {
+      L.push(
+        `- **a feed source's product page**, its rows mapped for \`${result.feedPage.categorySlug}\`. It only fills what a feed row lacks: category, brand, title, price, stock and every value the row has stay the feed's. simulate_product_source_import previews the rows merged with their pages.`,
+      );
+    }
     L.push('');
 
     if (result.errors.length) {
@@ -156,23 +183,18 @@ export class ProductSourceSimulateScrapeTools {
     }
 
     if (result.specs) {
+      const section = (title: string, specs: Record<string, unknown> | undefined) => {
+        if (!specs) return;
+        L.push(`### ${title}`);
+        L.push('```json');
+        L.push(JSON.stringify(specs, null, 2));
+        L.push('```');
+      };
       L.push('## Specs');
-      L.push('### Deterministic (SpecExtractionService)');
-      L.push('```json');
-      L.push(JSON.stringify(result.specs.deterministic, null, 2));
-      L.push('```');
-      L.push('### Identity extraction (the fields that decide which product this is)');
-      L.push('```json');
-      L.push(JSON.stringify(result.specs.identity, null, 2));
-      L.push('```');
-      L.push('### Spec unification (what it adds when this page creates a product)');
-      L.push('```json');
-      L.push(JSON.stringify(result.specs.unification, null, 2));
-      L.push('```');
-      L.push('### Merged (final)');
-      L.push('```json');
-      L.push(JSON.stringify(result.specs.merged, null, 2));
-      L.push('```');
+      section('Deterministic (SpecExtractionService)', result.specs.deterministic);
+      section('Identity extraction (the fields that decide which product this is)', result.specs.identity);
+      section('Spec unification (what it adds when this page creates a product)', result.specs.unification);
+      section('Merged (final)', result.specs.merged);
       L.push('');
     }
 
@@ -193,7 +215,7 @@ export class ProductSourceSimulateScrapeTools {
       L.push('```json');
       L.push(JSON.stringify(result.productPreview, null, 2));
       L.push('```');
-    } else {
+    } else if (!result.feedPage) {
       L.push('_No product model preview — see errors above for why extraction did not reach that stage._');
     }
 

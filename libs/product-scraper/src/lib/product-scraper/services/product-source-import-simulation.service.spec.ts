@@ -23,6 +23,9 @@ describe('ProductSourceImportSimulationService', () => {
   let specPostProcess: { extractIdentity: jest.Mock };
   let feedTriage: { triage: jest.Mock };
   let offerRepo: { findSyncStates: jest.Mock };
+  let pageReader: { read: jest.Mock };
+  let brandResolution: { resolve: jest.Mock };
+  let reidentification: { keyChangeOf: jest.Mock };
 
   const feedSource = {
     id: 'source-1',
@@ -121,6 +124,9 @@ describe('ProductSourceImportSimulationService', () => {
         .fn()
         .mockImplementation(async ({ scrapedProduct }) => ({ ...scrapedProduct, model: 'Named' })),
     };
+    pageReader = { read: jest.fn() };
+    brandResolution = { resolve: jest.fn().mockResolvedValue({ entity: { name: 'KTM' } }) };
+    reidentification = { keyChangeOf: jest.fn().mockReturnValue(undefined) };
 
     service = new ProductSourceImportSimulationService(
       scraperService as never,
@@ -143,6 +149,12 @@ describe('ProductSourceImportSimulationService', () => {
       specPostProcess as never,
       feedTriage as never,
       offerRepo as never,
+      pageReader as never,
+      { getConfig: jest.fn().mockReturnValue({ offerLevelSpecs: ['frameSize'] }) } as never,
+      sourceRecordRepo as never,
+      brandResolution as never,
+      { normalizedModelOf: jest.fn().mockReturnValue('named') } as never,
+      reidentification as never,
     );
   });
 
@@ -506,6 +518,247 @@ describe('ProductSourceImportSimulationService', () => {
 
       expect(result.errors).toEqual(['HTTP 404']);
       expect(result.feed).toBeUndefined();
+    });
+
+    // Rows sharing a page are each their own listing, triaged on their own.
+    it('triages every listing of a page, not one row per URL', async () => {
+      givenFeed(feed(['a', 'b']));
+      let row = 0;
+      mapper.map.mockImplementation(async () => {
+        row += 1;
+        return {
+          status: 'mapped',
+          url: 'https://speedbike.hu/p/scale',
+          scrapedProduct: { externalId: `sku-${row}`, offers: [{ externalId: `sku-${row}` }] },
+        };
+      });
+
+      const result = await service.simulate(feedSource);
+
+      expect(feedTriage.triage.mock.calls[0][1]).toHaveLength(2);
+      expect(result.feed?.wouldQueue).toBe(2);
+    });
+
+    // A source with a detailPage: the previews read their page as their page
+    // import would, and the counts say how many pages a run would fetch.
+    describe('a source that reads product pages', () => {
+      const ebikes = { id: 'cat-ebikes', slug: 'ebikes', name: 'E-bikes' };
+      const pageSource = {
+        ...feedSource,
+        fetchMode: 'proxied',
+        config: { ...feedSource.config, detailPage: { fetchMode: 'direct', rawSpecs: [] } },
+      } as unknown as ProductSource;
+
+      /** The feed row: its title and price, no spec but its own model year. */
+      const feedRow = (id: string, url = `https://speedbike.hu/p/${id}`) => ({
+        status: 'mapped',
+        url,
+        scrapedProduct: {
+          category: ebikes,
+          brand: 'KTM',
+          originalName: 'KTM Macina Tour',
+          externalId: id,
+          extractedSpecs: { modelYear: 2026 },
+          specs: { modelYear: 2026 },
+          offers: [{ externalId: id, price: 1_259_640 }],
+        },
+      });
+
+      /** What the page shows: gender, torque and its description. */
+      const pageRead = (url: string) => ({
+        url,
+        fetchMode: 'direct',
+        detail: {
+          rawSpecs: [
+            { name: 'Neme:', values: ['Férfi'] },
+            { name: 'Motor típusa:', values: ['Bosch Performance Line PX (90 Nm)'] },
+          ],
+          description: 'QUALITY. COMFORT.',
+          imageUrls: [],
+          rawOffers: [],
+        },
+        category: ebikes,
+        specs: { gender: 'Férfi', torque: 90, modelYear: 2025 },
+        contentHash: 'hash',
+      });
+
+      beforeEach(() => {
+        mapper.map.mockImplementation(async ({ item }) => feedRow(item.fields['identifier']));
+        pageReader.read.mockImplementation(async ({ task }) => pageRead(task.url));
+      });
+
+      it('counts the rows a run would read the page of', async () => {
+        givenFeed(feed(['a', 'b', 'c']));
+        feedTriage.triage.mockImplementation(async (_source, rows) => ({
+          unchanged: [],
+          toImport: rows,
+          needsPage: new Set(['a', 'c']),
+        }));
+
+        const result = await service.simulate(pageSource);
+
+        expect(result.feed?.wouldFetchPage).toBe(2);
+      });
+
+      it('previews each row with its page merged in, the feed winning', async () => {
+        givenFeed(feed(['a']));
+
+        const result = await service.simulate(pageSource);
+
+        const [preview] = result.feed?.products ?? [];
+        // The page filled gender and torque; the feed's model year stands.
+        expect(preview.extractedSpecs).toEqual({ modelYear: 2026, gender: 'Férfi', torque: 90 });
+        expect(preview.description).toBe('QUALITY. COMFORT.');
+        expect(result.feed?.pages).toEqual([
+          {
+            url: 'https://speedbike.hu/p/a',
+            fetchMode: 'direct',
+            rows: 2,
+            filledSpecs: ['gender', 'torque'],
+            filledDescription: true,
+          },
+        ]);
+        // Extracted as the page import would: the feed row apart, the page read now.
+        expect(specPostProcess.extractIdentity).toHaveBeenCalledWith({
+          context: expect.objectContaining({
+            feedListing: expect.objectContaining({ externalId: 'a' }),
+            pageRead: { fetchedAt: expect.any(Date) },
+          }),
+          scrapedProduct: expect.objectContaining({ page: expect.objectContaining({ rowCount: 1 }) }),
+        });
+        expect(pageReader.read).toHaveBeenCalledWith(
+          expect.objectContaining({
+            category: ebikes,
+            expectedExternalIds: ['a', 'a', undefined, undefined],
+          }),
+        );
+      });
+
+      it('reads a page its preview rows share once', async () => {
+        givenFeed(feed(['a', 'b']));
+        mapper.map.mockImplementation(async ({ item }) =>
+          feedRow(item.fields['identifier'], 'https://speedbike.hu/p/scale'),
+        );
+
+        const result = await service.simulate(pageSource);
+
+        expect(pageReader.read).toHaveBeenCalledTimes(1);
+        expect(result.feed?.pages).toHaveLength(2);
+      });
+
+      it('previews the row from the feed alone when its page cannot be read', async () => {
+        givenFeed(feed(['a']));
+        pageReader.read.mockRejectedValue(new Error('HTTP 404'));
+
+        const result = await service.simulate(pageSource);
+
+        expect(result.feed?.pages?.[0]).toMatchObject({ error: 'HTTP 404', rows: 0 });
+        expect(result.feed?.products[0].extractedSpecs).toEqual({ modelYear: 2026 });
+        expect(specPostProcess.extractIdentity).toHaveBeenCalledWith(
+          expect.objectContaining({ context: expect.objectContaining({ pageRead: undefined }) }),
+        );
+      });
+
+      /** The mode a read was asked in, as the reader resolves it (pageFetchModeOf). */
+      const fetchModeOfRead = (call: number) => {
+        const { task, config } = pageReader.read.mock.calls[call][0];
+        return config.detailPage.fetchMode ?? task.source.fetchMode;
+      };
+
+      // The tool's argument wins over detailPage.fetchMode, which wins over the source's.
+      it('reads pages in detailPage.fetchMode, unless the simulation overrides it', async () => {
+        givenFeed(feed(['a']));
+        await service.simulate(pageSource);
+        expect(fetchModeOfRead(0)).toEqual('direct');
+
+        givenFeed(feed(['a']));
+        const overridden = await service.simulate(pageSource, { fetchMode: 'proxied' });
+        expect(fetchModeOfRead(1)).toEqual('proxied');
+        expect(overridden.feed?.pages?.[0].fetchMode).toBe('proxied');
+      });
+
+      it('reads no page for a source without a detailPage', async () => {
+        givenFeed(feed(['a']));
+
+        const plain = await service.simulate(feedSource);
+
+        expect(pageReader.read).not.toHaveBeenCalled();
+        expect(plain.feed?.pages).toBeUndefined();
+      });
+    });
+
+    // What would put a listing's product in question once it is imported.
+    describe("a preview's identity key", () => {
+      beforeEach(() => {
+        mapper.map.mockResolvedValue({
+          status: 'mapped',
+          url: 'https://speedbike.hu/p/a',
+          scrapedProduct: { brand: 'KTM', originalName: 'KTM Macina', externalId: 'a', offers: [{ externalId: 'a', mpn: '1260161111' }] },
+        });
+      });
+
+      it('is new without a stored listing', async () => {
+        givenFeed(feed(['a']));
+
+        const result = await service.simulate(feedSource);
+
+        expect(result.feed?.identityKeys).toEqual([{ status: 'new' }]);
+        expect(sourceRecordRepo.findBySourceAndExternalId).toHaveBeenCalledWith('source-1', 'a');
+      });
+
+      it('names what changed against the stored listing', async () => {
+        givenFeed(feed(['a']));
+        const record = { id: 'record-a' };
+        sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue(record);
+        const change = { anchorsChanged: false, addedIdentifiers: [], changedSpecs: ['gender'] };
+        reidentification.keyChangeOf.mockReturnValue(change);
+
+        const result = await service.simulate(feedSource);
+
+        expect(result.feed?.identityKeys).toEqual([{ status: 'changed', change }]);
+        expect(reidentification.keyChangeOf).toHaveBeenCalledWith({
+          extracted: expect.objectContaining({ model: 'Named' }),
+          normalizedModel: 'named',
+          identifiers: [{ gtin: undefined, mpn: '1260161111' }],
+          record,
+        });
+      });
+
+      it('is unchanged, or not comparable without a stored key', async () => {
+        givenFeed(feed(['a', 'b']));
+        sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue({ id: 'record' });
+        reidentification.keyChangeOf.mockReturnValueOnce(undefined).mockReturnValueOnce(null);
+
+        const result = await service.simulate(feedSource);
+
+        expect(result.feed?.identityKeys).toEqual([{ status: 'unchanged' }, { status: 'not_comparable' }]);
+      });
+
+      it('is not comparable when the extraction named nothing', async () => {
+        givenFeed(feed(['a']));
+        sourceRecordRepo.findBySourceAndExternalId.mockResolvedValue({ id: 'record' });
+        specPostProcess.extractIdentity.mockImplementation(async ({ scrapedProduct }) => ({
+          ...scrapedProduct,
+          flags: ['identity_failed'],
+        }));
+
+        const result = await service.simulate(feedSource);
+
+        expect(result.feed?.identityKeys).toEqual([{ status: 'not_comparable' }]);
+        expect(reidentification.keyChangeOf).not.toHaveBeenCalled();
+      });
+
+      it('is not reported for a source that does not identify products', async () => {
+        givenFeed(feed(['a']));
+
+        const result = await service.simulate({
+          ...feedSource,
+          identifiesProducts: false,
+          seller: { id: 'seller-1' },
+        } as ProductSource);
+
+        expect(result.feed?.identityKeys).toEqual([undefined]);
+      });
     });
 
     it("fetches the feed in the source's mode unless told another", async () => {

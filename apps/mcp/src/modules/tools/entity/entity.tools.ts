@@ -126,6 +126,25 @@ export class EntityTools {
         if (record.brand) L.push(`- **Brand**: ${record.brand.name}`);
         if (record.model || record.normalizedModel)
           L.push(`- **Model**: "${record.model ?? '–'}" → \`${record.normalizedModel ?? '–'}\``);
+        // A feed listing's product page: read when, or failed when.
+        if (record.pageFetchedAt || record.pageFailedAt || record.scrapedProduct?.page) {
+          const at = (date: Date | null | undefined) =>
+            date ? (date.toISOString?.() ?? String(date)) : 'never';
+          const page = record.scrapedProduct?.page;
+          L.push(
+            `- **Product page**: read ${at(record.pageFetchedAt)}` +
+              (record.pageFailedAt ? ` · failed for good ${at(record.pageFailedAt)}` : '') +
+              (page ? ` · ${page.rawSpecs.length} rows kept, read for ${page.rowCount} feed row(s)` : ''),
+          );
+        }
+        if (record.identityPinned) {
+          L.push('- **Identity pinned**: an admin merge put it here; no import identifies it elsewhere');
+        }
+        if (record.reidentifyPending) {
+          L.push(
+            '- **Re-identification pending**: in shadow mode it no longer fit its product; decided on its next import once the mode is on',
+          );
+        }
 
         // What this source says, before the seller's sources are composed.
         const entries = record.scrapedProduct?.offers ?? [];

@@ -12,6 +12,8 @@ import {
 import {
   ProductSourceImportSimulationResult,
   ProductSourceImportSimulationService,
+  SimulatedIdentityKeyChange,
+  SimulatedPreviewPage,
 } from '@fittkereso-backend/product-scraper';
 import { ProductMatchQueryService } from '@fittkereso-backend/product-identity';
 import { formatListingIdentifiers } from './identifier-format';
@@ -28,7 +30,7 @@ export class ProductSourceSimulateImportTools {
   @Tool({
     name: 'simulate_product_source_import',
     description:
-      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ProductImportTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For a feed source ("arukereso" or "googleshop"): fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), maps every eligible item and reports what a run would do with it right now — queue a feed_entry task (new, changed, or missing its offer) or only refresh the offer in place — and runs the identity extraction on the first few. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
+      'Dry-run a whole IMPORT RUN for a ProductSource — what tonight would actually do — WITHOUT persisting anything (no ProductImportTasks queued, no ProductModel/Offer/ProductSourceRecord rows). Use simulate_product_source_scrape instead for one detail page. For a feed source ("arukereso" or "googleshop"): fetches the feed, reports how many of its items survive the category gate and why the rest do not, checks that the chosen externalId is actually unique across the whole feed (a repeated one silently collapses offers onto a single row), maps every eligible item and reports what a run would do with it right now — queue a task (new, changed, missing its offer, due for its product page, or left to be identified again) or only refresh the offer in place, and how many product pages it would read — and runs the identity extraction on the first few. With a detailPage, those few first read their product page and merge it in as their page import would (the feed wins, the page fills gaps: costs one fetch per page), and each says whether its identity key differs from its stored listing\'s — what puts its product in question on import. For a "scraping" source: resolves the start URLs into category URLs and enumerates every page the run would enqueue, then parses one list page and reports, per card, whether it would be refreshed in place or cost a paid detail fetch — which is what makes the global minimum set tunable against a real shop. Run this before enabling scheduling on a new source.',
     parameters: z.object({
       productSourceId: z.string().describe('ProductSource UUID to simulate a run for'),
       listUrl: z
@@ -55,7 +57,7 @@ export class ProductSourceSimulateImportTools {
         .enum(PRODUCT_SOURCE_FETCH_MODES)
         .optional()
         .describe(
-          "Fetch as if the source were in this mode — 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent) — for every fetch of the run, the page walk included. Defaults to the source's own fetchMode. The source itself is not changed: pass 'direct' to check a shop before switching it.",
+          "Fetch as if the source were in this mode — 'proxied' through Zyte (paid) or 'direct' from the shop (free, needs the shop's consent) — for every fetch of the run, the page walk and a feed's product pages included: it wins over detailPage.fetchMode too. Defaults to the source's own fetchMode, and for a feed's product pages to detailPage.fetchMode, else the source's. The source itself is not changed: pass 'direct' to check a shop before switching it.",
         ),
       config: z
         .record(z.string(), z.any())
@@ -144,8 +146,13 @@ export class ProductSourceSimulateImportTools {
     L.push('## What would be imported');
     L.push(`- **would import**: ${feed.wouldImport}`);
     L.push(
-      `  - right now: would queue ${feed.wouldQueue} feed_entry tasks (new, changed, or missing their offer) · would refresh ${feed.wouldRefresh} offers in place`,
+      `  - right now: would queue ${feed.wouldQueue} rows as tasks (new, changed, missing their offer, due for their page, or left to be identified again) · would refresh ${feed.wouldRefresh} offers in place`,
     );
+    if (feed.pages) {
+      L.push(
+        `  - of those, ${feed.wouldFetchPage} would read their product page (detail_page tasks: new rows, and pages never read or due by detailRefreshInterval); a page is one fetch however many rows share it`,
+      );
+    }
     if (feed.matchingOffers !== undefined) {
       L.push(
         `  - this source does not identify products: ${feed.matchingOffers} of ${feed.wouldImport} rows match an existing offer of the seller and would join it; the rest would wait unattached`,
@@ -196,15 +203,56 @@ export class ProductSourceSimulateImportTools {
         if (product) {
           L.push(`  - **model**: ${this.modelLine(product)}`);
         }
+        const page = feed.pages?.[index];
+        if (page) L.push(`  - **product page**: ${this.pageLine(page)}`);
+        const key = feed.identityKeys[index];
+        if (key) L.push(`  - **identity key**: ${this.identityKeyLine(key)}`);
         L.push(...formatListingIdentifiers(identifiers, '  '));
       });
       L.push('');
     }
 
-    L.push(`## Mapped previews (${feed.products.length})`);
+    L.push(
+      `## Mapped previews (${feed.products.length})${feed.pages ? ' — each with its product page merged in, the feed winning' : ''}`,
+    );
     L.push('```json');
     L.push(JSON.stringify(feed.products, null, 2));
     L.push('```');
+  }
+
+  /** What a preview's page gave its feed row, or why it was not read. */
+  private pageLine(page: SimulatedPreviewPage): string {
+    if (page.error) {
+      return `not read (${page.fetchMode}): ${page.error} — a run retries, then imports the row from the feed alone`;
+    }
+    const filled = page.filledSpecs.length ? page.filledSpecs.join(', ') : '_nothing the feed lacked_';
+    return `read (${page.fetchMode}), ${page.rows} spec rows · filled: ${filled}${page.filledDescription ? ' · and the description' : ''}`;
+  }
+
+  /**
+   * Against the stored listing: a changed key is what puts its product in
+   * question (import.reidentifyOnIdentityChange), though the fit check keeps
+   * it where what changed agrees with the product. The extraction here is
+   * fresh, so a model the LLM words differently than it stored also shows.
+   */
+  private identityKeyLine(key: SimulatedIdentityKeyChange): string {
+    switch (key.status) {
+      case 'new':
+        return 'new listing — decided as it is first imported';
+      case 'not_comparable':
+        return 'not compared (no model on one side)';
+      case 'unchanged':
+        return 'unchanged';
+      case 'changed': {
+        const { anchorsChanged, addedIdentifiers, changedSpecs } = key.change;
+        const parts = [
+          anchorsChanged ? 'its brand, model or an identifier it had changed' : undefined,
+          addedIdentifiers.length ? `identifiers added: ${addedIdentifiers.join(', ')}` : undefined,
+          changedSpecs.length ? `key specs changed: ${changedSpecs.join(', ')}` : undefined,
+        ].filter(Boolean);
+        return `**changed** — ${parts.join('; ')}. Its product is checked again on import (fit check first)`;
+      }
+    }
   }
 
   /** The extracted model and the normalizedModel name matching would compare. */

@@ -54,6 +54,8 @@ export interface PageInterpretation {
   url: string;
   /** How it was fetched: `detailPage.fetchMode`, else the source's. */
   fetchMode: ProductSourceFetchMode;
+  /** How much HTML came back: a blocked or empty answer is short. */
+  htmlLength: number;
   detail: DetailPageResult;
   /** The caller's category, else the page's; absent with a categoryProblem. */
   category?: PageCategory;
@@ -140,7 +142,7 @@ export class ProductPageReaderService {
 
     this.assertExpectedProduct(task, url, detail, params.expectedExternalIds);
 
-    const base = { url, fetchMode, detail };
+    const base = { url, fetchMode, htmlLength: html.length, detail };
     const category = params.category ?? (await this.categoryOfPage(config, detail));
     if ('reason' in category) return { ...base, categoryProblem: category };
 
