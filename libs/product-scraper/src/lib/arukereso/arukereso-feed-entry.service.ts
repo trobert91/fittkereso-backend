@@ -113,6 +113,7 @@ export class ArukeresoFeedEntryService {
             // still reads unchanged next run.
             feedRowHash: feedRowHash(row.url, row.scrapedProduct),
             pageRead,
+            feedListing: row.scrapedProduct,
           },
           listing,
         );

@@ -3,7 +3,7 @@ import { BasePostgresEntity } from './base-postgres-entity';
 import { Brand } from './brand.entity';
 import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
-import { ScrapedProduct } from '../../models/scraped-product';
+import { ListingInputHashes, ScrapedProduct } from '../../models/scraped-product';
 import { Expose, Transform } from 'class-transformer';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Offer } from './offer.entity';
@@ -141,6 +141,17 @@ export class ProductSourceRecord extends BasePostgresEntity {
   @Column({ type: 'timestamptz', nullable: true })
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   pageFailedAt?: Date | null;
+
+  /**
+   * The listing's input hashes, by part (ListingInputHashes): what decides
+   * whether an import may reuse the stored identity extraction, and whether
+   * spec unification runs again (postProcess.rerunSpecsOnChange). Each import
+   * writes the parts it read; the others stay as they were.
+   */
+  @Column({ type: 'jsonb', nullable: false, default: '{}' })
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @Transform(transfromExposeAll())
+  inputHashes: ListingInputHashes;
 
   /**
    * The listing's key within its source (listingExternalIdOf): its

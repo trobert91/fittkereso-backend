@@ -61,6 +61,7 @@ import { ScrapedOffer, ScrapedProduct } from '@fittkereso-backend/product';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
 import { compact, difference, isEmpty, minBy, pick, uniq } from 'lodash';
 import { SpecPostProcessService } from './spec-post-process.service';
+import { storedInputHashesOf } from './listing-input-hashes';
 import {
   IdentityRecheckVia,
   IdentityResolvedVia,
@@ -234,10 +235,11 @@ export class ProductScrapeUpdaterService {
         seller,
         { leaveOtherCategory: true },
       );
+      const ownRecord = this.ownRecordOf(context, listingId, history?.model);
       const extracted = await this.specPostProcess.extractIdentity({
         context,
         scrapedProduct,
-        ownRecord: this.ownRecordOf(context, listingId, history?.model),
+        ownRecord,
       });
 
       // The decision reads what the extraction produced: the sanity check
@@ -253,6 +255,7 @@ export class ProductScrapeUpdaterService {
         extracted,
         identity,
         !!brand,
+        { listingId, record: ownRecord },
       );
 
       // Everything above only reads (and calls the LLM). Everything below
@@ -324,12 +327,13 @@ export class ProductScrapeUpdaterService {
       );
     }
     // Its own record, so an unchanged listing reuses the stored extraction.
+    const ownRecord =
+      (await this.sourceRecordRepo.findBySourceAndExternalId(context.source.id, listingId)) ??
+      undefined;
     const extracted = await this.specPostProcess.extractIdentity({
       context,
       scrapedProduct,
-      ownRecord:
-        (await this.sourceRecordRepo.findBySourceAndExternalId(context.source.id, listingId)) ??
-        undefined,
+      ownRecord,
     });
     const write: ListingWrite = {
       context,
@@ -368,6 +372,7 @@ export class ProductScrapeUpdaterService {
         extracted,
         { model: offer.model, isExistingMatch: true, keyMatches: [], keyGates: {} },
         true,
+        { listingId, record: ownRecord },
       );
       const model = await this.writeContribution(
         { ...write, listing: this.withStoredOffers(listing, externalIds) },
@@ -877,26 +882,23 @@ export class ProductScrapeUpdaterService {
    * existing one. Every later size and every re-import of the source skips
    * it — the source's first record already carries what it adds. An admin's
    * forced resync is the exception: it re-reads that one listing in full.
+   * With the source's postProcess.rerunSpecsOnChange, also when the
+   * listing's spec content changed (SpecPostProcessService.unifyIfDue).
    */
   private async unifyForNewSource(
     context: ProductImportContext,
     scrapedProduct: ScrapedProduct,
     identity: ResolvedIdentity,
     brandResolved: boolean,
+    own: { listingId: string; record: ProductSourceRecord | undefined },
   ): Promise<ScrapedProduct> {
-    const { model } = identity;
-    const contributed = !!model?.sources?.some(
-      (record) => record.source?.id === context.source.id,
-    );
-    if (contributed && !context.force) return scrapedProduct;
-    // A product whose brand is unknown cannot be created, so the listing is
-    // about to be dropped — not worth the most expensive call of the import.
-    if (!model && !brandResolved) return scrapedProduct;
-
-    return this.specPostProcess.unify({
+    return this.specPostProcess.unifyIfDue({
       context,
       scrapedProduct,
-      trigger: !model ? 'created' : contributed ? 'forced' : 'new_source',
+      model: identity.model,
+      brandResolved,
+      listingId: own.listingId,
+      storedHashes: storedInputHashesOf(own.record, context.source.type),
     });
   }
 

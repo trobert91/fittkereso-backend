@@ -141,7 +141,36 @@ export interface ScrapedProduct {
    * read, and on scraped listings, whose page is the listing itself.
    */
   page?: ScrapedPage;
+  /**
+   * This import's input hashes, by part — handed from the post-process step
+   * to the record write, which merges them into
+   * ProductSourceRecord.inputHashes. Not kept in the stored JSON.
+   */
+  inputHashes?: ListingInputHashes;
 }
+
+/**
+ * The parts a listing's input is hashed in (ProductSourceRecord.inputHashes):
+ * - `feedIdentity` / `pageIdentity`: what the identity extraction would be
+ *   given from the feed row, and from the product page;
+ * - `feedSpecs` / `pageSpecs`: what spec unification reads from each — the
+ *   rows and mapped values, normalised, without offer-level values or the
+ *   description;
+ * - `unifiedSpecs`: the feed + page specs the stored unification output was
+ *   made from.
+ * An import compares only the parts it read: a feed-only import its feed's,
+ * a page import both, a scraping import its page's. A part it did not read
+ * keeps its stored hash.
+ */
+export const LISTING_INPUT_PARTS = [
+  'feedIdentity',
+  'pageIdentity',
+  'feedSpecs',
+  'pageSpecs',
+  'unifiedSpecs',
+] as const;
+export type ListingInputPart = (typeof LISTING_INPUT_PARTS)[number];
+export type ListingInputHashes = Partial<Record<ListingInputPart, string>>;
 
 /** What a feed listing's product page said (ScrapedProduct.page). */
 export interface ScrapedPage {

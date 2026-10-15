@@ -4,7 +4,9 @@ import {
   CategorySpecPromptExamples,
   isArukeresoConfig,
   isScrapingConfig,
+  ListingInputHashes,
   modelExcludedSpecKeys,
+  ProductModel,
   ProductSource,
   ProductSourceConfig,
   ProductSourcePostProcessConfig,
@@ -36,6 +38,15 @@ import { CustomLogger } from '@fittkereso-backend/logger';
 import { filterDefinedSpecs, htmlToText } from '@fittkereso-backend/utils';
 import { difference, isEmpty, isNil, omit, omitBy, pick, uniq } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
+import {
+  ListingInputParts,
+  identityPartOf,
+  inputPartsOf,
+  specsHashOf,
+  specsKeyOf,
+  specsPartOf,
+  storedInputHashesOf,
+} from './listing-input-hashes';
 
 /**
  * Which fields each LLM call owns for one category. Read from the category
@@ -178,9 +189,16 @@ export class SpecPostProcessService {
       model: rawTitle,
       specs: filterDefinedSpecs(pick(deterministic, scopes.identityKeys)),
     };
-    // A listing whose description has no keyword hashes as it did before its
-    // source sent excerpts, so it isn't asked again for nothing.
-    const identityInputHash = hashOf({ ...data, rows, description, descriptionEvidence });
+    // The input hashed by part — the feed row's and the page's apart — and
+    // compared only for the parts this import read: a feed-only import
+    // re-reads its feed alone, its kept page merged in but not compared.
+    const parts = inputPartsOf(scrapedProduct, context);
+    const inputHashes = this.inputHashesOf(parts, scrapedProduct.category.slug, scopes, config, specRows);
+    const storedHashes = storedInputHashesOf(ownRecord, context.source.type);
+    const inputUnchanged = parts.read.every((side) => {
+      const part = identityPartOf(side);
+      return !!storedHashes[part] && storedHashes[part] === inputHashes[part];
+    });
 
     const enabled = config?.identity !== false;
     const modelContract = contractOf(scopes);
@@ -205,14 +223,8 @@ export class SpecPostProcessService {
       ownRecord?.scrapedProduct?.category?.slug === scrapedProduct.category.slug
         ? ownRecord.scrapedProduct
         : undefined;
-    if (
-      stored?.model &&
-      !context.force &&
-      ownRecord?.offerSpecsHash === scrapedProduct.offerSpecsHash &&
-      ownRecord?.productSpecsHash === scrapedProduct.productSpecsHash &&
-      stored.identityInputHash === identityInputHash
-    ) {
-      const reused = this.reuse(scrapedProduct, stored, identityInputHash, scopes);
+    if (stored?.model && !context.force && inputUnchanged) {
+      const reused = this.reuse(scrapedProduct, stored, inputHashes, scopes, ownRecord);
       // A model asked under an older rule is asked again, where the name is
       // used: a contributing source's listing names and matches nothing.
       const stale =
@@ -271,7 +283,7 @@ export class SpecPostProcessService {
           scrapedProduct.flags,
           merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
         ),
-        identityInputHash,
+        inputHashes,
         offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
       },
       schema,
@@ -403,11 +415,145 @@ export class SpecPostProcessService {
     };
   }
 
+  /**
+   * Spec unification, when it is due for this listing:
+   * - as before, when the listing creates its product, is its source's first
+   *   on it, or an admin forces a resync of it;
+   * - with the source's `postProcess.rerunSpecsOnChange`, also when its spec
+   *   content (ListingInputHashes `feedSpecs` + `pageSpecs`) differs from the
+   *   content its stored unification was made from — once per product and
+   *   source: a sibling of the same source on the same product unified from
+   *   the same content gives its result instead of a call.
+   *
+   * A listing with no record of what it was unified from takes its content
+   * now as that, without a call — so switching the option on starts no wave.
+   * With the option off, a change is only counted (`would_run`), and the
+   * stored content stays, for the count to hold when it is switched on.
+   */
+  public async unifyIfDue(params: {
+    context: ProductImportContext;
+    scrapedProduct: ScrapedProduct;
+    /** The product the listing goes to; undefined while it is to be created. */
+    model: ProductModel | undefined;
+    brandResolved: boolean;
+    listingId: string;
+    /** The listing's stored input hashes (storedInputHashesOf its record). */
+    storedHashes: ListingInputHashes;
+  }): Promise<ScrapedProduct> {
+    const { context, scrapedProduct, model, brandResolved, listingId, storedHashes } = params;
+    const specsKey = specsKeyOf({ ...storedHashes, ...scrapedProduct.inputHashes });
+    const unifiedFrom = (listing: ScrapedProduct): ScrapedProduct => ({
+      ...listing,
+      inputHashes: { ...listing.inputHashes, unifiedSpecs: specsKey },
+    });
+
+    const contributed = !!model?.sources?.some((record) => record.source?.id === context.source.id);
+    if (!contributed || context.force) {
+      // A product whose brand is unknown cannot be created, so the listing is
+      // about to be dropped — not worth the most expensive call of the import.
+      if (!model && !brandResolved) return scrapedProduct;
+      const trigger = !model ? 'created' : contributed ? 'forced' : 'new_source';
+      const unified = await this.unify({ context, scrapedProduct, trigger });
+      return unified === scrapedProduct ? scrapedProduct : unifiedFrom(unified);
+    }
+
+    const config = postProcessConfigOf(context.source.config);
+    if (config?.specs === false) return scrapedProduct;
+    const before = storedHashes.unifiedSpecs;
+    if (before === specsKey) return scrapedProduct;
+    if (!before) return unifiedFrom(scrapedProduct);
+    if (!config?.rerunSpecsOnChange) {
+      this.productMetrics.specUnification(context.source.name, 'input_changed', 'would_run');
+      return scrapedProduct;
+    }
+
+    const schema = this.categoryConfigService.getJsonSchema(scrapedProduct.category.slug);
+    const sibling = model?.sources?.find(
+      (record) =>
+        record.source?.id === context.source.id &&
+        record.externalId !== listingId &&
+        record.inputHashes?.unifiedSpecs === specsKey,
+    );
+    if (sibling && schema) {
+      const { unificationKeys } = this.scopesOf(scrapedProduct.category.slug, schema);
+      this.productMetrics.specUnification(context.source.name, 'input_changed', 'copied');
+      return unifiedFrom({
+        ...scrapedProduct,
+        specs: { ...scrapedProduct.specs, ...pick(sibling.scrapedProduct?.specs, unificationKeys) },
+      });
+    }
+
+    const unified = await this.unify({ context, scrapedProduct, trigger: 'input_changed' });
+    return unified === scrapedProduct ? scrapedProduct : unifiedFrom(unified);
+  }
+
+  /** This import's input hashes, by part: only the parts it read. */
+  private inputHashesOf(
+    parts: ListingInputParts,
+    categorySlug: string,
+    scopes: CategorySpecScopes,
+    config: ProductSourcePostProcessConfig | undefined,
+    specRows: string[] | undefined,
+  ): ListingInputHashes {
+    const hashes: ListingInputHashes = {};
+    for (const side of parts.read) {
+      const part = parts[side];
+      if (!part) continue;
+      hashes[identityPartOf(side)] = this.identityHashOf(part, scopes, config, specRows);
+      hashes[specsPartOf(side)] = specsHashOf(part, scopes.offerLevelKeys, categorySlug);
+    }
+    return hashes;
+  }
+
+  /**
+   * What the identity extraction would be given from one part, hashed. The
+   * same fields in the same order as the single hash of before
+   * (identityInputHash), so a feed listing without a page, or a scraped one,
+   * hashes as it did and reuses its stored extraction after the change. A
+   * description without a keyword hashes as before its source sent excerpts.
+   */
+  private identityHashOf(
+    part: ListingInputParts['feed'] & object,
+    scopes: CategorySpecScopes,
+    config: ProductSourcePostProcessConfig | undefined,
+    specRows: string[] | undefined,
+  ): string {
+    const rows = selectIdentitySpecRows(part.rawSpecs, specRows);
+    const { description, descriptionEvidence } = identityDescriptionOf(part.description, config, scopes);
+    const data = {
+      brand: part.brand,
+      model: part.title,
+      specs: filterDefinedSpecs(pick(part.specs, scopes.identityKeys)),
+    };
+    return hashOf({ ...data, rows, description, descriptionEvidence });
+  }
+
+  /**
+   * A reused extraction's specs: the stored ones — the identity values the LLM
+   * gave, and unification's — with today's mapped non-identity values over
+   * them when the mapping changed since (a fixed spec mapping), as a fresh
+   * extraction would have them.
+   */
+  private reusedSpecs(
+    scrapedProduct: ScrapedProduct,
+    stored: Partial<ScrapedProduct>,
+    scopes: CategorySpecScopes,
+    ownRecord: ProductSourceRecord | undefined,
+  ): ProductSpecs | undefined {
+    const storedSpecs = stored.specs ?? scrapedProduct.specs;
+    if (ownRecord?.productSpecsHash === scrapedProduct.productSpecsHash) return storedSpecs;
+    return {
+      ...storedSpecs,
+      ...omit(scrapedProduct.productLevelDeterministicSpecs ?? {}, scopes.identityKeys),
+    };
+  }
+
   private reuse(
     scrapedProduct: ScrapedProduct,
     stored: Partial<ScrapedProduct>,
-    identityInputHash: string,
+    inputHashes: ListingInputHashes,
     scopes: CategorySpecScopes,
+    ownRecord: ProductSourceRecord | undefined,
   ): ScrapedProduct {
     const storedOffers = stored.offers ?? [];
     const storedSpecsFor = (offer: ScrapedOffer, index: number) =>
@@ -422,9 +568,9 @@ export class SpecPostProcessService {
       brand: stored.brand ?? scrapedProduct.brand,
       model: stored.model,
       modelContract: stored.modelContract,
-      specs: stored.specs ?? scrapedProduct.specs,
+      specs: this.reusedSpecs(scrapedProduct, stored, scopes, ownRecord),
       flags: withIdentityFlag(scrapedProduct.flags, undefined),
-      identityInputHash,
+      inputHashes,
       offers: withOfferLevelSpecs(scrapedProduct.offers, (offer, index) =>
         pick(storedSpecsFor(offer, index), scopes.offerLevelKeys),
       ),

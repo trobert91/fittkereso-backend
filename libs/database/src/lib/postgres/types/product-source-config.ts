@@ -186,6 +186,16 @@ export interface ProductSourcePostProcessConfig {
    * copy with no reliable spec content, to skip the extra input tokens.
    */
   includeDescriptionInModelSpecs?: boolean;
+  /**
+   * Whether spec unification runs again when a listing's spec input changes
+   * (its rows or mapped values; ListingInputHashes `feedSpecs`/`pageSpecs`),
+   * once per product and source per changed content — a size whose sibling
+   * of the same source and product was unified from the same content takes
+   * its result. Off by default: unification then runs once per product per
+   * source, as before, and a page read for a listing already on a product
+   * adds its rows to the identity extraction only.
+   */
+  rerunSpecsOnChange?: boolean;
 }
 
 /** ProductSourcePostProcessConfig.identityDescription. */

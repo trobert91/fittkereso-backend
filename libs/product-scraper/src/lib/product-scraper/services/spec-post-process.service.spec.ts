@@ -1,6 +1,9 @@
 import { SpecPostProcessService } from './spec-post-process.service';
 import { ProductSourcePostProcessMergeService } from '@fittkereso-backend/product';
+import { omit } from 'lodash';
+import { specsKeyOf } from './listing-input-hashes';
 import type {
+  ProductModel,
   ProductSource,
   ProductSourceRecord,
   ScrapedProduct,
@@ -67,6 +70,7 @@ describe('SpecPostProcessService', () => {
     source: {
       id: 'source-1',
       name: 'speedbike-arukereso',
+      type: 'arukereso',
       config: { feedUrl: 'https://speedbike.hu/feed', mapping: {}, ...config },
     } as unknown as ProductSource,
   });
@@ -173,7 +177,9 @@ describe('SpecPostProcessService', () => {
       });
       expect(result.flags).toBeUndefined();
       expect(result.specs).not.toHaveProperty('frameSize');
-      expect(result.identityInputHash).toEqual(expect.any(String));
+      // A feed listing without its feed part apart, or a page: its input is its feed's.
+      expect(result.inputHashes).toEqual({ feedIdentity: expect.any(String), feedSpecs: expect.any(String) });
+      expect(result).not.toHaveProperty('identityInputHash');
     });
 
     // A page listing several variants gives each offer its own size.
@@ -247,7 +253,7 @@ describe('SpecPostProcessService', () => {
         });
 
         expect(postProcess.extractIdentity.mock.calls[1][0].descriptionEvidence).toBeUndefined();
-        expect(inEvidenceMode.identityInputHash).toBe(asBefore.identityInputHash);
+        expect(inEvidenceMode.inputHashes?.feedIdentity).toBe(asBefore.inputHashes?.feedIdentity);
       });
     });
 
@@ -359,11 +365,13 @@ describe('SpecPostProcessService', () => {
         });
         postProcess.extractIdentity.mockClear();
         metrics.identityExtraction.mockClear();
+        const { inputHashes, ...stored } = first;
         return {
           offerSpecsHash: 'offer-hash',
           productSpecsHash: 'product-hash',
+          inputHashes,
           scrapedProduct: {
-            ...first,
+            ...stored,
             // What unification added when the product was created.
             specs: { ...first.specs, tubeless: true },
           },
@@ -416,6 +424,7 @@ describe('SpecPostProcessService', () => {
         const ownRecord = {
           offerSpecsHash: 'offer-hash',
           productSpecsHash: 'product-hash',
+          inputHashes: first.inputHashes,
           scrapedProduct: first,
         } as unknown as ProductSourceRecord;
 
@@ -446,16 +455,35 @@ describe('SpecPostProcessService', () => {
         expect(result.specs).toMatchObject({ tubeless: true, modelYear: 2026 });
       });
 
-      it('extracts again when a deterministic hash changed', async () => {
+      it('extracts again when a mapped identity value changed', async () => {
         const ownRecord = await storedRecord();
 
         await service.extractIdentity({
           context: context(),
-          scrapedProduct: listing({ productSpecsHash: 'changed' }),
+          scrapedProduct: listing({ extractedSpecs: { weight: 25, forkTravel: 150 }, productSpecsHash: 'changed' }),
           ownRecord,
         });
 
         expect(postProcess.extractIdentity).toHaveBeenCalled();
+      });
+
+      // A fixed mapping of a field the identity extraction never reads asks it
+      // nothing — and the listing still takes the newly mapped value.
+      it('reuses the extraction when only a mapped non-identity value changed, taking the new value', async () => {
+        const ownRecord = await storedRecord();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: listing({
+            extractedSpecs: { weight: 24, forkTravel: 160 },
+            productLevelDeterministicSpecs: { weight: 24, forkTravel: 160 },
+            productSpecsHash: 'changed',
+          }),
+          ownRecord,
+        });
+
+        expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+        expect(result.specs).toMatchObject({ forkTravel: 160, tubeless: true, modelYear: 2026, weight: 24 });
       });
 
       it('never reuses under force', async () => {
@@ -779,6 +807,7 @@ describe('SpecPostProcessService', () => {
       const ownRecord = {
         offerSpecsHash: 'offer-hash',
         productSpecsHash: 'product-hash',
+        inputHashes: first.inputHashes,
         // Stored before years were normalised.
         scrapedProduct: { ...first, specs: { ...first.specs, modelYear: '2026.' } },
       } as unknown as ProductSourceRecord;
@@ -810,6 +839,356 @@ describe('SpecPostProcessService', () => {
       });
 
       expect(result.specs).not.toHaveProperty('modelYear');
+    });
+  });
+
+  // A feed listing's input in two parts: what its feed row said, and what its
+  // product page said. An import compares only what it read.
+  describe('input hashes by part', () => {
+    const pageRows = [{ name: 'Neme:', values: ['Férfi'] }];
+    /** The feed row as mapped, before its page was merged in. */
+    const feedRow = (overrides: Partial<ScrapedProduct> = {}) => listing(overrides);
+    /** The listing with its page merged in: page rows after the feed's, page specs filling gaps. */
+    const withPage = (feed: ScrapedProduct, page: Partial<NonNullable<ScrapedProduct['page']>> = {}) => {
+      const stored = {
+        url: 'https://speedbike.hu/ktm-macina',
+        rawSpecs: pageRows,
+        specs: { batteryCapacity: 750 },
+        rowCount: 1,
+        contentHash: 'page',
+        ...page,
+      };
+      return {
+        ...feed,
+        rawSpecs: [...(feed.rawSpecs ?? []), ...stored.rawSpecs],
+        extractedSpecs: { ...stored.specs, ...feed.extractedSpecs },
+        page: stored,
+      } as ScrapedProduct;
+    };
+    const pageImport = (feed: ScrapedProduct, listingWithPage: ScrapedProduct, ownRecord?: ProductSourceRecord) =>
+      service.extractIdentity({
+        context: { ...context(), feedListing: feed, pageRead: { fetchedAt: new Date() } },
+        scrapedProduct: listingWithPage,
+        ownRecord,
+      });
+    const feedOnlyImport = (feed: ScrapedProduct, listingWithPage: ScrapedProduct, ownRecord?: ProductSourceRecord) =>
+      service.extractIdentity({
+        context: { ...context(), feedListing: feed },
+        scrapedProduct: listingWithPage,
+        ownRecord,
+      });
+    /** The record an import left: its result, its hashes in their column. */
+    const recordOf = (result: ScrapedProduct, before?: ProductSourceRecord): ProductSourceRecord => {
+      const { inputHashes, ...stored } = result;
+      return {
+        offerSpecsHash: result.offerSpecsHash,
+        productSpecsHash: result.productSpecsHash,
+        inputHashes: { ...(before?.inputHashes ?? {}), ...inputHashes },
+        scrapedProduct: stored,
+      } as unknown as ProductSourceRecord;
+    };
+
+    it('hashes the feed and the page apart on a page import, and writes both', async () => {
+      const feed = feedRow();
+      const result = await pageImport(feed, withPage(feed));
+
+      expect(result.inputHashes).toEqual({
+        feedIdentity: expect.any(String),
+        feedSpecs: expect.any(String),
+        pageIdentity: expect.any(String),
+        pageSpecs: expect.any(String),
+      });
+      // The LLM reads the whole listing: the feed's rows and the page's.
+      expect(postProcess.extractIdentity.mock.calls[0][0].rawSpecs).toEqual([...rawSpecs, ...pageRows]);
+    });
+
+    // The feed part hashes as the single hash of before, over the feed alone.
+    it("gives the feed part the same hash whether or not a page is merged in", async () => {
+      const feed = feedRow();
+      const alone = await feedOnlyImport(feed, feed);
+      const merged = await pageImport(feed, withPage(feed));
+
+      expect(merged.inputHashes?.feedIdentity).toBe(alone.inputHashes?.feedIdentity);
+    });
+
+    it('reuses on a feed-only import when the feed is unchanged, the kept page merged in but not compared', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await pageImport(feed, withPage(feed)));
+      postProcess.extractIdentity.mockClear();
+
+      const result = await feedOnlyImport(feed, withPage(feed), ownRecord);
+
+      expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+      expect(result.inputHashes).toEqual({ feedIdentity: expect.any(String), feedSpecs: expect.any(String) });
+    });
+
+    it('asks again on a feed-only import whose feed title changed, its kept page in the input', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await pageImport(feed, withPage(feed)));
+      postProcess.extractIdentity.mockClear();
+      const renamed = feedRow({ originalName: "KTM MACINA SCARP SX PRESTIGE Di2 M/43 '27 OLIVE" });
+
+      const result = await feedOnlyImport(renamed, withPage(renamed), ownRecord);
+
+      expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
+      expect(postProcess.extractIdentity.mock.calls[0][0].rawSpecs).toEqual([...rawSpecs, ...pageRows]);
+      // Only the feed part is rewritten: the page's stored hash stays.
+      expect(result.inputHashes).not.toHaveProperty('pageIdentity');
+      expect(result.inputHashes?.feedIdentity).not.toBe(ownRecord.inputHashes.feedIdentity);
+    });
+
+    it('reuses on a page import when neither the feed nor the page changed', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await pageImport(feed, withPage(feed)));
+      postProcess.extractIdentity.mockClear();
+
+      await pageImport(feed, withPage(feed), ownRecord);
+
+      expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+    });
+
+    it('asks again on a page import whose page rows changed', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await pageImport(feed, withPage(feed)));
+      postProcess.extractIdentity.mockClear();
+
+      const result = await pageImport(feed, withPage(feed, { rawSpecs: [{ name: 'Neme:', values: ['Női'] }] }), ownRecord);
+
+      expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
+      expect(result.inputHashes?.pageIdentity).not.toBe(ownRecord.inputHashes.pageIdentity);
+    });
+
+    // A listing's first page read: the page part was never hashed.
+    it('asks again when a part it reads was never hashed', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await feedOnlyImport(feed, feed));
+      postProcess.extractIdentity.mockClear();
+
+      await pageImport(feed, withPage(feed), ownRecord);
+
+      expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
+    });
+
+    it('always asks under force', async () => {
+      const feed = feedRow();
+      const ownRecord = recordOf(await pageImport(feed, withPage(feed)));
+      postProcess.extractIdentity.mockClear();
+
+      await service.extractIdentity({
+        context: { ...context({}, true), feedListing: feed },
+        scrapedProduct: withPage(feed),
+        ownRecord,
+      });
+
+      expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
+    });
+
+    it('hashes a scraped listing as its page', async () => {
+      const result = await service.extractIdentity({
+        context: { ...context(), source: { ...context().source, type: 'scraping' } as ProductSource },
+        scrapedProduct: listing(),
+      });
+
+      expect(result.inputHashes).toEqual({ pageIdentity: expect.any(String), pageSpecs: expect.any(String) });
+    });
+
+    // Records from before the hashes were kept by part carry identityInputHash
+    // alone; an unchanged listing must not be asked again for it.
+    describe('a record with only the hash of before', () => {
+      const legacyRecord = (result: ScrapedProduct, legacy: string | undefined, page?: unknown) =>
+        ({
+          offerSpecsHash: result.offerSpecsHash,
+          productSpecsHash: result.productSpecsHash,
+          inputHashes: {},
+          scrapedProduct: { ...omit(result, 'inputHashes'), identityInputHash: legacy, page },
+        }) as unknown as ProductSourceRecord;
+
+      it('reuses a feed listing without a page, its old hash read as its feed part', async () => {
+        const feed = feedRow();
+        const first = await feedOnlyImport(feed, feed);
+        postProcess.extractIdentity.mockClear();
+
+        await feedOnlyImport(feed, feed, legacyRecord(first, first.inputHashes?.feedIdentity));
+
+        expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+      });
+
+      it('reuses a scraped listing, its old hash read as its page part', async () => {
+        const scraping = { ...context(), source: { ...context().source, type: 'scraping' } as ProductSource };
+        const first = await service.extractIdentity({ context: scraping, scrapedProduct: listing() });
+        postProcess.extractIdentity.mockClear();
+
+        await service.extractIdentity({
+          context: scraping,
+          scrapedProduct: listing(),
+          ownRecord: legacyRecord(first, first.inputHashes?.pageIdentity),
+        });
+
+        expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+      });
+
+      it('asks once for a record with no hash at all', async () => {
+        const feed = feedRow();
+        const first = await feedOnlyImport(feed, feed);
+        postProcess.extractIdentity.mockClear();
+
+        await feedOnlyImport(feed, feed, legacyRecord(first, undefined));
+
+        expect(postProcess.extractIdentity).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  // Spec unification: once per product per source, as before — and, with the
+  // source's rerunSpecsOnChange, again when the spec content changed.
+  describe('unifyIfDue', () => {
+    const product = (sources: Partial<ProductSourceRecord>[] = []) =>
+      ({ id: 'model-1', sources }) as unknown as ProductModel;
+    const ours = (fields: Partial<ProductSourceRecord> = {}) =>
+      ({ source: { id: 'source-1' }, externalId: 'sku-43', ...fields }) as Partial<ProductSourceRecord>;
+    const due = (params: {
+      model?: ProductModel;
+      config?: Record<string, unknown>;
+      force?: boolean;
+      fresh?: Record<string, string>;
+      stored?: Record<string, string>;
+      brandResolved?: boolean;
+    }) =>
+      service.unifyIfDue({
+        context: context(params.config ?? {}, params.force ?? false),
+        scrapedProduct: listing({ inputHashes: params.fresh ?? { feedSpecs: 'rows-1' } }),
+        model: params.model,
+        brandResolved: params.brandResolved ?? true,
+        listingId: 'sku-43',
+        storedHashes: params.stored ?? {},
+      });
+    const keyOf = (feedSpecs: string, pageSpecs?: string) => specsKeyOf({ feedSpecs, pageSpecs });
+
+    describe('as before', () => {
+      it('unifies a listing that creates its product, and records what from', async () => {
+        const result = await due({ model: undefined });
+
+        expect(postProcess.processModelSpecs).toHaveBeenCalledTimes(1);
+        expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'created', 'ok');
+        expect(result.inputHashes?.unifiedSpecs).toBe(keyOf('rows-1'));
+      });
+
+      it("unifies its source's first listing on an existing product", async () => {
+        await due({ model: product([{ source: { id: 'other' } } as never]) });
+
+        expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'new_source', 'ok');
+      });
+
+      it('unifies a listing its source already contributed when forced', async () => {
+        await due({ model: product([ours()]), force: true });
+
+        expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'forced', 'ok');
+      });
+
+      it('does not unify a product whose brand is unknown', async () => {
+        await due({ model: undefined, brandResolved: false });
+
+        expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+      });
+
+      it('records nothing when unification gave nothing, for the next import to try', async () => {
+        postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
+
+        const result = await due({ model: undefined });
+
+        expect(result.inputHashes?.unifiedSpecs).toBeUndefined();
+      });
+    });
+
+    describe('a listing its source already contributed', () => {
+      const model = product([ours()]);
+
+      it('does nothing when its spec content is what it was unified from', async () => {
+        const result = await due({ model, stored: { unifiedSpecs: keyOf('rows-1') }, config: { postProcess: { rerunSpecsOnChange: true } } });
+
+        expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+        expect(result.inputHashes).toEqual({ feedSpecs: 'rows-1' });
+      });
+
+      // Unified before the hashes existed: its content now is the baseline, so
+      // switching the option on starts no wave.
+      it('takes its content now as what it was unified from, without a call', async () => {
+        const result = await due({ model, stored: {}, config: { postProcess: { rerunSpecsOnChange: true } } });
+
+        expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+        expect(result.inputHashes?.unifiedSpecs).toBe(keyOf('rows-1'));
+      });
+
+      describe('with rerunSpecsOnChange off (the default)', () => {
+        it('only counts a changed content, and keeps what it was unified from', async () => {
+          const result = await due({ model, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+          expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'input_changed', 'would_run');
+          expect(result.inputHashes?.unifiedSpecs).toBeUndefined();
+        });
+      });
+
+      describe('with rerunSpecsOnChange on', () => {
+        const on = { postProcess: { rerunSpecsOnChange: true } };
+
+        it('unifies again when its spec content changed', async () => {
+          const result = await due({ model, config: on, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).toHaveBeenCalledTimes(1);
+          expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'input_changed', 'ok');
+          expect(result.specs).toMatchObject({ tubeless: true });
+          expect(result.inputHashes?.unifiedSpecs).toBe(keyOf('rows-1'));
+        });
+
+        // mangobike's sizes of one model: one call, the others take its result.
+        it("takes a sibling's result, unified from the same content, instead of a call", async () => {
+          const sibling = ours({
+            externalId: 'sku-46',
+            inputHashes: { unifiedSpecs: keyOf('rows-1') },
+            scrapedProduct: { specs: { tubeless: true, forkTravel: 140, weight: 99 } } as never,
+          });
+
+          const result = await due({ model: product([ours(), sibling]), config: on, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+          expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'input_changed', 'copied');
+          // Unification's fields only: the sibling's identity values (weight) are its own.
+          expect(result.specs).toEqual({ weight: 24, tubeless: true, forkTravel: 140 });
+          expect(result.inputHashes?.unifiedSpecs).toBe(keyOf('rows-1'));
+        });
+
+        it('copies nothing from a sibling unified from other content', async () => {
+          const sibling = ours({ externalId: 'sku-46', inputHashes: { unifiedSpecs: keyOf('rows-9') } });
+
+          await due({ model: product([ours(), sibling]), config: on, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).toHaveBeenCalledTimes(1);
+        });
+
+        it("copies nothing from another source's listing", async () => {
+          const other = { source: { id: 'source-2' }, externalId: 'x', inputHashes: { unifiedSpecs: keyOf('rows-1') } };
+
+          await due({ model: product([ours(), other as never]), config: on, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).toHaveBeenCalledTimes(1);
+        });
+
+        // A feed-only import did not read the page: its stored page content counts.
+        it("counts the page's stored spec content on a feed-only import", async () => {
+          const unifiedFrom = keyOf('rows-1', 'page-1');
+
+          await due({ model, config: on, fresh: { feedSpecs: 'rows-1' }, stored: { pageSpecs: 'page-1', unifiedSpecs: unifiedFrom } });
+
+          expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+        });
+
+        it('does nothing for a source whose unification is off', async () => {
+          await due({ model, config: { postProcess: { rerunSpecsOnChange: true, specs: false } }, stored: { unifiedSpecs: keyOf('rows-0') } });
+
+          expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+        });
+      });
     });
   });
 });

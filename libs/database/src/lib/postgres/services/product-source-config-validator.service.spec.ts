@@ -496,6 +496,22 @@ describe('ProductSourceConfigValidatorService', () => {
       expect(validator.problems('googleshop', feedConfig({ price: [{ field: 'price' }, {}] }))).not.toBeNull();
     });
 
+    it('takes rerunSpecsOnChange as a boolean switch of the post-process block', () => {
+      const withPostProcess = (postProcess: Record<string, unknown>) => ({ ...feedConfig(), postProcess });
+
+      expect(validator.problems('arukereso', withPostProcess({ rerunSpecsOnChange: true }))).toBeNull();
+      expect(validator.problems('arukereso', withPostProcess({ rerunSpecsOnChange: false }))).toBeNull();
+      expect(validator.problems('arukereso', withPostProcess({ rerunSpecsOnChange: 'yes' }))).not.toBeNull();
+      expect(
+        validator.problems(
+          'scraping',
+          configWith((c) => {
+            c.detailPage.postProcess = { rerunSpecsOnChange: true };
+          }),
+        ),
+      ).toBeNull();
+    });
+
     // A feed's detailPage is the scraping detailPage's parts and ops, narrowed:
     // none required, and no category, offerLinks or postProcess.
     describe('detailPage', () => {

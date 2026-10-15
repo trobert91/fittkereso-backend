@@ -322,6 +322,11 @@ const postProcessConfigSchema: JsonSchemaFragment = {
       description:
         'Whether the extracted description reaches full spec unification (the once-per-product call filling every non-identity field). Defaults to true. Set false for a source whose description is pure sales copy.',
     },
+    rerunSpecsOnChange: {
+      type: 'boolean',
+      description:
+        "Whether spec unification runs again when a listing's spec rows or mapped values change, once per product and source per changed content (sizes with the same content share one call). The description alone never triggers it. Default false: unification runs once per product per source.",
+    },
   },
   additionalProperties: false,
 };

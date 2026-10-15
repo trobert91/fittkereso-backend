@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { omit } from 'lodash';
 import {
   Brand,
   ProductModel,
@@ -282,9 +283,14 @@ export class ProductSourceRecordUpdaterService {
       validation,
     } = params;
     source.url = sourceUrl;
+    // The import's input hashes go to their column, merged over the stored
+    // ones: a part this import did not read keeps its hash.
+    if (scrapedProduct?.inputHashes) {
+      source.inputHashes = { ...(source.inputHashes ?? {}), ...scrapedProduct.inputHashes };
+    }
     source.scrapedProduct = scrapedProduct
       ? {
-          ...scrapedProduct,
+          ...omit(scrapedProduct, 'inputHashes'),
           specs: processedSpecs,
           extractedSpecs: scrapedProduct.extractedSpecs
             ? this.processSpecs(scrapedProduct.extractedSpecs)

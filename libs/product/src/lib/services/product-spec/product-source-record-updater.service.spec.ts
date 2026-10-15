@@ -172,6 +172,25 @@ describe('ProductSourceRecordUpdaterService.upsertSourceRecord', () => {
     expect(model.sources).toHaveLength(1);
   });
 
+  // An import writes the input hashes of the parts it read; the others stay.
+  it('merges the input hashes into their column, and keeps them out of the stored listing', async () => {
+    const model = makeModel();
+    const upsert = (inputHashes: Record<string, string>) =>
+      service.upsertSourceRecord({
+        model,
+        source,
+        scrapedProduct: { specs: { weight: 22 }, inputHashes } as any,
+        externalId: 'product-1',
+        sourceUrl: 'https://speedbike.hu/product-1',
+      });
+
+    await upsert({ feedIdentity: 'f1', pageIdentity: 'p1', unifiedSpecs: 'u1' });
+    const record = await upsert({ feedIdentity: 'f2', feedSpecs: 's2' });
+
+    expect(record?.inputHashes).toEqual({ feedIdentity: 'f2', pageIdentity: 'p1', unifiedSpecs: 'u1', feedSpecs: 's2' });
+    expect(record?.scrapedProduct).not.toHaveProperty('inputHashes');
+  });
+
   // A feed listing's page bookkeeping: when its page was read, or reading it
   // failed for good — what the feed run's triage reads to queue its page.
   describe('page bookkeeping', () => {

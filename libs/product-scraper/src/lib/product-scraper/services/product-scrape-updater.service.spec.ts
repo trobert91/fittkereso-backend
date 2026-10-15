@@ -282,6 +282,21 @@ describe('ProductScrapeUpdaterService', () => {
         .fn()
         .mockImplementation(async ({ scrapedProduct }) => scrapedProduct),
       unify: jest.fn().mockImplementation(async ({ scrapedProduct }) => scrapedProduct),
+      // The gate itself is SpecPostProcessService's spec; here, its rule as it
+      // stands with rerunSpecsOnChange off, so the updater's wiring is what
+      // these cases test: once per product per source, or forced.
+      unifyIfDue: jest.fn().mockImplementation(async ({ context, scrapedProduct, model, brandResolved }) => {
+        const contributed = !!model?.sources?.some(
+          (record: { source?: { id: string } }) => record.source?.id === context.source.id,
+        );
+        if (contributed && !context.force) return scrapedProduct;
+        if (!model && !brandResolved) return scrapedProduct;
+        return mockSpecPostProcess.unify({
+          context,
+          scrapedProduct,
+          trigger: !model ? 'created' : contributed ? 'forced' : 'new_source',
+        });
+      }),
     } as unknown as jest.Mocked<SpecPostProcessService>;
 
     mockLocks = {

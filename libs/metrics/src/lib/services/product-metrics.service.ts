@@ -104,9 +104,10 @@ export type IdentityExtractionResult =
 
 /**
  * Why a product's spec unification ran: it was created, a source first
- * contributed, or an admin forced a resync of one listing.
+ * contributed, an admin forced a resync of one listing, or a listing's spec
+ * input changed (postProcess.rerunSpecsOnChange).
  */
-export type SpecUnificationTrigger = 'created' | 'new_source' | 'forced';
+export type SpecUnificationTrigger = 'created' | 'new_source' | 'forced' | 'input_changed';
 
 /** What normalizeGtin made of one scraped offer's barcode. */
 export type OfferGtinResult = 'valid' | 'invalid' | 'absent';
@@ -337,7 +338,11 @@ export class ProductMetricsService {
   specUnification(
     source: string,
     trigger: SpecUnificationTrigger,
-    result: 'ok' | 'failed' | 'disabled',
+    /**
+     * `copied`: a sibling's result taken instead of a call; `would_run`: the
+     * input changed while rerunSpecsOnChange is off, so nothing ran.
+     */
+    result: 'ok' | 'failed' | 'disabled' | 'copied' | 'would_run',
   ): void {
     this.specUnificationCounter.inc({ source, trigger, result });
   }

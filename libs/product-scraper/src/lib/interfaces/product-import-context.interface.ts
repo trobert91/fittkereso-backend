@@ -1,4 +1,10 @@
-import { ListingPageRead, ProductModel, ProductSource, ProductImportTask } from '@fittkereso-backend/database';
+import {
+  ListingPageRead,
+  ProductModel,
+  ProductSource,
+  ProductImportTask,
+  ScrapedProduct,
+} from '@fittkereso-backend/database';
 
 /**
  * Everything the persistence path needs about "where this product came from",
@@ -50,6 +56,13 @@ export interface ProductImportContext {
    * import, which leave both as stored.
    */
   pageRead?: ListingPageRead;
+
+  /**
+   * A feed listing as its feed row alone mapped it, before its product page
+   * was merged in: the listing's feed part, whose input hashes are kept
+   * apart from its page's (ListingInputHashes). Unset on the scrape path.
+   */
+  feedListing?: ScrapedProduct;
 }
 
 /** The scrape path's context: everything derives from the task itself. */
