@@ -153,7 +153,7 @@ export class ProductSourceSimulateScrapeTools {
       value === undefined ? '_not mapped_' : (value ?? '_none_');
     result.extraction.rawOffers.forEach((offer, index) => {
       L.push(
-        `  - offer ${index + 1}: price ${offer.price ?? '_none_'} · availability ${describe(offer.availability)} · condition ${describe(offer.condition)}`,
+        `  - offer ${index + 1}: price ${offer.price ?? '_none_'} · old price ${offer.priceWithoutDiscount === undefined ? '_not mapped_' : (offer.priceWithoutDiscount ?? '_none_')} · availability ${describe(offer.availability)} · condition ${describe(offer.condition)}`,
       );
     });
     L.push('');

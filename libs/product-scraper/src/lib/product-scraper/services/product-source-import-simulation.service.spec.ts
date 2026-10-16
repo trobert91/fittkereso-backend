@@ -560,6 +560,7 @@ describe('ProductSourceImportSimulationService', () => {
           externalId: id,
           extractedSpecs: { modelYear: 2026 },
           specs: { modelYear: 2026 },
+          rawSpecs: [{ name: 'Webshop kategória', values: ['Elektromos Kerékpárok'] }],
           offers: [{ externalId: id, price: 1_259_640 }],
         },
       });
@@ -618,6 +619,8 @@ describe('ProductSourceImportSimulationService', () => {
             filledDescription: true,
           },
         ]);
+        // The rows the extraction is given are counted after the merge.
+        expect(result.feed?.productIdentifiers?.[0]).toMatchObject({ specRowsSent: 3, specRowsTotal: 3 });
         // Extracted as the page import would: the feed row apart, the page read now.
         expect(specPostProcess.extractIdentity).toHaveBeenCalledWith({
           context: expect.objectContaining({

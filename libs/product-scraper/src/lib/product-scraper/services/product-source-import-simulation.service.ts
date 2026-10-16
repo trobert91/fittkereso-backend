@@ -625,7 +625,8 @@ export class ProductSourceImportSimulationService {
                 externalId: offer?.externalId,
                 gtin: offer?.gtin,
                 mpn: offer?.mpn,
-                rawSpecs,
+                // The rows the extraction was given: the feed's, then its page's.
+                rawSpecs: listing.rawSpecs ?? rawSpecs,
                 specRows: categorySectionOf(config, classified.slug)
                   ?.identitySpecRows,
               }),
