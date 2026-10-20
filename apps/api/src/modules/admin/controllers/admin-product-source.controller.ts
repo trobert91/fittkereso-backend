@@ -57,7 +57,6 @@ export class AdminProductSourceController {
   ) {}
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [
@@ -88,7 +87,6 @@ export class AdminProductSourceController {
    * cannot disagree about what a valid config is.
    */
   @Get('config-schema')
-  @MinRole(UserRole.user)
   @SerializeOptions({ strategy: 'exposeAll' })
   getConfigSchema(
     @Query('type') type?: string,
@@ -112,7 +110,6 @@ export class AdminProductSourceController {
   }
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [
@@ -163,7 +160,6 @@ export class AdminProductSourceController {
    * versions indefinitely, and each row carries a complete config.
    */
   @Get(':id/versions')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [SerializeGroup.adminList, SerializeGroup.list],
@@ -182,7 +178,6 @@ export class AdminProductSourceController {
 
   /** One numbered revision, with its whole config. */
   @Get(':id/versions/:version')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [
@@ -230,7 +225,6 @@ export class AdminProductSourceController {
 
   /** The audit timeline: what happened to this source, when, and who did it. */
   @Get(':id/actions')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [SerializeGroup.adminList, SerializeGroup.list],

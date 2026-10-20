@@ -19,7 +19,6 @@ export class AdminTaskController {
   constructor(private readonly searchService: TaskSearchService) {}
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

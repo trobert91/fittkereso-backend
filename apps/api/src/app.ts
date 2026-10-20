@@ -61,7 +61,9 @@ const configureApp = (app: INestApplication) => {
     origin: allowedOrigins,
     allowedHeaders:
       'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept, Observe, Authorization, OrganizationId, ProjectId',
-    methods: 'GET,PUT,POST,DELETE,UPDATE,OPTIONS',
+    // PATCH has to be listed: it is not a CORS-safelisted method, so without
+    // it the browser's preflight refuses PATCH /admin-user/:id and /auth/me.
+    methods: 'GET,PUT,POST,PATCH,DELETE,UPDATE,OPTIONS',
     credentials: true,
   });
 };

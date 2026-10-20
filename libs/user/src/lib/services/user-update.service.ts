@@ -3,7 +3,7 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { User, UserRepository } from '@fittkereso-backend/database';
+import { User, UserRepository, UserRole } from '@fittkereso-backend/database';
 import { SupabaseAuthAdminService } from '@fittkereso-backend/supabase';
 import { every, isUndefined } from 'lodash';
 import { UserUpdateDto } from '../models';
@@ -16,7 +16,11 @@ export class UserUpdateService {
     private readonly supabaseAuthAdmin: SupabaseAuthAdminService,
   ) {}
 
-  async update(id: string, dto: UserUpdateDto): Promise<User> {
+  async update(
+    id: string,
+    dto: UserUpdateDto,
+    callerUserId: string,
+  ): Promise<User> {
     // Checked field by field rather than with isEmpty: the validation pipe
     // hands us a class instance, which can carry declared-but-undefined keys.
     const patchedValues = [
@@ -38,6 +42,12 @@ export class UserUpdateService {
       user.name = dto.name;
     }
     if (!isUndefined(dto.role)) {
+      // The same reasoning as refusing self-delete: an admin who demotes
+      // themselves is locked out of the admin app on their next request, and
+      // only another admin could undo it.
+      if (id === callerUserId && dto.role !== UserRole.admin) {
+        throw new ConflictException('You cannot remove your own admin role');
+      }
       user.role = dto.role;
     }
     if (!isUndefined(dto.passwordChangeRequired)) {

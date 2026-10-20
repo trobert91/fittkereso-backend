@@ -36,7 +36,6 @@ export class AdminProductDuplicateController {
   ) {}
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [

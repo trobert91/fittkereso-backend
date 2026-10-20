@@ -1,6 +1,7 @@
 import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { UserRole } from '@fittkereso-backend/database';
 import { RoleGuard } from './role-guard';
+import { ROLE_RANK } from '../decorators/roles.decorator';
 import { AuthenticatedUser } from '../models/auth-user';
 
 /**
@@ -52,24 +53,21 @@ describe('RoleGuard', () => {
 
   it('allows a role above the required rank', () => {
     expect(
-      makeGuard(UserRole.admin).canActivate(
-        makeContext({ role: UserRole.superadmin }),
-      ),
+      makeGuard(UserRole.user).canActivate(makeContext({ role: UserRole.admin })),
     ).toBe(true);
   });
 
+  // A `user` account is a partner account: the admin surface must refuse it.
   it('refuses a role below the required rank', () => {
     expect(() =>
       makeGuard(UserRole.admin).canActivate(makeContext({ role: UserRole.user })),
     ).toThrow(ForbiddenException);
   });
 
-  it('refuses a user reaching a superadmin route', () => {
-    expect(() =>
-      makeGuard(UserRole.superadmin).canActivate(
-        makeContext({ role: UserRole.admin }),
-      ),
-    ).toThrow(ForbiddenException);
+  it('ranks every role, so none can fail open', () => {
+    for (const role of Object.values(UserRole)) {
+      expect(typeof ROLE_RANK[role]).toBe('number');
+    }
   });
 
   it('refuses when a role is required but no user was attached', () => {

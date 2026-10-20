@@ -19,11 +19,11 @@ export class UserAuthService {
    * frontend's benefit and cannot be audited from here, so it must not be
    * able to grant anything.
    *
-   * A token with no matching row is rejected rather than auto-provisioned.
-   * Even the lowest role is read access to the whole admin surface, so if
+   * A token with no matching row is rejected rather than auto-provisioned: if
    * sign-ups are open on the Supabase project, auto-provisioning would hand
-   * that to anyone who registers. Accounts are created by a superadmin or by
-   * the seed script, never by showing up.
+   * an account to anyone who registers. Accounts are created by an admin, by
+   * a shop admin's invitation in the partner portal (fittkereso-frontend), or
+   * by the seed script, never by showing up.
    */
   public async getUser(accessToken: string): Promise<AuthenticatedUser> {
     const decoded = await this.supabaseJwtService.verifyToken(accessToken);

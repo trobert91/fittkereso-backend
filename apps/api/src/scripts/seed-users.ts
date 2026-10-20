@@ -59,16 +59,16 @@ interface SeedOptions {
  */
 const TEMPORARY_PASSWORD = 'password123';
 
-const SUPERADMIN: SeedAccount = {
+const ADMIN: SeedAccount = {
   email: 'torzsok.robert1@gmail.com',
   name: 'Robert Torzsok',
-  role: UserRole.superadmin,
+  role: UserRole.admin,
   password: TEMPORARY_PASSWORD,
 };
 
 const ACCOUNTS_BY_ENVIRONMENT: Record<SeedEnvironment, SeedAccount[]> = {
-  dev: [SUPERADMIN],
-  prod: [SUPERADMIN],
+  dev: [ADMIN],
+  prod: [ADMIN],
 };
 
 function parseArguments(): SeedOptions {

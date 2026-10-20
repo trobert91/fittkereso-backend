@@ -1,6 +1,6 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-/** Self-service profile edits, as opposed to a superadmin editing someone else. */
+/** Self-service profile edits, as opposed to an admin editing someone else. */
 export class MeUpdateDto {
   @IsOptional()
   @IsString()

@@ -86,7 +86,6 @@ export class AdminProductController {
   ) {}
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchProducts(
     @Body() searchParams: ProductSearchParams,
@@ -97,7 +96,6 @@ export class AdminProductController {
   }
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -111,7 +109,6 @@ export class AdminProductController {
   }
 
   @Post(':id/offers/search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,

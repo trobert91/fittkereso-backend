@@ -29,7 +29,7 @@ export class UserUpdateDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  /** Lets a superadmin lift or re-impose the temporary-password hold. */
+  /** Lets an admin lift or re-impose the temporary-password hold. */
   @IsOptional()
   @IsBoolean()
   passwordChangeRequired?: boolean;

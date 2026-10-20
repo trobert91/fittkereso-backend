@@ -35,7 +35,6 @@ export class AdminCategoryController {
   ) {}
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -53,7 +52,6 @@ export class AdminCategoryController {
   }
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [SerializeGroup.adminList, SerializeGroup.list],
   })

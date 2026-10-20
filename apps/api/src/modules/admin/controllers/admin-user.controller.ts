@@ -28,14 +28,14 @@ import {
 import { SerializeGroup } from '@fittkereso-backend/utils';
 
 /**
- * User administration, superadmin only.
+ * User administration, admin only.
  *
  * Note the serialize groups: BasePostgresEntity exposes id/createdAt/updatedAt
  * under `list`, so every route here has to include it alongside the admin
  * groups or the ids silently vanish from the response.
  */
 @Controller('admin-user')
-@MinRole(UserRole.superadmin)
+@MinRole(UserRole.admin)
 export class AdminUserController {
   constructor(
     private readonly searchService: UserSearchService,
@@ -97,8 +97,9 @@ export class AdminUserController {
   async updateUser(
     @Param('id') id: string,
     @Body() dto: UserUpdateDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<User> {
-    return this.updateService.update(id, dto);
+    return this.updateService.update(id, dto, currentUser.id);
   }
 
   @Delete(':id')

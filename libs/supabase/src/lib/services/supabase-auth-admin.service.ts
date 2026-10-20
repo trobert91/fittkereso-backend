@@ -55,7 +55,7 @@ export class SupabaseAuthAdminService {
       .auth.admin.createUser({
         email: params.email,
         password: params.password,
-        // A superadmin vouches for the address, so skip the confirmation mail.
+        // An admin vouches for the address, so skip the confirmation mail.
         email_confirm: true,
         user_metadata: { name: params.name },
         app_metadata: {

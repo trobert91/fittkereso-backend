@@ -37,7 +37,6 @@ export class AdminProductSourceRecordController {
 
   // The rows are plain objects, so the route exposes them whole.
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({ strategy: 'exposeAll', groups: [SerializeGroup.list] })
   async searchRecords(
     @Body() params: ProductSourceRecordSearchParams,
@@ -46,7 +45,6 @@ export class AdminProductSourceRecordController {
   }
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,

@@ -9,7 +9,7 @@ export class UserCreateDto {
   email: string;
 
   /**
-   * The temporary password the superadmin hands to the new account holder.
+   * The temporary password the admin hands to the new account holder.
    * The account is created with passwordChangeRequired set, so this password
    * only survives until their first sign-in.
    */

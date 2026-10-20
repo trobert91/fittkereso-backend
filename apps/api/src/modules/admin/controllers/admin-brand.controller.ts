@@ -34,7 +34,6 @@ export class AdminBrandController {
   ) {}
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -48,7 +47,6 @@ export class AdminBrandController {
   }
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchBrands(
     @Body() searchParams: BrandSearchParams,

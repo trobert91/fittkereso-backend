@@ -41,7 +41,6 @@ export class AdminSellerController {
   ) {}
 
   @Get(':id')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     groups: [
       SerializeGroup.adminList,
@@ -55,7 +54,6 @@ export class AdminSellerController {
   }
 
   @Post('search')
-  @MinRole(UserRole.user)
   @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
   async searchSellers(
     @Body() searchParams: SellerSearchParams,
@@ -112,7 +110,6 @@ export class AdminSellerController {
   }
 
   @Post(':id/product-sources/search')
-  @MinRole(UserRole.user)
   @SerializeOptions({
     strategy: 'exposeAll',
     groups: [
