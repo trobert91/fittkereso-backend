@@ -37,6 +37,8 @@ import { ProductDuplicatePair } from './postgres/models/product-duplicate-pair.e
 import { ProductDuplicatePairRepository } from './postgres/repositories/product-duplicate-pair-repository';
 import { User } from './postgres/models/user.entity';
 import { UserRepository } from './postgres/repositories/user-repository';
+import { SellerMembership } from './postgres/models/seller-membership.entity';
+import { SellerMembershipRepository } from './postgres/repositories/seller-membership-repository';
 import { ProductSourceConfigValidatorService } from './postgres/services/product-source-config-validator.service';
 import { AdvisoryLockService } from './postgres/services/advisory-lock.service';
 import { ProductSourceVersion } from './postgres/models/product-source-version.entity';
@@ -63,6 +65,7 @@ export const entityList = [
   PriceHistory,
   ProductDuplicatePair,
   User,
+  SellerMembership,
   ProductSourceVersion,
   ProductSourceAction,
 ];
@@ -87,6 +90,7 @@ export const entityList = [
     PriceHistoryRepository,
     ProductDuplicatePairRepository,
     UserRepository,
+    SellerMembershipRepository,
     ProductSourceConfigValidatorService,
     AdvisoryLockService,
     ProductSourceVersionRepository,
@@ -110,6 +114,7 @@ export const entityList = [
     PriceHistoryRepository,
     ProductDuplicatePairRepository,
     UserRepository,
+    SellerMembershipRepository,
     ProductSourceConfigValidatorService,
     AdvisoryLockService,
     ProductSourceVersionRepository,

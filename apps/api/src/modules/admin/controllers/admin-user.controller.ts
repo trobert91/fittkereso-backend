@@ -8,11 +8,14 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   SerializeOptions,
 } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser, MinRole } from '@fittkereso-backend/auth';
-import { User, UserRole } from '@fittkereso-backend/database';
+import { SellerMembership, User, UserRole } from '@fittkereso-backend/database';
 import {
+  SellerMembershipRoleDto,
+  SellerMembershipService,
   UserCreateDto,
   UserCreateService,
   UserDeleteService,
@@ -43,6 +46,7 @@ export class AdminUserController {
     private readonly createService: UserCreateService,
     private readonly updateService: UserUpdateService,
     private readonly deleteService: UserDeleteService,
+    private readonly membershipService: SellerMembershipService,
   ) {}
 
   @Post('search')
@@ -109,5 +113,29 @@ export class AdminUserController {
     @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<void> {
     await this.deleteService.delete(id, currentUser.id);
+  }
+
+  /**
+   * Adds the account to a seller, or changes its role there. PUT because the
+   * pair (user, seller) names the membership: sending it twice is one change.
+   */
+  @Put(':id/memberships/:sellerId')
+  @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
+  async putMembership(
+    @Param('id') id: string,
+    @Param('sellerId') sellerId: string,
+    @Body() dto: SellerMembershipRoleDto,
+  ): Promise<SellerMembership> {
+    return this.membershipService.upsert(id, sellerId, dto.role);
+  }
+
+  /** Removes the account from the seller. The account itself stays. */
+  @Delete(':id/memberships/:sellerId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteMembership(
+    @Param('id') id: string,
+    @Param('sellerId') sellerId: string,
+  ): Promise<void> {
+    await this.membershipService.remove(id, sellerId);
   }
 }

@@ -20,3 +20,4 @@ export * from './offer.entity';
 export * from './price-history.entity';
 export * from './product-duplicate-pair.entity';
 export * from './user.entity';
+export * from './seller-membership.entity';

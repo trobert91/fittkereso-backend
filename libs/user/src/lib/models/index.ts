@@ -4,3 +4,4 @@ export * from './me-update.dto';
 export * from './set-password.dto';
 export * from './password-reset-request.dto';
 export * from './verify-recovery.dto';
+export * from './seller-membership-role.dto';

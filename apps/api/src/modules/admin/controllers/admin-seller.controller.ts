@@ -8,7 +8,8 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import { MinRole } from '@fittkereso-backend/auth';
-import { UserRole } from '@fittkereso-backend/database';
+import { SellerMembership, UserRole } from '@fittkereso-backend/database';
+import { SellerMembershipService } from '@fittkereso-backend/user';
 import {
   SellerCreateDto,
   SellerCreateService,
@@ -38,6 +39,7 @@ export class AdminSellerController {
     private readonly createService: SellerCreateService,
     private readonly productSourceCreateService: SellerProductSourceCreateService,
     private readonly productSourceSearchService: ProductSourceSearchService,
+    private readonly membershipService: SellerMembershipService,
   ) {}
 
   @Get(':id')
@@ -126,5 +128,12 @@ export class AdminSellerController {
       ...searchParams,
       sellerId: id,
     });
+  }
+
+  /** The seller's team: each member's account and shop role, by email. */
+  @Get(':id/members')
+  @SerializeOptions({ groups: [SerializeGroup.adminList, SerializeGroup.list] })
+  async getSellerMembers(@Param('id') id: string): Promise<SellerMembership[]> {
+    return this.membershipService.listForSeller(id);
   }
 }

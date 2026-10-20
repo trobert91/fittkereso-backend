@@ -1,8 +1,9 @@
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, OneToMany } from 'typeorm';
 import { Expose } from 'class-transformer';
 import { SerializeGroup } from '@fittkereso-backend/utils';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { UserRole } from '../../models/user-roles';
+import { SellerMembership } from './seller-membership.entity';
 
 /**
  * An admin account.
@@ -58,4 +59,9 @@ export class User extends BasePostgresEntity {
   @Expose({ groups: [SerializeGroup.adminList, SerializeGroup.adminDetails] })
   @Column({ type: 'timestamptz', nullable: true })
   lastSignInAt?: Date | null;
+
+  /** The sellers this account works for, and in which role. Loaded on request. */
+  @Expose({ groups: [SerializeGroup.adminDetails] })
+  @OneToMany(() => SellerMembership, (membership) => membership.user)
+  memberships?: SellerMembership[];
 }

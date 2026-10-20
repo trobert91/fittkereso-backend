@@ -14,3 +14,4 @@ export * from './seller-type';
 export * from './offer-condition';
 export * from './offer-availability';
 export * from './product-duplicate-pair.types';
+export * from './seller-member-role';

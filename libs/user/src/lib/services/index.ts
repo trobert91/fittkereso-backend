@@ -6,3 +6,4 @@ export * from './set-password.service';
 export * from './me-update.service';
 export * from './password-reset.service';
 export * from './sign-in-record.service';
+export * from './seller-membership.service';

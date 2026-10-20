@@ -6,6 +6,7 @@ import { SellerType } from '../types/seller-type';
 import { ProductSource } from './product-source.entity';
 import { BillingInfo } from './billing-info.entity';
 import { Offer } from './offer.entity';
+import { SellerMembership } from './seller-membership.entity';
 
 @Entity()
 export class Seller extends BasePostgresEntity {
@@ -75,4 +76,9 @@ export class Seller extends BasePostgresEntity {
 
   @OneToMany(() => Offer, (offer) => offer.seller)
   offers: Offer[];
+
+  // Not exposed: members are served by GET /admin-seller/:id/members, and a
+  // loaded membership's own `seller` would otherwise serialize back into here.
+  @OneToMany(() => SellerMembership, (membership) => membership.seller)
+  memberships?: SellerMembership[];
 }

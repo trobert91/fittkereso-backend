@@ -6,6 +6,7 @@ import { EmailModule } from '@fittkereso-backend/email';
 import {
   MeUpdateService,
   PasswordResetService,
+  SellerMembershipService,
   SetPasswordService,
   SignInRecordService,
   UserCreateService,
@@ -26,6 +27,7 @@ import {
     SignInRecordService,
     MeUpdateService,
     PasswordResetService,
+    SellerMembershipService,
   ],
   exports: [
     UserCreateService,
@@ -36,6 +38,7 @@ import {
     SignInRecordService,
     MeUpdateService,
     PasswordResetService,
+    SellerMembershipService,
   ],
 })
 export class UserModule {}
