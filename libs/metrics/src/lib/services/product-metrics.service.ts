@@ -355,9 +355,10 @@ export class ProductMetricsService {
     trigger: SpecUnificationTrigger,
     /**
      * `copied`: a sibling's result taken instead of a call; `would_run`: the
-     * input changed while rerunSpecsOnChange is off, so nothing ran.
+     * input changed while rerunSpecsOnChange is off, so nothing ran;
+     * `thin_input`: too few spec rows and too little description to call.
      */
-    result: 'ok' | 'failed' | 'disabled' | 'copied' | 'would_run',
+    result: 'ok' | 'failed' | 'disabled' | 'copied' | 'would_run' | 'thin_input',
   ): void {
     this.specUnificationCounter.inc({ source, trigger, result });
   }

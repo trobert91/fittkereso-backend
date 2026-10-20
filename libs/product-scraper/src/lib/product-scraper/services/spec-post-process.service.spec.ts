@@ -771,6 +771,58 @@ describe('SpecPostProcessService', () => {
       expect(result.specs).toMatchObject({ tubeless: true, modelYear: 2026 });
     });
 
+    // A feed giving a title, the shop's category and a one-line description.
+    describe('a listing with too little to read', () => {
+      const thin = async (overrides: Partial<ScrapedProduct> = {}) => ({
+        ...(await extracted()),
+        rawSpecs: [{ name: 'Webshop kategória', values: ['Kerékpár > MTB'] }],
+        description: '<p>Összteleszkópos MTB kerékpár</p>',
+        ...overrides,
+      });
+
+      it('makes no call and keeps the listing as it was', async () => {
+        const before = await thin();
+
+        const result = await service.unify({ context: context(), scrapedProduct: before, trigger: 'created' });
+
+        expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+        expect(result).toBe(before);
+        expect(metrics.specUnification).toHaveBeenCalledWith('speedbike-arukereso', 'created', 'thin_input');
+      });
+
+      it('calls for a description long enough to name parts', async () => {
+        await service.unify({
+          context: context(),
+          scrapedProduct: await thin({
+            description: '16-os gyerek kerékpár. 90-115 cm testmagassághoz ajánlott. Aluminum 6061 váz, V-fék.',
+          }),
+          trigger: 'created',
+        });
+
+        expect(postProcess.processModelSpecs).toHaveBeenCalled();
+      });
+
+      it('calls for a spec table, whatever the description', async () => {
+        await service.unify({
+          context: context(),
+          scrapedProduct: await thin({ rawSpecs, description: undefined }),
+          trigger: 'created',
+        });
+
+        expect(postProcess.processModelSpecs).toHaveBeenCalled();
+      });
+
+      it('counts no description the source does not send', async () => {
+        await service.unify({
+          context: context({ postProcess: { includeDescriptionInModelSpecs: false } }),
+          scrapedProduct: await thin({ description: 'x'.repeat(500) }),
+          trigger: 'created',
+        });
+
+        expect(postProcess.processModelSpecs).not.toHaveBeenCalled();
+      });
+    });
+
     it('leaves the listing as it was when the call fails', async () => {
       postProcess.processModelSpecs.mockResolvedValueOnce(undefined);
       const before = await extracted();

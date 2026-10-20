@@ -353,6 +353,12 @@ export class SpecPostProcessService {
       this.productMetrics.specUnification(context.source.name, trigger, 'disabled');
       return scrapedProduct;
     }
+    const description =
+      config?.includeDescriptionInModelSpecs === false ? undefined : scrapedProduct.description;
+    if (hasThinSpecInput(scrapedProduct.rawSpecs, description)) {
+      this.productMetrics.specUnification(context.source.name, trigger, 'thin_input');
+      return scrapedProduct;
+    }
 
     const scopes = this.scopesOf(scrapedProduct.category.slug, schema);
     this.logger.debug('Running spec unification', {
@@ -375,10 +381,7 @@ export class SpecPostProcessService {
         ),
       ),
       rawSpecs: scrapedProduct.rawSpecs,
-      description:
-        config?.includeDescriptionInModelSpecs === false
-          ? undefined
-          : scrapedProduct.description,
+      description,
       schema,
       outputKeys: scopes.unificationKeys,
       goldenSample: this.categoryConfigService.getGoldenSample(
@@ -640,6 +643,28 @@ function identityDescriptionOf(
 
   const excerpts = findDescriptionEvidence(htmlToText(description), scopes.evidenceKeywords, setting);
   return isEmpty(excerpts) ? {} : { descriptionEvidence: excerpts };
+}
+
+/**
+ * At most this many spec rows and this much description text give spec
+ * unification nothing to read beyond the title. Measured on the 418 listings
+ * of the 2026-10-20 test round: such listings (tuttobici's, most of
+ * downhillendurokerekpar's) gained 0.4 fields a call, mostly a suspension the
+ * title already says; a description of 60–150 characters gained 1, of 300 or
+ * more 8–14. A shop's category row (`Webshop kategória`) is one of the two.
+ */
+const THIN_INPUT_MAX_SPEC_ROWS = 2;
+const THIN_INPUT_MAX_DESCRIPTION_CHARS = 60;
+
+/** Whether the call would read too little to be worth making. */
+function hasThinSpecInput(
+  rawSpecs: ScrapedProduct['rawSpecs'],
+  description: string | undefined,
+): boolean {
+  return (
+    (rawSpecs?.length ?? 0) <= THIN_INPUT_MAX_SPEC_ROWS &&
+    htmlToText(description ?? '').trim().length < THIN_INPUT_MAX_DESCRIPTION_CHARS
+  );
 }
 
 function llmOptionsOf(config: ProductSourcePostProcessConfig | undefined) {
