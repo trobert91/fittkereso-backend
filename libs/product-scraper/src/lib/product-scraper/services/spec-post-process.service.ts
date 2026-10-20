@@ -36,8 +36,9 @@ import {
 } from '@fittkereso-backend/metrics';
 import { CustomLogger } from '@fittkereso-backend/logger';
 import { filterDefinedSpecs, htmlToText } from '@fittkereso-backend/utils';
-import { difference, isEmpty, isNil, omit, omitBy, pick, uniq } from 'lodash';
+import { difference, isEmpty, isEqual, isNil, omit, omitBy, pick, uniq } from 'lodash';
 import { ProductImportContext } from '../../interfaces/product-import-context.interface';
+import { brandIdentifierSpecsOf } from './deterministic-specs';
 import {
   ListingInputParts,
   identityPartOf,
@@ -233,10 +234,14 @@ export class SpecPostProcessService {
         context.source.identifiesProducts !== false;
       if (!stale) {
         this.productMetrics.identityExtraction(context.source.name, 'reused');
-        return withNormalizedYears(reused, schema);
+        return withNormalizedYears(this.withIdentifierFacts(reused, scopes, schema), schema);
       }
       return withNormalizedYears(
-        await this.refreshModel(reused, callIdentity, modelContract, context, scopes),
+        this.withIdentifierFacts(
+          await this.refreshModel(reused, callIdentity, modelContract, context, scopes),
+          scopes,
+          schema,
+        ),
         schema,
       );
     }
@@ -271,23 +276,54 @@ export class SpecPostProcessService {
     const offerLevel = pick(merged.specs, scopes.offerLevelKeys);
 
     return withNormalizedYears(
-      {
-        ...scrapedProduct,
-        brand: merged.brand,
-        // Only a name the call returned: without one the listing keeps its
-        // title alone, and its flags say why.
-        model: merged.model,
-        modelContract: merged.model ? modelContract : undefined,
-        specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
-        flags: withIdentityFlag(
-          scrapedProduct.flags,
-          merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
-        ),
-        inputHashes,
-        offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
-      },
+      this.withIdentifierFacts(
+        {
+          ...scrapedProduct,
+          brand: merged.brand,
+          // Only a name the call returned: without one the listing keeps its
+          // title alone, and its flags say why.
+          model: merged.model,
+          modelContract: merged.model ? modelContract : undefined,
+          specs: { ...carried, ...omit(merged.specs, scopes.offerLevelKeys) },
+          flags: withIdentityFlag(
+            scrapedProduct.flags,
+            merged.model ? undefined : enabled ? 'identity_failed' : 'identity_off',
+          ),
+          inputHashes,
+          offers: withOfferLevelSpecs(scrapedProduct.offers, () => offerLevel),
+        },
+        scopes,
+        schema,
+      ),
       schema,
     );
+  }
+
+  /**
+   * The listing with every product-level value its brand's identifiers
+   * confirm (brandIdentifierSpecs) put back over the LLM's. Such a value is a
+   * manufacturer fact every shop selling the article shares — a KTM article
+   * number's year — while a title or spec row is the shop's own season label:
+   * shops label one carry-over article 2024 and 2027. An LLM reading such a
+   * label must not replace it, or the article splits by shop.
+   *
+   * Only a deterministic value the rule agrees with is pinned: one the shop
+   * states itself, and the rule contradicts, stays the LLM's to weigh, as
+   * foldBrandIdentifierSpecs leaves it. Applied on the reuse paths too, so a
+   * stored record heals on its next import without a call.
+   */
+  private withIdentifierFacts(
+    listing: ScrapedProduct,
+    scopes: CategorySpecScopes,
+    schema: SpecDefinitionJsonSchema,
+  ): ScrapedProduct {
+    const rules = this.categoryConfigService.getConfig(listing.category.slug)?.brandIdentifierSpecs;
+    const deterministic = listing.extractedSpecs ?? {};
+    const facts = omitBy(
+      brandIdentifierSpecsOf({ brand: listing.brand, offers: listing.offers }, rules, schema),
+      (value, key) => scopes.offerLevelKeys.includes(key) || !isEqual(deterministic[key], value),
+    );
+    return isEmpty(facts) ? listing : { ...listing, specs: { ...listing.specs, ...facts } };
   }
 
   /**

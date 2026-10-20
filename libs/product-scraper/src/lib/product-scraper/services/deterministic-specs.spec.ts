@@ -5,6 +5,7 @@ import type {
 } from '@fittkereso-backend/database';
 import {
   BrandIdentifiedListing,
+  brandIdentifierSpecsOf,
   foldBrandIdentifierSpecs,
   foldReleaseYear,
 } from './deterministic-specs';
@@ -175,5 +176,13 @@ describe('foldBrandIdentifierSpecs', () => {
     expect(fold({ brand: 'KTM', offers: [{ mpn: '1260040108' }] }, {}, prefixed)).toEqual({
       frameType: 'Magas',
     });
+  });
+
+  // What the post-process pins over the LLM: the rules' reading alone.
+  it('reports through brandIdentifierSpecsOf what the identifiers say, whatever the listing states', () => {
+    expect(
+      brandIdentifierSpecsOf({ brand: 'KTM', offers: [{ mpn: '1260040108' }] }, { KTM: [...rules['KTM'], ...frames['KTM']] }, schema),
+    ).toEqual({ modelYear: 2026, frameType: 'Magas' });
+    expect(brandIdentifierSpecsOf({ brand: 'Cube', offers: [{ mpn: '1260040108' }] }, rules, schema)).toEqual({});
   });
 });

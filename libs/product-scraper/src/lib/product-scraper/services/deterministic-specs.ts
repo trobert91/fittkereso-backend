@@ -54,11 +54,27 @@ export function foldBrandIdentifierSpecs(
   rulesByBrand: Record<string, BrandIdentifierSpec[]> | undefined,
   schema: SpecDefinitionJsonSchema,
 ): void {
+  for (const [key, value] of Object.entries(brandIdentifierSpecsOf(listing, rulesByBrand, schema))) {
+    if (isNil(specs[key])) specs[key] = value;
+  }
+}
+
+/**
+ * The spec values the listing's brand rules read off its identifiers
+ * (ProductCategoryConfig.brandIdentifierSpecs), whatever the listing states
+ * itself: per spec, the first rule that matches one of its identifiers.
+ */
+export function brandIdentifierSpecsOf(
+  listing: BrandIdentifiedListing,
+  rulesByBrand: Record<string, BrandIdentifierSpec[]> | undefined,
+  schema: SpecDefinitionJsonSchema,
+): ProductSpecs {
+  const specs: ProductSpecs = {};
   const brand = toLower(trim(listing.brand));
   const rules = Object.entries(rulesByBrand ?? {}).find(
     ([name]) => toLower(trim(name)) === brand,
   )?.[1];
-  if (!brand || !rules?.length) return;
+  if (!brand || !rules?.length) return specs;
 
   const identifiers = {
     mpn: compact((listing.offers ?? []).map((offer) => trim(offer.mpn ?? ''))),
@@ -78,6 +94,7 @@ export function foldBrandIdentifierSpecs(
       break;
     }
   }
+  return specs;
 }
 
 /** Text as a value of the schema field: a number, a year, or an allowed string. */

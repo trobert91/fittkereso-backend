@@ -4,6 +4,7 @@ import { omit } from 'lodash';
 import { specsKeyOf } from './listing-input-hashes';
 import type {
   ProductModel,
+  ProductSpecs,
   ProductSource,
   ProductSourceRecord,
   ScrapedProduct,
@@ -305,6 +306,84 @@ describe('SpecPostProcessService', () => {
 
       expect(postProcess.extractIdentity).toHaveBeenCalled();
       expect(result.model).toBe('Macina Scarp SX Prestige Di2');
+    });
+
+    // A carry-over KTM article keeps its number: shops label it 2024 and 2027,
+    // the number says 2024 at every one of them.
+    describe("a value the brand's identifiers confirm", () => {
+      const withRules = () =>
+        categoryConfigService.getConfig.mockReturnValue({
+          ...categoryConfigService.getConfig(),
+          brandIdentifierSpecs: {
+            KTM: [{ spec: 'modelYear', identifier: 'mpn', pattern: '^2(2\\d)\\d{7}$', prefix: '20' }],
+          },
+        });
+      const carryOver = (extractedSpecs: ProductSpecs) =>
+        listing({ extractedSpecs, offers: [{ price: 1, externalId: 'sku-43', mpn: '2240539106' }] });
+
+      beforeEach(() => {
+        postProcess.extractIdentity.mockResolvedValue({
+          model: 'Life Space',
+          specs: { modelYear: 2027, batteryCapacity: 750 },
+        });
+      });
+
+      it("wins over the LLM's reading of a title or spec row", async () => {
+        withRules();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: carryOver({ weight: 24, modelYear: 2024 }),
+        });
+
+        expect(result.specs).toMatchObject({ modelYear: 2024, batteryCapacity: 750 });
+      });
+
+      // The fold leaves a year the shop states; the LLM weighs it, as before.
+      it('pins nothing the shop states and the rule contradicts', async () => {
+        withRules();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: carryOver({ weight: 24, modelYear: 2026 }),
+        });
+
+        expect(result.specs?.['modelYear']).toBe(2027);
+      });
+
+      it('pins nothing for a brand without rules', async () => {
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: carryOver({ weight: 24, modelYear: 2024 }),
+        });
+
+        expect(result.specs?.['modelYear']).toBe(2027);
+      });
+
+      it('heals a record stored with the LLM year on its next import, without a call', async () => {
+        const first = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: carryOver({ weight: 24, modelYear: 2024 }),
+        });
+        expect(first.specs?.['modelYear']).toBe(2027);
+        const { inputHashes, ...stored } = first;
+        postProcess.extractIdentity.mockClear();
+        withRules();
+
+        const result = await service.extractIdentity({
+          context: context(),
+          scrapedProduct: carryOver({ weight: 24, modelYear: 2024 }),
+          ownRecord: {
+            offerSpecsHash: 'offer-hash',
+            productSpecsHash: 'product-hash',
+            inputHashes,
+            scrapedProduct: stored,
+          } as unknown as ProductSourceRecord,
+        });
+
+        expect(postProcess.extractIdentity).not.toHaveBeenCalled();
+        expect(result.specs?.['modelYear']).toBe(2024);
+      });
     });
 
     describe('the model rule', () => {
