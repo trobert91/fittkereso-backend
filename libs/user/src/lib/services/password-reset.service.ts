@@ -52,6 +52,7 @@ export class PasswordResetService {
       await this.passwordResetEmail.sendPasswordReset({
         email: normalizedEmail,
         resetUrl: this.buildResetUrl(tokenHash),
+        adminUrl: this.appSettings.adminUrl,
       });
     } catch (error) {
       // Swallowed on purpose: the response is identical either way, so a
