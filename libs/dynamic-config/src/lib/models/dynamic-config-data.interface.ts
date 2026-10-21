@@ -79,6 +79,17 @@ export interface DynamicConfigData {
      * not after deleteAfterDays, and while off the offers age out as usual.
      */
     completeSourceRemovalEnabled?: boolean;
+    /** The website's offer-click log (OfferClick). */
+    clicks?: {
+      /**
+       * A click's pseudonymous visitor key is erased once it is this many
+       * hours old. Default: 24. Must be at least the website's billing window
+       * (its CLICK_BILLING_WINDOW_HOURS, also 24): the website looks for the
+       * visitor's last billable click inside that window, and a key erased
+       * sooner would make a repeat click billable again.
+       */
+      visitorKeyRetentionHours?: number;
+    };
   };
 
   /** Import behaviour shared across every source. Read from `import.json`. */
@@ -430,6 +441,20 @@ export const dynamicConfigSchema = {
           description:
             'Whether a complete run of a source that lists the whole catalog (hasAllProducts) removes the offers it did not see, at once. The kill switch: while off, those offers age out through the stale-offer sweep as usual. Default: true',
           default: true,
+        },
+        clicks: {
+          type: 'object',
+          description: "The website's offer-click log (offer_click).",
+          properties: {
+            visitorKeyRetentionHours: {
+              type: 'number',
+              minimum: 1,
+              maximum: 720,
+              description:
+                "A click's pseudonymous visitor key is erased once it is this many hours old. Must be at least the website's billing window (CLICK_BILLING_WINDOW_HOURS), or repeat clicks become billable again. Default: 24",
+              default: 24,
+            },
+          },
         },
       },
     },

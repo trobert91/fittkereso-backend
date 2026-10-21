@@ -2,5 +2,8 @@
   "freshnessDays": 3,
   "deleteAfterDays": 14,
   "deletionEnabled": true,
-  "completeSourceRemovalEnabled": true
+  "completeSourceRemovalEnabled": true,
+  "clicks": {
+    "visitorKeyRetentionHours": 24
+  }
 }

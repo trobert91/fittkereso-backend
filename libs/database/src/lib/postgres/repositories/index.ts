@@ -20,3 +20,4 @@ export * from './price-history-repository';
 export * from './product-duplicate-pair-repository';
 export * from './user-repository';
 export * from './seller-membership-repository';
+export * from './offer-click-repository';

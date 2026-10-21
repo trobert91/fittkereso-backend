@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ProductSourceSyncScheduler } from './product-source-sync-scheduler.service';
 import { ProductDuplicateScanScheduler } from './product-duplicate-scan-scheduler.service';
 import { StaleOfferSweepScheduler } from './stale-offer-sweep-scheduler.service';
+import { OfferClickRetentionScheduler } from './offer-click-retention-scheduler.service';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { TaskModule } from '@fittkereso-backend/task';
 import { MetricsModule } from '@fittkereso-backend/metrics';
@@ -24,6 +25,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductSourceSyncScheduler,
     ProductDuplicateScanScheduler,
     StaleOfferSweepScheduler,
+    OfferClickRetentionScheduler,
   ],
 })
 export class SchedulingModule {}

@@ -27,6 +27,7 @@ describe('DynamicConfigFileLoaderService', () => {
       deleteAfterDays: 14,
       deletionEnabled: true,
       completeSourceRemovalEnabled: true,
+      clicks: { visitorKeyRetentionHours: 24 },
     });
   });
 

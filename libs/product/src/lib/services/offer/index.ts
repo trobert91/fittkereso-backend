@@ -4,3 +4,4 @@ export * from './stale-product-reprice.service';
 export * from './offer-composer.service';
 export * from './contributor-detach.service';
 export * from './complete-source-removal.service';
+export * from './offer-click-retention.service';
