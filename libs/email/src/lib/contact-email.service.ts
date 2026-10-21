@@ -19,6 +19,7 @@ export class ContactEmailService {
   async sendContactEmail(params: {
     senderName: string;
     senderEmail: string;
+    senderPhone?: string;
     message: string;
   }): Promise<void> {
     const adminEmail = this.dynamicConfigService.general.adminContactEmail;
@@ -31,6 +32,7 @@ export class ContactEmailService {
     const { html, text } = this.templateService.render('contact', {
       senderName: params.senderName,
       senderEmail: params.senderEmail,
+      senderPhone: params.senderPhone || '-',
       message: params.message,
     });
 
@@ -40,6 +42,8 @@ export class ContactEmailService {
       subject: `Contact Form: ${params.senderName}`,
       html,
       text,
+      // Answering the notification answers the visitor, not noreply@.
+      replyTo: params.senderEmail,
     });
   }
 }

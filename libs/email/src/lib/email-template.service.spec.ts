@@ -48,6 +48,20 @@ describe('EmailTemplateService', () => {
     expect(text).toContain("price $& $' $1");
   });
 
+  it('fills every placeholder of the contact mail, the phone included', () => {
+    const { html, text } = makeService().render('contact', {
+      senderName: 'Kiss Anna',
+      senderEmail: 'anna@example.com',
+      senderPhone: '+36 30 123 4567',
+      message: 'first line\nsecond line',
+    });
+
+    expect(text).toContain('Phone: +36 30 123 4567');
+    expect(html).toContain('+36 30 123 4567');
+    expect(html).not.toMatch(/\{\{\w+\}\}/);
+    expect(text).not.toMatch(/\{\{\w+\}\}/);
+  });
+
   it('escapes the ampersands of a reset link inside its href', () => {
     const resetUrl =
       'https://admin.example.com/auth/confirm?token_hash=abc&type=recovery&next=%2Fauth%2Fset-password';

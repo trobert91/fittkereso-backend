@@ -8,6 +8,8 @@ export interface SendEmailOptions {
   subject: string;
   html: string;
   text: string;
+  /** Where a reply goes, when not to the sender (a contact form's visitor). */
+  replyTo?: string;
 }
 
 @Injectable()
@@ -17,7 +19,7 @@ export class EmailService {
   constructor(private readonly mailgunConfig: MailgunConfigService) {}
 
   async send(options: SendEmailOptions): Promise<void> {
-    const { to, from, subject, html, text } = options;
+    const { to, from, subject, html, text, replyTo } = options;
     const { apiKey, domain, apiUrl } = this.mailgunConfig;
 
     const url = `${apiUrl}/${domain}/messages`;
@@ -28,6 +30,7 @@ export class EmailService {
     formData.append('subject', subject);
     formData.append('html', html);
     formData.append('text', text);
+    if (replyTo) formData.append('h:Reply-To', replyTo);
 
     const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
 

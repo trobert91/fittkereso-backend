@@ -8,7 +8,12 @@ export class RecaptchaService {
 
   constructor(private readonly recaptchaConfig: RecaptchaConfigService) {}
 
-  async verifyToken(token: string): Promise<boolean> {
+  /**
+   * A reCAPTCHA v3 token is good when Google accepts it, its score reaches
+   * `min_score` and - given `expectedAction` - it was executed for that action,
+   * so a token minted for another form on the page does not pass here.
+   */
+  async verifyToken(token: string, expectedAction?: string): Promise<boolean> {
     const { secretKey, minScore } = this.recaptchaConfig;
 
     const params = new URLSearchParams({
@@ -35,6 +40,13 @@ export class RecaptchaService {
     if (data.score !== undefined && data.score < minScore) {
       this.logger.warn(
         `reCAPTCHA score ${data.score} below threshold ${minScore}`,
+      );
+      return false;
+    }
+
+    if (expectedAction && data.action && data.action !== expectedAction) {
+      this.logger.warn(
+        `reCAPTCHA action ${data.action} is not ${expectedAction}`,
       );
       return false;
     }

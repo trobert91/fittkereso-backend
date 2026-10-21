@@ -47,6 +47,9 @@ const configureApp = (app: INestApplication) => {
   const allowedOrigins = [
     'https://fittkereso.com',
     'https://app.fittkereso.com',
+    // The public website: its contact form posts to /api/v1/public/contact.
+    'https://fittkereso.hu',
+    'https://www.fittkereso.hu',
   ];
   if (process.env.FRONTEND_URL) {
     allowedOrigins.push(process.env.FRONTEND_URL);
@@ -55,6 +58,7 @@ const configureApp = (app: INestApplication) => {
     allowedOrigins.push('http://localhost:3200');
     allowedOrigins.push('http://localhost:3201');
     allowedOrigins.push('http://localhost:3000');
+    allowedOrigins.push('http://localhost:3300');
   }
 
   app.enableCors({
