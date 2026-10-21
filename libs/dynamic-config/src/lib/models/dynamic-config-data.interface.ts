@@ -85,8 +85,8 @@ export interface DynamicConfigData {
        * A click's pseudonymous visitor key is erased once it is this many
        * hours old. Default: 24. Must be at least the website's billing window
        * (its CLICK_BILLING_WINDOW_HOURS, also 24): the website looks for the
-       * visitor's last billable click inside that window, and a key erased
-       * sooner would make a repeat click billable again.
+       * visitor's last billed click inside that window, and a key erased
+       * sooner would make a repeat click billed again.
        */
       visitorKeyRetentionHours?: number;
     };
@@ -451,7 +451,7 @@ export const dynamicConfigSchema = {
               minimum: 1,
               maximum: 720,
               description:
-                "A click's pseudonymous visitor key is erased once it is this many hours old. Must be at least the website's billing window (CLICK_BILLING_WINDOW_HOURS), or repeat clicks become billable again. Default: 24",
+                "A click's pseudonymous visitor key is erased once it is this many hours old. Must be at least the website's billing window (CLICK_BILLING_WINDOW_HOURS), or repeat clicks become billed again. Default: 24",
               default: 24,
             },
           },
