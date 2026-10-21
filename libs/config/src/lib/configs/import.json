@@ -1,4 +1,4 @@
 {
   "listRefreshRequiredFields": ["url", "price", "availability"],
-  "reidentifyOnIdentityChange": "off"
+  "reidentifyOnIdentityChange": "on"
 }
