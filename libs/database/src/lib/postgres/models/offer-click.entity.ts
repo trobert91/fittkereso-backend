@@ -6,17 +6,17 @@ import { OfferCondition } from '../types/offer-condition';
 
 /**
  * One click on a "go to shop" button of the public website: the log a shop is
- * billed from. `createdAt` is the click time.
+ * billable from. `createdAt` is the click time.
  *
  * Written by fittkereso-frontend, not by this API: its `/api/v1/out/{offerId}`
  * redirect inserts one row per click as the `fittkereso_click` database role
  * (SELECT and INSERT on this table only), and its partner portal reads the
  * shop's statistics from it. Renaming or dropping a column breaks recording.
  *
- * - **Every click is a row** — repeats and bots too. `billed` is decided at
+ * - **Every click is a row** — repeats and bots too. `billable` is decided at
  *   insert time and stored, so a later change to the rule never re-prices a
- *   click that was already billed: a click is billed when it is not a bot and
- *   the same visitor has no billed click on the same product at the same
+ *   click that was already billed: a click is billable when it is not a bot and
+ *   the same visitor has no billable click on the same product at the same
  *   seller within the website's billing window (24 hours).
  * - **No foreign key to the offer or the product.** The stale-offer sweep
  *   deletes offers, and a product merge deletes the merged product with its
@@ -30,7 +30,7 @@ import { OfferCondition } from '../types/offer-condition';
  */
 @Entity()
 @Index([nameOf<OfferClick>('seller'), nameOf<OfferClick>('createdAt')])
-// The billing check: this visitor's billed clicks on this product of this
+// The billing check: this visitor's billable clicks on this product of this
 // seller inside the window.
 @Index(
   [
@@ -39,7 +39,7 @@ import { OfferCondition } from '../types/offer-condition';
     nameOf<OfferClick>('visitorKey'),
     nameOf<OfferClick>('createdAt'),
   ],
-  { where: '"billed"' },
+  { where: '"billable"' },
 )
 export class OfferClick extends BasePostgresEntity {
   @ManyToOne(() => Seller, { nullable: false, onDelete: 'CASCADE' })
@@ -87,7 +87,7 @@ export class OfferClick extends BasePostgresEntity {
   visitorKey?: string | null;
 
   @Column({ type: 'boolean', nullable: false })
-  billed: boolean;
+  billable: boolean;
 
   @Column({ type: 'boolean', nullable: false, default: false })
   bot: boolean;

@@ -17,7 +17,7 @@ export interface OfferClickRetentionResult {
  * once it is older than `offers.clicks.visitorKeyRetentionHours`.
  *
  * The key exists for one thing: the website's billing check, which looks for
- * the same visitor's last billed click inside its window. Past the window
+ * the same visitor's last billable click inside its window. Past the window
  * nothing needs it, so it is not kept (data minimisation). The rows stay — the
  * shops' statistics and bills are counted from them — but are tied to no one.
  */
