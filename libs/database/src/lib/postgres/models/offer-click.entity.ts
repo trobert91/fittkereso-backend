@@ -2,6 +2,7 @@ import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { nameOf } from '@fittkereso-backend/utils';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { Seller } from './seller.entity';
+import { OfferCondition } from '../types/offer-condition';
 
 /**
  * One click on a "go to shop" button of the public website: the log a shop is
@@ -20,7 +21,8 @@ import { Seller } from './seller.entity';
  * - **No foreign key to the offer or the product.** The stale-offer sweep
  *   deletes offers, and a product merge deletes the merged product with its
  *   offers; the log has to outlive both. The URL and price are kept as they were
- *   at the time of the click.
+ *   at the time of the click, and so are the category, brand, source and
+ *   condition the shop filters its statistics by.
  * - **`visitorKey`** is a pseudonymous key (an HMAC of the visitor's IP and
  *   User-Agent with a secret only the website has). OfferClickRetentionService
  *   erases it once it is older than the billing window, after which a row is
@@ -59,6 +61,26 @@ export class OfferClick extends BasePostgresEntity {
 
   @Column({ type: 'varchar', nullable: false })
   currency: string;
+
+  // What the shop's statistics filter on, as it was at the time of the click:
+  // a product's category or brand can change and a merge deletes the product,
+  // but a click keeps counting where it counted. No foreign keys, for the same
+  // reason as offerId. Null on a click whose offer lacked it.
+
+  /** The ProductCategory id. */
+  @Column({ type: 'uuid', nullable: true })
+  categoryId?: string | null;
+
+  /** The Brand id. */
+  @Column({ type: 'uuid', nullable: true })
+  brandId?: string | null;
+
+  /** The ProductSource whose listing supplied the offer. */
+  @Column({ type: 'uuid', nullable: true })
+  sourceId?: string | null;
+
+  @Column({ type: 'enum', enum: OfferCondition, nullable: true })
+  condition?: OfferCondition | null;
 
   /** Null once erased by the retention job. */
   @Column({ type: 'varchar', length: 32, nullable: true })
