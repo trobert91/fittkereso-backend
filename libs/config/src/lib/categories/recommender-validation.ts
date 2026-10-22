@@ -285,14 +285,17 @@ export function validateRecommender(
         errors.push(`${at}: factor names ${factor.answer}, no such step`);
         continue;
       }
+      const key = factor.value;
+      // A number step's factor is the number itself, or a value of the band it falls in.
       if (step.type === 'number') {
-        if (factor.value !== undefined)
-          errors.push(
-            `${at}: factor reads values.${factor.value} of a number step`,
-          );
+        if (
+          key !== undefined &&
+          !(step.bands ?? []).some((b) => b.values?.[key] !== undefined)
+        ) {
+          errors.push(`${at}: no band of ${factor.answer} has values.${key}`);
+        }
         continue;
       }
-      const key = factor.value;
       if (key === undefined) {
         errors.push(
           `${at}: factor of choice step ${factor.answer} names no value`,

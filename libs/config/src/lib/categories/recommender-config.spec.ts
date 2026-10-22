@@ -277,6 +277,22 @@ describe('validateRecommender', () => {
     const textSpec = valid();
     textSpec.derived[0].spec = 'kind';
     expectError(textSpec, 'kind is a string spec');
+    // A number step's factor is its number, or a value of its bands.
+    const withHeight = valid();
+    withHeight.steps.push({
+      id: 'height',
+      type: 'number',
+      question: text,
+      number: { min: 140, max: 210, step: 1, initial: 175, unit: text },
+      bands: [{ max: 170, values: { factor: 0.9 } }, { min: 170 }],
+    });
+    withHeight.derived[0].multiply = [
+      { answer: 'height' },
+      { answer: 'height', value: 'factor' },
+    ];
+    expect(errorsOf(withHeight)).toEqual([]);
+    withHeight.derived[0].multiply = [{ answer: 'height', value: 'nope' }];
+    expectError(withHeight, 'no band of height has values.nope');
   });
 
   it('rejects raising a spec no answer sets', () => {
