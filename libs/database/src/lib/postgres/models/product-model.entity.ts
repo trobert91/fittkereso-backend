@@ -24,6 +24,7 @@ import { Expose, Transform } from 'class-transformer';
 @Entity()
 @Index(['productCategory', 'enabled'])
 export class ProductModel extends BasePostgresEntity {
+  @Index()
   @ManyToOne(() => Brand, (brand) => brand.models, { nullable: false })
   @Expose({ groups: [SerializeGroup.list] })
   brand: Brand;
@@ -51,6 +52,26 @@ export class ProductModel extends BasePostgresEntity {
   @Column({ type: 'text', nullable: true })
   @Expose({ groups: [SerializeGroup.details] })
   description: string | null;
+
+  /*
+   * The public site's search document, written only by the database: the
+   * product_model_search trigger rebuilds both columns whenever the model,
+   * brand, orderedSpecs or description change, and a brand rename refreshes
+   * its products (ProductSearch1792000000000 holds the functions). TypeORM
+   * never reads or writes them. GIN indexes can't be declared here, so the
+   * migration creates them and `synchronize: false` keeps sync from dropping
+   * them.
+   */
+
+  /** search_normalize(brand + ' ' + model): the typo fallback's trigram target. */
+  @Index('product_model_search_name_trgm_idx', { synchronize: false })
+  @Column({ type: 'text', nullable: true, select: false, insert: false, update: false })
+  searchName?: string | null;
+
+  /** Weighted lexemes: A brand + model, C spec values, D description. */
+  @Index('product_model_search_vector_idx', { synchronize: false })
+  @Column({ type: 'tsvector', nullable: true, select: false, insert: false, update: false })
+  searchVector?: string | null;
 
   @ManyToOne(() => ProductCategory, (type) => type.models, { nullable: true })
   @Expose({ groups: [SerializeGroup.list] })

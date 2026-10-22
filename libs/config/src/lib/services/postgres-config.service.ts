@@ -9,6 +9,7 @@ import { Brand1758983295970 } from '../migrations/1758983295970-brand';
 import { AddOfferSpecsGinIndex1787153028613 } from '../migrations/1787153028613-add-offer-specs-gin-index';
 import { ProductSourceVersionBackfill1790000000000 } from '../migrations/1790000000000-product-source-version-backfill';
 import { ProductSourceCategorySections1791000000000 } from '../migrations/1791000000000-product-source-category-sections';
+import { ProductSearch1792000000000 } from '../migrations/1792000000000-product-search';
 
 @Injectable()
 export class PostgresConfigService implements TypeOrmOptionsFactory {
@@ -36,6 +37,7 @@ export class PostgresConfigService implements TypeOrmOptionsFactory {
             AddOfferSpecsGinIndex1787153028613,
             ProductSourceVersionBackfill1790000000000,
             ProductSourceCategorySections1791000000000,
+            ProductSearch1792000000000,
           ]
         : [],
     };

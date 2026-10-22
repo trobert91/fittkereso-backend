@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, ManyToOne } from 'typeorm';
 import { BasePostgresEntity } from './base-postgres-entity';
 import { Expose } from 'class-transformer';
 import { SerializeGroup } from '@fittkereso-backend/utils';
@@ -6,6 +6,9 @@ import { ProductModel } from './product-model.entity';
 import { ProductSource } from './product-source.entity';
 
 @Entity()
+// A product's images in order: the first one is every listing, search and
+// dropdown row's picture, and the product page lists them all.
+@Index(['model', 'order'])
 export class ProductImage extends BasePostgresEntity {
   // `disable`: saving a ProductModel with a loaded, stale images array must
   // never detach a row another writer attached meanwhile. TypeORM's default
