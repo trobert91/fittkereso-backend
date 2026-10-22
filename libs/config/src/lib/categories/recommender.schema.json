@@ -1,0 +1,338 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "recommender.schema.json",
+  "title": "Category recommender",
+  "description": "The guided product finder of one category: its question steps, what each answer means in specs, and how the matches are weighted. Read by the public website (a resolved copy, fittkereso-frontend/src/config/recommenders/); validated by recommender-config.spec.ts, which also checks the spec names and values against the category's jsonSchema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "steps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "title": { "$ref": "#/definitions/text" },
+    "intro": { "$ref": "#/definitions/text" },
+    "weights": {
+      "description": "Score weight per importance. Default high 5, medium 3, low 1.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["high", "medium", "low"],
+      "properties": {
+        "high": { "type": "number", "exclusiveMinimum": 0 },
+        "medium": { "type": "number", "exclusiveMinimum": 0 },
+        "low": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minResults": {
+          "description": "The search relaxes (drops low, then medium parameters) until at least this many products match. Default 12.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxResults": {
+          "description": "How many products the results list. Default 60.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "unknownScore": {
+          "description": "The credit a product gets on a parameter it has no value for. Default 0.4.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "derived": { "type": "array", "items": { "$ref": "#/definitions/derived" } }
+  },
+  "definitions": {
+    "id": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*$" },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hu", "en"],
+      "properties": {
+        "hu": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      }
+    },
+    "importance": { "enum": ["high", "medium", "low"] },
+    "condition": {
+      "description": "Holds when an earlier choice step's answer contains one of anyOf, or none of noneOf (an unanswered step contains none).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step"],
+      "properties": {
+        "step": { "$ref": "#/definitions/id" },
+        "anyOf": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/id" }
+        },
+        "noneOf": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/id" }
+        }
+      },
+      "oneOf": [{ "required": ["anyOf"] }, { "required": ["noneOf"] }]
+    },
+    "showIf": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/condition" }
+    },
+    "tolerance": {
+      "description": "How far past the bound, relative to it, a value still earns partial credit.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 0.5
+    },
+    "constraint": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["in"],
+          "properties": {
+            "in": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "partial": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "exclusiveMaximum": 1
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["gte"],
+          "properties": {
+            "gte": { "type": "number" },
+            "tolerance": { "$ref": "#/definitions/tolerance" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["lte"],
+          "properties": {
+            "lte": { "type": "number" },
+            "tolerance": { "$ref": "#/definitions/tolerance" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["between"],
+          "properties": {
+            "between": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "number" }
+            },
+            "tolerance": { "$ref": "#/definitions/tolerance" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["is"],
+          "properties": { "is": { "const": true } }
+        }
+      ]
+    },
+    "alternative": {
+      "allOf": [{ "$ref": "#/definitions/constraint" }],
+      "type": "object",
+      "required": ["spec"],
+      "properties": {
+        "spec": { "type": "string", "minLength": 1 },
+        "in": {},
+        "partial": {},
+        "gte": {},
+        "lte": {},
+        "between": {},
+        "is": {},
+        "tolerance": {}
+      },
+      "additionalProperties": false
+    },
+    "effect": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "#/definitions/constraint" }],
+          "type": "object",
+          "required": ["spec", "importance"],
+          "properties": {
+            "spec": { "type": "string", "minLength": 1 },
+            "importance": { "$ref": "#/definitions/importance" },
+            "assumeWhenMissing": {
+              "description": "The value to judge a product by when it has none: for a spec a listing only states when unusual.",
+              "type": ["string", "number", "boolean"]
+            },
+            "in": {},
+            "partial": {},
+            "gte": {},
+            "lte": {},
+            "between": {},
+            "is": {},
+            "tolerance": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Met by any one alternative: for a need several specs can show, such as a size in cm or as a letter.",
+          "type": "object",
+          "required": ["anyOf", "importance"],
+          "properties": {
+            "anyOf": {
+              "type": "array",
+              "minItems": 2,
+              "items": { "$ref": "#/definitions/alternative" }
+            },
+            "importance": { "$ref": "#/definitions/importance" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "values": {
+      "description": "Numbers a derived parameter multiplies (see derived.multiply).",
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "label": { "$ref": "#/definitions/text" },
+        "help": { "$ref": "#/definitions/text" },
+        "showIf": { "$ref": "#/definitions/showIf" },
+        "set": { "type": "array", "items": { "$ref": "#/definitions/effect" } },
+        "values": { "$ref": "#/definitions/values" },
+        "raise": {
+          "description": "Spec keys whose parameters this answer makes high importance.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "band": {
+      "description": "A range of a number answer, [min, max): the first visible band holding the number applies its effects.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "showIf": { "$ref": "#/definitions/showIf" },
+        "set": { "type": "array", "items": { "$ref": "#/definitions/effect" } },
+        "values": { "$ref": "#/definitions/values" }
+      }
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "question", "options"],
+          "properties": {
+            "id": { "$ref": "#/definitions/id" },
+            "type": { "enum": ["single", "multi"] },
+            "question": { "$ref": "#/definitions/text" },
+            "help": { "$ref": "#/definitions/text" },
+            "optional": { "type": "boolean" },
+            "maxChoices": { "type": "integer", "minimum": 2 },
+            "default": { "$ref": "#/definitions/id" },
+            "showIf": { "$ref": "#/definitions/showIf" },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/option" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "question", "number", "bands"],
+          "properties": {
+            "id": { "$ref": "#/definitions/id" },
+            "type": { "const": "number" },
+            "question": { "$ref": "#/definitions/text" },
+            "help": { "$ref": "#/definitions/text" },
+            "optional": { "type": "boolean" },
+            "showIf": { "$ref": "#/definitions/showIf" },
+            "number": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["min", "max", "step", "initial", "unit"],
+              "properties": {
+                "min": { "type": "number" },
+                "max": { "type": "number" },
+                "step": { "type": "number", "exclusiveMinimum": 0 },
+                "initial": { "type": "number" },
+                "unit": { "$ref": "#/definitions/text" }
+              }
+            },
+            "bands": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/band" }
+            }
+          }
+        }
+      ]
+    },
+    "factor": {
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["answer"],
+          "properties": {
+            "answer": { "$ref": "#/definitions/id" },
+            "value": { "type": "string", "minLength": 1 },
+            "default": { "type": "number" }
+          }
+        }
+      ]
+    },
+    "derived": {
+      "description": "A parameter computed from several answers: the product of the factors, rounded (up for gte, down for lte) and clamped.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec", "op", "importance", "multiply"],
+      "properties": {
+        "spec": { "type": "string", "minLength": 1 },
+        "op": { "enum": ["gte", "lte"] },
+        "importance": { "$ref": "#/definitions/importance" },
+        "multiply": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/factor" }
+        },
+        "round": { "type": "number", "exclusiveMinimum": 0 },
+        "clamp": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "tolerance": { "$ref": "#/definitions/tolerance" }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "../recommender.schema.json",
+  "title": { "hu": "E-bike ajánló", "en": "E-bike finder" },
+  "steps": [
+    {
+      "id": "usage",
+      "type": "multi",
+      "question": {
+        "hu": "Mire használnád leginkább?",
+        "en": "What will you mostly ride it for?"
+      },
+      "options": [
+        {
+          "id": "commute",
+          "label": {
+            "hu": "Városi közlekedés, munkába járás",
+            "en": "Commuting in town"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["City", "Trekking"],
+              "importance": "high"
+            }
+          ]
+        },
+        {
+          "id": "mountain",
+          "label": { "hu": "Hegyi terep", "en": "Mountain trails" },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["MTB", "Összteleszkópos MTB"],
+              "importance": "high"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "budget",
+      "type": "single",
+      "question": { "hu": "Mennyit szánnál rá?", "en": "What is your budget?" },
+      "options": [
+        {
+          "id": "upTo1600k",
+          "label": { "hu": "1,6 millió Ft-ig", "en": "Up to 1.6 million Ft" },
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 1600000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
