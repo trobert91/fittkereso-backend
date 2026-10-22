@@ -1,13 +1,30 @@
 {
   "$schema": "../recommender.schema.json",
-  "title": { "hu": "E-bike ajánló", "en": "E-bike finder" },
+  "title": {
+    "hu": "E-bike ajánló",
+    "en": "E-bike finder"
+  },
+  "intro": {
+    "hu": "Néhány kérdés alapján megmutatjuk a hozzád illő elektromos kerékpárokat. Bármelyik kérdést kihagyhatod.",
+    "en": "A few questions, and we show the e-bikes that suit you. You can skip any question."
+  },
+  "search": {
+    "minResults": 12,
+    "maxResults": 60,
+    "unknownScore": 0.4
+  },
   "steps": [
     {
       "id": "usage",
       "type": "multi",
+      "maxChoices": 2,
       "question": {
         "hu": "Mire használnád leginkább?",
         "en": "What will you mostly ride it for?"
+      },
+      "help": {
+        "hu": "Ez a legfontosabb döntés: a kerékpár jellege igazodjon ahhoz, ahol használni fogod. Ha a mostani bringádat hasonló célra használod, érdemes abból kiindulni.",
+        "en": "This matters most: the kind of bike should match where you will ride it. If you ride your current bike for the same purpose, start from that."
       },
       "options": [
         {
@@ -20,18 +37,949 @@
             {
               "spec": "usageType",
               "in": ["City", "Trekking"],
+              "partial": {
+                "Cross Trekking": 0.6
+              },
               "importance": "high"
+            },
+            {
+              "spec": "lighting",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            },
+            {
+              "spec": "fenders",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "tour",
+          "label": {
+            "hu": "Túrázás aszfalton, murván",
+            "en": "Touring on asphalt and gravel paths"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["Trekking", "Cross Trekking"],
+              "partial": {
+                "City": 0.5
+              },
+              "importance": "high"
+            },
+            {
+              "spec": "rack",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "trail",
+          "label": {
+            "hu": "Erdei, mezei utak, könnyű terep",
+            "en": "Forest and field tracks, light off-road"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["Cross Trekking", "MTB"],
+              "partial": {
+                "Trekking": 0.5,
+                "Gravel": 0.5
+              },
+              "importance": "high"
+            },
+            {
+              "spec": "suspension",
+              "in": ["Első teleszkóp", "Első teleszkóp, hátsó rugóstag"],
+              "importance": "medium"
             }
           ]
         },
         {
           "id": "mountain",
-          "label": { "hu": "Hegyi terep", "en": "Mountain trails" },
+          "label": {
+            "hu": "Hegyi terep, single trail",
+            "en": "Mountain trails"
+          },
           "set": [
             {
               "spec": "usageType",
               "in": ["MTB", "Összteleszkópos MTB"],
               "importance": "high"
+            },
+            {
+              "spec": "motorPosition",
+              "in": ["Középmotor"],
+              "importance": "medium"
+            },
+            {
+              "spec": "torque",
+              "gte": 75,
+              "tolerance": 0.15,
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "sport",
+          "label": {
+            "hu": "Sportos tekerés országúton, gravelen",
+            "en": "Sporty riding on road or gravel"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["Gravel", "Országúti", "Cyclocross", "Fitness"],
+              "importance": "high"
+            },
+            {
+              "spec": "weight",
+              "lte": 20,
+              "tolerance": 0.15,
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "cargo",
+          "label": {
+            "hu": "Teher vagy gyerek szállítása",
+            "en": "Carrying cargo or children"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["Cargo"],
+              "importance": "high"
+            },
+            {
+              "spec": "torque",
+              "gte": 75,
+              "tolerance": 0.15,
+              "importance": "medium"
+            },
+            {
+              "spec": "maxTotalWeight",
+              "gte": 180,
+              "tolerance": 0.15,
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "folding",
+          "label": {
+            "hu": "Utazás, kis helyen tárolás",
+            "en": "Travel, storing in a small space"
+          },
+          "help": {
+            "hu": "Összecsukható kerékpár",
+            "en": "A folding bike"
+          },
+          "set": [
+            {
+              "spec": "usageType",
+              "in": ["Összecsukható"],
+              "importance": "high"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "terrain",
+      "type": "single",
+      "question": {
+        "hu": "Milyen terepen tekersz, mennyi emelkedővel?",
+        "en": "What terrain do you ride, how hilly is it?"
+      },
+      "help": {
+        "hu": "Emelkedőn a motor nyomatéka számít: nagyjából 30 Nm gyenge, 40–50 Nm átlagos, 60 Nm felett erős. Meredek, hosszú emelkedőkhöz erősebb középmotort keresünk.",
+        "en": "On climbs the torque of the motor counts: about 30 Nm is weak, 40–50 Nm average, over 60 Nm strong. For long, steep climbs we look for a stronger mid-drive motor."
+      },
+      "options": [
+        {
+          "id": "flat",
+          "label": {
+            "hu": "Főleg sík",
+            "en": "Mostly flat"
+          },
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain"]
+            }
+          ],
+          "values": {
+            "whPerKm": 6
+          }
+        },
+        {
+          "id": "hilly",
+          "label": {
+            "hu": "Dombos, néhány emelkedővel",
+            "en": "Rolling, some climbs"
+          },
+          "values": {
+            "whPerKm": 9
+          },
+          "set": [
+            {
+              "spec": "torque",
+              "gte": 50,
+              "tolerance": 0.15,
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "steep",
+          "label": {
+            "hu": "Meredek, hosszú emelkedők",
+            "en": "Steep, long climbs"
+          },
+          "values": {
+            "whPerKm": 12
+          },
+          "set": [
+            {
+              "spec": "torque",
+              "gte": 65,
+              "tolerance": 0.15,
+              "importance": "medium"
+            },
+            {
+              "spec": "motorPosition",
+              "in": ["Középmotor"],
+              "importance": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "distance",
+      "type": "single",
+      "showIf": [
+        {
+          "step": "usage",
+          "noneOf": ["folding"]
+        }
+      ],
+      "question": {
+        "hu": "Milyen hosszú egy tipikus utad?",
+        "en": "How long is a typical ride?"
+      },
+      "help": {
+        "hu": "A gyári hatótávot kedvező körülmények között mérik. Az utad hosszára rászámolunk 30–40% tartalékot, és ebből becsüljük a szükséges akkumulátor-kapacitást.",
+        "en": "Factory range is measured in ideal conditions. We add a 30–40% reserve to your ride and estimate the battery capacity you need from that."
+      },
+      "options": [
+        {
+          "id": "upTo20",
+          "label": {
+            "hu": "20 km-ig",
+            "en": "Up to 20 km"
+          },
+          "values": {
+            "km": 20
+          }
+        },
+        {
+          "id": "upTo40",
+          "label": {
+            "hu": "20–40 km",
+            "en": "20–40 km"
+          },
+          "values": {
+            "km": 40
+          }
+        },
+        {
+          "id": "upTo70",
+          "label": {
+            "hu": "40–70 km",
+            "en": "40–70 km"
+          },
+          "values": {
+            "km": 70
+          }
+        },
+        {
+          "id": "over70",
+          "label": {
+            "hu": "70 km felett",
+            "en": "Over 70 km"
+          },
+          "values": {
+            "km": 100
+          }
+        }
+      ]
+    },
+    {
+      "id": "speed",
+      "type": "single",
+      "default": "pedelec",
+      "question": {
+        "hu": "Milyen gyorsan szeretnél haladni rásegítéssel?",
+        "en": "How fast should the motor help you go?"
+      },
+      "help": {
+        "hu": "A pedelec 25 km/h-ig segít, és kerékpárnak számít. A 45 km/h-s S-pedelec segédmotoros kerékpár: jogosítvány, biztosítás és bukósisak kell hozzá, és jóval drágább.",
+        "en": "A pedelec assists up to 25 km/h and counts as a bicycle. A 45 km/h S-pedelec is a moped: it needs a licence, insurance and a helmet, and costs much more."
+      },
+      "options": [
+        {
+          "id": "pedelec",
+          "label": {
+            "hu": "25 km/h-ig (pedelec)",
+            "en": "Up to 25 km/h (pedelec)"
+          },
+          "set": [
+            {
+              "spec": "pedelecClass",
+              "in": ["Pedelec"],
+              "importance": "high",
+              "assumeWhenMissing": "Pedelec"
+            }
+          ]
+        },
+        {
+          "id": "speed",
+          "label": {
+            "hu": "45 km/h-ig (S-pedelec)",
+            "en": "Up to 45 km/h (S-pedelec)"
+          },
+          "help": {
+            "hu": "Jogosítvány, biztosítás és bukósisak kell hozzá.",
+            "en": "Needs a licence, insurance and a helmet."
+          },
+          "set": [
+            {
+              "spec": "pedelecClass",
+              "in": ["S-Pedelec"],
+              "importance": "high"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "height",
+      "type": "number",
+      "question": {
+        "hu": "Milyen magas vagy?",
+        "en": "How tall are you?"
+      },
+      "help": {
+        "hu": "A testmagasságodból becsüljük a vázméretet (MTB-nél ugyanahhoz a magassághoz kisebb váz illik), és előre soroljuk azokat a kerékpárokat, amelyek a te méretedben kaphatók.",
+        "en": "We estimate the frame size from your height (an MTB frame runs smaller for the same height) and rank the bikes available in your size first."
+      },
+      "number": {
+        "min": 140,
+        "max": 210,
+        "step": 1,
+        "initial": 175,
+        "unit": {
+          "hu": "cm",
+          "en": "cm"
+        }
+      },
+      "bands": [
+        {
+          "min": 140,
+          "max": 160,
+          "showIf": [
+            {
+              "step": "usage",
+              "anyOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [36, 40]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["XS", "S"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 160,
+          "max": 170,
+          "showIf": [
+            {
+              "step": "usage",
+              "anyOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [39, 44]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["S", "M"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 170,
+          "max": 180,
+          "showIf": [
+            {
+              "step": "usage",
+              "anyOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [43, 48]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["M", "L"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 180,
+          "max": 190,
+          "showIf": [
+            {
+              "step": "usage",
+              "anyOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [47, 52]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["L", "XL"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 190,
+          "max": 211,
+          "showIf": [
+            {
+              "step": "usage",
+              "anyOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [51, 56]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["XL", "XXL"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 140,
+          "max": 160,
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [41, 46]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["XS", "S"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 160,
+          "max": 170,
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [45, 50]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["S", "M"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 170,
+          "max": 180,
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [49, 54]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["M", "L"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 180,
+          "max": 190,
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [53, 58]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["L", "XL"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "min": 190,
+          "max": 211,
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "anyOf": [
+                {
+                  "spec": "frameSize",
+                  "between": [57, 64]
+                },
+                {
+                  "spec": "frameSizeLabel",
+                  "in": ["XL", "XXL"]
+                }
+              ],
+              "importance": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weight",
+      "type": "single",
+      "optional": true,
+      "question": {
+        "hu": "Mekkora a testsúlyod (csomaggal együtt)?",
+        "en": "What do you weigh (with luggage)?"
+      },
+      "help": {
+        "hu": "Nagyobb terheléshez több akkumulátor-kapacitás és erősebb motor kell, és a kerékpár megengedett össztömegére is figyelünk.",
+        "en": "A heavier load needs more battery capacity and a stronger motor, and we check the maximum total weight of the bike."
+      },
+      "options": [
+        {
+          "id": "upTo85",
+          "label": {
+            "hu": "85 kg-ig",
+            "en": "Up to 85 kg"
+          },
+          "values": {
+            "whFactor": 1
+          }
+        },
+        {
+          "id": "upTo110",
+          "label": {
+            "hu": "85–110 kg",
+            "en": "85–110 kg"
+          },
+          "values": {
+            "whFactor": 1.1
+          }
+        },
+        {
+          "id": "over110",
+          "label": {
+            "hu": "110 kg felett",
+            "en": "Over 110 kg"
+          },
+          "values": {
+            "whFactor": 1.2
+          },
+          "set": [
+            {
+              "spec": "torque",
+              "gte": 65,
+              "tolerance": 0.15,
+              "importance": "medium"
+            },
+            {
+              "spec": "maxTotalWeight",
+              "gte": 140,
+              "tolerance": 0.1,
+              "importance": "low"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "frame",
+      "type": "single",
+      "question": {
+        "hu": "Milyen vázat szeretnél?",
+        "en": "What kind of frame do you want?"
+      },
+      "help": {
+        "hu": "Az alacsony belépésű váz kényelmes fel- és leszállást ad, például városban vagy ha nehezebb átlendíteni a lábad.",
+        "en": "A low step-through frame makes getting on and off easy, for example in town or if swinging a leg over is hard."
+      },
+      "options": [
+        {
+          "id": "easy",
+          "label": {
+            "hu": "Könnyű fel- és leszállás (alacsony váz)",
+            "en": "Easy on and off (step-through)"
+          },
+          "set": [
+            {
+              "spec": "frameType",
+              "in": ["Alacsony"],
+              "partial": {
+                "Trapéz": 0.5
+              },
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "classic",
+          "label": {
+            "hu": "Hagyományos váz",
+            "en": "Classic frame"
+          },
+          "set": [
+            {
+              "spec": "frameType",
+              "in": ["Magas", "Trapéz"],
+              "importance": "low"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mustHaves",
+      "type": "multi",
+      "optional": true,
+      "question": {
+        "hu": "Mi legyen benne mindenképp?",
+        "en": "What must it have?"
+      },
+      "help": {
+        "hu": "Csak azt jelöld meg, amiről nem mondanál le: minden extra szűkíti a kínálatot.",
+        "en": "Only pick what you would not do without: every extra narrows the choice."
+      },
+      "options": [
+        {
+          "id": "removable",
+          "label": {
+            "hu": "Kivehető akkumulátor",
+            "en": "Removable battery"
+          },
+          "help": {
+            "hu": "Lakásban is tölthető",
+            "en": "Charge it indoors"
+          },
+          "set": [
+            {
+              "spec": "batteryRemovable",
+              "is": true,
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "cityKit",
+          "label": {
+            "hu": "Teljes városi felszereltség",
+            "en": "Full city equipment"
+          },
+          "help": {
+            "hu": "Lámpa, sárvédő, csomagtartó, kitámasztó",
+            "en": "Lights, fenders, rack, kickstand"
+          },
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["sport", "mountain"]
+            }
+          ],
+          "set": [
+            {
+              "spec": "lighting",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            },
+            {
+              "spec": "fenders",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            },
+            {
+              "spec": "rack",
+              "in": ["Alapfelszereltség"],
+              "importance": "low"
+            },
+            {
+              "spec": "kickstand",
+              "is": true,
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "suspension",
+          "label": {
+            "hu": "Teleszkópos villa",
+            "en": "Suspension fork"
+          },
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "trail"]
+            }
+          ],
+          "set": [
+            {
+              "spec": "suspension",
+              "in": ["Első teleszkóp", "Első teleszkóp, hátsó rugóstag"],
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "abs",
+          "label": {
+            "hu": "ABS",
+            "en": "ABS"
+          },
+          "set": [
+            {
+              "spec": "abs",
+              "is": true,
+              "importance": "medium"
+            }
+          ]
+        },
+        {
+          "id": "smart",
+          "label": {
+            "hu": "Okos rendszer, telefonos app",
+            "en": "Smart system, phone app"
+          },
+          "set": [
+            {
+              "spec": "smartConnectivity",
+              "is": true,
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "light",
+          "label": {
+            "hu": "Könnyű, 23 kg alatt",
+            "en": "Light, under 23 kg"
+          },
+          "help": {
+            "hu": "Lépcsőn, autóra emelve is kezelhető",
+            "en": "Easier to carry upstairs or onto a car"
+          },
+          "set": [
+            {
+              "spec": "weight",
+              "lte": 23,
+              "tolerance": 0.1,
+              "importance": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motor",
+      "type": "multi",
+      "optional": true,
+      "question": {
+        "hu": "Van kedvenc motorrendszered?",
+        "en": "Do you have a favourite motor system?"
+      },
+      "help": {
+        "hu": "Sokan a motor alapján választanak e-bike-ot. A nagy gyártók rendszerei mind megbízhatóak, ez inkább ízlés kérdése.",
+        "en": "Many people choose an e-bike by its motor. The systems of the big makers are all reliable; it is mostly a matter of taste."
+      },
+      "options": [
+        {
+          "id": "bosch",
+          "label": {
+            "hu": "Bosch",
+            "en": "Bosch"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["Bosch"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "shimano",
+          "label": {
+            "hu": "Shimano",
+            "en": "Shimano"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["Shimano"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "yamaha",
+          "label": {
+            "hu": "Yamaha",
+            "en": "Yamaha"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["Yamaha"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "brose",
+          "label": {
+            "hu": "Brose",
+            "en": "Brose"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["Brose"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "panasonic",
+          "label": {
+            "hu": "Panasonic",
+            "en": "Panasonic"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["Panasonic"],
+              "importance": "low"
+            }
+          ]
+        },
+        {
+          "id": "tq",
+          "label": {
+            "hu": "TQ",
+            "en": "TQ"
+          },
+          "set": [
+            {
+              "spec": "motorBrand",
+              "in": ["TQ"],
+              "importance": "low"
             }
           ]
         }
@@ -40,11 +988,63 @@
     {
       "id": "budget",
       "type": "single",
-      "question": { "hu": "Mennyit szánnál rá?", "en": "What is your budget?" },
+      "question": {
+        "hu": "Mennyit szánnál rá?",
+        "en": "What is your budget?"
+      },
+      "help": {
+        "hu": "Új e-bike-nál nagyjából 600–850 ezer Ft a belépő szint, 1–2 millió Ft a középkategória, 2,5 millió Ft felett a prémium. 500–600 ezer Ft alatt ritka a jó minőségű új elektromos kerékpár.",
+        "en": "For a new e-bike, roughly: 600–850 thousand Ft is entry level, 1–2 million Ft mid-range, over 2.5 million Ft premium. Good new e-bikes under 500–600 thousand Ft are rare."
+      },
       "options": [
         {
+          "id": "upTo850k",
+          "label": {
+            "hu": "850 ezer Ft-ig",
+            "en": "Up to 850,000 Ft"
+          },
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "cargo"]
+            }
+          ],
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 850000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        },
+        {
+          "id": "upTo1200k",
+          "label": {
+            "hu": "1,2 millió Ft-ig",
+            "en": "Up to 1.2 million Ft"
+          },
+          "showIf": [
+            {
+              "step": "usage",
+              "noneOf": ["mountain", "cargo"]
+            }
+          ],
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 1200000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        },
+        {
           "id": "upTo1600k",
-          "label": { "hu": "1,6 millió Ft-ig", "en": "Up to 1.6 million Ft" },
+          "label": {
+            "hu": "1,6 millió Ft-ig",
+            "en": "Up to 1.6 million Ft"
+          },
           "set": [
             {
               "spec": "@price",
@@ -53,8 +1053,143 @@
               "importance": "high"
             }
           ]
+        },
+        {
+          "id": "upTo2000k",
+          "label": {
+            "hu": "2 millió Ft-ig",
+            "en": "Up to 2 million Ft"
+          },
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 2000000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        },
+        {
+          "id": "upTo2500k",
+          "label": {
+            "hu": "2,5 millió Ft-ig",
+            "en": "Up to 2.5 million Ft"
+          },
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 2500000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        },
+        {
+          "id": "upTo3500k",
+          "label": {
+            "hu": "3,5 millió Ft-ig",
+            "en": "Up to 3.5 million Ft"
+          },
+          "set": [
+            {
+              "spec": "@price",
+              "lte": 3500000,
+              "tolerance": 0.1,
+              "importance": "high"
+            }
+          ]
+        },
+        {
+          "id": "any",
+          "label": {
+            "hu": "Nem számít",
+            "en": "No limit"
+          }
         }
       ]
+    },
+    {
+      "id": "priorities",
+      "type": "multi",
+      "maxChoices": 2,
+      "optional": true,
+      "question": {
+        "hu": "Mi a legfontosabb neked?",
+        "en": "What matters most to you?"
+      },
+      "help": {
+        "hu": "Legfeljebb két szempontot jelölj meg: ezeket erősebben vesszük figyelembe a sorrendnél.",
+        "en": "Pick up to two: they weigh more in the ranking."
+      },
+      "options": [
+        {
+          "id": "price",
+          "label": {
+            "hu": "Az ár",
+            "en": "Price"
+          },
+          "raise": ["@price"]
+        },
+        {
+          "id": "range",
+          "label": {
+            "hu": "A hatótáv",
+            "en": "Range"
+          },
+          "raise": ["batteryCapacity"]
+        },
+        {
+          "id": "power",
+          "label": {
+            "hu": "Az erő emelkedőn",
+            "en": "Power on climbs"
+          },
+          "raise": ["torque"]
+        },
+        {
+          "id": "lightness",
+          "label": {
+            "hu": "A kis súly",
+            "en": "Low weight"
+          },
+          "raise": ["weight"]
+        },
+        {
+          "id": "equipment",
+          "label": {
+            "hu": "A felszereltség",
+            "en": "Equipment"
+          },
+          "raise": ["lighting", "fenders", "rack", "kickstand"]
+        }
+      ]
+    }
+  ],
+  "derived": [
+    {
+      "spec": "batteryCapacity",
+      "op": "gte",
+      "importance": "medium",
+      "multiply": [
+        {
+          "answer": "distance",
+          "value": "km"
+        },
+        {
+          "answer": "terrain",
+          "value": "whPerKm",
+          "default": 8
+        },
+        {
+          "answer": "weight",
+          "value": "whFactor",
+          "default": 1
+        },
+        1.35
+      ],
+      "round": 50,
+      "clamp": [250, 1000],
+      "tolerance": 0.15
     }
   ]
 }
