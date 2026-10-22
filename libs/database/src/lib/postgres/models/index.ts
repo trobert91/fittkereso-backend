@@ -22,3 +22,5 @@ export * from './product-duplicate-pair.entity';
 export * from './user.entity';
 export * from './seller-membership.entity';
 export * from './offer-click.entity';
+export * from './finder-visitor.entity';
+export * from './finder-result.entity';

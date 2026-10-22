@@ -17,4 +17,5 @@ export * from './merge';
 export * from './product-spec';
 export * from './product-name';
 export * from './offer';
+export * from './finder';
 export * from './product-description';

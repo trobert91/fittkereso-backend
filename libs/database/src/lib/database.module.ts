@@ -41,6 +41,9 @@ import { SellerMembership } from './postgres/models/seller-membership.entity';
 import { SellerMembershipRepository } from './postgres/repositories/seller-membership-repository';
 import { OfferClick } from './postgres/models/offer-click.entity';
 import { OfferClickRepository } from './postgres/repositories/offer-click-repository';
+import { FinderVisitor } from './postgres/models/finder-visitor.entity';
+import { FinderResult } from './postgres/models/finder-result.entity';
+import { FinderVisitorRepository } from './postgres/repositories/finder-visitor-repository';
 import { ProductSourceConfigValidatorService } from './postgres/services/product-source-config-validator.service';
 import { AdvisoryLockService } from './postgres/services/advisory-lock.service';
 import { ProductSourceVersion } from './postgres/models/product-source-version.entity';
@@ -69,6 +72,8 @@ export const entityList = [
   User,
   SellerMembership,
   OfferClick,
+  FinderVisitor,
+  FinderResult,
   ProductSourceVersion,
   ProductSourceAction,
 ];
@@ -95,6 +100,7 @@ export const entityList = [
     UserRepository,
     SellerMembershipRepository,
     OfferClickRepository,
+    FinderVisitorRepository,
     ProductSourceConfigValidatorService,
     AdvisoryLockService,
     ProductSourceVersionRepository,
@@ -120,6 +126,7 @@ export const entityList = [
     UserRepository,
     SellerMembershipRepository,
     OfferClickRepository,
+    FinderVisitorRepository,
     ProductSourceConfigValidatorService,
     AdvisoryLockService,
     ProductSourceVersionRepository,

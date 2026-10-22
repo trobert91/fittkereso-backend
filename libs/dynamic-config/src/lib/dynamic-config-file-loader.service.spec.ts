@@ -39,6 +39,10 @@ describe('DynamicConfigFileLoaderService', () => {
     ]);
   });
 
+  it('reads finder.json', () => {
+    expect(data.finder).toEqual({ retentionDays: 183 });
+  });
+
   it('still reads the sections it read before', () => {
     expect(data.scheduling).toBeDefined();
     expect(data.translation).toBeDefined();

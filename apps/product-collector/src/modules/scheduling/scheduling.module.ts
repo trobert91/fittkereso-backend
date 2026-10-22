@@ -3,6 +3,7 @@ import { ProductSourceSyncScheduler } from './product-source-sync-scheduler.serv
 import { ProductDuplicateScanScheduler } from './product-duplicate-scan-scheduler.service';
 import { StaleOfferSweepScheduler } from './stale-offer-sweep-scheduler.service';
 import { OfferClickRetentionScheduler } from './offer-click-retention-scheduler.service';
+import { FinderRetentionScheduler } from './finder-retention-scheduler.service';
 import { DatabaseModule } from '@fittkereso-backend/database';
 import { TaskModule } from '@fittkereso-backend/task';
 import { MetricsModule } from '@fittkereso-backend/metrics';
@@ -26,6 +27,7 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductDuplicateScanScheduler,
     StaleOfferSweepScheduler,
     OfferClickRetentionScheduler,
+    FinderRetentionScheduler,
   ],
 })
 export class SchedulingModule {}

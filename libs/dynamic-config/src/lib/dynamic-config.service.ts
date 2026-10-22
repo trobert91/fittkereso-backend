@@ -32,6 +32,10 @@ export class DynamicConfigService {
     return this.fileLoader.getData().offers;
   }
 
+  get finder(): DynamicConfigData['finder'] {
+    return this.fileLoader.getData().finder;
+  }
+
   get scheduling(): DynamicConfigData['scheduling'] {
     return this.fileLoader.getData().scheduling;
   }

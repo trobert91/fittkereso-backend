@@ -92,6 +92,19 @@ export interface DynamicConfigData {
     };
   };
 
+  /**
+   * The website's saved finder results (FinderVisitor, FinderResult). Read
+   * from `finder.json`.
+   */
+  finder?: {
+    /**
+     * A visitor not seen for this many days is deleted with their saved
+     * results. Default: 183 (6 months). The website's privacy notice states
+     * this period, so change both together.
+     */
+    retentionDays?: number;
+  };
+
   /** Import behaviour shared across every source. Read from `import.json`. */
   import?: {
     /**
@@ -455,6 +468,20 @@ export const dynamicConfigSchema = {
               default: 24,
             },
           },
+        },
+      },
+    },
+    finder: {
+      type: 'object',
+      description: "The website's saved finder results (finder_visitor, finder_result).",
+      properties: {
+        retentionDays: {
+          type: 'number',
+          minimum: 1,
+          maximum: 730,
+          description:
+            "A visitor not seen for this many days is deleted with their saved results. The website's privacy notice states this period. Default: 183",
+          default: 183,
         },
       },
     },

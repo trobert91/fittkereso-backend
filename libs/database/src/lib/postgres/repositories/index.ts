@@ -21,3 +21,4 @@ export * from './product-duplicate-pair-repository';
 export * from './user-repository';
 export * from './seller-membership-repository';
 export * from './offer-click-repository';
+export * from './finder-visitor-repository';

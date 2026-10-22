@@ -51,6 +51,7 @@ import { OfferMatchingService } from './services/offer/offer-matching.service';
 import { OfferComposerService } from './services/offer/offer-composer.service';
 import { StaleOfferSweepService } from './services/offer/stale-offer-sweep.service';
 import { OfferClickRetentionService } from './services/offer/offer-click-retention.service';
+import { FinderRetentionService } from './services/finder/finder-retention.service';
 import { StaleProductRepriceService } from './services/offer/stale-product-reprice.service';
 import { ContributorDetachService } from './services/offer/contributor-detach.service';
 import { CompleteSourceRemovalService } from './services/offer/complete-source-removal.service';
@@ -119,6 +120,7 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     CompleteSourceRemovalService,
     StaleOfferSweepService,
     OfferClickRetentionService,
+    FinderRetentionService,
     StaleProductRepriceService,
     SellerCreateService,
     SellerDetailService,
@@ -168,6 +170,7 @@ import { ProductSourceVersionService } from './services/product-source/product-s
     CompleteSourceRemovalService,
     StaleOfferSweepService,
     OfferClickRetentionService,
+    FinderRetentionService,
     StaleProductRepriceService,
     SellerCreateService,
     SellerDetailService,
