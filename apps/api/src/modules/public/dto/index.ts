@@ -5,5 +5,4 @@ export * from './paginated-result.dto';
 export * from './product-detail.dto';
 export * from './product-list.dto';
 export * from './product-query.dto';
-export * from './search.dto';
 export * from './contact-form.dto';

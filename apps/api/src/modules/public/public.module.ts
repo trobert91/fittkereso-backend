@@ -9,13 +9,9 @@ import {
 } from '@fittkereso-backend/config';
 import { PublicProductsController } from './controllers/public-products.controller';
 import { PublicCategoriesController } from './controllers/public-categories.controller';
-import { PublicSearchController } from './controllers/public-search.controller';
 import { PublicContactController } from './controllers/public-contact.controller';
 import { PublicProductsService } from './services/public-products.service';
 import { PublicCategoriesService } from './services/public-categories.service';
-import { PublicAutocompleteService } from './services/public-autocomplete.service';
-import { PublicSearchService } from './services/public-search.service';
-import { SearchAnalyticsService } from './services/search-analytics.service';
 import { RecaptchaService } from './services/recaptcha.service';
 import { PublicContactService } from './services/public-contact.service';
 
@@ -24,7 +20,6 @@ import { PublicContactService } from './services/public-contact.service';
   controllers: [
     PublicProductsController,
     PublicCategoriesController,
-    PublicSearchController,
     PublicContactController,
   ],
   providers: [
@@ -32,9 +27,6 @@ import { PublicContactService } from './services/public-contact.service';
     RecaptchaConfigService,
     PublicProductsService,
     PublicCategoriesService,
-    PublicAutocompleteService,
-    PublicSearchService,
-    SearchAnalyticsService,
     RecaptchaService,
     PublicContactService,
   ],
