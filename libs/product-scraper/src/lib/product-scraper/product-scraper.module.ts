@@ -21,6 +21,11 @@ import { ArukeresoImportService } from '../arukereso/arukereso-import.service';
 import { ArukeresoFeedTriageService } from '../arukereso/arukereso-feed-triage.service';
 import { ArukeresoFeedConfirmService } from '../arukereso/arukereso-feed-confirm.service';
 import { ArukeresoFeedEntryService } from '../arukereso/arukereso-feed-entry.service';
+import { ShopReviewSummaryService } from '../shop-review/shop-review-summary.service';
+import { FeedCheckService } from '../shop-review/feed-check.service';
+import { FeedSnapshotService } from '../shop-review/feed-snapshot.service';
+import { ListingSampleService } from '../shop-review/listing-sample.service';
+import { PageSampleService } from '../shop-review/page-sample.service';
 import { TaskModule } from '@fittkereso-backend/task';
 import { ProductIdentityModule } from '@fittkereso-backend/product-identity';
 import { AiModule } from '@fittkereso-backend/ai';
@@ -70,6 +75,11 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductSourceImporterRegistry,
     ProductSourceSimulationService,
     ProductSourceImportSimulationService,
+    ShopReviewSummaryService,
+    FeedCheckService,
+    FeedSnapshotService,
+    ListingSampleService,
+    PageSampleService,
   ],
   exports: [
     ProductDetailsPageScraperService,
@@ -83,6 +93,11 @@ import { DynamicConfigModule } from '@fittkereso-backend/dynamic-config';
     ProductSourceImporterRegistry,
     ProductSourceSimulationService,
     ProductSourceImportSimulationService,
+    ShopReviewSummaryService,
+    FeedCheckService,
+    FeedSnapshotService,
+    ListingSampleService,
+    PageSampleService,
     ListingModelRefreshService,
   ],
 })

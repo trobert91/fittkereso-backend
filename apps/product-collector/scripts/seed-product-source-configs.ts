@@ -110,7 +110,7 @@ const SOURCES: SeedSourceSpec[] = [
   {
     // speedbike is FEED-ONLY — its scraping source is deliberately not seeded.
     // `speedbike.config.json` stays as a fixture (the table-based markup
-    // template the add-webshop skill points at, with its interpreter specs
+    // template the onboard-webshop skill points at, with its interpreter specs
     // still running), but one Árukereső GET replaces thousands of paid page
     // fetches for the same catalogue.
     //

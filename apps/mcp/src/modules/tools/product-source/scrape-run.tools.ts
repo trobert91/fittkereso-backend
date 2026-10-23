@@ -179,20 +179,7 @@ export class ScrapeRunTools {
   async getProductSourceImportStatus(args: {
     productSourceId: string;
   }): Promise<string> {
-    const kindColumn = `t.${nameOf<ProductImportTask>('kind')}`;
-    const statusColumn = `t.${nameOf<ProductImportTask>('status')}`;
-    const rows: { kind: string; status: string; count: string }[] =
-      await this.importTaskRepo.repo
-        .createQueryBuilder('t')
-        .select(kindColumn, 'kind')
-        .addSelect(statusColumn, 'status')
-        .addSelect('COUNT(*)::int', 'count')
-        .where(`t.${nameOf<ProductImportTask>('source')} = :sourceId`, {
-          sourceId: args.productSourceId,
-        })
-        .groupBy(kindColumn)
-        .addGroupBy(statusColumn)
-        .getRawMany();
+    const rows = await this.importTaskRepo.statusCounts(args.productSourceId);
 
     const L: string[] = [];
     L.push(`# Import Status for Product Source ${args.productSourceId}`);

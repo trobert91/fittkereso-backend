@@ -6,6 +6,7 @@ export * from './product-category-repository';
 export * from './product-image-repository';
 export * from './product-model-repository';
 export * from './product-source-record-repository';
+export * from './product-source-record-review-repository';
 export * from './product-source-repository';
 export * from './product-source-version-repository';
 export * from './product-source-action-repository';

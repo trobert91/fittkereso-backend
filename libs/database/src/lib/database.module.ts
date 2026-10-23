@@ -7,6 +7,7 @@ import { ProductCategoryRepository } from './postgres/repositories/product-categ
 import { ProductModelRepository } from './postgres/repositories/product-model-repository';
 import { ProductSourceRecord } from './postgres/models/product-source-record.entity';
 import { ProductSourceRecordRepository } from './postgres/repositories/product-source-record-repository';
+import { ProductSourceRecordReviewRepository } from './postgres/repositories/product-source-record-review-repository';
 import { ProductAliasRepository } from './postgres/repositories/product-alias-repository';
 import { Task } from './postgres/models/task.entity';
 import { TaskRepository } from './postgres/repositories/task-repository';
@@ -87,6 +88,7 @@ export const entityList = [
     ProductCategoryRepository,
     ProductModelRepository,
     ProductSourceRecordRepository,
+    ProductSourceRecordReviewRepository,
     ProductImageRepository,
     ProductSourceRepository,
     ProductImportTaskRepository,
@@ -113,6 +115,7 @@ export const entityList = [
     ProductCategoryRepository,
     ProductModelRepository,
     ProductSourceRecordRepository,
+    ProductSourceRecordReviewRepository,
     ProductImageRepository,
     ProductSourceRepository,
     ProductImportTaskRepository,

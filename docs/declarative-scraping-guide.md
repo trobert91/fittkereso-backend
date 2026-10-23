@@ -216,6 +216,16 @@ Before touching the live pipeline, look at the tests here — they're the best w
 
 These are the closest thing to living documentation for "what does this config actually produce."
 
+**What a live source imports, compared with what the shop publishes.** Three read-only MCP tools (`apps/mcp/src/modules/tools/product-source/shop-review.tools.ts`, services in `libs/product-scraper/src/lib/shop-review/`) show where a source's config leaves data behind. None calls an LLM or writes anything.
+
+| Tool | Reads | Shows |
+|---|---|---|
+| `get_shop_review_summary` | the database | per category, each schema key's share from the specMapping (`extractedSpecs`), after the LLM (`specs`), in offer entries and on the product; saved-field coverage; spec rows no specMapping reads; mappings none of whose labels any row carries; feed columns no target reads |
+| `check_product_source_feed` | one feed download | rows by gate outcome, repeated ids, new and delisted listings, columns that appeared or vanished, every column with the config part that reads it |
+| `sample_shop_listings` | the database, plus the feed the check downloaded | a stable slice (ordered by `publicId`) of listings, each next to its raw spec rows and feed row, marked mapped / identity-only / unread |
+
+A feed row's top-level columns never reach a listing unless a `mapping` target, the `filter` or an `extraSpecRows` entry reads it: the mapper keeps only the row's `attributes` as spec rows. `feedFieldsReadBy` and `specLabelsReadBy` decide what counts as read. The `review-webshop` and `onboard-webshop` skills are built on these tools.
+
 ---
 
 ## 6. Where fetched HTML enters the interpreter — the two scraper services
@@ -455,7 +465,7 @@ Everything below the converge line is import-agnostic: identity resolution, merg
 
 ## If you want to add a new source
 
-**Use the `add-webshop` skill** (`.claude/skills/add-webshop/`) — it is the maintained procedure, with a plan/execute split and a human review gate between them. In outline:
+**Use the workspace skills** — they are the maintained procedure: `scout-webshop` measures the shop and writes an onboarding ticket, a human reviews it, and `onboard-webshop` executes it on dev (seller, sources, config, a capped test import, then a mapping loop with the review tools of §5). `review-webshop` re-checks onboarded sellers later. They live in the workspace's `.claude/skills/`, outside this repo. In outline:
 
 0. **Decide the type first.** Probe for a feed before assuming you must scrape: `curl -o /dev/null -w '%{http_code}' 'https://<shop>/api/?route=export/feed&id=arukereso'` (ShopRenter's pattern — 200 enabled, 405 disabled, 401 password-protected; `id=google_shopping` is the same shop's Google Shopping TSV, a `googleshop` source). One GET beats thousands of paid page fetches. The type cannot be changed afterwards.
 1. Author the config for that type, against the schema `get_product_source_config_schema({ type })` returns. Copy the closest fixture: `ebikeshop.config.json` (JSON-hydration markup), `speedbike.config.json` (classic `<table>`), `speedbike-arukereso.config.json` (feed), `speedbike-googleshop.config.json` (a Google Shopping feed contributing to another source's offers). A shop that publishes both feeds gets both sources: the Árukereső one identifying, the Google one contributing at a lower priority (§11).

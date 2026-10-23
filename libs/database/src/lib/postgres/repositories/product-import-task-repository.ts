@@ -331,11 +331,7 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
 
     for (const task of tasks) {
       const payload = task.payload ?? {};
-      const rows: { item?: unknown; listingId?: string; rowHash?: string }[] = Array.isArray(payload['rows'])
-        ? payload['rows']
-        : payload['item']
-          ? [{ item: payload['item'] }]
-          : [];
+      const rows = feedRowsOf(payload);
       const row =
         (listingId ? rows.find((candidate) => candidate.listingId === listingId) : undefined) ??
         (rows.length === 1 ? rows[0] : undefined);
@@ -346,6 +342,73 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
       };
     }
     return null;
+  }
+
+  /**
+   * The feed rows a source's newest import tasks stored, newest first, one
+   * per listing (its newest row), up to `limit`: what the shop's feed said
+   * when each listing was last imported. Rows are the raw feed items
+   * (`{ fields, attributes }`); a task that stored several rows (a page the
+   * sizes share) gives each of them.
+   */
+  async recentFeedRows(params: {
+    sourceId: string;
+    limit: number;
+  }): Promise<{ listingId: string | null; url: string; item: Record<string, any> }[]> {
+    const t = (field: keyof ProductImportTask) => `task.${nameOf<ProductImportTask>(field)}`;
+    const found: { listingId: string | null; url: string; item: Record<string, any> }[] = [];
+    const seen = new Set<string>();
+    const batch = 200;
+    // Bounded: a source whose newest tasks repeat the same listings stops
+    // after this many tasks rather than reading its whole history.
+    for (let skip = 0; found.length < params.limit && skip < 5000; skip += batch) {
+      const tasks = await this.repo
+        .createQueryBuilder('task')
+        .select([t('id'), t('url')])
+        .addSelect(t('payload'))
+        .where(`task."${nameOf<ProductImportTask>('source')}Id" = :sourceId`, {
+          sourceId: params.sourceId,
+        })
+        .andWhere(`${t('kind')} IN (:...kinds)`, {
+          kinds: [ProductImportTaskKind.FeedEntry, ProductImportTaskKind.DetailPage],
+        })
+        .andWhere(`${t('payload')} IS NOT NULL`)
+        .orderBy(t('createdAt'), 'DESC')
+        .addOrderBy(t('id'), 'DESC')
+        .skip(skip)
+        .take(batch)
+        .getMany();
+      if (tasks.length === 0) break;
+      for (const task of tasks) {
+        for (const row of feedRowsOf(task.payload)) {
+          if (!row?.item) continue;
+          const listingId = row.listingId ?? null;
+          const seenKey = listingId ?? `url:${task.url}`;
+          if (seen.has(seenKey)) continue;
+          seen.add(seenKey);
+          found.push({ listingId, url: task.url, item: row.item as Record<string, any> });
+          if (found.length >= params.limit) break;
+        }
+        if (found.length >= params.limit) break;
+      }
+    }
+    return found;
+  }
+
+  /** How many of a source's import tasks are in each status, per kind. */
+  async statusCounts(sourceId: string): Promise<{ kind: string; status: string; count: number }[]> {
+    const kindColumn = `t.${nameOf<ProductImportTask>('kind')}`;
+    const statusColumn = `t.${nameOf<ProductImportTask>('status')}`;
+    const rows: { kind: string; status: string; count: string }[] = await this.repo
+      .createQueryBuilder('t')
+      .select(kindColumn, 'kind')
+      .addSelect(statusColumn, 'status')
+      .addSelect('COUNT(*)::int', 'count')
+      .where(`t.${nameOf<ProductImportTask>('source')} = :sourceId`, { sourceId })
+      .groupBy(kindColumn)
+      .addGroupBy(statusColumn)
+      .getRawMany();
+    return rows.map((row) => ({ kind: row.kind, status: row.status, count: Number(row.count) }));
   }
 
   /**
@@ -413,4 +476,23 @@ export class ProductImportTaskRepository extends BasePostgresRepository<ProductI
       })
       .getMany();
   }
+}
+
+/** One stored feed row of a feed task's payload. */
+interface StoredFeedRow {
+  item?: unknown;
+  listingId?: string;
+  rowHash?: string;
+}
+
+/**
+ * The feed rows a feed task's payload stored: its `rows`, or the single
+ * `item` of a payload written before tasks held several rows.
+ */
+function feedRowsOf(payload: Record<string, any> | null | undefined): StoredFeedRow[] {
+  if (!payload) return [];
+  if (Array.isArray(payload['rows'])) {
+    return payload['rows'] as StoredFeedRow[];
+  }
+  return payload['item'] ? [{ item: payload['item'] }] : [];
 }

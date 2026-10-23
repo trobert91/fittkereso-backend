@@ -18,6 +18,7 @@ import { ScrapeRunTools } from './scrape-run.tools';
 import { ProductSourceRecordsTools } from './product-source-records.tools';
 import { OfferSweepTools } from './offer-sweep.tools';
 import { ListingModelRefreshTools } from './listing-model-refresh.tools';
+import { ShopReviewTools } from './shop-review.tools';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ListingModelRefreshTools } from './listing-model-refresh.tools';
         ProductSourceRecordsTools,
         OfferSweepTools,
         ListingModelRefreshTools,
+        ShopReviewTools,
       ],
       'fittkereso',
     ),
@@ -48,6 +50,7 @@ import { ListingModelRefreshTools } from './listing-model-refresh.tools';
   providers: [
     OfferSweepTools,
     ListingModelRefreshTools,
+    ShopReviewTools,
     ProductSourceTools,
     ProductSourceConfigGeneratorTools,
     ProductSourceSimulateScrapeTools,

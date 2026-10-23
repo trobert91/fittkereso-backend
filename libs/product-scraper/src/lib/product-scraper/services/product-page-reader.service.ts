@@ -56,6 +56,8 @@ export interface PageInterpretation {
   fetchMode: ProductSourceFetchMode;
   /** How much HTML came back: a blocked or empty answer is short. */
   htmlLength: number;
+  /** The HTML itself, only when the caller asked for it (keepHtml): a review compares it with what was read. */
+  html?: string;
   detail: DetailPageResult;
   /** The caller's category, else the page's; absent with a categoryProblem. */
   category?: PageCategory;
@@ -90,6 +92,8 @@ interface ReadParams {
    * feed URL's rows'. A page naming none of them is another product.
    */
   expectedExternalIds?: (string | undefined | null)[];
+  /** Keep the fetched HTML on the result. Off for imports: nothing there needs it. */
+  keepHtml?: boolean;
 }
 
 /**
@@ -142,7 +146,7 @@ export class ProductPageReaderService {
 
     this.assertExpectedProduct(task, url, detail, params.expectedExternalIds);
 
-    const base = { url, fetchMode, htmlLength: html.length, detail };
+    const base = { url, fetchMode, htmlLength: html.length, detail, ...(params.keepHtml ? { html } : {}) };
     const category = params.category ?? (await this.categoryOfPage(config, detail));
     if ('reason' in category) return { ...base, categoryProblem: category };
 
