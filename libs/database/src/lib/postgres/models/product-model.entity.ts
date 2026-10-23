@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Generated,
   Index,
   JoinColumn,
   ManyToOne,
@@ -143,6 +144,19 @@ export class ProductModel extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: true })
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.adminList] })
   slug?: string | null;
+
+  /**
+   * The product's short public number, for the site's URLs
+   * (`<slug>-p<publicId>`): it identifies the product there, and the slug is
+   * only for reading. Assigned by the database on insert (a serial, which also
+   * numbered the rows there were when it was added), never set or changed by
+   * code, never reused. The UUID stays the id everywhere else.
+   */
+  @Index({ unique: true })
+  @Column({ type: 'int', nullable: false })
+  @Generated('increment')
+  @Expose({ groups: [SerializeGroup.list, SerializeGroup.adminList] })
+  publicId: number;
 
   @Index()
   @Column({ nullable: false, default: true })
