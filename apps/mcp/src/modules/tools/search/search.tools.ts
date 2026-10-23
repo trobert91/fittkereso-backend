@@ -12,6 +12,7 @@ import {
 import { OfferCondition, ProductCategoryRepository } from '@fittkereso-backend/database';
 import { CategoryConfigService } from '@fittkereso-backend/config';
 import { productDisplayName } from '@fittkereso-backend/utils';
+import { BrandCreateService } from '@fittkereso-backend/product';
 
 @Injectable()
 export class SearchTools {
@@ -21,6 +22,7 @@ export class SearchTools {
     private readonly brandSearch: BrandSearchService,
     private readonly categoryRepo: ProductCategoryRepository,
     private readonly categoryConfigService: CategoryConfigService,
+    private readonly brandCreate: BrandCreateService,
   ) {}
 
   @Tool({
@@ -206,5 +208,32 @@ export class SearchTools {
     }
 
     return L.join('\n');
+  }
+
+  @Tool({
+    name: 'create_brand',
+    description:
+      "Create a brand, as the admin's Brands page does: a name and optionally the brand's own web domains. Refuses a name that already exists, ignoring case (search_brands lists them). A shop's listings only resolve to a brand that exists, so create the brands a new shop sells before its first import. The product collector caches brands for up to 30 minutes: restart it, or wait, before an import that needs the new brand.",
+    parameters: z.object({
+      name: z.string().min(1).describe('The brand name as the manufacturer writes it, e.g. "Kellys"'),
+      domains: z
+        .array(z.string())
+        .optional()
+        .describe('The brand\'s own web domains, e.g. ["kellysbike.com"]'),
+    }),
+  })
+  async createBrand(args: { name: string; domains?: string[] }): Promise<string> {
+    const name = args.name.trim();
+    const params = new BrandSearchParams();
+    params.searchTerm = name;
+    params.pageSize = 100;
+    params.page = 1;
+    const existing = ((await this.brandSearch.search(params)).items ?? []).find(
+      (brand) => brand.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) return `Brand "${existing.name}" already exists (${existing.id}). Nothing created.`;
+
+    const created = await this.brandCreate.createBrand({ name, domains: args.domains });
+    return `Created brand "${created.name}" (${created.id}), slug ${created.slug ?? '–'}.`;
   }
 }
