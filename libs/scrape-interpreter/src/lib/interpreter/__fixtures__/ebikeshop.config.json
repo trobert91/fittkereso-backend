@@ -19,16 +19,47 @@
           {
             "key": "gender",
             "labels": [
+              "Nem (vázkód)"
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": [
               "Váztípus"
             ],
-            "valueMap": {
-              "Cross női": "Női"
-            }
+            "valuePatterns": [
+              {
+                "pattern": "(^|\\s)női$",
+                "value": "Női"
+              },
+              {
+                "pattern": "(^|\\s)férfi$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "(^|\\s)(uniszex|unisex)$",
+                "value": "Uniszex"
+              }
+            ]
           },
           {
             "key": "frameType",
             "labels": [
               "Váztípus"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^magas$",
+                "value": "Magas"
+              },
+              {
+                "pattern": "^alacsony$",
+                "value": "Alacsony"
+              },
+              {
+                "pattern": "^trapéz$",
+                "value": "Trapéz"
+              }
             ]
           },
           {
@@ -47,6 +78,26 @@
               "Cross": "Cross Trekking",
               "Városi": "City"
             }
+          },
+          {
+            "key": "usageType",
+            "labels": [
+              "Váztípus"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(összteleszkópos|all mountain)$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "^merev mtb$",
+                "value": "MTB"
+              },
+              {
+                "pattern": "^összecsukható$",
+                "value": "Összecsukható"
+              }
+            ]
           },
           {
             "key": "batteryPosition",
@@ -77,7 +128,10 @@
             "key": "suspension",
             "labels": [
               "Rugózás"
-            ]
+            ],
+            "valueMap": {
+              "Nincs": "Rugózatlan"
+            }
           },
           {
             "key": "brakeType",
@@ -143,6 +197,18 @@
             ]
           },
           {
+            "key": "ebikeSystem",
+            "labels": [
+              "Motor típusa"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^bosch\\b.*\\(smart system\\)",
+                "value": "Bosch Smart System"
+              }
+            ]
+          },
+          {
             "key": "topSpeed",
             "labels": [
               "Maximális rásegítés"
@@ -163,6 +229,22 @@
             "key": "displayModel",
             "labels": [
               "Kijelző típus"
+            ]
+          },
+          {
+            "key": "display",
+            "labels": [
+              "Kijelző típus"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
             ]
           }
         ]
@@ -340,6 +422,30 @@
             "asArray": true
           }
         }
+      },
+      {
+        "op": "appendSyntheticSpec",
+        "name": "Nem (vázkód)",
+        "value": [
+          {
+            "op": "parseJsonAttr",
+            "selector": "#app",
+            "attr": "data-page",
+            "path": "props.product.name"
+          },
+          {
+            "op": "regexCapture",
+            "pattern": "(?:^|\\s)(HE|US)\\s?\\d{2}\\s?cm\\b",
+            "group": 1
+          },
+          {
+            "op": "mapValue",
+            "cases": {
+              "HE": "Férfi",
+              "US": "Uniszex"
+            }
+          }
+        ]
       }
     ],
     "description": [

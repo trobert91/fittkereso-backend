@@ -104,6 +104,12 @@
           "pattern": "\\s*[A-Z]{3}$"
         }
       ]
+    },
+    "availability": {
+      "field": "availability"
+    },
+    "condition": {
+      "field": "condition"
     }
   },
   "postProcess": {

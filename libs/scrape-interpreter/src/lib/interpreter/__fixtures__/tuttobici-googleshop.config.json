@@ -44,8 +44,185 @@
               "group": 1
             }
           ]
+        },
+        {
+          "label": "Nem (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| )(FÉRFI|[Ff]érfi|NŐI|[Nn]ői|UNISEX|[Uu]nisex|GYEREK|GYERMEK|[Gg]yermek|Gyerek(?= kerékpár))(?= |$)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Típus (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| |/)([Öö]sszteleszkópos|[Cc]ross ?trekking|[Tt]rekking|[Gg]ravel|[Oo]rszágúti|MTB)(?=[ /-]|$)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váltás (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| )(Di2|DI2|AXS|T-TYPE|T-Type)(?= |$)",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "^Férfi kerékpár",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^Női kerékpár",
+                "value": "Női"
+              },
+              {
+                "pattern": "^Gyerek kerékpárok",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^férfi$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^női$",
+                "value": "Női"
+              },
+              {
+                "pattern": "^unisex$",
+                "value": "Uniszex"
+              },
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> Összteleszkópos( >|$)",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "> MTB( >|$)",
+                "value": "MTB"
+              },
+              {
+                "pattern": "országúti",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^Gyerek kerékpárok",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "^Gravel E-BIKE$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^Trekking E-BIKE$",
+                "value": "Trekking"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^összteleszkópos$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "^cross ?trekking$",
+                "value": "Cross Trekking"
+              },
+              {
+                "pattern": "^trekking$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^országúti$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^MTB$",
+                "value": "MTB"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyerek"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> Összteleszkópos( >|$)",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^összteleszkópos$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Váltás (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(di2|axs|t-type)$",
+                "value": "Elektromos"
+              }
+            ]
+          }
+        ]
+      }
     },
     "bikes": {
       "enabled": true,
@@ -91,8 +268,210 @@
               "group": 1
             }
           ]
+        },
+        {
+          "label": "Nem (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| )(FÉRFI|[Ff]érfi|NŐI|[Nn]ői|UNISEX|[Uu]nisex|GYEREK|GYERMEK|[Gg]yermek|Gyerek(?= kerékpár))(?= |$)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Típus (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| |/)([Öö]sszteleszkópos|[Cc]ross ?trekking|[Tt]rekking|[Gg]ravel|[Oo]rszágúti|MTB)(?=[ /-]|$)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váltás (cím)",
+          "field": "title",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^| )(Di2|DI2|AXS|T-TYPE|T-Type)(?= |$)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Életkor (kategória)",
+          "field": "product_type",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\((\\d{1,2}(?:\\s*-\\s*\\d{1,2})? éves kor(?:ig| felett))\\)",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "^Férfi kerékpár",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^Női kerékpár",
+                "value": "Női"
+              },
+              {
+                "pattern": "^Gyerek kerékpárok",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^férfi$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^női$",
+                "value": "Női"
+              },
+              {
+                "pattern": "^unisex$",
+                "value": "Uniszex"
+              },
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> Összteleszkópos( >|$)",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "> MTB( >|$)",
+                "value": "MTB"
+              },
+              {
+                "pattern": "országúti",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^Gyerek kerékpárok",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "^Gravel E-BIKE$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^Trekking E-BIKE$",
+                "value": "Trekking"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^összteleszkópos$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "^cross ?trekking$",
+                "value": "Cross Trekking"
+              },
+              {
+                "pattern": "^trekking$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^országúti$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^MTB$",
+                "value": "MTB"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyerek"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> Összteleszkópos( >|$)",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^összteleszkópos$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Váltás (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(di2|axs|t-type)$",
+                "value": "Elektromos"
+              }
+            ]
+          },
+          {
+            "key": "recommendedAge",
+            "labels": ["Életkor (kategória)"],
+            "replacePatterns": [
+              {
+                "from": " éves kor felett",
+                "to": "+ év"
+              },
+              {
+                "from": " éves korig",
+                "to": " év"
+              }
+            ]
+          }
+        ]
+      }
     }
   },
   "category": {
@@ -150,6 +529,9 @@
     },
     "availability": {
       "field": "availability"
+    },
+    "condition": {
+      "field": "condition"
     },
     "currency": {
       "pipeline": [

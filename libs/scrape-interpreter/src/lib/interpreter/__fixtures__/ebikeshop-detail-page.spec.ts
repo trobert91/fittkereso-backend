@@ -199,13 +199,13 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
     it('maps every row the ebikes schema has a key for', async () => {
       const result = await runDetailPage(loadEbikeshopCapture('detail-ktm-exonicx-48'));
 
-      // Váztípus "Összteleszkópos" is neither a frame type nor a gender, and
-      // is dropped; the LLM sees the row. Gyártó is the brand, Modellév the
-      // release year, Emelt teherbírás a yes/no no key fits, and Állapot is
-      // the offer's condition, not a spec.
+      // Váztípus "Összteleszkópos" is no frame type or gender but names the
+      // bike type, which wins over Felhasználás módja's plain "MTB". Gyártó is
+      // the brand, Modellév the release year, Emelt teherbírás a yes/no no key
+      // fits, and Állapot is the offer's condition, not a spec.
       expect(mappedSpecs(result.rawSpecs)).toEqual({
         frameSize: 48,
-        usageType: 'MTB',
+        usageType: 'Összteleszkópos MTB',
         batteryPosition: 'Vázba integrált',
         wheelSize: 29,
         drivetrain: 'Lánc',
@@ -220,9 +220,11 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
         torque: 60,
         motorBrand: 'Bosch',
         motorModel: 'Bosch Performance SX (Smart System)',
+        ebikeSystem: 'Bosch Smart System',
         topSpeed: 25,
         pedelecClass: 'Pedelec',
         displayModel: 'Bosch Mini Remote',
+        display: true,
       });
     });
 
@@ -243,13 +245,21 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
       expect(mappedSpecs(result.rawSpecs)).not.toHaveProperty('gearCount');
     });
 
+    // On a "Magas" Trekking page titled "… HE51 cm …", so a Váztípus type word
+    // doesn't hide the Felhasználás módja cases, and an explicit "Cross női"
+    // beats the title's HE code.
     it.each([
       ['Felhasználás módja', 'Cross', { usageType: 'Cross Trekking' }],
       ['Felhasználás módja', 'Városi', { usageType: 'City' }],
       ['Váztípus', 'Cross női', { gender: 'Női' }],
       ['Váztípus', 'Alacsony', { frameType: 'Alacsony' }],
+      ['Váztípus', 'Összecsukható', { usageType: 'Összecsukható' }],
+      ['Váztípus', 'All Mountain', { usageType: 'Összteleszkópos MTB' }],
+      ['Váztípus', 'Merev MTB', { usageType: 'MTB' }],
+      ['Rugózás', 'Nincs', { suspension: 'Rugózatlan' }],
+      ['Kijelző típus', 'Nincs', { display: false }],
     ])('maps %s "%s" onto the schema', async (label, value, expected) => {
-      const capture = loadEbikeshopCapture('detail-ktm-exonicx-48');
+      const capture = loadEbikeshopCapture('detail-rm-delite4-speed');
       const row = productOf(capture).properties.find((candidate) => candidate.categoryTitle === label);
       if (!row) throw new Error(`the capture has a ${label} row`);
       row.value = value;
@@ -257,6 +267,38 @@ describe('ebikeshop detail page — declarative config golden fixture', () => {
       const result = await runDetailPage(capture);
 
       expect(mappedSpecs(result.rawSpecs)).toMatchObject(expected);
+    });
+
+    // A type word in Váztípus is no step height: no frameType from it.
+    it('takes no frame type from a Váztípus bike-type word', async () => {
+      const capture = loadEbikeshopCapture('detail-rm-delite4-speed');
+      const row = productOf(capture).properties.find((candidate) => candidate.categoryTitle === 'Váztípus');
+      if (!row) throw new Error('the capture has a Váztípus row');
+      row.value = 'Összecsukható';
+
+      const result = await runDetailPage(capture);
+
+      expect(mappedSpecs(result.rawSpecs)).not.toHaveProperty('frameType');
+    });
+
+    // The title's frame code (HE = Herren, US = Unisex) is the only gender
+    // signal the page has; it becomes a synthetic "Nem (vázkód)" row.
+    it.each([
+      ['detail-rm-delite4-speed', 'Férfi'],
+      ['detail-rm-homage5-extrak', 'Uniszex'],
+      ['detail-cube-supreme-varhato', 'Uniszex'],
+    ] as const)('reads the gender off the frame code in the %s title', async (name, gender) => {
+      const result = await runDetailPage(loadEbikeshopCapture(name));
+
+      expect(result.rawSpecs).toContainEqual({ name: 'Nem (vázkód)', values: [gender] });
+      expect(mappedSpecs(result.rawSpecs)).toMatchObject({ gender });
+    });
+
+    it('adds no gender row when the title has no frame code', async () => {
+      const result = await runDetailPage(loadEbikeshopCapture('detail-ktm-exonicx-48'));
+
+      expect(result.rawSpecs.map((row) => row.name)).not.toContain('Nem (vázkód)');
+      expect(mappedSpecs(result.rawSpecs)).not.toHaveProperty('gender');
     });
   });
 

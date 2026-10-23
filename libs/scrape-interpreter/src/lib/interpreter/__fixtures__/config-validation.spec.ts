@@ -325,8 +325,376 @@ describe('hand-authored source configs', () => {
     ).toBeUndefined();
   });
 
+  describe("ebikeshop's spec rows", () => {
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    const ebikeshopRows = (rows: Record<string, string>) =>
+      specsOf(ebikeshopConfig as unknown as ArukeresoSourceConfig, 'ebikes', rows);
+
+    // display: the shop's "Kijelző típus" row is on every e-bike; a named display is one.
+    it.each([
+      ['Bosch Kiox 300', true],
+      ['Bosch Led Remote', true],
+      ['Bosch Purion 200', true],
+      ['Nincs', false],
+    ])('ebikeshop maps Kijelző típus %j to display %j', (value, display) => {
+      expect(ebikeshopRows({ 'Kijelző típus': value })).toMatchObject({ display });
+    });
+
+    // usageType: Váztípus names the bike type more precisely than Felhasználás
+    // módja ("MTB", "Kompakt városi"), so it wins when it names one.
+    it.each([
+      ['All Mountain', 'MTB', 'Összteleszkópos MTB'],
+      ['Összteleszkópos', 'MTB', 'Összteleszkópos MTB'],
+      ['Merev MTB', 'MTB', 'MTB'],
+      ['Összecsukható', 'Kompakt városi', 'Összecsukható'],
+    ])('ebikeshop maps Váztípus %j (Felhasználás módja %j) to usageType %j', (frame, use, usageType) => {
+      expect(ebikeshopRows({ 'Váztípus': frame, 'Felhasználás módja': use })).toMatchObject({ usageType });
+    });
+
+    it('ebikeshop keeps Felhasználás módja when Váztípus is a step height', () => {
+      expect(ebikeshopRows({ 'Váztípus': 'Alacsony', 'Felhasználás módja': 'Városi' })).toMatchObject({
+        usageType: 'City',
+        frameType: 'Alacsony',
+      });
+    });
+
+    // frameType: only the three step heights; a type word is no frame type.
+    it.each(['Összecsukható', 'Merev MTB', 'All Mountain', 'Összteleszkópos'])(
+      'ebikeshop takes no frameType from Váztípus %j',
+      (frame) => {
+        expect(ebikeshopRows({ 'Váztípus': frame })).not.toHaveProperty('frameType');
+      },
+    );
+
+    it('ebikeshop maps Rugózás "Nincs" to Rugózatlan', () => {
+      expect(ebikeshopRows({ 'Rugózás': 'Nincs' })).toMatchObject({ suspension: 'Rugózatlan' });
+    });
+
+    // ebikeSystem only where the motor row states the system; "Perf. Line CX
+    // BDU38" rows say nothing about it and are left to the LLM.
+    it.each([
+      ['Bosch performance Line CX (Smart System)', 'Bosch Smart System'],
+      ['Bosch Performance Line PX (Smart System)', 'Bosch Smart System'],
+      ['Bosch Perf. Line CX BDU38', undefined],
+    ])('ebikeshop maps Motor típusa %j to ebikeSystem %j', (motor, ebikeSystem) => {
+      expect(ebikeshopRows({ 'Motor típusa': motor })['ebikeSystem']).toBe(ebikeSystem);
+    });
+
+    // gender: the title's frame code (HE = Herren, US = Unisex) becomes the
+    // synthetic "Nem (vázkód)" row (detailPage.rawSpecs appendSyntheticSpec).
+    it.each([
+      ["MACINA TOUR CX 810 GX AXS HE56cm '26 agyagbarna", 'Férfi'],
+      ["Touring Hybrid Deluxe SLX 800 HE50cm '27 szürke", 'Férfi'],
+      ["Supreme Hybrid Comfort ONE 600 US42cm '27 viharkék", 'Uniszex'],
+      ['RM Homage5 GT rohloff US56 cm kék elektromos kerékpár', 'Uniszex'],
+      ["KTM MACINA STYLE 820 TR46cm fehér elektromos kerékpár", undefined],
+      ["KTM MACINA SCARP SX EXONICX T-TYPE 48cm '26 narancs", undefined],
+    ])("ebikeshop reads the frame code in %j as gender %j", async (title, gender) => {
+      const raw = (ebikeshopConfig as unknown as ScrapingSourceConfig).detailPage.rawSpecs as ScrapeOperation[];
+      const synthetic = raw.find((op) => op.op === 'appendSyntheticSpec') as unknown as {
+        name: string;
+        value: ScrapeOperation[];
+      };
+      expect(synthetic.name).toBe('Nem (vázkód)');
+      const row = await interpreter.runValuePipeline(synthetic.value.slice(1), title, {
+        baseUrl: 'https://ebikeshop.hu',
+      });
+      expect(row ?? undefined).toBe(gender);
+      if (row) expect(ebikeshopRows({ 'Nem (vázkód)': row as string })).toMatchObject({ gender });
+    });
+
+    // An explicit gender word in Váztípus beats the title's frame code, and a
+    // step height there no longer blanks the code's gender.
+    it('ebikeshop lets Váztípus "Cross női" win over the title code, and keeps the code over a step height', () => {
+      expect(ebikeshopRows({ 'Nem (vázkód)': 'Férfi', 'Váztípus': 'Cross női' })).toMatchObject({ gender: 'Női' });
+      expect(ebikeshopRows({ 'Nem (vázkód)': 'Férfi', 'Váztípus': 'Magas' })).toMatchObject({
+        gender: 'Férfi',
+        frameType: 'Magas',
+      });
+    });
+  });
+
   describe("speedbike's Árukereső feed config", () => {
     const config = speedbikeArukeresoConfig as unknown as ArukeresoSourceConfig;
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // The path segments whose listings all agreed with the LLM's usage type on
+    // the 2026-10-23 sample. KERÉKPÁR > TREKKING holds cross-trekking bikes too,
+    // CITY - URBAN E-BIKE a folding bike, FITNESS E-BIKE a city bike, and the
+    // older "Gravel - Cyclocross" two types: those stay with the LLM.
+    it.each([
+      ['KERÉKPÁR > MTB > Fully MTB > 29"', 'bikes', 'Összteleszkópos MTB'],
+      ['KERÉKPÁR > MTB > Hardtail MTB > 29"', 'bikes', 'MTB'],
+      ['KERÉKPÁR > GRAVEL', 'bikes', 'Gravel'],
+      ['KERÉKPÁR > CROSS', 'bikes', 'Cross Trekking'],
+      ['KERÉKPÁR > ORSZÁGÚTI', 'bikes', 'Országúti'],
+      ['KERÉKPÁR > GYEREK KERÉKPÁR > 26" (145cm felett)', 'bikes', 'Gyerek'],
+      ['KERÉKPÁR > TREKKING', 'bikes', undefined],
+      ['KERÉKPÁR > Gravel - Cyclocross', 'bikes', undefined],
+      ['E-BIKE > TREKKING E-BIKE', 'ebikes', 'Trekking'],
+      ['E-BIKE > GRAVEL E-BIKE', 'ebikes', 'Gravel'],
+      ['E-BIKE > MTB E-BIKE', 'ebikes', 'MTB'],
+      ['E-BIKE > ÖSSZTELESZKÓPOS E-BIKE', 'ebikes', 'Összteleszkópos MTB'],
+      ['E-BIKE > Cross Trekking E-BIKE', 'ebikes', undefined],
+      ['E-BIKE > CITY - URBAN E-BIKE', 'ebikes', undefined],
+      ['E-BIKE > FITNESS E-BIKE', 'ebikes', undefined],
+    ])('reads the usage type off the path %j (%s) as %j', (path, slug, usageType) => {
+      expect(specsOf(config, slug as 'bikes' | 'ebikes', { 'Webshop kategória': path })['usageType']).toBe(usageType);
+    });
+
+    // The motor row names the brand first, and its one wattage is the rated
+    // power (the LLM put it in motorPeakPower).
+    it.each([
+      ['Motor', 'Bosch PERFORMANCE PX BDU3470', { motorBrand: 'Bosch' }],
+      ['engine', 'Bosch Drive Unit Performance SX (55Nm) Cruise (250 Watt), Smart System', { motorBrand: 'Bosch', motorPower: 250, torque: 55 }],
+      ['Motor', 'Bosch Drive Unit Active Line Plus Generation 3 (50Nm) Cruise (250Watt), Smart System', { motorPower: 250, torque: 50 }],
+      ['MOTOR', 'Bosch PERFORMANCE CX Gen.4 SMART SYSTEM - 25km/h / 85Nm / 250W', { motorBrand: 'Bosch', motorPower: 250, topSpeed: 25, torque: 85 }],
+      ['MOTOR', 'Bosch Perfomance Line 3.GEN., 250W, 65 Nm, 25 km/h', { motorBrand: 'Bosch', motorPower: 250, topSpeed: 25 }],
+    ])('reads the %s row %j', (name, value, expected) => {
+      expect(specsOf(config, 'ebikes', { [name]: value })).toMatchObject(expected);
+    });
+
+    // A wattage marked as the maximum is the peak, not the rated power; Giant's
+    // SyncDrive is no brand this mapping names.
+    it('reads no rated power or brand off a peak-only Giant motor row', () => {
+      const specs = specsOf(config, 'ebikes', { Motor: 'Giant SyncDrive Race, 48v, 90Nm, 700W max power, 400% max support ratio' });
+      expect(specs['motorPower']).toBeUndefined();
+      expect(specs['motorBrand']).toBeUndefined();
+    });
+
+    // The travel, never the axle (15x110, QR15mm, 12x100mm).
+    it.each([
+      ['Villa', 'SR Suntour XCS, 100mm', 100],
+      ['VILLA', 'Suntour NEX tekercs 28" 63mm', 63],
+      ['Villa', 'FOX 34SC Float 29" Factory 120mm 15x110', 120],
+      ['VILLA', 'SUNTOUR NEX-E25 DS QR 700C STEEL TAPERED / 63mm Travel', 63],
+      ['fork', 'SR Suntour NEX-E25, 50mm', 50],
+      ['Villa', 'ROCKSHOX JUDY GOLD RL 15mm SOLO AIR 100mm BOOST + ONELOC', 100],
+      ['Villa', 'CUBE TS Disc, Full Carbon, Taper, Flat Mount, 12x100mm', undefined],
+    ])('reads the fork travel of the %s row %j as %j', (name, value, forkTravel) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })['forkTravel']).toBe(forkTravel);
+      }
+    });
+
+    // The range as numbers only: the schema's unit "T" is appended on display.
+    // A regexpList cannot rewrite "11x34" into the dash form: that stays with the LLM.
+    it.each([
+      ['Fogaskoszorú', 'Shimano Cues CS-LG300, 11-46T', '11-46'],
+      ['FOGASKOSZORÚ', 'Shimano HG31-8 / 11-32', '11-32'],
+      ['FOGASKOSZORÚ', 'SRAM XX SL T-Type XS-1299 / 10-52', '10-52'],
+      ['cassette', 'Sram XS-1275, 10-52T', '10-52'],
+      ['Kazetta', 'Sunrace CSM55 8AV / 11-34T', '11-34'],
+      ['Fogaskoszorú', 'Shimano CS-HG400, 11x34', undefined],
+      ['Fogaskoszorú', 'SUNRACE CSM66-8', undefined],
+    ])('reads the cassette range of the %s row %j as %j', (name, value, cassetteRange) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })['cassetteRange']).toBe(cassetteRange);
+      }
+    });
+
+    // KTM's "Hajtás" row is the drivetrain (rings × sprockets); Cube's is the
+    // crankset, whose "46x30T" is no gear count.
+    it.each([
+      ['Hajtás', '1X5 SHIMANO NEXUS', { gearCount: 5, chainringCount: 1 }],
+      ['Hajtás', '1X12 SHIMANO DEORE XT', { gearCount: 12, chainringCount: 1 }],
+      ['Hajtás', '2X12 SHIMANO 105', { gearCount: 24, chainringCount: 2 }],
+      ['HAJTÁSRENDSZER', '2X12 SHIMANO GRX', { gearCount: 24, chainringCount: 2 }],
+    ])('reads the %s row %j', (name, value, expected) => {
+      expect(specsOf(config, 'bikes', { [name]: value })).toMatchObject(expected);
+    });
+
+    it('reads no gear count off a crankset in the Hajtás row', () => {
+      const specs = specsOf(config, 'bikes', { Hajtás: 'Shimano GRX FC-RX610, 46x30T' });
+      expect(specs['gearCount']).toBeUndefined();
+      expect(specs['chainringCount']).toBeUndefined();
+      expect(specs['chainring']).toBe('46x30T');
+    });
+
+    // Several rings from the crank row as written; one ring is chainringTeeth.
+    it.each([
+      ['HAJTÓMŰ', 'Shimano Tourney T501 48-38-28T', { chainring: '48-38-28T' }],
+      ['Hajtókar', 'Shimano GRX FC-RX820, 48x31T', { chainring: '48x31T' }],
+      ['HAJTÓMŰ', 'Shimano Claris FC-RS200 50x34T', { chainring: '50x34T' }],
+      ['HAJTÓMŰ', 'SRAM XX SL T-Type Carbon DUB 34T', { chainringTeeth: 34 }],
+      ['Hajtókar', 'Shimano MT511-12 32T', { chainringTeeth: 32 }],
+    ])('reads the crank row %s %j', (name, value, expected) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })).toMatchObject(expected);
+      }
+    });
+
+    it.each([
+      ['Töltő', 'Bosch STANDARD Charger 4A', 4],
+      ['TÖLTŐ', 'Bosch Compact 2A Charger', 2],
+      ['charger', 'Bosch 4A', 4],
+    ])('reads the charger current of the %s row %j as %j', (name, value, chargerCurrent) => {
+      expect(specsOf(config, 'ebikes', { [name]: value })['chargerCurrent']).toBe(chargerCurrent);
+    });
+
+    it.each([
+      ['Első fék', 'Tektro HD-M750 / E730 4-Piston', 4],
+      ['Első fék', 'Shimano MT402 (3-F) / MT420 4-Piston', 4],
+      ['FÉK', 'TEKTRO 2 dugattyús', 2],
+      ['ELSŐ FÉK', 'Tektro HD-T275 2-piston', 2],
+      ['Fék', 'Shimano BR-MT200, Hydr. Disc Brake (180/160)', undefined],
+    ])('reads the brake pistons of the %s row %j as %j', (name, value, brakePistons) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })['brakePistons']).toBe(brakePistons);
+      }
+    });
+
+    // Spacing × axle as the schema writes it ("148x12"), from a hub row in
+    // either order, or from a wheelset row naming both hubs (Cube: axle first).
+    it.each([
+      ['Hátsó agy', 'DT Swiss 370 6B 32H 148/12TA', { hubSpacingRear: '148x12' }],
+      ['HÁTSÓ AGY', 'Shimano MT400B CL 32H 148-12TA', { hubSpacingRear: '148x12' }],
+      ['Hátsó agy', 'Shimano TC500 CL 28H 142-12TA', { hubSpacingRear: '142x12' }],
+      ['Hátsó agy', 'Shimano MT400-B Steckachse 12x148mm', { hubSpacingRear: '148x12' }],
+      ['ELSŐ AGY', 'Shimano TC500B CL 32H 110-15TA', { hubSpacingFront: '110x15' }],
+      ['Első agy', 'Shimano Deore M6000 CL 32H 100-5QR', { hubSpacingFront: '100x5' }],
+      ['wheelset', 'Newmen Beskar 30, 28/28 Spokes (Light/Base), 15x110mm / 12x148mm, Tubeless Ready', { hubSpacingFront: '110x15', hubSpacingRear: '148x12' }],
+      ['Kerékszett', 'ACID SLX RA 2.3 Aero Disc, 28/28 Spokes, Centerlock, 12x100mm/12x142mm, Tubeless Ready', { hubSpacingFront: '100x12', hubSpacingRear: '142x12' }],
+    ])('reads the hub row %s %j', (name, value, expected) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })).toMatchObject(expected);
+      }
+    });
+
+    it.each([
+      ['Nyeregcső', 'bySchulz G.2 ST suspension 30.9/350', 30.9],
+      ['seat post', 'Newmen Advanced, Carbon, 27.2mm', 27.2],
+      ['NYEREGCSŐ', 'Syncros RR2.5 27.2/350mm', 27.2],
+      ['Nyeregcső', 'CUBE Dropper Post, Handlebar Lever, Internal Cable Routing, 31.6mm', 31.6],
+      ['Nyeregcső', 'KTM Comp dropper internal', undefined],
+    ])('reads the seatpost diameter of the %s row %j as %j', (name, value, seatpostDiameter) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })['seatpostDiameter']).toBe(seatpostDiameter);
+      }
+    });
+
+    it.each([
+      ['Kormány', 'Ergotec low rizer 740mm', 740],
+      ['KORMÁNY', 'KTM Team Trail35 rizer25 800mm', 800],
+      ['handlebar', 'CUBE Rise Trail Bar, 680mm', 680],
+      ['Kormány', 'FSA KFX SIC Carbon 65x780mm', 780],
+      ['Kormány', 'Giant Connect XC Riser 31.8x690mm', 690],
+      ['Kormány', 'Giant Contour GT, cable integrated, 30° back sweep 31.8mm', undefined],
+    ])('reads the handlebar width of the %s row %j as %j', (name, value, handlebarWidth) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })['handlebarWidth']).toBe(handlebarWidth);
+      }
+    });
+
+    // The shop's own spellings, its "Össszsúly" typo included, and a decimal before "kg".
+    it.each([
+      ['Össszsúly utassal', '130 kg', { maxTotalWeight: 130 }],
+      ['Maximum összsúly', '128 kg', { maxTotalWeight: 128 }],
+      ['Maximális megengedett össztömeg', '127,00 kg', { maxTotalWeight: 127 }],
+      ['LEGNAGYOBB MEGENGEDETT ÖSSZTÖMEG', '146', { maxTotalWeight: 146 }],
+      ['Utas súly MAX', '100 kg', { maxLoad: 100 }],
+    ])('reads the weight row %s %j', (name, value, expected) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { [name]: value })).toMatchObject(expected);
+      }
+    });
+
+    // Component rows under labels the mapping did not know yet.
+    it.each([
+      ['ebikes', 'wheelset', 'Newmen Evolution SL X.R.25', 'wheelset'],
+      ['bikes', 'Kerékszett', 'Newmen Performance X.R.25, 28/28 Spokes, 12x100mm / 12x142mm, Tubeless Ready', 'wheelset'],
+      ['bikes', 'ELSŐ  KERÉK', 'KTM Line - Shimano DH-3D37 CL 32H 100 QR / KTM 28" Casual 32H; 622x19 / Richman 2.0 INOX, ezüst', 'wheelset'],
+      ['ebikes', 'seat clamp', 'CUBE Screwlock, 36mm', 'seatClamp'],
+      ['bikes', 'seat clamp', 'CUBE Screwlock, 31.8mm', 'seatClamp'],
+      ['ebikes', 'Akku', 'Bosch CompactTube 400', 'batteryModel'],
+      ['bikes', 'Hátsó kerékagy', 'Formula DC-25 8s RQR Disc', 'hubModel'],
+      ['ebikes', 'rear hub', 'Shimano Alfine SG-S7001, 8-Speed', 'hubModel'],
+      ['bikes', 'BAL VÁLTÓKAR', 'Shimano SL-U4000-9R w/ OGD', 'shifter'],
+      ['bikes', 'Váltó/fékkar egység', 'Shimano GRX ST-RX610', 'shifter'],
+      ['bikes', 'Váltó/fékkar egység', 'Shimano GRX ST-RX610', 'brakeLever'],
+      ['ebikes', 'shift-brake-levers', 'Shimano GRX ST-RX820', 'shifter'],
+      ['ebikes', 'shift-brake-levers', 'Shimano GRX ST-RX820', 'brakeLever'],
+      ['ebikes', 'FÉKKAR', 'Shimano BR-M200 Disc', 'brakeLever'],
+      ['bikes', 'Felni', 'Syncros X-20 Disc 32H / black', 'rimModel'],
+      ['ebikes', 'FELNI', 'Cross X17 Disc 32h', 'rimModel'],
+      ['bikes', 'FÉKTÁRCSA', 'Shimano CL900 CL 160 freeza / CL900 CL 160 freeza', 'rotorModel'],
+      ['ebikes', 'gear teeth', 'Shimano Nexus, 18T', 'cassette'],
+      ['bikes', 'Kazetta', 'Sunrace CSM55 8AV / 11-34T', 'cassette'],
+      ['ebikes', 'Hátsó teleszkóp', 'Fox Float Rhythm RC, 210x55mm, Adjustable LSR w/ 2-Pos. Lever', 'rearShockModel'],
+      ['bikes', 'RUGÓSTAG', 'FOX Float SL Perf-Elite 3PTL 210x55', 'rearShockModel'],
+      ['ebikes', 'GUMIKÖPENY', 'Schwalbe Energizer Active Plus 700x50c', 'tireModel'],
+      ['bikes', 'HÁTSÓ GUMIKÖPENY', 'Schwalbe G-ONE Bite Performance 700x40C', 'tireModel'],
+      ['bikes', 'front derailleur', 'Shimano Cues FD-U6010, Top-Swing, 31.8mm', 'frontDerailleur'],
+      ['bikes', 'Küllő', '14 G / stainless / black', 'spokes'],
+      ['ebikes', 'Vezérlő', 'Bosch System Control, incl. Mini Remote', 'controlUnit'],
+    ])('reads the %s row %j %j as %s', (slug, name, value, key) => {
+      expect(specsOf(config, slug as 'bikes' | 'ebikes', { [name]: value })[key]).toBe(value);
+    });
+
+    it.each([
+      ['ebikes', 'Akku', 'Bosch CompactTube 400', { batteryCapacity: 400 }],
+      ['ebikes', 'HÁTSÓ GUMIKÖPENY', 'Maxxis Minion DHR II 3C-MaxxTerra/EXO/TR 70-584', { tireSize: '70-584' }],
+      ['bikes', 'FÉKTÁRCSA', 'Shimano CL900 CL 160 freeza / CL900 CL 160 freeza', { rotorSizeFront: 160, rotorSizeRear: 160 }],
+      ['bikes', 'Féktárcsa', 'Tektro / 6 bolt / F&R 160mm', { rotorSizeFront: 160, rotorSizeRear: 160 }],
+      ['ebikes', 'ROTOR', 'Shimano MT800 CL 203 / EM810 CL 180 Freeza', { rotorSizeFront: 203, rotorSizeRear: 180 }],
+      ['ebikes', 'KERÉKMÉRET', '28"', { wheelSize: 28 }],
+      ['bikes', 'Kerékméret', '27,5"', { wheelSize: 27.5 }],
+    ])('reads the %s row %j %j', (slug, name, value, expected) => {
+      expect(specsOf(config, slug as 'bikes' | 'ebikes', { [name]: value })).toMatchObject(expected);
+    });
+
+    it('reads no wheel size off a Kerékméret row naming two', () => {
+      expect(specsOf(config, 'bikes', { Kerékméret: '29" / 27.5"+' })['wheelSize']).toBeUndefined();
+    });
+
+    // A row naming the ABS unit is ABS; a spacer that mentions it is not.
+    it.each([
+      ['Bosch ABS control unit Magura', true],
+      ['BOSCH ABS Pro Control Unit Shimano', true],
+      ['-', false],
+      ['Spacer ABS PM-Discbrake WT:3mm', undefined],
+    ])('reads the ABS row %j as %j', (value, abs) => {
+      expect(specsOf(config, 'ebikes', { ABS: value })['abs']).toBe(abs);
+    });
+
+    // The year a title ends with; a spec row still wins (it comes first).
+    it.each([
+      ['Cube Aim ONE  salmon´n´black L  MTB kerékpár - 2027', '2027'],
+      ['CUBE KATHMANDU PRO GREY´N´LUNAR - 2025 - TREKKING KERÉKPÁR - 46 CM', '2025'],
+      ['Cube AMS Hybrid ONE44 C:62 Pro 400X - Elektromos összteleszkópos MTB kerékpár - blackline színben - L - 2026', '2026'],
+      ['KTM MACINA TEAM 892 LFC ABS  M/43 elektromos  MTB kerékpár BURNT ORANGE színben 2026', '2026'],
+      ['SCOTT CONTESSA ACTIVE 50 29" PETROL GREEN/MINERAL BLUE M/44CM NŐI MTB KERÉKPÁR', undefined],
+    ])('reads the model year of the title %j as %j', async (name, year) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        const row = await extraRowOf(config, slug, 'Modellév (cím)', { name });
+        expect(row).toBe(year);
+        if (row) expect(specsOf(config, slug, { 'Modellév (cím)': row })['modelYear']).toBe(Number(year));
+      }
+    });
+
+    it('prefers a Modellév row to the title year', () => {
+      expect(specsOf(config, 'bikes', { Modellév: '2024', 'Modellév (cím)': '2027' })['modelYear']).toBe(2024);
+    });
+
+    // A rider the title states; a kids' bike for boys is a kids' bike.
+    it.each([
+      ['KTM X-LIFE TRACK STREET AZZURRO SILVER (DARK GREY+GREY) S/46CM FÉRFI CROSS KERÉKPÁR', 'Férfi'],
+      ['SCOTT CONTESSA ACTIVE 50 29" PETROL GREEN/MINERAL BLUE M/44CM NŐI MTB KERÉKPÁR', 'Női'],
+      ['KTM MACINA CROSS CX 820 L  D 46 Női elektromos crosstrekking kerékpár FLAMING GREY színben 2026', 'Női'],
+      ['PELLS Thorr City Steel Grey M (167-180 cm) 2024 Unisex Elektromos Trekking Kerékpár', 'Uniszex'],
+      ['GIANT ARX 20 férfi gyermek cross/gravel kerékpár - 20" méretben', 'Gyermek'],
+      ['KTM KTM WILD SPEED 26 méretben -  gyermek kerékpár - METALLIC BLACK+BLUE színben - 2027', 'Gyermek'],
+      ['Cube Aim SLX  slateblack´n´chrome M  MTB kerékpár - 2027', undefined],
+    ])('reads the rider stated in the title %j as %j', async (name, gender) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        const row = await extraRowOf(config, slug, 'Nem (cím)', { name });
+        expect(row).toBe(gender);
+        if (row) expect(specsOf(config, slug, { 'Nem (cím)': row })['gender']).toBe(gender);
+      }
+    });
+
 
     it('validates against the Árukereső config schema', () => {
       assertConfigValid(config, 'speedbike-arukereso', 'arukereso');
@@ -552,6 +920,19 @@ describe('hand-authored source configs', () => {
   // source's offers, for the old price and the descriptions that feed lacks.
   describe("speedbike's Google Shopping feed config", () => {
     const config = speedbikeGoogleshopConfig as unknown as ArukeresoSourceConfig;
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // The Árukereső feed has no stock or condition column: this source is the
+    // only one that states them. Google writes availability in the importer's
+    // own spelling, and condition's "New" is read case-insensitively.
+    it('reads availability and condition from their columns', async () => {
+      expect(config.mapping['availability']).toEqual({ field: 'availability' });
+      expect(config.mapping['condition']).toEqual({ field: 'condition' });
+      expect(await readText(config, 'availability', { availability: 'out_of_stock' })).toBe('out_of_stock');
+      expect(await readText(config, 'condition', { condition: 'New' })).toBe('New');
+    });
+
     const arukereso = speedbikeArukeresoConfig as unknown as ArukeresoSourceConfig;
     const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
 
@@ -753,6 +1134,191 @@ describe('hand-authored source configs', () => {
   describe("bikelife's Árgép feed config", () => {
     const config = asFeedConfig(bikelifeArukeresoConfig);
 
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    /** Every extra row of a section for one feed row, as the importer hands them to specMapping. */
+    async function feedSpecsOf(slug: 'bikes' | 'ebikes', fields: Record<string, string>) {
+      const rows: Record<string, string> = {};
+      for (const { label } of config.categories?.[slug]?.extraSpecRows ?? []) {
+        const value = await extraRowOf(config, slug, label, fields);
+        if (value) rows[label] = value;
+      }
+      return specsOf(config, slug, rows);
+    }
+
+    // Lower-case words in the titles; "ffi" is the shop's short form. Kids'
+    // titles name the child, never the sex.
+    it.each([
+      ['bikes', 'KTM Life Ride női trekking kerékpár 24 fokozatú ALTUS váltó, tárcsafék, matt elderberry 46cm', 'Női'],
+      ['bikes', 'KTM X-Life 1964 Cross férfi cross kerékpár 30 fokozatú Deore XT váltó hidraulikus tárcsafék fekete 46cm', 'Férfi'],
+      ['bikes', 'Neuzer X200 Disc ffi cross kerékpár 24sebességes Shimano váltó, fekete/kék-sárga 19"', 'Férfi'],
+      ['bikes', 'Kellys Vanity X40 White női specifikus 26" MTB kerékpár Microshift váltórendszerrel és mechanikus tárcsafékekkel 15"/XS', 'Női'],
+      ['bikes', 'Kellys Emma Menthol 16"-os gyerekkerékpár kontrafék, alu váz', 'Gyermek'],
+      ['bikes', 'Kellys Naga Air Belt yellow 20"-os superlight gyerekkerékpár aluminium vázzal két fokozatú automata agyváltóval és szíjhajtással', 'Gyermek'],
+      ['bikes', 'Csepel Mustang 20" fiú gyermek kerékpár, 6 fokozatú váltó, 2023 fekete', 'Gyermek'],
+      ['ebikes', 'Scott Sub Tour Eride 30 unisex trekking Ebike 9 fokozatú Shimano Alivio váltó, Bosch meghajtás, M', 'Uniszex'],
+      ['ebikes', 'Kellys Tygon R50 Forest férfi 29" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M', 'Férfi'],
+      ['ebikes', 'Kellys Estima COMP 60 City Ebike 8 fokozatú Nexus váltó, Shimano Steps meghajtás, S', undefined],
+    ] as const)('reads the %s rider from %j as %j', async (slug, name, gender) => {
+      expect((await feedSpecsOf(slug, { name }))['gender']).toBe(gender);
+    });
+
+    // Only the unambiguous words. A plain "MTB" stays with the LLM (a fully's
+    // title may not say so), and "cross" is also a model name (X-Life Cross,
+    // Macina Cross). A kids', folding or tandem bike is that whatever else the
+    // title says, and the title word overrides the sku prefix.
+    it.each([
+      ['ebikes', 'Scott Sub Tour Eride 30 unisex trekking Ebike 9 fokozatú Shimano Alivio váltó, Bosch meghajtás, M', '', 'Trekking'],
+      ['ebikes', 'Kellys Estima COMP 60 City Ebike 8 fokozatú Nexus váltó, Shimano Steps meghajtás, S', '', 'City'],
+      ['ebikes', 'KTM Macina Kapoho Master férfi 29/27,5" összteleszkópos MTB Ebike 12 fokozatú Shimano XT váltó, Bosch Perf. CX Smart meghajtás, L/48cm', '', 'Összteleszkópos MTB'],
+      ['ebikes', 'KTM Macina Fold 20 elektromos camping kerékpár Bosch Perf. PX Smart 75Nm/500Wh, Nexus 5 váltó, Gates szíjhatjás,  összecsukható, olive pearl', '', 'Összecsukható'],
+      ['ebikes', 'Kellys Tygon R50 Forest férfi 29" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M', '', undefined],
+      ['ebikes', 'KTM Macina Cross CX820 ebike 10 fokozatú Shimano CUES U600 Suntour NCX32 Air Flaming Gray 56cm', '', undefined],
+      ['bikes', 'Csepel Camping 20"-os városi kerékpár, összecsukható, kontrás, piros', '010900000001', 'Összecsukható'],
+      ['bikes', 'Kellys SOOT 20 gravel kerékpár 2x8 fokozartú Shimano Claris váltó, M', '010700000075', 'Gravel'],
+      ['bikes', 'Kellys SOOT 30 országúti gravel kerékpár 16 fokozatú Shimano Claris váltó, mechanikus tárcsafék kék L', '010800000054', 'Gravel'],
+      ['bikes', 'Csepel Woodlands Zero 24-es gyerek kerékpár alumínium vázzal, 6sebességes, matt zöld', '010600001235', 'Gyerek'],
+      ['bikes', 'Csepel Royal 3* singlespeed 28" kerékpár flipflop aggyal, férfi 52cm sárga', '010900000001', 'Single speed / Fixi'],
+      ['bikes', 'Scott Spark 960 29" trail kerékpár 1x12 Deore-XT váltóval, 130/120mm rugóúttal, fekete, S', '012000000258', undefined],
+    ] as const)('reads the %s type from %j (sku %j) as %j', async (slug, name, sku, usageType) => {
+      expect((await feedSpecsOf(slug, { name, sku }))['usageType']).toBe(usageType);
+    });
+
+    it('reads a full-suspension title as front and rear suspension', async () => {
+      const name =
+        'KTM Macina Kapoho Master férfi 29/27,5" összteleszkópos MTB Ebike 12 fokozatú Shimano XT váltó, Bosch Perf. CX Smart meghajtás, L/48cm';
+      expect(await feedSpecsOf('ebikes', { name })).toMatchObject({ suspension: 'Első teleszkóp, hátsó rugóstag' });
+    });
+
+    // "NN fokozatú", "NN fok.", "NNf", "NN sebességes" and the typos; NxM is
+    // chainrings × sprockets, as the bikes schema counts.
+    it.each([
+      ['bikes', 'KTM Life Ride női trekking kerékpár 24 fokozatú ALTUS váltó, tárcsafék, matt elderberry 46cm', 24],
+      ['bikes', 'Scott Contessa Active 40 29" női mtb 18f Shimano Altus váltó Suntour XCT30 100mm rugóút lila M', 18],
+      ['bikes', 'KTM Life Space női trekking kerékpár 2x9 fokozatú CUES váltó, tárcsafék, zöld/lila mono váz 46cm', 18],
+      ['bikes', 'Kellys SOOT 20 gravel kerékpár 2x8 fokozartú Shimano Claris váltó, M', 16],
+      ['bikes', 'Scott Spark 960 29" trail kerékpár 1x12 Deore-XT váltóval, 130/120mm rugóúttal, fekete, S', 12],
+      ['bikes', 'Kellys Naga Air 50 24"-os kerékpár 1x7 Shimano TY300', 7],
+      ['bikes', 'Neuzer Duster Hobby 27,5"-os MTB kerékpár 21 fokazatú Shimano TY300 váltó, fekete/piros-szürke, 19"', 21],
+      ['bikes', 'Kellys Naga Air Belt yellow 20"-os superlight gyerekkerékpár aluminium vázzal két fokozatú automata agyváltóval és szíjhajtással', undefined],
+      ['ebikes', 'Kellys Estima COMP 60 City Ebike 8 fokozatú Nexus váltó, Shimano Steps meghajtás, S', 8],
+      ['ebikes', 'Kellys Tygon R50 Forest férfi 29" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M', 10],
+      ['ebikes', 'Scott Patron eRide 920 elektromos MTB kerékpár Bosch Perf. CX hajtás, 12 fok. Deore XT váltó, 47cm, L', 12],
+      ['ebikes', 'Neuzer E-Trek ebike/pedelec aluvázas férfi 6seb, 28"-as kerék, 36V/250W motor, 11Ah Li-ion akku, fekete 19"', 6],
+    ] as const)('reads the %s gear count from %j as %j', async (slug, name, gearCount) => {
+      expect((await feedSpecsOf(slug, { name }))['gearCount']).toBe(gearCount);
+    });
+
+    // The capacity, torque and motor maker the e-bike titles state. "Shimano"
+    // names the motor only next to Steps, a torque or "motor"/"meghajtás":
+    // the titles also name Shimano derailleurs.
+    it.each([
+      [
+        'KTM Macina Aera FS Elite LFC Ebike Bosch Performance CX 120Nm/800Wh rendszer karbon monovázas 11 fokozatú Cues váltó olive pearl matt 46cm',
+        { batteryCapacity: 800, torque: 120, motorBrand: 'Bosch' },
+      ],
+      [
+        'Kellys E-Carson 30 Magic Blue Ebike trekking 95Nm-es Panasonic motor 725Wh akku 9 fokozatú Shimano Cues váltó M',
+        { batteryCapacity: 725, torque: 95, motorBrand: 'Panasonic' },
+      ],
+      [
+        'Kellys E-Carson 30 trekking ebike antracit 95Nm-es Panasonic motorral 725 Wh akkuval férfi XL-es',
+        { batteryCapacity: 725, torque: 95, motorBrand: 'Panasonic' },
+      ],
+      [
+        'Kellys E-Carson 10 Teal ebike Shimano Steps meghajtás 630Wh akkumulátor Shimano Cues váltórendszer L-es',
+        { batteryCapacity: 630, motorBrand: 'Shimano' },
+      ],
+      ['Kellys E-Cristy 30 White női trekking Ebike 9 fokozatú Altus váltó, Steps meghajtás, L', { motorBrand: 'Shimano' }],
+      ['Kellys Tygon R50 Forest férfi 29" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M', { motorBrand: 'Panasonic' }],
+      [
+        'Neuzer Sorrento női elektromos kerékpár XOFO hátsó agymotoros, 40Nm/324Wh matt fekete 17"',
+        { batteryCapacity: 324, torque: 40, motorBrand: 'XOFO' },
+      ],
+    ])('reads the motor facts of %j', async (name, expected) => {
+      expect(await feedSpecsOf('ebikes', { name })).toMatchObject(expected);
+    });
+
+    it('reads no motor maker from a Shimano derailleur, and no capacity from "White"', async () => {
+      const specs = await feedSpecsOf('ebikes', {
+        name: 'KTM Macina Cross CX820 ebike 10 fokozatú Shimano CUES U600 Suntour NCX32 Air Flaming Gray 56cm',
+      });
+      expect(pick(specs, ['motorBrand', 'batteryCapacity'])).toEqual({});
+      expect(
+        (await feedSpecsOf('ebikes', { name: 'Kellys Tayen R50 White női 27,5" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M' }))[
+          'batteryCapacity'
+        ],
+      ).toBeUndefined();
+    });
+
+    // Titles name no brake combinations; "fék nélküli" (a balance bike) has no
+    // enum value and stays empty.
+    it.each([
+      ['KTM Life Ride női trekking kerékpár 24 fokozatú ALTUS váltó, tárcsafék, matt elderberry 46cm', 'Tárcsa'],
+      ['Kellys Spider 50 Black 29"-os MTB kerékpár 3x8 fokozatú Shimano Altus váltó, Hidr. DISC, M', 'Tárcsa'],
+      ['Kellys Emma Pink 16"-os gyerekkerékpár kontrafék, alu váz', 'Kontrafék'],
+      ['Hauser Puma 12"-os gyerekkerékpár, kontrás, matt szürke', 'Kontrafék'],
+      ['Kellys Wasper Neo Teal szuperkönnyű 16-os gyerekkerékpár aluvázzal és V-fékekkel', 'Racker (Felni)'],
+      ['Kellys KIRU Purple futóbicikli Alu/Mg váz, csapágyazott fém kerekű, tömlős, fék nélküli', undefined],
+    ])('reads the brake of %j as %j', async (name, brakeType) => {
+      expect((await feedSpecsOf('bikes', { name }))['brakeType']).toBe(brakeType);
+    });
+
+    // Only a material next to "váz": "acélszürke" is a colour, and the ARC's
+    // carbon is its fork.
+    it.each([
+      ['bikes', 'Kellys Emma Menthol 16"-os gyerekkerékpár kontrafék, alu váz', 'Alumínium'],
+      ['bikes', 'Kellys Wasper Neo Teal szuperkönnyű 16-os gyerekkerékpár aluvázzal és V-fékekkel', 'Alumínium'],
+      ['bikes', 'Kellys Naga Air Belt yellow 20"-os superlight gyerekkerékpár aluminium vázzal két fokozatú automata agyváltóval és szíjhajtással', 'Alumínium'],
+      ['bikes', 'Kellys KIRU Purple futóbicikli Alu/Mg váz, csapágyazott fém kerekű, tömlős, fék nélküli', 'Alumínium'],
+      ['bikes', 'Kellys ARC 10 Yellow országúti kerékpár 16 fokozatú Claris váltó, alu váz+karbon villa M', 'Alumínium'],
+      ['bikes', 'KTM Life Joy férfi trekking kerékpár 24 fokozatú Shimano Altus váltó, acélszürke 56cm', undefined],
+      ['ebikes', 'Neuzer Ebike e-Trek LIDO női fekete 7seb. acél váz + teleszkóp 28" 36V/250W 13 Ah Li-ion akku, 19,5"', 'Acél'],
+      ['ebikes', 'KTM Macina Aera FS Elite LFC Ebike Bosch Performance CX 120Nm/800Wh rendszer karbon monovázas 11 fokozatú Cues váltó olive pearl matt 46cm', 'Karbon'],
+    ] as const)('reads the %s frame material of %j as %j', async (slug, name, frameMaterial) => {
+      expect((await feedSpecsOf(slug, { name }))['frameMaterial']).toBe(frameMaterial);
+    });
+
+    // A wheel size, never the frame's inch size: a wheel is "NN"-os/-as/-es",
+    // "NN" MTB" or "NN" kerék", or a 27.5/28/29 in inches. A mullet stays empty.
+    it.each([
+      ['bikes', 'Kellys Emma Menthol 16"-os gyerekkerékpár kontrafék, alu váz', 16],
+      ['bikes', 'Neuzer 12-es gyerek kerékpár fiú sárga-fekete-kék', 12],
+      ['bikes', 'KTM Chicago 27,5"-os MTB kerékpár 18 fokozatú Altus váltó, hidr. tárcsafék, matt szürke XL/53cm', 27.5],
+      ['bikes', 'Kellys Vanity 50 Sky Blue női 29"-os MTB kerékpár 24 fok. Shimano Altus váltó, Hidraulikus Disc, 19"/L', 29],
+      ['bikes', 'Csepel Traction 200 férfi trekking kerékpár, alumínium váz, 21 fokozatú, matt szürke-kék, 19"', undefined],
+      ['bikes', 'KTM Ultra Evo Dim 29" / 27,5" Plus -os MTB kerékpár Sram SX 1x12 azzuro ezüst M/43cm', undefined],
+      ['ebikes', 'Kellys Tygon R50 Forest férfi 29" MTB Ebike 10 fokozatú Shimano váltó, Panasonic meghajtás, M', 29],
+      ['ebikes', 'Neuzer E-Trek ebike/pedelec aluvázas férfi 6seb, 28"-as kerék, 36V/250W motor, 11Ah Li-ion akku, fekete 19"', 28],
+      ['ebikes', 'KTM Macina Kapoho Master férfi 29/27,5" összteleszkópos MTB Ebike 12 fokozatú Shimano XT váltó, Bosch Perf. CX Smart meghajtás, L/48cm', undefined],
+    ] as const)('reads the %s wheel of %j as %j', async (slug, name, wheelSize) => {
+      expect((await feedSpecsOf(slug, { name }))['wheelSize']).toBe(wheelSize);
+    });
+
+    // The Shimano group the title names, as "Shimano <group>"; model codes
+    // (TY300) and hub gears stay with the LLM, and "Comp XT" is a model name.
+    it.each([
+      ['bikes', 'KTM Life Ride női trekking kerékpár 24 fokozatú ALTUS váltó, tárcsafék, matt elderberry 46cm', 'Shimano Altus'],
+      ['bikes', 'KTM Ultra 1964 Comp XT 29"-os MTB kerékpár 12 fokozatú Deore XT váltó, mattfekete, S/38cm', 'Shimano Deore XT'],
+      ['bikes', 'Scott Spark 960 29" trail kerékpár 1x12 Deore-XT váltóval, 130/120mm rugóúttal, fekete, S', 'Shimano Deore XT'],
+      ['bikes', 'Kellys SOOT 20 gravel kerékpár 2x8 fokozartú Shimano Claris váltó, M', 'Shimano Claris'],
+      ['bikes', 'Kellys Spider X70 Thunderstorm Blue 29"-os MTB kerékpár 9 fokozatú Shimano Cues váltó, hidr. tárcsafék, M', 'Shimano CUES'],
+      ['bikes', 'Kellys Naga Air 50 24"-os kerékpár 1x7 Shimano TY300', undefined],
+      ['ebikes', 'Kellys Theos F90 férfi 29/27,5" összteleszkópos MTB Ebike 11 fokozatú Shimano XT Di2 váltó, Shimano Steps meghajtás, M', 'Shimano Deore XT Di2'],
+      ['ebikes', 'Scott Patron eRide 920 elektromos MTB kerékpár Bosch Perf. CX hajtás, 12 fok. Deore XT váltó, 47cm, L', 'Shimano Deore XT'],
+    ] as const)('reads the %s derailleur group of %j as %j', async (slug, name, rearDerailleurTier) => {
+      expect((await feedSpecsOf(slug, { name }))['rearDerailleurTier']).toBe(rearDerailleurTier);
+    });
+
+    // A colour in the title is the LLM's, as the shop writes it: no row reads it.
+    it('maps no colour from the title', async () => {
+      const name = 'KTM Macina Style 810 elektromos kerékpár Bosch CX Smart 100Nm, 800Wh, 11 fokozatú Deore XT váltó, férfi, purple flip 56cm';
+      const specs = await feedSpecsOf('ebikes', { name });
+      expect(specs['color']).toBeUndefined();
+      expect(specs).toMatchObject({ batteryCapacity: 800, torque: 100, gearCount: 11, gender: 'Férfi', motorBrand: 'Bosch' });
+    });
+
+
     // The `Kerékpárok` tree mixes e-bikes with every other bike, and only the
     // shop's `0200` SKU prefix tells them apart; `0201`–`0203` are e-bike
     // parts and `1901` e-scooters. Rows outside the tree keep their own path,
@@ -818,6 +1384,159 @@ describe('hand-authored source configs', () => {
 
   describe("mangobike's Árukereső feed config", () => {
     const config = asFeedConfig(mangobikeArukeresoConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Scott's 6-digit model number (the 9-digit article less its size code: the
+    // form the other shops store, so an MPN lookup matches) and Kellys' 5-digit one, as
+    // the image folder (= the page's "Cikkszám:") carries them. Scott's 13-digit
+    // codes are no GTINs and stay out, as do Cube's two-size codes (VB-…-M-L):
+    // the one Cube form the other shops share has a single size.
+    it.each([
+      ['SC-290674008', '290674'],
+      ['SC-290130008', '290130'],
+      ['KL-64367', '64367'],
+      ['KL-81846', '81846'],
+      ['SC-4253288356010', undefined],
+      ['VB-125500-M-L', undefined],
+    ])('reads the MPN off the image folder %j (review 2026-10-23)', async (sku, mpn) => {
+      expect(await readText(config, 'mpn', { image_url: imageOf(sku) })).toBe(mpn);
+    });
+
+    // The page's component table: its labels end in a colon.
+    it.each([
+      ['bikes', { 'Lánc:': 'KMC X12' }, { chain: 'KMC X12', drivetrain: 'Lánc' }],
+      ['ebikes', { 'Lánc:': 'Gates drive-belt 118T CDX' }, { chain: 'Gates drive-belt 118T CDX', drivetrain: 'Szíj' }],
+      ['bikes', { 'Villa:': 'FOX 34 Float Rhythm Air Grip, 3-Modes' }, { forkModel: 'FOX 34 Float Rhythm Air Grip, 3-Modes', forkType: 'Levegős' }],
+      ['ebikes', { 'Villa:': 'SR Suntour NVX 32 5TA NLO Coil, Tapered, 5x100 TA, Lock Out, 100mm Travel' }, { forkType: 'Acélrugós' }],
+      ['bikes', { 'Villa:': 'CUBE CSL Race Disc, Full Carbon, 1 1/8" - 1 1/4" Tapered, Flat Mount, 12x100mm' }, { forkType: 'Merev' }],
+      ['bikes', { 'Hátsó váltó típusa:': 'Shimano 105', 'Hátsó váltó:': 'Shimano 105 RD-R7100-DGS, 12-Speed' }, { gearType: 'Láncváltó', rearDerailleurTier: 'Shimano 105', rearDerailleur: 'Shimano 105 RD-R7100-DGS, 12-Speed', shiftingActuation: 'Mechanikus' }],
+      ['bikes', { 'Hátsó váltó:': 'Shimano Acera M3020-8 SGS' }, { gearType: 'Láncváltó' }],
+      ['ebikes', { 'Hátsó váltó típusa:': 'Shimano Nexus 5', 'Hátsó váltó:': 'Shimano Nexus SL-C7000-5, Revoshift' }, { gearType: 'Agyváltó', shiftingActuation: 'Mechanikus' }],
+      ['ebikes', { 'Hátsó váltó típusa:': 'Enviolo' }, { gearType: 'Agyváltó' }],
+      ['ebikes', { 'Hátsó váltó:': 'SRAM X0 Eagle AXS Transmission 12 Speed, Wireless Electronic Shift System' }, { shiftingActuation: 'Elektromos' }],
+      ['ebikes', { 'Hátsó váltó:': 'Shimano Deore Di2 M6260-11 LG SGS shad+' }, { shiftingActuation: 'Elektromos' }],
+      ['bikes', { 'Váltókar:': 'SRAM AXS Pod Controller' }, { shifter: 'SRAM AXS Pod Controller', shiftingActuation: 'Elektromos' }],
+      ['bikes', { 'Első váltó:': 'Shimano 105 FD-R7100-F, Braze-On' }, { frontDerailleur: 'Shimano 105 FD-R7100-F, Braze-On' }],
+      ['ebikes', { 'Hajtómű:': 'Miranda 172,5mm' }, { crankset: 'Miranda 172,5mm', crankLength: 172.5 }],
+      ['ebikes', { 'Hajtómű:': 'KTM E-TRAIL2 ISIS 160mm Q12; FSA steel 36T Direct Mount' }, { crankLength: 160, chainring: 'FSA steel 36T Direct Mount', chainringTeeth: 36 }],
+      ['bikes', { 'Hajtómű:': 'Prowheel CC10Y-NW, 32T, 170mm' }, { crankLength: 170, chainringTeeth: 32 }],
+      ['bikes', { 'Hajtómű:': 'Shimano FC-U6010 / 46-32T w/ BB (BSA) w/ CG' }, { chainGuard: true }],
+      ['bikes', { 'Fogaskoszorú:': 'Shimano 105 CS-HG710, 11-36T' }, { cassette: 'Shimano 105 CS-HG710, 11-36T', cassetteRange: '11-36T' }],
+      ['ebikes', { 'Fogaskoszorú:': 'Gates Rear Sprocket CDC, 24T' }, { cassette: 'Gates Rear Sprocket CDC, 24T' }],
+      ['bikes', { 'Középcsapágy:': 'Shimano BB71-41B pressfit' }, { bottomBracket: 'Shimano BB71-41B pressfit' }],
+      ['ebikes', { 'Pedál:': 'Syncros SP-828' }, { pedals: 'Syncros SP-828' }],
+      ['ebikes', { 'Fék:': 'SRAM Maven Silver Stealth 4-Piston Disc' }, { brakeModel: 'SRAM Maven Silver Stealth 4-Piston Disc', brakePistons: 4 }],
+      ['bikes', { 'Fék:': 'Shimano BR-R7170, Hydr. Disc Brake, Flat Mount (160/160)' }, { brakeModel: 'Shimano BR-R7170, Hydr. Disc Brake, Flat Mount (160/160)' }],
+      ['ebikes', { 'Féktárcsa:': 'Disc Brake (203/180)' }, { rotorSizeFront: 203, rotorSizeRear: 180 }],
+      ['ebikes', { 'Féktárcsa:': 'Magura MDR-P CL 203; Magura MDR-P CL 180' }, { rotorModel: 'Magura MDR-P CL 203; Magura MDR-P CL 180', rotorSizeFront: 203, rotorSizeRear: 180 }],
+      ['bikes', { 'Féktárcsa:': 'Shimano RT10 CL 160 / 160' }, { rotorSizeFront: 160, rotorSizeRear: 160 }],
+      ['ebikes', { 'Féktárcsa:': 'Shimano RT30 CL 180; Shimano EM300 CL 160 magnet' }, { rotorSizeFront: 180, rotorSizeRear: 160 }],
+      ['bikes', { 'Kerék:': 'ACID Pro 25, 32/32 Spokes, QR/QR, Tubeless Ready' }, { wheelset: 'ACID Pro 25, 32/32 Spokes, QR/QR, Tubeless Ready', tubeless: true }],
+      ['ebikes', { 'Felni:': 'ACID EX25, 32H, Disc, Tubeless Ready' }, { rimModel: 'ACID EX25, 32H, Disc, Tubeless Ready', tubeless: true }],
+      ['ebikes', { 'Kerékagy:': 'DT Swiss 370 CL 28H 110/15TA; DT Swiss 370 CL 28H 148/12TA' }, { hubModel: 'DT Swiss 370 CL 28H 110/15TA; DT Swiss 370 CL 28H 148/12TA', hubType: 'CenterLock' }],
+      ['ebikes', { 'Kerékagy:': 'DT Swiss 370 6B 32H 110/15TA / DT Swiss 370 6B 32H 148/12TA' }, { hubType: '6-lyukas (IS)' }],
+      ['bikes', { 'Külsőgumi:': 'Conti Grand Prix, Kevlar, 30-622' }, { tireModel: 'Conti Grand Prix, Kevlar, 30-622', tireSize: '30-622' }],
+      ['ebikes', { 'Kormány:': 'Syncros UC3.0 680mm / Rise 12mm / backsweep 15°' }, { handlebar: 'Syncros UC3.0 680mm / Rise 12mm / backsweep 15°', handlebarWidth: 680 }],
+      ['ebikes', { 'Kormány:': 'Newmen Advanced Gravel Bar 318, Carbon, 31.8mm' }, { handlebarMaterial: 'Karbon' }],
+      ['ebikes', { 'Kormányszár:': 'CUBE Comfort Stem Pro, 35mm, Adjustable' }, { stem: 'CUBE Comfort Stem Pro, 35mm, Adjustable', adjustableStem: true }],
+      ['bikes', { 'Kormánycsapágy:': 'Acros AICR intern 1.1/8"-1.5" angle lim' }, { headset: 'Acros AICR intern 1.1/8"-1.5" angle lim' }],
+      ['bikes', { 'Markolat:': 'ACID Travel Comfort' }, { grips: 'ACID Travel Comfort' }],
+      ['ebikes', { 'Nyereg:': 'Syncros Capilano' }, { saddle: 'Syncros Capilano' }],
+      ['ebikes', { 'Nyeregcső:': 'KTM COMP II dropper internal 34.9 T:150' }, { seatpost: 'KTM COMP II dropper internal 34.9 T:150', seatpostType: 'Teleszkópos (dropper)', seatpostDiameter: 34.9 }],
+      ['bikes', { 'Nyeregcső:': 'KTM Comp 27.2/300/350/400' }, { seatpostDiameter: 27.2 }],
+      ['bikes', { 'Váz:': '28" Alloy 6061 OFFROAD / T-2380-M' }, { frameModel: '28" Alloy 6061 OFFROAD / T-2380-M' }],
+      ['ebikes', { 'Hátsó rugóstag:': 'Fox Float Rhythm RC, 210x55mm, Adjustable LSR w/ 2-Pos. Lever' }, { rearShockModel: 'Fox Float Rhythm RC, 210x55mm, Adjustable LSR w/ 2-Pos. Lever', suspension: 'Első teleszkóp, hátsó rugóstag' }],
+      ['ebikes', { 'Lámpák:': 'Lezyne Hecto 70LUX 210LUMEN Superbright' }, { lighting: 'Alapfelszereltség' }],
+      ['ebikes', { 'Sárvédő:': 'Curana alloy profile Fender' }, { fenders: 'Alapfelszereltség' }],
+      ['ebikes', { 'Csomagtartó:': 'Racktime w/ spring clamp SnapIt 2.0' }, { rack: 'Alapfelszereltség' }],
+      ['bikes', { 'Letámasztó:': 'KTM 28" adjustable' }, { kickstand: true }],
+      ['ebikes', { 'Kijelző:': 'Bosch Kiox 300' }, { displayModel: 'Bosch Kiox 300', display: true }],
+      ['ebikes', { 'Motor típusa:': 'Bosch Performance Line CX (85 Nm)' }, { motorBrand: 'Bosch', torque: 85 }],
+      ['ebikes', { 'Motor:': 'Bosch Drive Unit Performance Line 75Nm (BDU34)' }, { motorBrand: 'Bosch', torque: 75 }],
+      ['ebikes', { 'Motor típusa:': 'Panasonic GX Ultimate' }, { motorBrand: 'Panasonic' }],
+      ['ebikes', { 'Akkumulátor töltő:': 'Bosch STANDARD Charger 4A' }, { chargerCurrent: 4 }],
+      ['bikes', { 'Váz anyaga:': 'Magnézium' }, { frameMaterial: 'Magnézium' }],
+    ] as const)('reads the %s page rows %j (review 2026-10-23)', (slug, rows, specs) => {
+      expect(specsOf(config, slug, rows)).toMatchObject(specs);
+    });
+
+    // A row that does not state the spec leaves it to the LLM.
+    it.each([
+      ['bikes', { 'Villa:': 'SR Suntour NEX 63mm' }, 'forkType'],
+      ['ebikes', { 'Féktárcsa:': 'Disc Brake (180/180)' }, 'rotorModel'],
+      ['ebikes', { 'Fék:': 'Shimano GRX BR-RX820' }, 'brakePistons'],
+      ['ebikes', { 'Hátsó váltó típusa:': 'Enviolo', 'Hátsó váltó:': 'Enviolo MC-TWIST' }, 'rearDerailleur'],
+      ['ebikes', { 'Hátsó váltó típusa:': 'Shimano Nexus 5' }, 'rearDerailleurTier'],
+      ['ebikes', { 'Akkumulátor töltő:': 'PowerTube 625Wh' }, 'chargerCurrent'],
+      ['ebikes', { 'Akkumulátor töltő:': 'PowerTube 625Wh' }, 'chargerModel'],
+      ['bikes', { 'Hajtómű:': 'Shimano Tourney T501 46-30T' }, 'chainringTeeth'],
+      ['bikes', { 'Fogaskoszorú:': 'Shimano 105 R7101-12 / 11-34' }, 'cassetteRange'],
+      // A rear-travel row alone is not read: Cube's Nature and Supreme hardtails carry a stray one.
+      ['bikes', { 'Hátsó rugós tag útja:': '160 mm' }, 'suspension'],
+      ['bikes', { 'Hátsó rugós tag útja:': '160 mm' }, 'rearTravel'],
+      // The shop's colour word would replace the title's verbatim maker colour.
+      ['ebikes', { 'Szín:': 'szürke' }, 'color'],
+    ] as const)('maps no %s value from %j for %s (review 2026-10-23)', (slug, rows, key) => {
+      expect(specsOf(config, slug, rows)[key]).toBeUndefined();
+    });
+
+    // Inch frame sizes in centimetres; a centimetre size is read as it stands.
+    it.each([
+      ['ebikes', '19 coll', 48.26],
+      ['ebikes', '14,5 coll', 36.83],
+      ['bikes', '17,5 coll', 44.45],
+      ['bikes', '22 coll', 55.88],
+      ['bikes', '57 cm', 57],
+    ] as const)('reads the %s frame size %j as %d cm (review 2026-10-23)', (slug, size, cm) => {
+      expect(specsOf(config, slug, { 'Vázméret:': size })).toMatchObject({ frameSize: cm });
+    });
+
+    // The category path's leaf, where it names the type (the identity outputs agreed on all
+    // 28 measured listings but two Cube Nature cross-trekking bikes the LLM called fullies).
+    it.each([
+      ['bikes', 'Kerékpárok > Túra Kerékpárok > Offroad Cross Trekking Kerékpár', { usageType: 'Cross Trekking' }],
+      ['bikes', 'Kerékpárok > Túra Kerékpárok > Onroad Trekking Kerékpár', { usageType: 'Trekking' }],
+      ['bikes', 'Kerékpárok > Mountain Bike Kerékpárok > Fully Mountain Bike Kerékpár', { usageType: 'Összteleszkópos MTB', suspension: 'Első teleszkóp, hátsó rugóstag' }],
+      ['bikes', 'Kerékpárok > Mountain Bike Kerékpárok > Hardtail Mountain Bike Kerékpár', { usageType: 'MTB', suspension: 'Első teleszkóp' }],
+      ['bikes', 'Kerékpárok > Országúti és Gravel Kerékpárok > Országúti Kerékpár', { usageType: 'Országúti' }],
+      ['bikes', 'Kerékpárok > Országúti és Gravel Kerékpárok > Gravel Kerékpár', { usageType: 'Gravel' }],
+      ['bikes', 'Kerékpárok > Gyerek Kerékpárok > Gyerek Kerékpár', { usageType: 'Gyerek' }],
+      ['bikes', 'Kerékpárok > Gyerek Kerékpárok > Gyerek Futóbicikli', { usageType: 'Futóbicikli' }],
+      ['ebikes', 'Kerékpárok > Összecsukható Kerékpárok', { usageType: 'Összecsukható' }],
+      ['ebikes', 'Elektromos Kerékpárok > Elektromos Túra Kerékpárok > Elektromos Onroad Trekking Kerékpár', { usageType: 'Trekking' }],
+      ['ebikes', 'Elektromos Kerékpárok > Elektromos Mountain Bike Kerékpárok > Elektromos Hardtail Mountain Bike Kerékpár', { usageType: 'MTB', suspension: 'Első teleszkóp' }],
+      ['ebikes', 'Elektromos Kerékpárok > Elektomos Light Kerékpárok > Elektromos Light Fully Mountain Bike Kerékpár', { usageType: 'Összteleszkópos MTB', suspension: 'Első teleszkóp, hátsó rugóstag' }],
+      ['ebikes', 'Elektromos Kerékpárok > Elektromos Országúti Kerékpárok > Elektromos Gravel Kerékpár', { usageType: 'Gravel' }],
+      ['ebikes', 'Elektromos Kerékpárok > Elektromos Városi Kerékpárok', { usageType: 'City' }],
+    ] as const)('reads the %s category path %j (review 2026-10-23)', (slug, path, specs) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })).toMatchObject(specs);
+    });
+
+    // A leaf whose listings mix types (a Light Túra e-bike titled "Light Hardtail MTB") stays with the LLM.
+    it('reads no type from the Light Túra leaf (review 2026-10-23)', () => {
+      expect(
+        specsOf(config, 'ebikes', { 'Webshop kategória': 'Elektromos Kerékpárok > Elektomos Light Kerékpárok > Elektromos Light Túra Kerékpárok' })
+          ['usageType'],
+      ).toBeUndefined();
+    });
+
+    // Kellys pages have no torque on the motor row; the description's "motor: …, NN Nm, NN V" run has it.
+    it('reads torque and voltage from the description motor run (review 2026-10-23)', async () => {
+      const description =
+        'váz: KELLYS TYGON R-series - advanced robotic welded Al 6061-T6, 12x148 mm Boost thru axle,motor: PANASONIC GX Ultimate, 95 Nm, 36 V,akkumulátor: KELLYS Re-Charge V10 Li-ion internal removable 820 Wh';
+      const row = await extraRowOf(config, 'ebikes', 'Motor (leírás)', { description });
+      expect(row).toBe('PANASONIC GX Ultimate, 95 Nm, 36 V');
+      expect(specsOf(config, 'ebikes', { 'Motor (leírás)': row ?? '', 'Motor típusa:': 'Panasonic GX Ultimate' })).toMatchObject({
+        torque: 95,
+        batteryVoltage: 36,
+        motorBrand: 'Panasonic',
+      });
+      // The motor row's own figure wins over the description's.
+      expect(specsOf(config, 'ebikes', { 'Motor (leírás)': 'Bosch CX, 85 Nm', 'Motor típusa:': 'Bosch Performance Line CX (90 Nm)' })).toMatchObject({ torque: 90 });
+      expect(await extraRowOf(config, 'ebikes', 'Motor (leírás)', { description: 'NAPKÖZBEN IS VELED VAN. A KTM motoros rásegítéssel 85 Nm nyomatékot ad.' })).toBeUndefined();
+    });
+
     const navJunk = '-&nbsp;-&nbsp;start_nav&nbsp;-&nbsp;-  > ';
     const trekking =
       'Elektromos Kerékpárok > Elektromos Túra Kerékpárok > Elektromos Onroad Trekking Kerékpár';
@@ -891,6 +1610,209 @@ describe('hand-authored source configs', () => {
 
   describe("bringaboard's Árukereső feed config", () => {
     const config = asFeedConfig(bringaboardArukeresoConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // A 9-digit Scott article-and-size number sits in ean_code on some rows.
+    it.each([
+      ['293361058', 'scott-293361-XL58', undefined],
+      ['4257038116006', 'scott-425703-colorado-gold-S', '4257038116006'],
+      ['12345678', '', '12345678'],
+    ])('keeps only a GTIN-shaped ean_code %j (sku %j) as %j', async (eanCode, sku, gtin) => {
+      expect(await readText(config, 'gtin', { ean_code: eanCode, sku })).toBe(gtin);
+    });
+
+    // Scott's 6-digit article number, the one other shops store (290127 = Spark 930).
+    it.each([
+      ['scott-290127-S', '290127'],
+      ['scott-423161-carbon-black-M', '423161'],
+      ['scott-286465-054', '286465'],
+      ['scott-290670', '290670'],
+      ['scott-2863807-S', undefined],
+    ])('reads the Scott MPN from sku %j as %j', async (sku, mpn) => {
+      expect(await readText(config, 'mpn', { sku })).toBe(mpn);
+    });
+
+    // The path's last segment; e-bikes' "Unisex" contradicts the title on 2 of 3 rows, so it is left out.
+    it.each([
+      ['E-BIKE > E-TÚRA > Férfi', 'Férfi'],
+      ['Kerékpár > E-Bike kerékpárok > női', 'Női'],
+      ['Kerékpár > Mountain Bike > Mountain Bike 27,5 > női', 'Női'],
+      ['Kerékpár > Fixi-1 sebi > Férfi fixi-1 sebi', 'Férfi'],
+      ['Kerékpár > Gyerek Kerékpár > Gyerek kerékpár 16', 'Gyermek'],
+      ['Kerékpár > Gyerek Kerékpár > Futókerékpár', 'Gyermek'],
+      ['Kerékpár > E-Bike kerékpárok > gyerek', 'Gyermek'],
+      ['E-BIKE > E-MTB FULLY > Unisex', undefined],
+    ])('reads the gender of the path %j as %j, for bikes and e-bikes', (path, gender) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { 'Webshop kategória': path })['gender']).toBe(gender);
+      }
+    });
+
+    it.each([
+      ['KTM Macina Team 893 2025 férfi E-bike Gr. Purple Flip Matt(Grey+Blk) L', 'férfi'],
+      ['GHOST E-Square Trekking Essential Ladies női E-Bike Dust/Sand Grey S (155-170 cm)', 'női'],
+      ['Bergamont E-Horizon SUV 6 Amsterdam unisex E-bike matt gloomy green 44cm', 'unisex'],
+      ['Rock Machine Thunder 29 VB 15 Gyerek Kerékpár', 'Gyerek'],
+      ['Neuzer Beach Női Cruiser Kerékpár krém', 'Női'],
+      ['Cross Legend Gent férfiTrekking Kerékpár szürkéskék (szürke/bézs) 48cm', undefined],
+    ])('reads the gender word of the title %j as %j', async (name, word) => {
+      for (const slug of ['bikes', 'ebikes']) {
+        expect(await extraRowOf(config, slug, 'Nem (cím)', { name })).toBe(word);
+      }
+    });
+
+    // The title states the rider for the product; the path is a navigation bucket.
+    it.each([
+      ['E-BIKE > E-MTB > Unisex', 'férfi', 'Férfi'],
+      ['E-BIKE > E-MTB FULLY > Unisex', 'unisex', 'Uniszex'],
+      ['Kerékpár > Mountain bike 26 V - fékes > férfi', 'Gyerek', 'Gyermek'],
+      ['Kerékpár > Trekking kerékpár > női', 'Női', 'Női'],
+    ])('lets the title word decide the gender over the path %j (title %j: %j)', (path, word, gender) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { 'Webshop kategória': path, 'Nem (cím)': word })['gender']).toBe(gender);
+      }
+    });
+
+    // Only paths that hold one riding type (E-TÚRA mixes trekking, SUV, gravel and city;
+    // Classic - Cruiser and Mountain Bike 29 Carbon mix too; the gender-less MTB paths hold kids' bikes).
+    it.each([
+      ['Kerékpár > Mountain Bike > Mountain Bike 29 Fully > férfi', 'Összteleszkópos MTB'],
+      ['Kerékpár > Mountain Bike > Mountain Bike 27,5 Fully > női', 'Összteleszkópos MTB'],
+      ['E-BIKE > E-MTB FULLY > Unisex', 'Összteleszkópos MTB'],
+      ['Kerékpár > Mountain Bike > Mountain Bike 29 > férfi', 'MTB'],
+      ['Kerékpár > Mountain Bike > Mountain bike 26 V - fékes > női', 'MTB'],
+      ['E-BIKE > E-MTB > Férfi', 'MTB'],
+      ['E-BIKE > E-CROSS > Női', 'Cross Trekking'],
+      ['E-BIKE > E-VÁROSI > Unisex', 'City'],
+      ['E-BIKE > E-FAT', 'Fat'],
+      ['E-BIKE > E-CARGO', 'Cargo'],
+      ['Kerékpár > Gravel kerékpár > női', 'Gravel'],
+      ['Kerékpár > Trekking kerékpár > férfi', 'Trekking'],
+      ['Kerékpár > Cross kerékpár > férfi', 'Cross Trekking'],
+      ['Kerékpár > Cyclocross kerékpár > férfi', 'Cyclocross'],
+      ['Kerékpár > City Kerékpár > City agyváltós > női', 'City'],
+      ['Kerékpár > Fitness kerékpárok > férfi', 'Fitness'],
+      ['Kerékpár > Országúti kerékpár > férfi', 'Országúti'],
+      ['Kerékpár > Dirt jump kerékpár', 'Dirt'],
+      ['Kerékpár > BMX kerékpárok - 20', 'BMX'],
+      ['Kerékpár > Fatbike kerékpárok', 'Fat'],
+      ['Kerékpár > Fixi-1 sebi > Férfi fixi-1 sebi', 'Single speed / Fixi'],
+      ['Kerékpár > Speciális Kerékpárok > Összecsukható kerékpár', 'Összecsukható'],
+      ['Kerékpár > Speciális Kerékpárok > Tandem kerékpár', 'Tandem'],
+      ['Kerékpár > Gyerek Kerékpár > Futókerékpár', 'Futóbicikli'],
+      ['Kerékpár > Gyerek Kerékpár > Gyerek kerékpár 20', 'Gyerek'],
+      ['Kerékpár > E-Bike kerékpárok > gyerek', 'Gyerek'],
+      ['E-BIKE > E-TÚRA > Férfi', undefined],
+      ['Kerékpár > Classic - Cruiser > női', undefined],
+      ['Kerékpár > Mountain Bike > Mountain Bike 29 Carbon', undefined],
+      ['Kerékpár > Mountain Bike > Mountain Bike 27,5', undefined],
+      ['Kerékpár > E-Bike kerékpárok > férfi', undefined],
+      ['Akció > Kerékpárok', undefined],
+    ])('reads the usage type of the path %j as %j, for bikes and e-bikes', (path, usageType) => {
+      for (const slug of ['bikes', 'ebikes'] as const) {
+        expect(specsOf(config, slug, { 'Webshop kategória': path })['usageType']).toBe(usageType);
+      }
+    });
+
+    it.each([
+      // Fork travel from the fork row; an axle (15x110), an offset or a steerer is no travel.
+      ['ebikes', 'villa', 'SR SUNTOUR NVX30 NLO (29), 100mm, coil spring', 'forkTravel', 100],
+      ['ebikes', 'FORK', 'FOX 34 Float 29" AWL e-bike 120mm 15x110', 'forkTravel', 120],
+      ['bikes', 'Teleszkóp', 'Suntour XCT30-HLO   100 mm utas', 'forkTravel', 100],
+      ['bikes', 'Villa', 'RockShox Domain Gold Isolator R, Travel: 170mm, 15 x 110mm pevná osa Boost', 'forkTravel', 170],
+      ['bikes', 'Villa', 'Topstone Carbon, 1-1/8" to 1.5" steerer, 55mm OutFront offset, flat mount disc', 'forkTravel', undefined],
+      ['bikes', 'Teleszkóp', 'SR Suntour Zeron 36X Air 140 STR Tapered 44mm fork off set 29x2.6" max WHS', 'forkTravel', undefined],
+      ['bikes', 'Villa', 'CrMo kúpos villalábak, 28 mm-es eltolás', 'forkTravel', undefined],
+      ['bikes', 'Teleszkóp', 'Rock Shox Judy TK Coil 100 LO', 'forkModel', 'Rock Shox Judy TK Coil 100 LO'],
+      // Brake pistons.
+      ['ebikes', 'BRAKE', 'Shimano MT402 (3-F) / MT420 4-Piston', 'brakePistons', 4],
+      ['ebikes', 'Brakes', 'SRAM Maven Silver Stealth 4-Piston Disc', 'brakePistons', 4],
+      ['bikes', 'Fék', 'Tektro HD-T280 (Hydraulic disc brake, 2 pistons)', 'brakePistons', 2],
+      ['bikes', 'Fék', 'Shimano MT200 Hydraulic Disc', 'brakePistons', undefined],
+      // Cassette range, in the stored "11-36T" form: only where the shop writes the T.
+      ['ebikes', 'kazettás fogaskoszorú', 'SHIMANO CS-HG201-9 (11-36T) or microSHIFT Marvo CS-H092 (11-36T)', 'cassetteRange', '11-36T'],
+      ['ebikes', 'Cassette', 'Shimano CS-LG40010 11-48 T', 'cassetteRange', undefined],
+      ['ebikes', 'SPROCKET', 'Shimano Deore M6100-12 / 10-51', 'cassetteRange', undefined],
+      ['bikes', 'Fogaskeréksor', 'Shimano CS-HG200-9 / 11-36T', 'cassetteRange', '11-36T'],
+      ['bikes', 'Fogaskeréksor', 'Shimano CS-HG200-9 / 11-36T', 'cassette', 'Shimano CS-HG200-9 / 11-36T'],
+      // Handlebar width: the first 3-digit mm figure, when it is a width.
+      ['ebikes', 'kormány', 'KALLOY RiseBar - diam 31.8mm / width 640mm', 'handlebarWidth', 640],
+      ['ebikes', 'BAR', 'KTM TEAM II flat 2X 720mm', 'handlebarWidth', 720],
+      ['ebikes', 'Handlebar', 'Syncros UC3.0 680mm, Rise 12mm, Backsweep 15°', 'handlebarWidth', 680],
+      ['bikes', 'Kormány', 'Gravel Bar RA120A 440 mm (S) 460 mm (M) 480 mm (L) 500 mm (XL)', 'handlebarWidth', undefined],
+      // Seatpost diameter.
+      ['ebikes', 'nyeregcső', 'KLS Active - diam 30.9mm / length 350mm', 'seatpostDiameter', 30.9],
+      ['ebikes', 'SEATPOST', 'KTM COMP dropper internal 30.9 T:100', 'seatpostDiameter', 30.9],
+      ['ebikes', 'Seatpost', 'Syncros 3.0, 31.6mm, 350mm', 'seatpostDiameter', 31.6],
+      ['bikes', 'Nyeregcső', 'Csepel WAK, alu 27,2x400 mm', 'seatpostDiameter', 27.2],
+      // Tyre size (ETRTO) and the wheel size its bead names.
+      ['ebikes', 'TIRE F', 'Maxxis Rekon EXO/TR 62-622', 'tireSize', '62-622'],
+      ['ebikes', 'Front Tire', 'Schwalbe Big Apple Performance, 60-622', 'tireSize', '60-622'],
+      ['ebikes', 'köpenyek', 'SCHWALBE Nobby Nic Performance 60-622 (29x2.35) ADDIX', 'tireSize', '60-622'],
+      ['ebikes', 'köpenyek', 'SCHWALBE Nobby Nic Performance 60-622 (29x2.35) ADDIX', 'tireModel', 'SCHWALBE Nobby Nic Performance 60-622 (29x2.35) ADDIX'],
+      ['bikes', 'köpenyek', 'RUBENA Walrus 47-305 (16x1.75x2)', 'tireModel', 'RUBENA Walrus 47-305 (16x1.75x2)'],
+      ['ebikes', 'TIRE F', 'Schwalbe Johnny Watts Perf. Folding 65-584 DD', 'wheelSize', 27.5],
+      ['ebikes', 'Front Tire', 'Schwalbe PRO ONE EVO Super RaceTL-EasyFold700x38C', 'wheelSize', 28],
+      ['bikes', 'köpenyek', 'RUBENA Walrus 47-305 (16x1.75x2)', 'wheelSize', 16],
+      ['ebikes', 'TIRE F', 'Schwalbe Marathon Mondial Perf. RaceGuard 47-622 Reflex', 'wheelSize', undefined],
+      // Lighting, from the front or the rear lamp row.
+      ['ebikes', 'első lámpa', 'AXA Compactline 35', 'lighting', 'Alapfelszereltség'],
+      ['ebikes', 'hátsó lámpa', 'TRELOCK Duo Flat', 'lighting', 'Alapfelszereltség'],
+      ['ebikes', 'LIGHT R', 'B&M Toplight 2C', 'lighting', 'Alapfelszereltség'],
+      ['bikes', 'LIGHT R', 'AXA Juno Steady', 'lighting', 'Alapfelszereltség'],
+      // The accessories row names the rack, the kickstand, the fenders and the lights.
+      ['ebikes', 'kiegészitők', 'alloy carrier, adjustable kickstand, bell', 'rack', 'Alapfelszereltség'],
+      ['ebikes', 'kiegészitők', 'alloy carrier, adjustable kickstand, bell', 'kickstand', true],
+      ['ebikes', 'kiegészitők', 'kickstand, bell', 'rack', undefined],
+      ['bikes', 'Kiegészítők', 'Csomagtartó, sárvédő, kitámasztó, csengő', 'fenders', 'Alapfelszereltség'],
+      ['bikes', 'Extras', 'fender mount, water bottle cages, tubeless prepared, 38mm max tire size', 'fenders', undefined],
+      ['bikes', 'Extras', 'Kickstand mount', 'kickstand', undefined],
+      ['bikes', 'Extras', 'Axa Compactline 35E front light, Axa Blueline rear light, Tubus rear rack (25kg)', 'lighting', 'Alapfelszereltség'],
+      // Rotor sizes from the combined rows; a size-only cell is no rotor model.
+      ['ebikes', 'féktárcsák', '160mm front / 160mm rear', 'rotorSizeFront', 160],
+      ['ebikes', 'féktárcsák', '180 mm front / 160 mm rear', 'rotorSizeRear', 160],
+      ['ebikes', 'féktárcsák', '160mm front / 160mm rear', 'rotorModel', undefined],
+      ['ebikes', 'féktárcsák', 'SM-RT30', 'rotorModel', 'SM-RT30'],
+      ['ebikes', 'BRAKE-DISC', 'Shimano RT64 CL 180 / RT64 CL 160', 'rotorSizeRear', 160],
+      ['ebikes', 'Rotor', 'Front: SM-RT30 CL 180mm, Rear: SM-RT30 CL 160mm', 'rotorSizeRear', 160],
+      ['bikes', 'Féktárcsa Hátsó', 'Shimano RT10 160 mm', 'rotorSizeRear', 160],
+      // Hub spacing, in the width x axle form whatever the shop's order.
+      ['ebikes', 'Rear Hub', 'Shimano FHTC500HMBB, 148x12mm', 'hubSpacingRear', '148x12'],
+      ['ebikes', 'Rear Hub', 'Formula CL-148S, 12x148mm', 'hubSpacingRear', '148x12'],
+      ['bikes', 'Hub (Rear)', 'Shimano FH-MT410-B CL / 12x148mm / Micro Spline', 'hubSpacingRear', '148x12'],
+      ['ebikes', 'rögzített tengely', 'ROCK SHOX Maxle Stealth 15x110mm front / NOVATEC 12x148mm rear', 'hubSpacingFront', '110x15'],
+      ['ebikes', 'WHEEL F', 'KTM Line - DT Swiss 370 6b 32L 110/15 / Ryde Andra29 32H 622x29C', 'hubSpacingFront', '110x15'],
+      ['ebikes', 'WHEELSET', 'KTM Line - Shimano Deore M6000 CL 32H 100-5QR / 135 QR', 'hubSpacingRear', undefined],
+      // Crank length and chainring teeth from the crankset row; a double or triple has no single ring.
+      ['ebikes', 'hajtómű', 'SHIMANO E5000 (38T) - length 175mm', 'crankLength', 175],
+      ['ebikes', 'hajtómű', 'SHIMANO E5000 (38T) - length 175mm', 'chainringTeeth', 38],
+      ['ebikes', 'CRANKSET', 'KTM E-TEAM2 ISIS 170mm Q8', 'crankLength', 170],
+      ['bikes', 'Hajtómű', 'Shimano FC-M315 48/38/28T 175mm', 'chainringTeeth', undefined],
+      ['bikes', 'Hajtómű', 'Shimano FC-M315 48/38/28T 175mm', 'crankLength', 175],
+      // E-bike electrics.
+      ['ebikes', 'Drive Unit', 'Bosch Performance Line PX (BDU347Y)EU: 25kmh', 'topSpeed', 25],
+      ['ebikes', 'Drive Unit', 'TQ HPR50 Mid Motor drive 50Nm max Torque / EU: 25kmh / US: 20mph', 'topSpeed', 25],
+      ['ebikes', 'motor', 'SHIMANO STEPS E5000, 36 V', 'batteryVoltage', 36],
+      ['ebikes', 'Charger', 'TQ 100-240V-4A', 'chargerCurrent', 4],
+      ['ebikes', 'CHARGER', 'Bosch Standard Charger 4A', 'chargerCurrent', 4],
+      ['ebikes', 'switch unit', 'PANASONIC', 'controlUnit', 'PANASONIC'],
+      // Weight: the KG cell of the brand spreadsheets is date-mangled on some rows.
+      ['ebikes', 'Approx weight in KG', '28.szept', 'weight', undefined],
+      ['ebikes', 'Approx weight in KG', '04.dec', 'weight', undefined],
+      ['ebikes', 'Approx weight in KG', '28,9', 'weight', 28.9],
+      ['ebikes', 'Approx weight in KG', '19.8 Tubless setup without RE (1.1kg)', 'weight', 19.8],
+      ['bikes', 'Kb. súly KG', '10.26', 'weight', 10.26],
+      // Labels other rows already had under another spelling.
+      ['bikes', 'monoblokk', 'SHIMANO BB-RS500', 'bottomBracket', 'SHIMANO BB-RS500'],
+      ['bikes', 'F. DERAILL.', 'Shimano Tourney TY601', 'frontDerailleur', 'Shimano Tourney TY601'],
+      ['bikes', 'F.DERAILL', 'Shimano Cues FD-U4000 TS', 'frontDerailleur', 'Shimano Cues FD-U4000 TS'],
+      ['bikes', 'Ülés', 'Syncros Savona 2.5 V-Concept', 'saddle', 'Syncros Savona 2.5 V-Concept'],
+      ['ebikes', 'fűzott kerekek', 'NOVATEC M30A 622x30 front / NOVATEC M35A 584x35 rear, Center Lock', 'wheelset', 'NOVATEC M30A 622x30 front / NOVATEC M35A 584x35 rear, Center Lock'],
+    ] as const)('reads a %s row %s: %j as %s %j (review 2026-10-23)', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
     const freewheel = (value: string) => [{ name: 'Cassette / freewheel', values: [value] }];
 
     // Two e-bike branches. The e-scooters under E-BIKE are cut by labelFrom,
@@ -1063,6 +1985,98 @@ describe('hand-authored source configs', () => {
   describe("akosbike's spec rows", () => {
     const config = asFeedConfig(akosbikeArukeresoConfig);
 
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // The shop's own path names the type where a segment holds one type only. "Fitness, városi",
+    // "Cross, Trekking", "Cross-trekking" (Kathmandu trekking next to Nature cross), "Országúti" (a
+    // Cross Race cyclocross among the road bikes) and the 12"/14"/balance-bike path mix types: the LLM decides.
+    it.each([
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > MTB Fully E-bike kerékpár', 'Összteleszkópos MTB'],
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > Gravel E-bike kerékpár', 'Gravel'],
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > Gyerek E-bike kerékpár', 'Gyerek'],
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > Fitness, városi E-bike kerékpár', undefined],
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > Cross, Trekking E-bike kerékpár', undefined],
+      ['bikes', 'Cube kerékpárok > MTB kerékpár', 'MTB'],
+      ['bikes', 'Cube kerékpárok > MTB fully kerékpár', 'Összteleszkópos MTB'],
+      ['bikes', 'Cube kerékpárok > Gravel kerékpár', 'Gravel'],
+      ['bikes', 'Cube kerékpárok > 20" gyerek kerékpár', 'Gyerek'],
+      ['bikes', 'Cube kerékpárok > 12", 14" és futó gyerek kerékpár', undefined],
+      ['bikes', 'Cube kerékpárok > Cross-trekking kerékpár', undefined],
+      ['bikes', 'Cube kerékpárok > Országúti kerékpár', undefined],
+    ] as const)('reads the %s path %j as usage type %j', (slug, path, usageType) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })['usageType']).toEqual(usageType);
+    });
+
+    it.each([
+      ['ebikes', 'Elektromos kerékpárok > Új E-bike Kerékpár > Gyerek E-bike kerékpár', 'Gyermek'],
+      ['bikes', 'Cube kerékpárok > 12", 14" és futó gyerek kerékpár', 'Gyermek'],
+      ['bikes', 'Cube kerékpárok > MTB kerékpár', undefined],
+    ] as const)('reads the %s path %j as rider %j', (slug, path, gender) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })['gender']).toEqual(gender);
+    });
+
+    it.each([
+      ['ebikes', 'Motor', 'Bosch Drive Unit Performance Line CX max. 120 Nm (BDU38)', 'motorBrand', 'Bosch'],
+      ['ebikes', 'Fékek', 'Shimano XT BR-M8120, Hydr. Disc Brake (203/180)', 'rotorSizeFront', 203],
+      ['ebikes', 'Fékek', 'Shimano XT BR-M8120, Hydr. Disc Brake (203/180)', 'rotorSizeRear', 180],
+      ['ebikes', 'Fékek', 'Shimano BR-MT200, Hydr. Disc Brake (180/180)', 'brakeType', 'Tárcsa'],
+      ['bikes', 'Fék', 'Tektro MD-C510, Flat Mount (160/160)', 'brakeType', 'Tárcsa'],
+      ['bikes', 'Fék', 'Tektro MD-C510, Flat Mount (160/160)', 'rotorSizeFront', 160],
+      // The travel is the standalone mm figure, not the 15x110mm axle.
+      ['ebikes', 'Villa', 'RockShox Psylo Silver RC Air, Tapered, 15x110mm, Lockout, 120mm', 'forkTravel', 120],
+      ['ebikes', 'Villa/Teleszkóp', 'SR Suntour XCR34X-Air, Tapered, 15x110mm, 100mm', 'forkTravel', 100],
+      ['ebikes', 'Villa', 'CUBE Editor Full Carbon, 1 1/8" - 1 1/2" Tapered, Internal Cable Routing, 12x100mm', 'forkTravel', undefined],
+      ['ebikes', 'Villa/Teleszkóp', 'SR Suntour XCR34X-Air, Tapered, 15x110mm, 100mm', 'forkType', 'Levegős'],
+      ['ebikes', 'Villa', 'Fox 38 Float Performance GRIP, Tapered, 15x110mm, 170mm', 'forkType', 'Levegős'],
+      ['bikes', 'Villa', 'Rigid Alloy Fork', 'forkType', 'Merev'],
+      ['bikes', 'Villa/Teleszkóp', 'SR Suntour XCS, 100mm', 'forkType', undefined],
+      // ETRTO only; a width alone ("2.4") is left to the LLM.
+      ['ebikes', 'Első gumi', 'Conti Contact Urban, 50-622', 'tireSize', '50-622'],
+      ['ebikes', 'Első gumi', 'Schwalbe Nobby Nic, Addix Performance, Kevlar, 2.4', 'tireSize', undefined],
+      ['ebikes', 'Nyeregcső', 'CUBE Dropper Post, Handlebar Lever, Internal Cable Routing, 31.6mm', 'seatpostDiameter', 31.6],
+      ['ebikes', 'Nyeregcső', 'CUBE Dropper Post, Handlebar Lever, Internal Cable Routing, 31.6mm', 'seatpostType', 'Teleszkópos (dropper)'],
+      ['ebikes', 'Nyeregcső', 'CUBE Performance Post, 30.9mm', 'seatpostDiameter', 30.9],
+      ['ebikes', 'Nyeregcső', 'CUBE Performance Post, 30.9mm', 'seatpostType', undefined],
+      // One chainring only.
+      ['ebikes', 'Hajtómű', 'ACID MTB Hybrid Pro, 38T', 'chainringTeeth', 38],
+      ['ebikes', 'Hajtómű', 'ACID MTB Hybrid Pro', 'chainringTeeth', undefined],
+      ['bikes', 'Hajtómű', 'Shimano GRX FC-RX820, 48x31T', 'chainringTeeth', undefined],
+      ['ebikes', 'Fogaskoszorú', 'KMC LG-11, 11-50T', 'cassetteRange', '11-50T'],
+      ['ebikes', 'Fogaskoszorú', 'Gates Rear Sprocket CDX, 34T', 'cassetteRange', undefined],
+      // The shop writes axle x width; the stored form is width x axle.
+      ['ebikes', 'Kerékszett', 'ACID SLX 30, 32/32 Spokes, 15x110mm/12x148mm, Tubeless Ready', 'hubSpacingFront', '110x15'],
+      ['ebikes', 'Kerékszett', 'ACID SLX 30, 32/32 Spokes, 15x110mm/12x148mm, Tubeless Ready', 'hubSpacingRear', '148x12'],
+      ['ebikes', 'Kerékszett', 'Newmen Performance X.R.25, 28/28 Spokes, 12x100mm / 12x142mm, Tubeless Ready', 'hubSpacingFront', '100x12'],
+      ['ebikes', 'Kerékszett', 'Newmen Performance X.R.25, 28/28 Spokes, 12x100mm / 12x142mm, Tubeless Ready', 'hubSpacingRear', '142x12'],
+      ['ebikes', 'Kerékszett', 'ACID SLX 30, 32/32 Spokes, 15x110mm/12x148mm, Tubeless Ready', 'tubeless', true],
+      ['ebikes', 'Kerékszett', 'CUBE SX24, Disc, 36H', 'tubeless', undefined],
+      ['ebikes', 'Kormány', 'CUBE Rise Trail Bar, 720mm', 'handlebarWidth', 720],
+      ['ebikes', 'Kormány', 'Newmen Advanced Gravel Bar 318, Carbon, 31.8mm', 'handlebarWidth', undefined],
+      ['bikes', 'Max. teherbírás', '140 kg', 'maxTotalWeight', 140],
+      ['bikes', 'Max.teherbírás', '115 kg', 'maxTotalWeight', 115],
+      ['bikes', 'Méret', '53 cm / M, átlagos testmagasságnak megfelelő', 'frameSize', 53],
+      ['bikes', 'Méret', '53 cm / M, átlagos testmagasságnak megfelelő', 'frameSizeLabel', 'M'],
+      // XXS is not in the label enum.
+      ['bikes', 'Méret', '46 cm / XXS', 'frameSize', 46],
+      ['bikes', 'Méret', '46 cm / XXS', 'frameSizeLabel', undefined],
+      ['bikes', 'Bandázs', 'ACID Bartape CX', 'grips', 'ACID Bartape CX'],
+      ['bikes', 'Rugós tag', 'RockShox Deluxe Select+, 190x42.5mm', 'rearShockModel', 'RockShox Deluxe Select+, 190x42.5mm'],
+      ['bikes', 'Beépített kormány és kormányszár', 'CUBE Phenix Carbon Cockpit System', 'handlebar', 'CUBE Phenix Carbon Cockpit System'],
+      ['bikes', 'Gumi elöl', 'Schwalbe Racing Ray, Super Race, Addix Speed, Kevlar, 2.25', 'tireModel', 'Schwalbe Racing Ray, Super Race, Addix Speed, Kevlar, 2.25'],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
+    // A row an identity-relevant mapping reads goes to the identity call too.
+    it('sends the size, shock and tyre row variants to the identity extraction', () => {
+      for (const slug of ['bikes', 'ebikes']) {
+        expect(config.categories?.[slug]?.identitySpecRows).toEqual(
+          expect.arrayContaining(['Méret', 'Rugós tag', 'Gumi elöl', 'Gumi hátul']),
+        );
+      }
+    });
+
+
     it.each([
       ['bikes', 'Váz kialakítás', 'Trapéz', 'frameType', 'Trapéz'],
       ['bikes', 'Váz', 'C:62® Advanced Twin Mold Technology', 'frameMaterial', 'Karbon'],
@@ -1121,6 +2135,40 @@ describe('hand-authored source configs', () => {
   describe("bikelife's bike type", () => {
     const config = asFeedConfig(bikelifeArukeresoConfig);
 
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // The sku prefix as the schema's usage type, only where the prefix holds one
+    // type (checked against every title of the 2026-10-20 feed). 0107 "Fitness"
+    // holds the SOOT 20 gravel bike, 0108 "Országúti" gravel and fitness bikes,
+    // 0109 "City" a singlespeed and a cyclocross: no row. The MTB prefixes hold a
+    // fully (Spark 960), fitness, city and kids' bikes, so they keep the shop's
+    // words, which no enum value matches.
+    it.each([
+      ['010100000065', 'Futóbicikli', { usageType: 'Futóbicikli', gender: 'Gyermek' }],
+      ['010203000044', 'Gyerek', { usageType: 'Gyerek', gender: 'Gyermek' }],
+      ['010300000001', 'BMX', { usageType: 'BMX' }],
+      ['010500000622', 'Trekking', { usageType: 'Trekking' }],
+      ['010600001409', 'Cross Trekking', { usageType: 'Cross Trekking' }],
+      ['011000000001', 'Cruiser', { usageType: 'Cruiser' }],
+      ['011200000001', 'Tandem', { usageType: 'Tandem' }],
+      ['014000000001', 'Cyclocross', { usageType: 'Cyclocross' }],
+      ['015000000001', 'Gravel', { usageType: 'Gravel' }],
+      ['012000000258', 'MTB 29"', {}],
+      ['013000000001', 'MTB 27.5"', {}],
+      ['010400000001', 'MTB 26"', {}],
+    ])('reads sku %s as %j and maps it to %j', async (sku, row, specs) => {
+      expect(await extraRowOf(config, 'bikes', 'Webshop kategória', { sku })).toBe(row);
+      expect(specsOf(config, 'bikes', { 'Webshop kategória': row })).toEqual(specs);
+    });
+
+    it.each(['010700000075', '010800000054', '010900000001'])(
+      'gives sku %s, a prefix that mixes bike types, no row',
+      async (sku) => {
+        expect(await extraRowOf(config, 'bikes', 'Webshop kategória', { sku })).toBeUndefined();
+      },
+    );
+
+
     // Its category is flat; the sku's first four digits name the bike type.
     it.each([
       ['010612345678', 'Cross Trekking'],
@@ -1135,6 +2183,80 @@ describe('hand-authored source configs', () => {
 
   describe("ambringa's spec rows", () => {
     const config = asFeedConfig(ambringaArukeresoConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Every e-bike title ends "(NNNWh, colour)"; it also covers the rows with an
+    // empty description, where no other row names the capacity.
+    it.each([
+      ['CUBE Nuride Hybrid Pro 600 elektromos kerékpár (600Wh, chilli´n´black)', 600],
+      ['Cube Touring Hybrid Deluxe SLX 800 férfi elektromos kerékpár (800Wh, slabgrey´n´chrome)', 800],
+      ['FLYER Goroc2 6.30 HS elektromos kerékpár (750 Wh, cast silver gloss) - 45 km/h', 750],
+    ])('reads the battery capacity from the title %j', async (name, capacity) => {
+      const row = await extraRowOf(config, 'ebikes', 'Akkumulátor kapacitása (cím)', { name });
+      expect(specsOf(config, 'ebikes', { 'Akkumulátor kapacitása (cím)': row ?? '' })).toMatchObject({
+        batteryCapacity: capacity,
+      });
+    });
+
+    // The description's motor and battery lines, already made into rows, now
+    // read deterministically.
+    it.each([
+      ['Rásegítés sebességhatára', '25 km/h', { topSpeed: 25 }],
+      ['Rásegítés sebességhatára', '45 km/h', { topSpeed: 45 }],
+      ['Motor névleges teljesítménye', '250W', { motorPower: 250 }],
+      ['Motor működési elve', 'Nyomatékszenzor', { sensorType: 'Nyomatékszenzor' }],
+      [
+        'Motor működési elve',
+        'Nyomatékszenzor + integrált, 12 sebességes középagyváltó',
+        { sensorType: 'Nyomatékszenzor' },
+      ],
+      ['Akkumulátor elhelyezése', 'vázcső belsejébe rejtett bölcsőben', { batteryPosition: 'Vázba integrált' }],
+      ['Akkumulátor elhelyezése', 'vázra szerelt dokkolón', { batteryPosition: 'Külső' }],
+      ['Akkumulátor technológiája', 'Li-ion', { batteryChemistry: 'Li-ion' }],
+      ['Akkumulátor levehető', 'igen, kulccsal kinyitva', { batteryRemovable: true }],
+    ])('maps the description row %s %j', (label, value, expected) => {
+      expect(specsOf(config, 'ebikes', { [label]: value })).toMatchObject(expected);
+    });
+
+    it('leaves "gyártónként változó" without a removable-battery value', () => {
+      expect(specsOf(config, 'ebikes', { 'Akkumulátor levehető': 'gyártónként változó' })['batteryRemovable']).toBeUndefined();
+    });
+
+    // Only a title word that names the rider; silence gives nothing (explicitOnly).
+    it.each([
+      ['Cube Touring Hybrid Deluxe SLX 800 férfi elektromos kerékpár (800Wh, slabgrey´n´chrome)', 'Férfi'],
+      ['Cube Kathmandu Hybrid Pro 800 női elektromos kerékpár (800Wh, coal´n´black)', 'Női'],
+      ['KTM Macina Tour CX 820 unisex elektromos kerékpár (800Wh, diamond black matt)', 'Uniszex'],
+      ['SCOTT Sub Sport eRIDE 10 Men elektromos kerékpár (750Wh, zöld szín)', 'Férfi'],
+      ['Bergamont E-Revox Edition EQ elektromos kerékpár férfi vázzal (500Wh, matt galaxy grey)', 'Férfi'],
+      ['CUBE Nuride Hybrid Pro 600 elektromos kerékpár (600Wh, chilli´n´black)', undefined],
+    ])('reads the rider from the title %j as %j', async (name, gender) => {
+      const row = await extraRowOf(config, 'ebikes', 'Nem (cím)', { name });
+      expect(row ? specsOf(config, 'ebikes', { 'Nem (cím)': row })['gender'] : undefined).toBe(gender);
+    });
+
+    // The article number's size suffix (Cube, Bergamont, Scott): a cm size or a
+    // letter. KTM's and BULLS's numbers carry none.
+    it.each([
+      ['110220-54_df', { frameSize: 54 }],
+      ['813700-50_cf', { frameSize: 50 }],
+      ['111122-46E_cf', { frameSize: 46 }],
+      ['111121-50T_tf', { frameSize: 50 }],
+      ['1111101-54_tf', { frameSize: 54 }],
+      ['290670-M_df', { frameSizeLabel: 'M' }],
+      ['423630-L_df', { frameSizeLabel: 'L' }],
+      ['1260161111_df', {}],
+      ['657-45350_df', {}],
+    ])('reads the size of sku %s as %j', async (sku, expected) => {
+      const rows: Record<string, string> = {};
+      for (const label of ['Vázméret (cikkszám, cm)', 'Vázméret jelölés (cikkszám)']) {
+        const row = await extraRowOf(config, 'ebikes', label, { sku });
+        if (row) rows[label] = row;
+      }
+      expect(pick(specsOf(config, 'ebikes', rows), SIZE_KEYS)).toEqual(expected);
+    });
+
 
     // The sku's suffix: the frame, or a full-suspension or folding bike.
     it.each([
@@ -1182,6 +2304,175 @@ describe('hand-authored source configs', () => {
   // rows are what the config adds to the titles.
   describe("tuttobici's Google Shopping feed config", () => {
     const config = asFeedConfig(tuttobiciGoogleshopConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Every row states `New`: Google's word, read case-insensitively by the importer.
+    it('reads availability as written and condition from its column', async () => {
+      expect(config.mapping['availability']).toEqual({ field: 'availability' });
+      expect(config.mapping['condition']).toEqual({ field: 'condition' });
+      expect(await readText(config, 'condition', { condition: 'New' })).toBe('New');
+    });
+
+    // A feed row's specs as the importer builds them: the section's extra rows
+    // (the shop's path, the title rows, the bikes' age row), then its specMapping.
+    async function feedSpecs(slug: 'bikes' | 'ebikes', fields: Record<string, string>) {
+      const rows: Record<string, string> = {};
+      for (const { label } of config.categories?.[slug]?.extraSpecRows ?? []) {
+        const value = await extraRowOf(config, slug, label, fields);
+        if (value !== undefined) rows[label] = value;
+      }
+      return specsOf(config, slug, rows);
+    }
+
+    // The title names the gender in capitals on KTM (FÉRFI / NŐI / UNISEX) and in
+    // lower case on Giant and Liv; a kids' bike says "Gyerek kerékpár" or "gyermek".
+    it.each([
+      ['ebikes', 'KTM MACINA FOLD NŐI Elektromos városi kerékpár - OLIVE PEARL', 'Női'],
+      ['ebikes', 'KTM MACINA AERA 872 LFC UNISEX Elektromos MTB kerékpár - SMARAGD BLACK - több méretben', 'Uniszex'],
+      [
+        'ebikes',
+        'KTM MACINA PROWLER PRESTIGE CX-R Di2 FÉRFI Összteleszkópos elektromos MTB kerékpár - SHARK BLUE+METALLIC BLACK MATT - több méretben',
+        'Férfi',
+      ],
+      ['ebikes', 'LIV Lurra E+ 29" elektromos női MTB kerékpár - Lunar Eclipse', 'Női'],
+      ['bikes', 'KTM REVELATOR 15 NŐI Országúti kerékpár - KEEN GREEN - több méretben', 'Női'],
+      ['bikes', 'KTM WILD SPEED DISC 26 Gyerek kerékpár - 34', 'Gyermek'],
+      ['bikes', 'GIANT ARX 20   gyermek cross/gravel kerékpár - Cobalt', 'Gyermek'],
+      ['bikes', 'Tern Link B7 összecsukható kerékpár', undefined],
+    ])('reads the %s gender off the title %j as %j', async (slug, title, gender) => {
+      expect((await feedSpecs(slug as 'bikes' | 'ebikes', { title }))['gender']).toBe(gender);
+    });
+
+    // The bikes path opens with the gender; the title wins where both speak.
+    it.each([
+      ['Kerékpár > Férfi kerékpár > Összteleszkópos > 29"', 'Bottecchia 74A Shimano 105 - 2026', 'Férfi'],
+      ['Kerékpár > Női kerékpár > Országúti (700, 622, 28")', 'Bottecchia 74A Shimano 105 - 2026', 'Női'],
+      ['Kerékpár > Gyerek kerékpárok > 26" (14 éves kor felett)', 'KTM WILD SPEED 26 - 34', 'Gyermek'],
+      ['Kerékpár > Férfi kerékpár > MTB > 29"', 'KTM MYROON ELITE NŐI 29" MTB kerékpár - BURNT ORANGE', 'Női'],
+    ])('reads the bikes gender of path %j (title %j) as %j', async (product_type, title, gender) => {
+      expect((await feedSpecs('bikes', { product_type, title }))['gender']).toBe(gender);
+    });
+
+    // Usage type: the path's unambiguous segments, then the title's bike-type word,
+    // which wins (the e-bike path "Elektromos MTB kerékpárok" holds hardtails and
+    // full-suspension bikes, and "City-Városi E-BIKE" holds the folding MACINA FOLD:
+    // neither is mapped), then a kids' title word, which wins over both.
+    it.each([
+      [
+        'bikes',
+        'Kerékpár > Férfi kerékpár > Összteleszkópos > 29"',
+        'KTM SCARP EXONIC FÉRFI Összteleszkópos MTB kerékpár - CARBON CRYSTAL RED - több méretben',
+        'Összteleszkópos MTB',
+      ],
+      ['bikes', 'Kerékpár > Férfi kerékpár > MTB > 29"', 'KTM MYROON ELITE FÉRFI 29" MTB kerékpár - BURNT ORANGE - 38', 'MTB'],
+      [
+        'bikes',
+        'Kerékpár > Férfi kerékpár > Férfi országúti kerékpár (700, 622, 28")',
+        'KTM REVELATOR ALTO PRO FÉRFI Országúti kerékpár - CANDY BLUEGREY - több méretben',
+        'Országúti',
+      ],
+      ['bikes', 'Kerékpár > Gyerek kerékpárok > 26" (14 éves kor felett)', 'KTM WILD SPEED DISC 26 Gyerek kerékpár - 34', 'Gyerek'],
+      ['bikes', 'Kerékpár > Gyerek kerékpárok > 20" (7-9 éves korig)', 'GIANT ARX 20   gyermek cross/gravel kerékpár - Cobalt', 'Gyerek'],
+      // The path alone (no type word in the title).
+      ['bikes', 'Kerékpár > Női kerékpár > Országúti (700, 622, 28")', 'Bottecchia 74A Shimano 105 - 2026', 'Országúti'],
+      ['ebikes', 'Kerékpár > Elektromos kerékpárok > Gravel E-BIKE', 'KTM MACINA GRAVELATOR SX 10 FÉRFI - MUDDY MATT', 'Gravel'],
+      ['ebikes', 'Kerékpár > Elektromos kerékpárok > Trekking E-BIKE', 'KTM MACINA TOUR CX 810 GX AXS FÉRFI - TERRA', 'Trekking'],
+      // The title's word.
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok',
+        'KTM MACINA SCARP SX ELITE FÉRFI Összteleszkópos elektromos MTB kerékpár - FLAMING BLACK MATT - több méretben',
+        'Összteleszkópos MTB',
+      ],
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok',
+        'KTM MACINA AERA FS ELITE LFC UNISEX Elektromos összteleszkópos MTB kerékpár - OLIVE PEARL MATT - több méretben',
+        'Összteleszkópos MTB',
+      ],
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok',
+        'KTM MACINA TEAM 892 XL Di2 FÉRFI 29" Elektromos MTB kerékpár - OLIVE PEARL MATT - több méretben',
+        'MTB',
+      ],
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Trekking E-BIKE',
+        'KTM MACINA STYLE 840 FÉRFI Elektromos trekking- túra kerékpár - DIAMOND BLACK MATT - több méretben',
+        'Trekking',
+      ],
+      [
+        'ebikes',
+        'Kerékpár > Férfi kerékpár > Összteleszkópos > 27.5"',
+        'KTM MACINA CROSS CX 820 L NŐI Elektromos crosstrekking kerékpár - FLAMING GREY - több méretben',
+        'Cross Trekking',
+      ],
+      ['ebikes', 'Kerékpár > Elektromos kerékpárok', 'Liv Avail Advanced E+ EL 0  - női elektromos országúti kerékpár - 2025', 'Országúti'],
+      // Neither: left to the LLM.
+      ['ebikes', 'Kerékpár > Elektromos kerékpárok > City-Városi E-BIKE', 'KTM MACINA FOLD NŐI Elektromos városi kerékpár - OLIVE PEARL', undefined],
+      ['ebikes', 'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok', 'KTM MACINA KAPOHO 8973 L FÉRFI - FRESH ORANGE', undefined],
+    ])('reads the %s usage type of path %j (title %j) as %j', async (slug, product_type, title, usageType) => {
+      expect((await feedSpecs(slug as 'bikes' | 'ebikes', { product_type, title }))['usageType']).toBe(usageType);
+    });
+
+    // Only full suspension is stated (the path segment or the title word); a
+    // hardtail's fork is not, so it gets no value.
+    it.each([
+      ['bikes', 'Kerékpár > Férfi kerékpár > Összteleszkópos > 29"', 'KTM SCARP MT MASTER FÉRFI - 38', 'Első teleszkóp, hátsó rugóstag'],
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok',
+        'KTM MACINA LYCAN 773 L FÉRFI Összteleszkópos elektromos MTB kerékpár - ELDERBERRY+BLACK MATT - több méretben',
+        'Első teleszkóp, hátsó rugóstag',
+      ],
+      ['bikes', 'Kerékpár > Férfi kerékpár > MTB > 29"', 'KTM MYROON PRIME FÉRFI 29" MTB kerékpár - OLIVE PEARL - több méretben', undefined],
+      [
+        'ebikes',
+        'Kerékpár > Elektromos kerékpárok > Elektromos MTB kerékpárok',
+        'KTM MACINA TEAM 893 FÉRFI 29" Elektromos MTB kerékpár - DIAMOND BLACK MATT - több méretben',
+        undefined,
+      ],
+    ])('reads the %s suspension of path %j (title %j) as %j', async (slug, product_type, title, suspension) => {
+      expect((await feedSpecs(slug as 'bikes' | 'ebikes', { product_type, title }))['suspension']).toBe(suspension);
+    });
+
+    // Shimano Di2, SRAM AXS and SRAM's T-Type (Eagle Transmission, AXS only) shift electronically.
+    it.each([
+      ['ebikes', 'KTM MACINA TEAM 892 XL Di2 FÉRFI 29" Elektromos MTB kerékpár - OLIVE PEARL MATT - több méretben', 'Elektromos'],
+      ['ebikes', 'KTM MACINA TOUR CX 810 GX AXS FÉRFI Elektromos trekking- túra kerékpár - TERRA - több méretben', 'Elektromos'],
+      [
+        'ebikes',
+        "KTM MAC PROWLER EXONIC CX-R XX T-TYPE FÉRFI Összteleszkópos elektromos MTB kerékpár - FRESH'BURNT ORANGE+BLACK MATT - több méretben",
+        'Elektromos',
+      ],
+      ['bikes', 'KTM SCARP MT EXONIC Di2 FÉRFI Összteleszkópos MTB kerékpár - CARBON', 'Elektromos'],
+      ['ebikes', 'KTM MACINA STYLE 840 FÉRFI Elektromos trekking- túra kerékpár - DIAMOND BLACK MATT - több méretben', undefined],
+    ])('reads the %s shifting actuation off the title %j as %j', async (slug, title, shiftingActuation) => {
+      expect((await feedSpecs(slug as 'bikes' | 'ebikes', { title }))['shiftingActuation']).toBe(shiftingActuation);
+    });
+
+    // The kids' paths state the rider age in brackets: an "Életkor (kategória)"
+    // row, written as the schema's "7-11 év" ("14 éves kor felett" → "14+ év").
+    it('sends the bracketed rider age of a kids path as a bikes row', async () => {
+      const product_type = 'Kerékpár > Gyerek kerékpárok > 26" (14 éves kor felett)';
+      expect(await extraRowOf(config, 'bikes', 'Életkor (kategória)', { product_type })).toBe('14 éves kor felett');
+      expect(
+        await extraRowOf(config, 'bikes', 'Életkor (kategória)', { product_type: 'Kerékpár > Férfi kerékpár > MTB > 29"' }),
+      ).toBeUndefined();
+    });
+
+    it.each([
+      ['Kerékpár > Gyerek kerékpárok > 26" (14 éves kor felett)', '14+ év'],
+      ['Kerékpár > Gyerek kerékpárok > 20" (7-9 éves korig)', '7-9 év'],
+      ['Kerékpár > Férfi kerékpár > MTB > 29"', undefined],
+    ])('reads the bikes recommended age of path %j as %j', async (product_type, recommendedAge) => {
+      expect((await feedSpecs('bikes', { product_type, title: 'KTM WILD SPEED DISC 26 - 34' }))['recommendedAge']).toBe(
+        recommendedAge,
+      );
+    });
+
     const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
 
     it('validates against the feed config schema', () => {
@@ -1321,16 +2612,68 @@ describe('hand-authored source configs', () => {
       ).toBe('Férfi kerékpár > Gravel');
     });
 
-    // Every row says in_stock and New: availability is read as Google writes
-    // it, and condition is left to the default.
-    it('reads availability as written and maps no condition', async () => {
-      expect(config.mapping['availability']).toEqual({ field: 'availability' });
-      expect(config.mapping['condition']).toBeUndefined();
-    });
   });
 
   describe("downhillendurokerekpar's Árukereső feed config", () => {
     const config = asFeedConfig(downhillendurokerekparArukeresoConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Almost every title opens with the model year ("2023 SCOTT …"). Only a leading year counts: a year
+    // inside a title ("CLASH RIDE 2022 Enduro") is left to the LLM, and a title without one stays empty.
+    it.each([
+      ['bikes', '2026 SCOTT Spark RC Team Kerékpár', 2026],
+      ['bikes', ' 2023 SCOTT GENIUS ST 900 TUNED Enduro Kerékpár', 2023],
+      ['bikes', '2021 KELLYS Gibon 30 Merev Enduro Kerékpár', 2021],
+      ['ebikes', '2023 SCOTT STRIKE ERIDE 930 E-Bike', 2023],
+      ['ebikes', '2023 KELLYS Theos F70 M/L 29/27.5 725Wh E-Bike', 2023],
+      ['ebikes', 'SCOTT Contessa Patron eRIDE 900 E-Bike', undefined],
+      ['bikes', 'COMMENCAL CLASH RIDE 2022 Enduro', undefined],
+    ] as const)('reads the %s title %j as model year %j', async (slug, name, modelYear) => {
+      const row = await extraRowOf(config, slug, 'Modellév (cím)', { name });
+      expect(specsOf(config, slug, row ? { 'Modellév (cím)': row } : {})['modelYear']).toEqual(modelYear);
+    });
+
+    // The GRAVEL shelf also holds Sirrus X step-through fitness bikes, so the title word decides, not the
+    // shelf. Every titled "Gravel" row is a drop-bar gravel bike (Speedster Gravel, 365, Diverge, Stigmata,
+    // Turbo Creo among the e-bikes).
+    it.each([
+      ['bikes', '2023 SCOTT SPEEDSTER GRAVEL 40 EQ Kerékpár', 'Gravel'],
+      ['bikes', '2025 COMMENCAL 365 RIDE CHALK Gravel', 'Gravel'],
+      ['ebikes', '2026 Specialized Turbo Creo 2 Comp E5 SRAM Apex Gravel Kerékpár', 'Gravel'],
+      ['bikes', '2026 Specialized Sirrus X 2.0 Step-Through', undefined],
+      ['bikes', '2026 SCOTT Spark RC Team Kerékpár', undefined],
+    ] as const)('reads the %s title %j as usage type %j', async (slug, name, usageType) => {
+      const row = await extraRowOf(config, slug, 'Gravel (cím)', { name });
+      expect(specsOf(config, slug, row ? { 'Gravel (cím)': row } : {})['usageType']).toEqual(usageType);
+    });
+
+    // The shop's shelves mix types: ENDURO and ALL-MOUNTAIN hold hardtails (Gibon "Merev Enduro", Chisel,
+    // Rockhopper, META HT) next to full-suspension bikes, DOWNHILL a "gyerek downhill" bike, GRAVEL the
+    // Sirrus X, GYEREK MTB push bikes. The path alone maps no usage type.
+    it.each(['ENDURO > Kerékpárok', 'ALL-MOUNTAIN', 'DOWNHILL > Kerékpárok', 'GRAVEL', 'GYEREK MTB > 20"'])(
+      'reads no usage type from the shelf %j alone',
+      (path) => {
+        expect(specsOf(config, 'bikes', { 'Webshop kategória': path })['usageType']).toBeUndefined();
+      },
+    );
+
+    // The e-bike descriptions name the motor maker next to "motor"/"meghajtóegység"; "motorozás" (riding)
+    // after a groupset name is not a motor.
+    it.each([
+      ['A belső kábelek és a gondosan megválasztott geometria az új, erőteljes Bosch motorral kombinálva', 'Bosch'],
+      ['a SCOTT legújabb technológiáit kínálja a Bosch legújabb motorjával együtt.', 'Bosch'],
+      ['a gondosan megválasztott geometria az új Bosch meghajtóegységgel kombinálva', 'Bosch'],
+      ['A 85 Nm nyomatékú Bosch Performance Line CX Smart System motorral, a 800 Wh-s akkumulátorral', 'Bosch'],
+      ['könnyebb, Shimano XT váltóval és all-mountain motorozáshoz tökéletes RockShox villával', undefined],
+      ['akik egy trail bike-ra vágynak egy kompakt és csendes motorral kiegészítve', undefined],
+    ] as const)('reads the e-bike description %j as motor brand %j', async (description, motorBrand) => {
+      const row = await extraRowOf(config, 'ebikes', 'Motor márkája (leírás)', { description });
+      expect(specsOf(config, 'ebikes', row ? { 'Motor márkája (leírás)': row } : {})['motorBrand']).toEqual(
+        motorBrand,
+      );
+    });
+
     const newBike = 'A META SX V5-öt előbb vezetik, mielőtt megülne. A 165 mm-es rugóút…';
 
     it('validates against the Árukereső config schema', () => {
@@ -1493,6 +2836,164 @@ describe('hand-authored source configs', () => {
 
   describe("bikecafe's Google Shopping feed config", () => {
     const config = asFeedConfig(bikecafeGoogleshopConfig);
+
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Used bikes are kept out by the gate; the condition column (Google's New/Used/Refurbished) is the offer's.
+    it('reads the offer condition from the condition column', async () => {
+      expect(config.mapping['condition']).toEqual({ field: 'condition' });
+      expect(await readText(config, 'condition', { condition: 'New' })).toBe('New');
+    });
+
+    // product_weight / shipping_weight are the shop's placeholder (10.00 kg on every bike, 20.00 kg on every
+    // e-bike): never read.
+    it('reads no weight column', () => {
+      for (const section of Object.values(config.categories ?? {})) {
+        const fields = (section.extraSpecRows ?? []).map((row) => row.field);
+        expect(fields).not.toContain('product_weight');
+        expect(fields).not.toContain('shipping_weight');
+      }
+    });
+
+    // The gender column says Férfi or Női where the shop knows it, else "Nemtől független" on every other
+    // row (the kids' bikes too): only the explicit two are read, so products don't split by gender. The
+    // children's path gives Gyermek; an explicit column value wins over it (a KTM City Fun 26 "női városi"
+    // sits among the children's bikes with gender Női).
+    it.each([
+      ['ebikes', { 'Nem': 'Női' }, 'Női'],
+      ['ebikes', { 'Nem': 'Nemtől független' }, undefined],
+      ['bikes', { 'Nem': 'Férfi' }, 'Férfi'],
+      ['bikes', { 'Nem': 'Női' }, 'Női'],
+      ['bikes', { 'Nem': 'Nemtől független' }, undefined],
+      ['bikes', { 'Webshop kategória': 'KERÉKPÁR > Gyerek kerékpár > 24" kerékpár', 'Nem': 'Nemtől független' }, 'Gyermek'],
+      ['bikes', { 'Webshop kategória': 'KERÉKPÁR > Gyerek kerékpár > 26" kerékpár', 'Nem': 'Női' }, 'Női'],
+      ['bikes', { 'Webshop kategória': 'KERÉKPÁR > Trekking kerékpár > Uniszex trekking kerékpár', 'Nem': 'Nemtől független' }, undefined],
+    ] as const)('reads the %s rows %j as rider %j', (slug, rows, gender) => {
+      expect(specsOf(config, slug, rows)['gender']).toEqual(gender);
+    });
+
+    it.each(['ebikes', 'bikes'] as const)('turns the %s gender column into the Nem row', async (slug) => {
+      expect(await extraRowOf(config, slug, 'Nem', { gender: 'Férfi' })).toBe('Férfi');
+    });
+
+    // The shop's path names one type per segment on 2,536 bike rows; promotions (AKCIÓINK), the Árukereső
+    // export path and the used bikes name none.
+    it.each([
+      ['ebikes', 'E-BIKE > MTB E-Bike > Összteleszkópos MTB E-Bike', 'Összteleszkópos MTB'],
+      ['ebikes', 'E-BIKE > MTB E-Bike > Merevfarú MTB E-Bike', 'MTB'],
+      ['ebikes', 'E-BIKE > Gravel E-Bike', 'Gravel'],
+      ['ebikes', 'E-BIKE > Országúti E-Bike', 'Országúti'],
+      ['ebikes', 'E-BIKE > Trekking E-Bike > Férfi trekking E-Bike', 'Trekking'],
+      ['ebikes', 'E-BIKE > Városi E-Bike', 'City'],
+      ['ebikes', 'AKCIÓINK > MERIDA készletkisöprés', undefined],
+      ['bikes', 'KERÉKPÁR > MTB kerékpár > Összteleszkópos MTB kerékpár', 'Összteleszkópos MTB'],
+      ['bikes', 'KERÉKPÁR > MTB kerékpár > Merevfarú MTB kerékpár', 'MTB'],
+      ['bikes', 'KERÉKPÁR > Gravel kerékpár', 'Gravel'],
+      ['bikes', 'KERÉKPÁR > Országúti kerékpár', 'Országúti'],
+      ['bikes', 'KERÉKPÁR > Triatlon kerékpár', 'Országúti'],
+      ['bikes', 'KERÉKPÁR > Cyclocross kerékpár', 'Cyclocross'],
+      ['bikes', 'KERÉKPÁR > Fitness kerékpár', 'Fitness'],
+      ['bikes', 'KERÉKPÁR > Városi kerékpár', 'City'],
+      ['bikes', 'KERÉKPÁR > Cross trekking kerékpár > Női cross trekking kerékpár', 'Cross Trekking'],
+      ['bikes', 'KERÉKPÁR > Trekking kerékpár > Uniszex trekking kerékpár', 'Trekking'],
+      ['bikes', 'KERÉKPÁR > Gyerek kerékpár > 20" kerékpár', 'Gyerek'],
+      ['bikes', 'KERÉKPÁR > Használt kerékpár', undefined],
+      ['bikes', 'arukereso > Kerékpár', undefined],
+    ] as const)('reads the %s path %j as usage type %j', (slug, path, usageType) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })['usageType']).toEqual(usageType);
+    });
+
+    // The title's own type word (the one before "[elektromos] kerékpár"), or FS / Dirt in the model name.
+    it.each([
+      ['ebikes', 'KTM Macina Aera FS Elite LFC elektromos MTB kerékpár 2025 - fekete', 'FS'],
+      ['ebikes', 'STEVENS E-Strada 6.3.4 FEQ városi elektromos kerékpár 2023 - fekete', 'városi'],
+      ['ebikes', 'KTM Macina Kapoho Elite elektromos MTB kerékpár 2025 - fekete', undefined],
+      ['bikes', 'MERIDA Dirt 500 MTB kerékpár 2026 - fekete', 'Dirt'],
+      ['bikes', 'KTM X-Life Track Street férfi cross trekking kerékpár 2024 - fekete', 'cross trekking'],
+      ['bikes', 'KTM City Fun 26 női városi kerékpár 2024 - pezsgő', 'városi'],
+      ['bikes', 'MERIDA Silex 400 gravel kerékpár 2025 - zöld', 'gravel'],
+      ['bikes', 'KTM Gravelator Elite 2X gravel kerékpár 2025 - szürke', 'gravel'],
+    ] as const)('reads the %s title %j as type word %j', async (slug, title, word) => {
+      expect(await extraRowOf(config, slug, 'Típus (cím)', { title })).toBe(word);
+    });
+
+    // A title word wins over the path where the path is the shop's broader shelf: two KTM Macina Aera FS
+    // full-suspension e-MTBs sit among the hardtails, Merida's dirt-jump bikes too, eight "cross trekking"
+    // bikes under Trekking and a "női városi" KTM City Fun 26 among the children's bikes.
+    it.each([
+      ['ebikes', 'E-BIKE > MTB E-Bike > Merevfarú MTB E-Bike', 'FS', 'Összteleszkópos MTB'],
+      ['bikes', 'KERÉKPÁR > MTB kerékpár > Merevfarú MTB kerékpár', 'Dirt', 'Dirt'],
+      ['bikes', 'KERÉKPÁR > Trekking kerékpár > Férfi trekking kerékpár', 'cross trekking', 'Cross Trekking'],
+      ['bikes', 'KERÉKPÁR > Gyerek kerékpár > 26" kerékpár', 'városi', 'City'],
+      ['bikes', 'AKCIÓINK > KTM készletkisöprés', 'városi', 'City'],
+      ['bikes', 'arukereso > Kerékpár', 'országúti', 'Országúti'],
+    ] as const)('reads the %s path %j with title word %j as %j', (slug, path, word, usageType) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path, 'Típus (cím)': word })['usageType']).toEqual(usageType);
+    });
+
+    // The description states the battery as "<n> Wh" on 344 of 540 e-bikes, always the battery first (a range
+    // extender comes after), and the torque as "<n> Nm" on 77.
+    it.each([
+      ['…a 800 Wh-s Bosch PowerTube akkumulátor kombinációja…', 800],
+      ['…400 Wh Bosch CompactTube akkumulátorral…', 400],
+      ['…eltávolítható 750 Wh-s akkumulátorral és az opcionális 360 Wh-s hatótávnövelővel…', 750],
+      ['A KTM Macina Lycan 891 elektromos MTB kerékpár…', undefined],
+    ] as const)('reads the battery capacity of %j as %j', async (description, batteryCapacity) => {
+      const row = await extraRowOf(config, 'ebikes', 'Akkumulátor (leírás)', { description });
+      expect(specsOf(config, 'ebikes', row ? { 'Akkumulátor (leírás)': row } : {})['batteryCapacity']).toEqual(batteryCapacity);
+    });
+
+    it.each([
+      ['…a Bosch Performance CX motor 85 Nm-es nyomatékával…', 85],
+      ['A Bosch Performance SX motor 55 Nm nyomatékkal…', 55],
+      ['…a 800 Wh-s Bosch PowerTube akkumulátor…', undefined],
+    ] as const)('reads the torque of %j as %j', async (description, torque) => {
+      const row = await extraRowOf(config, 'ebikes', 'Nyomaték (leírás)', { description });
+      expect(specsOf(config, 'ebikes', row ? { 'Nyomaték (leírás)': row } : {})['torque']).toEqual(torque);
+    });
+
+    // "<n> sebességes" is the whole drivetrain on an e-bike (one chainring); on a bike it is often the cassette
+    // alone (a 2x12 Merida Reacto says "12 sebességes"), so a bike reads only "AxB sebességes" or a hub gear's
+    // count (Nexus, Alfine, Pinion). A title's "1x12" / "2x12" counts too.
+    it.each([
+      ['ebikes', 'A TRP A12 12 sebességes váltórendszer…', 12, undefined],
+      ['ebikes', 'A Shimano CUES 10 sebességes váltórendszer…', 10, undefined],
+      ['bikes', 'a Shimano 2x8 sebességes váltórendszere…', 16, 2],
+      ['bikes', 'A Shimano Deore 3x10 sebességes váltórendszer…', 30, 3],
+      ['bikes', 'A Shimano Deore XT 1x12 sebességes hajtásrendszer…', 12, 1],
+      ['bikes', 'A Shimano Nexus 8 sebességes agyváltója…', 8, undefined],
+      ['bikes', 'a Shimano Deore XT 12 sebességes váltórendszer…', undefined, undefined],
+      ['bikes', 'A Shimano 105 11-sebességes váltórendszer…', undefined, undefined],
+    ] as const)('reads the %s description %j as %j gears on %j chainrings', async (slug, description, gearCount, chainringCount) => {
+      const row = await extraRowOf(config, slug, 'Sebességek (leírás)', { description });
+      const specs = specsOf(config, slug, row ? { 'Sebességek (leírás)': row } : {});
+      expect(specs['gearCount']).toEqual(gearCount);
+      expect(specs['chainringCount']).toEqual(chainringCount);
+    });
+
+    it.each([
+      ['RIDLEY Astr GRX600 2x12 gravel kerékpár - fekete', 24, 2],
+      ['RIDLEY Blast CUES 1x11 MTB kerékpár - fekete', 11, 1],
+      ['STEVENS 3X Lady cross trekking kerékpár 2022 - fekete', undefined, undefined],
+    ] as const)('reads the title %j as %j gears on %j chainrings', async (title, gearCount, chainringCount) => {
+      const row = await extraRowOf(config, 'bikes', 'Sebességek (cím)', { title });
+      const specs = specsOf(config, 'bikes', row ? { 'Sebességek (cím)': row } : {});
+      expect(specs['gearCount']).toEqual(gearCount);
+      expect(specs['chainringCount']).toEqual(chainringCount);
+    });
+
+    // KTM's descriptions state the bike's weight as "<n> kg-os súlyával / tömegével" (135 rows); "<n> kg alatt"
+    // (under n kg) is not a weight.
+    it.each([
+      ['bikes', 'A 11.9 kg-os súlyával ez egy sokoldalú bringa', 11.9],
+      ['bikes', 'Mindössze 7.7 kg-os tömegével ideális választás', 7.7],
+      ['ebikes', 'A 25 kg-os súlyával egy kompromisszumok nélküli…', 25],
+      ['bikes', 'a váz súlya 9 kg alatt marad', undefined],
+    ] as const)('reads the %s description %j as weight %j', async (slug, description, weight) => {
+      const row = await extraRowOf(config, slug, 'Tömeg (leírás)', { description });
+      expect(specsOf(config, slug, row ? { 'Tömeg (leírás)': row } : {})['weight']).toEqual(weight);
+    });
+
     const stripCurrency = [{ op: 'stripPattern', pattern: '\\s*[A-Z]{3}$' }];
     const schemaKeys: Record<string, Set<string>> = {
       bikes: new Set(Object.keys(bikesJsonSchema.properties)),
@@ -1541,11 +3042,6 @@ describe('hand-authored source configs', () => {
     // Google's values are OfferAvailability's own.
     it('reads stock from the availability column', () => {
       expect(config.mapping['availability']).toEqual({ field: 'availability' });
-    });
-
-    // Used bikes are kept out by the gate, not mapped as an offer condition.
-    it('maps no condition', () => {
-      expect(config.mapping['condition']).toBeUndefined();
     });
 
     it.each([
@@ -1629,6 +3125,194 @@ describe('hand-authored source configs', () => {
   describe("k2shop's Árukereső feed config", () => {
     const config = asFeedConfig(k2shopArukeresoConfig);
 
+    // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+
+    // Scott's 6-digit model number behind SC<yy>, without size or colour code.
+    // Cube keeps its item number + size: every other Cube seller stores that
+    // form (akosbike/speedbike 1140120L, mangobike 1135500XS), and an MPN
+    // lookup matches exactly.
+    it.each([
+      ['SC22286290_XL', '286290'],
+      ['SC22286379-29_M', '286379'],
+      ['SC26425706MNT_S', '425706'],
+      ['SC24420643_M', '420643'],
+      ['812900_58', '81290058'],
+      ['KTM2622604481CANBLU_S', undefined],
+      ['TR530189BLK_M', undefined],
+    ])('reads the MPN %j as %j', async (identifier, mpn) => {
+      expect(await readText(config, 'mpn', { identifier })).toBe(mpn);
+    });
+
+    it('gives bikes the title and description rows, not the drive rows', () => {
+      const labels = (config.categories?.['bikes']?.extraSpecRows ?? []).map((row) => row.label);
+      expect(labels).toEqual([
+        'Webshop kategória',
+        'Modellév (cím)',
+        'Futóbicikli (cím)',
+        'Kerékméret (leírás)',
+        'Váz anyaga (leírás)',
+        'Villa rugóútja (leírás)',
+      ]);
+    });
+
+    // Every bike and e-bike title ends in "<year> <size>" (982 of 984 rows);
+    // four digits, so "eRide 20" or "Scale 940" never read as a year.
+    it.each([
+      ['ebikes', 'Scott Strike eRide 930 kerékpár 2021 XL', 2021],
+      ['ebikes', 'Scott Sub Sport eRide 20 Lady kerékpár 2024 S', 2024],
+      ['ebikes', 'Cube Nuroad Hybrid C:62 Race 400X E-gravel kerékpár 2027', 2027],
+      ['bikes', 'Cube Aim One 29 MTB kerékpár 2027 M', 2027],
+      ['bikes', 'Cube Nature EXC FE kerékpár 2027 58', 2027],
+    ] as const)('reads the %s model year off the title %j', async (slug, name, year) => {
+      const row = await extraRowOf(config, slug, 'Modellév (cím)', { name });
+      expect(specsOf(config, slug, { 'Modellév (cím)': row ?? '' })).toMatchObject({ modelYear: year });
+    });
+
+    it('reads no model year off a title without one', async () => {
+      expect(await extraRowOf(config, 'bikes', 'Modellév (cím)', { name: 'Scott Spark RC Comp 29 MTB kerékpár M' })).toBeUndefined();
+    });
+
+    // Only the category paths that hold one bike type (checked title by title
+    // on the 2026-10-20 feed). MTB (hardtail and fully), Cross, Fitness,
+    // Városi and the e-bike paths other than eJunior mix types: the identity
+    // extraction decides those.
+    it.each([
+      ['bikes', 'Kerékpárok / Országúti', 'Országúti'],
+      ['bikes', 'Kerékpárok / Gravel', 'Gravel'],
+      ['bikes', 'Kerékpárok / Trekking', 'Trekking'],
+      ['bikes', 'Kerékpárok / Junior, gyerek', 'Gyerek'],
+      ['ebikes', 'Elektromos kerékpárok / eJunior', 'Gyerek'],
+    ] as const)('reads the %s usage type off the path %j', (slug, path, usageType) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })).toMatchObject({ usageType });
+    });
+
+    it.each([
+      ['bikes', 'Kerékpárok / MTB'],
+      ['bikes', 'Kerékpárok / Cross'],
+      ['bikes', 'Kerékpárok / Fitness'],
+      ['bikes', 'Kerékpárok / Városi'],
+      ['ebikes', 'Elektromos kerékpárok / eMTB, terepre'],
+      ['ebikes', 'Elektromos kerékpárok / eOrszágúti, eGravel'],
+      ['ebikes', 'Elektromos kerékpárok / eTúra, eVárosi'],
+      ['ebikes', 'Elektromos kerékpárok / eATB, minden terepre'],
+    ] as const)('leaves the %s usage type of the mixed path %j to the identity extraction', (slug, path) => {
+      expect(specsOf(config, slug, { 'Webshop kategória': path })['usageType']).toBeUndefined();
+    });
+
+    // The junior path holds the balance bikes too; their titles say so.
+    it.each([
+      ['Kellys Alpina Tornado futóbicikli 2020 12', 'Futóbicikli'],
+      ['Polisport futó kerékpár 2021 12', 'Futóbicikli'],
+      ['Cube Numove 120 Walk futó kerékpár 2026 12', 'Futóbicikli'],
+      ['Cube Numove 160 kerékpár 2025 16', 'Gyerek'],
+    ])('reads the junior title %j as %j', async (name, usageType) => {
+      const balance = await extraRowOf(config, 'bikes', 'Futóbicikli (cím)', { name });
+      const rows: Record<string, string> = { 'Webshop kategória': 'Kerékpárok / Junior, gyerek' };
+      if (balance) rows['Futóbicikli (cím)'] = balance;
+      expect(specsOf(config, 'bikes', rows)).toMatchObject({ usageType });
+    });
+
+    // The torque row holds the description's first Nm figure (always the
+    // motor's on the feed).
+    it.each([
+      ['85Nm', 85],
+      ['55 Nm', 55],
+      ['120Nm', 120],
+    ])('reads the torque row %j as %j', (raw, torque) => {
+      expect(specsOf(config, 'ebikes', { 'Motor nyomatéka': raw })).toMatchObject({ torque });
+    });
+
+    // The motor sentence ends at "akkumulátor": the capacity is the last
+    // figure before it, with or without Wh ("PowerTube 625 akkumulátor"), and
+    // never the motor's watts. The rated 250 W is motorPower, never peak.
+    it.each([
+      ['Bosch Performance CX 250W motor és 750Wh akkumulátor', 750, 250],
+      ['Bosch SX motor, 400 Wh akkumulátor', 400, undefined],
+      ['A Bosch Performance motorja egy 540 Wh-s akkumulátor', 540, undefined],
+      ['Bosch Performance Generation 3 (75Nm) Cruise (250W) Smart System motor és PowerTube 625 akkumulátor', 625, 250],
+      ['Bosch Performance Line BDU33 (max 75Nm) motor Bosch Purion 200 kijelző Bosch PowerTube 600 w akkumulátor', 600, undefined],
+      ['Bosch Performance Line Speed (85Nm, 250 W) motor PowerTube 750wh akkumulátor', 750, 250],
+      ['Bosch Performance CX Generation 4 (85Nm) Cruise (250 Watt) motor és Powertube 750 akkumulátor', 750, 250],
+      ['Bosch PowerTUBE 750Wh SMART SYSTEM akkumulátor', 750, undefined],
+      ['legmodernebb teljesítményű motor- és akkumulátor', undefined, undefined],
+      ['Hyena agymotor, kijelző és akkumulátor: motor: MRC-E250F, kijelző: CE-EL19A, akkumulátor', undefined, undefined],
+    ])('reads the drive row %j as %j Wh and %j W', (row, batteryCapacity, motorPower) => {
+      const specs = specsOf(config, 'ebikes', { 'Motor és akkumulátor': row });
+      expect(specs['batteryCapacity']).toBe(batteryCapacity);
+      expect(specs['motorPower']).toBe(motorPower);
+      expect(specs['motorPeakPower']).toBeUndefined();
+    });
+
+    // A capacity the description names outside a motor sentence; a range
+    // extender's (PowerMore, külső, kiegészítő, -bővítő, -erősítő) never.
+    it.each([
+      ['Solace 360 Wh-s belső akkumulátorral és opcionális 160 Wh-s külső hatótávolság-növelővel', '360 Wh'],
+      ['a 400 Wh-s akkumulátort is beépítettük az alsó csőbe', '400 Wh'],
+      ['Sőt, a vázra pluszban felszerelhetsz egy 250 Wh PowerMore kiegészítő akkumulátort.', undefined],
+      ['egy opcionális 250 Wh-s kiegészítő akkumulátorral', undefined],
+      ['a +250 Wh-s akkumulátor-erősítő', undefined],
+      ['egy további 250 Wh-s akkumulátorbővítő is', undefined],
+    ])('reads the battery off the description %j as %j', async (description, row) => {
+      expect(await extraRowOf(config, 'ebikes', 'Akkumulátor (leírás)', { description })).toBe(row);
+    });
+
+    // The motor sentence wins over the description-wide figure.
+    it('prefers the drive row capacity', () => {
+      expect(
+        specsOf(config, 'ebikes', {
+          'Akkumulátor (leírás)': '250 Wh',
+          'Motor és akkumulátor': 'Bosch SX motor és 400 Wh akkumulátor',
+        }),
+      ).toMatchObject({ batteryCapacity: 400 });
+      expect(specsOf(config, 'ebikes', { 'Akkumulátor (leírás)': '360 Wh' })).toMatchObject({ batteryCapacity: 360 });
+    });
+
+    // The descriptions open with the wheel size ("29"-es mountain bike",
+    // "Összteleszkópos 29"-es E-bike", "16-os gyerek kerékpár"); a size
+    // further in is a tyre width (2,25 colos) or a per-size note.
+    it.each([
+      ['ebikes', 'Összteleszkópos 29"-es E-bike. Bosch Performance CX 250W motor', 29],
+      ['ebikes', '27.5" junior e-kerékpár. A Reaction Hybrid Rookie', 27.5],
+      ['ebikes', '24"-os gyerek elektromos kerékpár 124-141 cm testmagasság', 24],
+      ['bikes', '16-os gyerek kerékpár. 90-115 cm testmagassághoz ajánlott.', 16],
+      ['bikes', 'Női 27.5-es mountain bike. Megbízható', 27.5],
+      ['bikes', '29-es mountain bike. Az Attention', 29],
+      ['bikes', 'Könnyűsúlyú kerékpár karbon HMF váz, széles, 2,25 colos gumik', undefined],
+      ['bikes', 'Női mountain bike. XS, S méret 27.5" kerékkel, az M és L 29"-es kerékkel', undefined],
+    ] as const)('reads the %s wheel size off the description %j as %j', async (slug, description, wheelSize) => {
+      const row = await extraRowOf(config, slug, 'Kerékméret (leírás)', { description });
+      expect(row ? specsOf(config, slug, { 'Kerékméret (leírás)': row })['wheelSize'] : undefined).toBe(wheelSize);
+    });
+
+    // The first material the description names for the frame ("váz",
+    // "vázzal", "karbonváz"), never the fork's, bar's or a general remark
+    // about the range ("karbon- és alumíniumvázak").
+    it.each([
+      ['Könnyűsúlyú kerékpár Alloy SL 6061 aluminium váz.', 'Alumínium'],
+      ['Könnyűsúlyú kerékpár karbon HMF váz.', 'Karbon'],
+      ['Aluminum 6061 váz, merev villa', 'Alumínium'],
+      ['Az elegáns C:62 karbonváz a Bosch SX motorját', 'Karbon'],
+      ['Karbon villa, Shimano 105 váltó. Aluminium 6061 merev villa', undefined],
+      ['A modelltől függően a kerékpárosok karbon- és alumíniumvázak közül választhatnak. Premium karbon váz', 'Karbon'],
+    ])('reads the frame material off the description %j as %j', async (description, frameMaterial) => {
+      const row = await extraRowOf(config, 'bikes', 'Váz anyaga (leírás)', { description });
+      expect(row ? specsOf(config, 'bikes', { 'Váz anyaga (leírás)': row })['frameMaterial'] : undefined).toBe(frameMaterial);
+    });
+
+    // Only a travel the run-on list ties to the fork ("<fork> villa, 130 mm
+    // rugóúttal"); a frame's or a rear shock's travel names no fork.
+    it.each([
+      ['RockShox Pike Select RL3 Air villa, 130 mm rugóúttal Shimano MT501 (180/180)', 130],
+      ['FOX 36 Float Rythm Air GRIP villával, 160 mm rugóúttal FOX Nude 5T', 160],
+      ['Fox villája 120 mm rugóúttal rendelkezik.', 120],
+      ['RockShox Flight Attendant elektronikus első és hátsó felfüggesztés, 120 mm rugóúttal', undefined],
+      ['Vegyük az eddigi legjobb Cross-Country/Trail Spark 900-at, 130 mm-es rugóúttal', undefined],
+    ])('reads the fork travel off the description %j as %j', async (description, forkTravel) => {
+      const row = await extraRowOf(config, 'ebikes', 'Villa rugóútja (leírás)', { description });
+      expect(row ? specsOf(config, 'ebikes', { 'Villa rugóútja (leírás)': row })['forkTravel'] : undefined).toBe(forkTravel);
+    });
+
+
     it('validates against the Árukereső config schema', () => {
       assertConfigValid(config, 'k2shop-arukereso', 'arukereso');
     });
@@ -1673,7 +3357,9 @@ describe('hand-authored source configs', () => {
     // shops' Cube MPNs take (akosbike VLB_104020-M, speedbike 104020-M), behind
     // k2shop's model-year prefix and its -27/-29 wheel note. A letter after the
     // item number (L, E) marks k2shop's own frame variant, and no other brand's
-    // identifier carries the manufacturer's code with its size, so those give none.
+    // identifier carries the manufacturer's code with its size, so those give none,
+    // except Scott's (SC<yy><6 digits>): its 6-digit model number is the form the
+    // other shops store.
     it.each([
       ['MY26_104020_M', '104020M'],
       ['MY26-117510_L', '117510L'],
@@ -1685,7 +3371,7 @@ describe('hand-authored source configs', () => {
       ['645100L_54', undefined],
       ['1111112E_46', undefined],
       ['1107272', undefined],
-      ['SC21280469_XL', undefined],
+      ['SC21280469_XL', '280469'],
       ['KTM2612601902_20', undefined],
       ['22704281BLUMAT_S', undefined],
       ['TR525868BLK_M', undefined],
@@ -1738,10 +3424,6 @@ describe('hand-authored source configs', () => {
       expect(await extraRowOf(config, 'ebikes', 'Motor nyomatéka', { description })).toBe(torque);
     });
 
-    it('gives bikes no drive rows', () => {
-      const labels = (config.categories?.['bikes']?.extraSpecRows ?? []).map((row) => row.label);
-      expect(labels).toEqual(['Webshop kategória']);
-    });
 
     // The titles rarely name the bike type (39 of 225 e-bike rows); the
     // descriptions open with it ("Összteleszkópos 29"-es E-bike.", "Cross
@@ -1862,6 +3544,113 @@ describe('hand-authored source configs', () => {
 
   describe("biciklikk's spec rows", () => {
     const config = asFeedConfig(biciklikkArukeresoConfig);
+
+      // 2026-10-23 shop review fixes (docs/shop-reviews/2026-10-23-all.md).
+    it.each([
+      // The leaf of the shop's category path, where it names one use only.
+      ['ebikes', 'Webshop kategória', 'Termékek > E-Bike > Városi e-kerékpárok', 'usageType', 'City'],
+      ['ebikes', 'Webshop kategória', 'Termékek > E-Bike > Túra, trekking, cross e-kerékpárok > Trekking, túra e-kerékpárok', 'usageType', 'Trekking'],
+      ['bikes', 'Webshop kategória', 'Termékek > Kerékpárok > Dirt és BMX kerékpárok > Dirt kerékpárok', 'usageType', 'Dirt'],
+      ['bikes', 'Webshop kategória', 'Termékek > Kerékpárok > Országúti és fitnesz kerékpárok > Gravel kerékpárok', 'usageType', 'Gravel'],
+      ['bikes', 'Webshop kategória', 'Termékek > Kerékpárok > Trekking és Túra kerékpárok > Cross, cross trekking kerékpárok', 'usageType', 'Cross Trekking'],
+      // MTB holds hardtails and full-suspension bikes, kids' bikes balance bikes too.
+      ['ebikes', 'Webshop kategória', 'Termékek > E-Bike > MTB e-kerékpárok', 'usageType', undefined],
+      ['bikes', 'Webshop kategória', 'Termékek > Kerékpárok > MTB kerékpárok', 'usageType', undefined],
+      ['bikes', 'Webshop kategória', 'Termékek > Kerékpárok > Gyerekkerékpárok', 'usageType', undefined],
+      // Gender and rider height from the title (the Név row).
+      ['ebikes', 'Név', 'KELLYS E-Carson 10 SH 504Wh 28" férfi elektromos túra/trekking kerékpár, Teal, L (178-190cm)', 'gender', 'Férfi'],
+      ['ebikes', 'Név', 'KELLYS Tayen R50 29" 720Wh MTB hardtail női elektromos kerékpár, Pink, M (166-178cm)', 'gender', 'Női'],
+      ['bikes', 'Név', 'KELLYS Naga Air Belt 20" gyermek MTB kerékpár, Blue', 'gender', 'Gyermek'],
+      ['bikes', 'Név', 'KELLYS Kite 12" gyermek tanulókerékpár / futóbicikli, Red', 'gender', 'Gyermek'],
+      ['bikes', 'Név', 'KELLYS Soot 20 28" gravel kerékpár, M (175-190cm)', 'gender', undefined],
+      ['ebikes', 'Név', 'KELLYS Theos F60 SH 29"/27.5" 820Wh MTB/enduro fully elektromos kerékpár, Space Grey, L', 'gender', undefined],
+      // A child seat or a kid-carrying cargo bike is no kids' bike.
+      ['ebikes', 'Név', 'Elektromos gyerekszállító cargo kerékpár, gyermekülés-tartóval', 'gender', undefined],
+      ['ebikes', 'Név', 'KELLYS E-Carson 30 P 725Wh 28" férfi elektromos túra/trekking kerékpár, Magic Blue, M (170-180cm)', 'recommendedRiderHeight', '170-180 cm'],
+      ['bikes', 'Név', 'KELLYS Soot 20 28" gravel kerékpár, M (175-190cm)', 'recommendedRiderHeight', '175-190 cm'],
+      ['bikes', 'Név', 'KELLYS Spider X70 29" MTB XC kerékpár, Thunderstorm Blue, M (165-180cm)', 'recommendedRiderHeight', '165-180 cm'],
+      // A kids' bike's single frame size and its rider height; the adult rows list every size.
+      ['bikes', 'Vázméret', '245 mm (100-110 cm testméret)', 'recommendedRiderHeight', '100-110 cm'],
+      ['bikes', 'Vázméret', '235mm (115-135 cm testméret)', 'seatTubeLength', 235],
+      ['bikes', 'Vázméret', 'M (155-174cm), L (169-188cm)', 'recommendedRiderHeight', undefined],
+      ['bikes', 'Vázméret', 'M (155-174cm), L (169-188cm)', 'seatTubeLength', undefined],
+      // Fork travel: the comma- or slash-delimited "NNN mm"; a thru-axle or a rigid fork gives none.
+      ['bikes', 'Villa', 'SR Suntour XCR32 Coil LOR DS (26), 100mm, coil / Speed Lockout', 'forkTravel', 100],
+      ['bikes', 'Villa', 'SR Suntour NEX HLO P, 63 mm, coil / Speed Lockout', 'forkTravel', 63],
+      ['bikes', 'Villa', 'SR Suntour XCM34 (29) Boost, 130mm, coil spring / 15mm thru axle', 'forkTravel', 130],
+      ['bikes', 'Villa', 'Rock Shox Recon Silver RL (29) Boost, 100 mm, Solo Air / Motion Control / OneLoc Remote Lockout', 'forkTravel', 100],
+      ['ebikes', 'Villa', 'SR Suntour XCM32-Air LOR DS (29") / 120mm, air / Speed Lockout /15mm thru axle', 'forkTravel', 120],
+      ['ebikes', 'Villa', 'Rock Shox Domain R (29") Boost, 150 mm, 38mm stanchions, DebonAir / Motion Control', 'forkTravel', 150],
+      ['bikes', 'Villa', 'Kellys Carbon Disc / 1.5" tapered steerer / flat mount disc brake / 12 mm thru axle', 'forkTravel', undefined],
+      ['bikes', 'Villa', 'Kellys Carbon Disc - 1.5 tapered steerer, flat mount disc brake, 12x100 mm thru axle', 'forkTravel', undefined],
+      // Battery voltage from the Motor row, chemistry from the Akkumulátor row.
+      ['ebikes', 'Motor', 'Shimano Steps E6100, 60 Nm, 36 V', 'batteryVoltage', 36],
+      ['ebikes', 'Motor', 'Panasonic GX Ultimate, 95Nm, 36V', 'batteryVoltage', 36],
+      ['ebikes', 'Akkumulátor', 'KELLYS Re-Charge V10 Li-ion internal removable 720Wh / capacity 20Ah, powered by BMZ', 'batteryChemistry', 'Li-ion'],
+      ['ebikes', 'Akkumulátor', 'Shimano BT-E8016, 630 Wh / capacity 17.5 Ah', 'batteryChemistry', undefined],
+      // The e-bike system only where the Motor row names it.
+      ['ebikes', 'Motor', 'SHIMANO STEPS E7000, 36V', 'ebikeSystem', 'Shimano Steps'],
+      ['ebikes', 'Motor', 'Shimano EP801, 85Nm, 36V', 'ebikeSystem', undefined],
+      ['bikes', 'Nyeregcső', 'KLS Active - diam 30.9mm / length 300mm', 'seatpostDiameter', 30.9],
+      ['bikes', 'Nyeregcső', 'KLS Active 30.9x350 mm', 'seatpostDiameter', 30.9],
+      ['bikes', 'Nyeregcső', 'alu - diam 27.2 mm / length 270 mm', 'seatpostDiameter', 27.2],
+      ['bikes', 'Nyeregcső', 'acél, állítható', 'seatpostDiameter', undefined],
+      ['ebikes', 'Kerékagy, első', 'Shimano MT400-B Disc Center Lock (32H)', 'hubType', 'CenterLock'],
+      ['bikes', 'Kerékagyak', 'KLS Firework Disc (32 holes)', 'hubType', undefined],
+      ['bikes', 'Fogaskoszorú', 'Shimano CS-HG200-9 (11-34T)', 'cassetteRange', '11-34T'],
+      ['bikes', 'Fogaskoszorú', 'Shimano Deore CS-M6100-12 (10-51T)', 'cassetteRange', '10-51T'],
+      // Either of two cassettes, or a single cog, gives none.
+      ['ebikes', 'Fogaskoszorú', 'Shimano Linkglide CS-LG300-9 (11-41T) VAGY Shimano CS-HG201-9 (11-36T)', 'cassetteRange', undefined],
+      ['bikes', 'Fogaskoszorú', 'single 16T sprocket', 'cassetteRange', undefined],
+      ['bikes', 'Féktárcsák', '160 mm / 160 mm', 'rotorSizeRear', 160],
+      ['bikes', 'Féktárcsák', '180mm front / 160mm rear', 'rotorSizeRear', 160],
+      ['ebikes', 'Féktárcsák', 'Shimano RT64 220 mm front / Shimano EM300 203 mm rear', 'rotorSizeRear', 203],
+      ['bikes', 'Féktárcsák', '180mm', 'rotorSizeRear', undefined],
+      // Hub spacing as <spacing>x<axle>; the shop writes <axle>x<spacing>, and a
+      // 12x162 / 12x170 / 12x177 / 12x181 rear figure is a thru-axle length.
+      ['ebikes', 'Rögzített tengely, első', 'SR Suntour 15x110mm', 'hubSpacingFront', '110x15'],
+      ['ebikes', 'Rögzített tengely', 'ROCK SHOX Maxle Stealth 15x110mm front / NOVATEC 12x148mm rear', 'hubSpacingFront', '110x15'],
+      ['ebikes', 'Rögzített tengely', 'ROCK SHOX Maxle Stealth 15x110mm front / NOVATEC 12x148mm rear', 'hubSpacingRear', '148x12'],
+      ['bikes', 'Rögzített tengely', 'Rock Shox Maxle Lite 15x110mm front / Novatec 12x170mm rear', 'hubSpacingRear', undefined],
+      ['ebikes', 'Rögzített tengely, hátsó', 'Novatec 12x181mm', 'hubSpacingRear', undefined],
+      ['bikes', 'Tengelyrögzítés', '12x118 mm front / 12x162 mm rear', 'hubSpacingFront', undefined],
+      ['ebikes', 'Kerékagy, hátsó', 'Deore TC500-B Disc Center Lock (12x148 mm / 32 holes)', 'hubSpacingRear', '148x12'],
+      ['bikes', 'Kerékagyak', 'SHIMANO MT400-B Disc Center Lock (15x110mm / 12x148mm / 32 holes)', 'hubSpacingFront', '110x15'],
+      ['bikes', 'Villa', 'Kellys Carbon Disc - 1.5 tapered steerer, flat mount disc brake, 12x100 mm thru axle', 'hubSpacingFront', '100x12'],
+      // A row of one colour is this listing's, as the shop writes it.
+      ['ebikes', 'Szín', 'grey', 'color', 'grey'],
+      ['ebikes', 'Szín', 'Magic Green', 'color', 'Magic Green'],
+      // A row naming two years gives none, not the first.
+      ['bikes', 'Modell év', '2020/2021', 'modelYear', undefined],
+    ] as const)('reads a %s row %s: %j as %s %j', (slug, name, value, key, expected) => {
+      expect(specsOf(config, slug, { [name]: value })[key]).toEqual(expected);
+    });
+
+    // The title wins over a kids' frame row, and the Név row is the feed's name column.
+    it('reads the rider height from the title over the frame row', () => {
+      expect(
+        specsOf(config, 'bikes', {
+          Vázméret: '245mm (100-110 cm testméret)',
+          Név: 'KELLYS Emma 16" gyermek kerékpár, Pink (105-115cm)',
+        })['recommendedRiderHeight'],
+      ).toBe('105-115 cm');
+    });
+
+    it('sends the title to the spec mapping and the identity extraction as the Név row', async () => {
+      const name = 'KELLYS Clea 90 28" női cross kerékpár, Dark Red, M (167-181cm)';
+      for (const slug of ['bikes', 'ebikes']) {
+        expect(await extraRowOf(config, slug, 'Név', { name })).toBe(name);
+        expect(config.categories?.[slug]?.identitySpecRows).toContain('Név');
+      }
+    });
+
+    // The Motor row's voltage only where the battery row states none.
+    it('prefers the battery row voltage', () => {
+      expect(
+        specsOf(config, 'ebikes', { Motor: 'Bafang M420, 36V', Akkumulátor: 'Samsung 48V 14 Ah (672 Wh)' })['batteryVoltage'],
+      ).toBe(48);
+    });
+
 
     it.each([
       ['ebikes', 'Akkumulátor', 'Kellys K2 AMXXPRO Carbon 725 Wh - superhigh energy density 213 Wh/kg, weight 3.4 kg', 'batteryCapacity', 725],

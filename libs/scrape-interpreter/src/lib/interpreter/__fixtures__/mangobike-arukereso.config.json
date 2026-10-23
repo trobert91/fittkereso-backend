@@ -24,16 +24,1188 @@
       ],
       "extraSpecRows": [
         {
-          "label": "Webshop kategória",
           "field": "category",
+          "label": "Webshop kategória",
           "pipeline": [
             {
               "op": "stripPattern",
-              "pattern": "^[^>]*start_nav[^>]*>\\s*"
+              "pattern": "^(?:[^>]*start_nav[^>]*|\\s*Kategóriák\\s*)>\\s*"
+            }
+          ]
+        },
+        {
+          "label": "Motor (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "[Mm][Oo][Tt][Oo][Rr]:\\s*([^,<>]+,\\s*\\d{2,3}\\s*Nm(?:,\\s*\\d{2}\\s*V\\b)?)",
+              "group": 1
             }
           ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "gender",
+            "labels": ["Neme:", "Neme"],
+            "valuePatterns": [
+              {
+                "value": "Férfi",
+                "pattern": "^\\s*f[ée]rfi"
+              },
+              {
+                "value": "Női",
+                "pattern": "^\\s*n[őöo]i"
+              },
+              {
+                "value": "Uniszex",
+                "pattern": "^\\s*uni"
+              },
+              {
+                "value": "Gyermek",
+                "pattern": "gyer"
+              }
+            ]
+          },
+          {
+            "key": "modelYear",
+            "labels": ["Évjárat:", "Évjárat"],
+            "extract": "number"
+          },
+          {
+            "key": "weight",
+            "labels": ["Súly:", "Súly"],
+            "extract": "number",
+            "replacePatterns": [
+              {
+                "to": ".",
+                "from": ","
+              }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Fokozatszám:", "Fokozatszám"],
+            "extract": "number"
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga:", "Váz anyaga"],
+            "valuePatterns": [
+              {
+                "value": "Karbon",
+                "pattern": "carbon|karbon"
+              },
+              {
+                "value": "Titán",
+                "pattern": "titán|titan"
+              },
+              {
+                "value": "Alumínium",
+                "pattern": "alu"
+              },
+              {
+                "value": "Acél",
+                "pattern": "acél|steel|cr-?mo"
+              },
+              {
+                "value": "Magnézium",
+                "pattern": "magn[eé]zium|magnesium"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret:", "Kerékméret"],
+            "extract": "number",
+            "replacePatterns": [
+              {
+                "to": ".",
+                "from": ","
+              }
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": ["Vázméret:", "Vázméret"],
+            "valuePatterns": [
+              {
+                "pattern": "(?<![\\d.,])12(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "30.48"
+              },
+              {
+                "pattern": "(?<![\\d.,])12[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "31.75"
+              },
+              {
+                "pattern": "(?<![\\d.,])13(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "33.02"
+              },
+              {
+                "pattern": "(?<![\\d.,])13[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "34.29"
+              },
+              {
+                "pattern": "(?<![\\d.,])14(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "35.56"
+              },
+              {
+                "pattern": "(?<![\\d.,])14[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "36.83"
+              },
+              {
+                "pattern": "(?<![\\d.,])15(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "38.1"
+              },
+              {
+                "pattern": "(?<![\\d.,])15[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "39.37"
+              },
+              {
+                "pattern": "(?<![\\d.,])16(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "40.64"
+              },
+              {
+                "pattern": "(?<![\\d.,])16[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "41.91"
+              },
+              {
+                "pattern": "(?<![\\d.,])17(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "43.18"
+              },
+              {
+                "pattern": "(?<![\\d.,])17[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "44.45"
+              },
+              {
+                "pattern": "(?<![\\d.,])18(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "45.72"
+              },
+              {
+                "pattern": "(?<![\\d.,])18[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "46.99"
+              },
+              {
+                "pattern": "(?<![\\d.,])19(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "48.26"
+              },
+              {
+                "pattern": "(?<![\\d.,])19[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "49.53"
+              },
+              {
+                "pattern": "(?<![\\d.,])20(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "50.8"
+              },
+              {
+                "pattern": "(?<![\\d.,])20[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "52.07"
+              },
+              {
+                "pattern": "(?<![\\d.,])21(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "53.34"
+              },
+              {
+                "pattern": "(?<![\\d.,])21[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "54.61"
+              },
+              {
+                "pattern": "(?<![\\d.,])22(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "55.88"
+              },
+              {
+                "pattern": "(?<![\\d.,])22[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "57.15"
+              },
+              {
+                "pattern": "(?<![\\d.,])23(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "58.42"
+              },
+              {
+                "pattern": "(?<![\\d.,])23[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "59.69"
+              },
+              {
+                "pattern": "(?<![\\d.,])24(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "60.96"
+              }
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": ["Vázméret:", "Vázméret"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d-])(\\d+(?:[.,]\\d+)?)\\s*cm"]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": ["Méret:", "Méret"],
+            "valuePatterns": [
+              {
+                "value": "XXL",
+                "pattern": "^\\s*XXL\\s*$"
+              },
+              {
+                "value": "XL",
+                "pattern": "^\\s*XL\\s*$"
+              },
+              {
+                "value": "L",
+                "pattern": "^\\s*L\\s*$"
+              },
+              {
+                "value": "M",
+                "pattern": "^\\s*M\\s*$"
+              },
+              {
+                "value": "S",
+                "pattern": "^\\s*S\\s*$"
+              },
+              {
+                "value": "XS",
+                "pattern": "^\\s*XS\\s*$"
+              }
+            ]
+          },
+          {
+            "key": "forkTravel",
+            "labels": ["Első teleszkóp útja:", "Első teleszkóp útja"],
+            "extract": "number"
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": ["Akkumulátor mérete:", "Akkumulátor mérete"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{3,4})\\s*Wh"]
+          },
+          {
+            "key": "torque",
+            "labels": ["Motor (leírás)"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2,3})\\s*Nm"]
+          },
+          {
+            "key": "batteryVoltage",
+            "labels": ["Motor (leírás)"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])(\\d{2})\\s*V\\b"]
+          },
+          {
+            "key": "torque",
+            "labels": ["Motor típusa:", "Motor típusa"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2,3})\\s*Nm"]
+          },
+          {
+            "key": "torque",
+            "labels": ["Motor:", "Motor"],
+            "extract": "regexpList",
+            "extractPatterns": ["(\\d{2,3})\\s*Nm"]
+          },
+          {
+            "key": "motorModel",
+            "labels": ["Motor típusa:", "Motor típusa"]
+          },
+          {
+            "key": "motorModel",
+            "labels": ["Motor:", "Motor"]
+          },
+          {
+            "key": "motorBrand",
+            "labels": ["Motor típusa:", "Motor típusa", "Motor:", "Motor"],
+            "valuePatterns": [
+              {
+                "pattern": "^\\s*bosch\\b",
+                "value": "Bosch"
+              },
+              {
+                "pattern": "^\\s*shimano\\b",
+                "value": "Shimano"
+              },
+              {
+                "pattern": "^\\s*panasonic\\b",
+                "value": "Panasonic"
+              },
+              {
+                "pattern": "^\\s*yamaha\\b",
+                "value": "Yamaha"
+              },
+              {
+                "pattern": "^\\s*brose\\b",
+                "value": "Brose"
+              },
+              {
+                "pattern": "^\\s*bafang\\b",
+                "value": "Bafang"
+              },
+              {
+                "pattern": "^\\s*fazua\\b",
+                "value": "Fazua"
+              },
+              {
+                "pattern": "^\\s*tq\\b",
+                "value": "TQ"
+              }
+            ]
+          },
+          {
+            "key": "displayModel",
+            "labels": ["Kijelző:", "Kijelző"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "display",
+            "labels": ["Kijelző:", "Kijelző"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "chargerCurrent",
+            "labels": ["Akkumulátor töltő:", "Akkumulátor töltő"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])(\\d+(?:[.,]\\d+)?)\\s*A\\b"]
+          },
+          {
+            "key": "brakeType",
+            "labels": ["Fék típusa:", "Fék típusa"],
+            "valuePatterns": [
+              {
+                "value": "Tárcsa + kontrafék",
+                "pattern": "tárcsa.*kontra|kontra.*tárcsa"
+              },
+              {
+                "value": "Racker + kontrafék",
+                "pattern": "(v-fék|patkó|felni|racker).*kontra|kontra.*(v-fék|patkó|felni|racker)"
+              },
+              {
+                "value": "Tárcsa",
+                "pattern": "tárcsa"
+              },
+              {
+                "value": "Racker (Felni)",
+                "pattern": "v-fék|patkó|felni|racker"
+              },
+              {
+                "value": "Görgős fék",
+                "pattern": "görgő"
+              },
+              {
+                "value": "Kontrafék",
+                "pattern": "kontra"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> (?:Gyerek )?Futóbicikli$",
+                "value": "Futóbicikli"
+              },
+              {
+                "pattern": "> Gyerek Kerékpár$",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "> Összecsukható Kerékpárok$",
+                "value": "Összecsukható"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Fully Mountain Bike Kerékpár$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Hardtail Mountain Bike Kerékpár$",
+                "value": "MTB"
+              },
+              {
+                "pattern": "> Offroad Cross Trekking Kerékpár$",
+                "value": "Cross Trekking"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Onroad Trekking Kerékpár$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Gravel Kerékpár$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Országúti Kerékpár$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "> Elektromos Városi Kerékpárok$",
+                "value": "City"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Fully Mountain Bike Kerékpár$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Hardtail Mountain Bike Kerékpár$",
+                "value": "Első teleszkóp"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Hátsó rugóstag:", "Hátsó rugóstag"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": ".",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "rearShockModel",
+            "labels": ["Hátsó rugóstag:", "Hátsó rugóstag"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frameModel",
+            "labels": ["Váz:", "Váz"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "forkModel",
+            "labels": ["Villa:", "Villa"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "forkType",
+            "labels": ["Villa:", "Villa"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bair\\b|\\bfloat\\b",
+                "value": "Levegős"
+              },
+              {
+                "pattern": "\\bcoil\\b",
+                "value": "Acélrugós"
+              },
+              {
+                "pattern": "\\brigid\\b|\\bmerev\\b|full carbon",
+                "value": "Merev"
+              }
+            ]
+          },
+          {
+            "key": "drivetrain",
+            "labels": ["Lánc:", "Lánc"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "belt|szíj|gates",
+                "value": "Szíj"
+              },
+              {
+                "pattern": ".",
+                "value": "Lánc"
+              }
+            ]
+          },
+          {
+            "key": "chain",
+            "labels": ["Lánc:", "Lánc"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "gearType",
+            "labels": [
+              "Hátsó váltó típusa:",
+              "Hátsó váltó típusa",
+              "Hátsó váltó:",
+              "Hátsó váltó"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay",
+                "value": "Agyváltó"
+              },
+              {
+                "pattern": "\\S",
+                "value": "Láncváltó"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Hátsó váltó:", "Hátsó váltó", "Váltókar:", "Váltókar"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "\\bdi2\\b|\\baxs\\b|\\betap\\b|wireless|electronic",
+                "value": "Elektromos"
+              },
+              {
+                "pattern": "\\S",
+                "value": "Mechanikus"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Váltókar:", "Váltókar"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bdi2\\b|\\baxs\\b|\\betap\\b|wireless|electronic",
+                "value": "Elektromos"
+              }
+            ]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": ["Hátsó váltó:", "Hátsó váltó"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*(?:nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay))\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "rearDerailleurTier",
+            "labels": ["Hátsó váltó típusa:", "Hátsó váltó típusa"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*(?:nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay))\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "frontDerailleur",
+            "labels": ["Első váltó:", "Első váltó"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "shifter",
+            "labels": ["Váltókar:", "Váltókar"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankset",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankLength",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.,])(1[4-8]\\d(?:[.,]5)?)\\s*mm\\b"]
+          },
+          {
+            "key": "chainring",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": [";\\s*([A-Za-z][^;]*?)\\s*$"]
+          },
+          {
+            "key": "chainringTeeth",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.x×/-])([2-5]\\d)\\s?T\\b"]
+          },
+          {
+            "key": "chainGuard",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "valuePatterns": [
+              {
+                "pattern": "chain\\s?guard|\\bw/\\s?CG\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "cassette",
+            "labels": ["Fogaskoszorú:", "Fogaskoszorú"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "cassetteRange",
+            "labels": ["Fogaskoszorú:", "Fogaskoszorú"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])((?:9|1[0-3])-[2-5]\\dT)\\b"]
+          },
+          {
+            "key": "bottomBracket",
+            "labels": ["Középcsapágy:", "Középcsapágy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "pedals",
+            "labels": ["Pedál:", "Pedál"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakeModel",
+            "labels": ["Fék:", "Fék"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakePistons",
+            "labels": ["Fék:", "Fék"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<!\\d)(\\d)[- ]?piston"]
+          },
+          {
+            "key": "rotorModel",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!\\s*disc brake\\b)\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<!\\d)(140|160|180|200|203|220)(?!\\d)"]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?<!\\d)(?:140|160|180|200|203|220)(?!\\d).*?(?<!\\d)(140|160|180|200|203|220)(?!\\d)"
+            ]
+          },
+          {
+            "key": "wheelset",
+            "labels": ["Kerék:", "Kerék"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rimModel",
+            "labels": ["Felni:", "Felni"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "hubModel",
+            "labels": ["Kerékagy:", "Kerékagy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "hubType",
+            "labels": ["Kerékagy:", "Kerékagy"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bCL\\b|center\\s?lock",
+                "value": "CenterLock"
+              },
+              {
+                "pattern": "\\b6B\\b|6[- ]?bolt",
+                "value": "6-lyukas (IS)"
+              }
+            ]
+          },
+          {
+            "key": "tireModel",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "tireSize",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "extract": "regexpList",
+            "extractPatterns": ["\\b([1-9]\\d-[1-7]\\d{2})\\b"]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Kerék:", "Kerék"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Felni:", "Felni"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "handlebar",
+            "labels": ["Kormány:", "Kormány"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "handlebarWidth",
+            "labels": ["Kormány:", "Kormány"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])([4-9]\\d{2})\\s*mm\\b"]
+          },
+          {
+            "key": "handlebarMaterial",
+            "labels": ["Kormány:", "Kormány"],
+            "valuePatterns": [
+              {
+                "pattern": "carbon|karbon",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "\\balloy\\b|\\balu|alumín|\\b(?:6061|7005|7075)\\b",
+                "value": "Alumínium"
+              }
+            ]
+          },
+          {
+            "key": "stem",
+            "labels": ["Kormányszár:", "Kormányszár"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "adjustableStem",
+            "labels": ["Kormányszár:", "Kormányszár"],
+            "valuePatterns": [
+              {
+                "pattern": "adjust|állítható",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "headset",
+            "labels": ["Kormánycsapágy:", "Kormánycsapágy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "grips",
+            "labels": ["Markolat:", "Markolat"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "saddle",
+            "labels": ["Nyereg:", "Nyereg"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatpost",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatpostType",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "valuePatterns": [
+              {
+                "pattern": "dropper",
+                "value": "Teleszkópos (dropper)"
+              }
+            ]
+          },
+          {
+            "key": "seatpostDiameter",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])((?:2[5-9]|3[0-5])[.,]\\d)(?!\\d)"]
+          },
+          {
+            "key": "lighting",
+            "labels": ["Lámpák:", "Lámpák"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "fenders",
+            "labels": ["Sárvédő:", "Sárvédő"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "rack",
+            "labels": ["Csomagtartó:", "Csomagtartó"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "kickstand",
+            "labels": ["Letámasztó:", "Letámasztó"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          }
+        ]
+      }
     },
     "bikes": {
       "enabled": true,
@@ -49,29 +1221,1077 @@
       ],
       "extraSpecRows": [
         {
-          "label": "Webshop kategória",
           "field": "category",
+          "label": "Webshop kategória",
           "pipeline": [
             {
               "op": "stripPattern",
-              "pattern": "^[^>]*start_nav[^>]*>\\s*"
+              "pattern": "^(?:[^>]*start_nav[^>]*|\\s*Kategóriák\\s*)>\\s*"
             }
           ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "gender",
+            "labels": ["Neme:", "Neme"],
+            "valuePatterns": [
+              {
+                "value": "Férfi",
+                "pattern": "^\\s*f[ée]rfi"
+              },
+              {
+                "value": "Női",
+                "pattern": "^\\s*n[őöo]i"
+              },
+              {
+                "value": "Uniszex",
+                "pattern": "^\\s*uni"
+              },
+              {
+                "value": "Gyermek",
+                "pattern": "gyer"
+              }
+            ]
+          },
+          {
+            "key": "modelYear",
+            "labels": ["Évjárat:", "Évjárat"],
+            "extract": "number"
+          },
+          {
+            "key": "weight",
+            "labels": ["Súly:", "Súly"],
+            "extract": "number",
+            "replacePatterns": [
+              {
+                "to": ".",
+                "from": ","
+              }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Fokozatszám:", "Fokozatszám"],
+            "extract": "number"
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga:", "Váz anyaga"],
+            "valuePatterns": [
+              {
+                "value": "Karbon",
+                "pattern": "carbon|karbon"
+              },
+              {
+                "value": "Titán",
+                "pattern": "titán|titan"
+              },
+              {
+                "value": "Alumínium",
+                "pattern": "alu"
+              },
+              {
+                "value": "Acél",
+                "pattern": "acél|steel|cr-?mo"
+              },
+              {
+                "value": "Magnézium",
+                "pattern": "magn[eé]zium|magnesium"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret:", "Kerékméret"],
+            "extract": "number",
+            "replacePatterns": [
+              {
+                "to": ".",
+                "from": ","
+              }
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": ["Vázméret:", "Vázméret"],
+            "valuePatterns": [
+              {
+                "pattern": "(?<![\\d.,])12(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "30.48"
+              },
+              {
+                "pattern": "(?<![\\d.,])12[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "31.75"
+              },
+              {
+                "pattern": "(?<![\\d.,])13(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "33.02"
+              },
+              {
+                "pattern": "(?<![\\d.,])13[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "34.29"
+              },
+              {
+                "pattern": "(?<![\\d.,])14(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "35.56"
+              },
+              {
+                "pattern": "(?<![\\d.,])14[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "36.83"
+              },
+              {
+                "pattern": "(?<![\\d.,])15(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "38.1"
+              },
+              {
+                "pattern": "(?<![\\d.,])15[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "39.37"
+              },
+              {
+                "pattern": "(?<![\\d.,])16(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "40.64"
+              },
+              {
+                "pattern": "(?<![\\d.,])16[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "41.91"
+              },
+              {
+                "pattern": "(?<![\\d.,])17(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "43.18"
+              },
+              {
+                "pattern": "(?<![\\d.,])17[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "44.45"
+              },
+              {
+                "pattern": "(?<![\\d.,])18(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "45.72"
+              },
+              {
+                "pattern": "(?<![\\d.,])18[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "46.99"
+              },
+              {
+                "pattern": "(?<![\\d.,])19(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "48.26"
+              },
+              {
+                "pattern": "(?<![\\d.,])19[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "49.53"
+              },
+              {
+                "pattern": "(?<![\\d.,])20(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "50.8"
+              },
+              {
+                "pattern": "(?<![\\d.,])20[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "52.07"
+              },
+              {
+                "pattern": "(?<![\\d.,])21(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "53.34"
+              },
+              {
+                "pattern": "(?<![\\d.,])21[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "54.61"
+              },
+              {
+                "pattern": "(?<![\\d.,])22(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "55.88"
+              },
+              {
+                "pattern": "(?<![\\d.,])22[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "57.15"
+              },
+              {
+                "pattern": "(?<![\\d.,])23(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "58.42"
+              },
+              {
+                "pattern": "(?<![\\d.,])23[.,]5\\s*(?:coll|col|inch|\")",
+                "value": "59.69"
+              },
+              {
+                "pattern": "(?<![\\d.,])24(?:[.,]0)?\\s*(?:coll|col|inch|\")",
+                "value": "60.96"
+              }
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": ["Vázméret:", "Vázméret"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d-])(\\d+(?:[.,]\\d+)?)\\s*cm"]
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": ["Méret:", "Méret"],
+            "valuePatterns": [
+              {
+                "value": "XXL",
+                "pattern": "^\\s*XXL\\s*$"
+              },
+              {
+                "value": "XL",
+                "pattern": "^\\s*XL\\s*$"
+              },
+              {
+                "value": "L",
+                "pattern": "^\\s*L\\s*$"
+              },
+              {
+                "value": "M",
+                "pattern": "^\\s*M\\s*$"
+              },
+              {
+                "value": "S",
+                "pattern": "^\\s*S\\s*$"
+              },
+              {
+                "value": "XS",
+                "pattern": "^\\s*XS\\s*$"
+              }
+            ]
+          },
+          {
+            "key": "forkTravel",
+            "labels": ["Első teleszkóp útja:", "Első teleszkóp útja"],
+            "extract": "number"
+          },
+          {
+            "key": "brakeType",
+            "labels": ["Fék típusa:", "Fék típusa"],
+            "valuePatterns": [
+              {
+                "value": "Tárcsa + kontrafék",
+                "pattern": "tárcsa.*kontra|kontra.*tárcsa"
+              },
+              {
+                "value": "Racker + kontrafék",
+                "pattern": "(v-fék|patkó|felni|racker).*kontra|kontra.*(v-fék|patkó|felni|racker)"
+              },
+              {
+                "value": "Tárcsa",
+                "pattern": "tárcsa"
+              },
+              {
+                "value": "Racker (Felni)",
+                "pattern": "v-fék|patkó|felni|racker"
+              },
+              {
+                "value": "Görgős fék",
+                "pattern": "görgő"
+              },
+              {
+                "value": "Kontrafék",
+                "pattern": "kontra"
+              }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> (?:Gyerek )?Futóbicikli$",
+                "value": "Futóbicikli"
+              },
+              {
+                "pattern": "> Gyerek Kerékpár$",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "> Összecsukható Kerékpárok$",
+                "value": "Összecsukható"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Fully Mountain Bike Kerékpár$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Hardtail Mountain Bike Kerékpár$",
+                "value": "MTB"
+              },
+              {
+                "pattern": "> Offroad Cross Trekking Kerékpár$",
+                "value": "Cross Trekking"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Onroad Trekking Kerékpár$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Gravel Kerékpár$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "> (?:Elektromos )?Országúti Kerékpár$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "> Elektromos Városi Kerékpárok$",
+                "value": "City"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Fully Mountain Bike Kerékpár$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              },
+              {
+                "pattern": "> (?:Elektromos )?(?:Light )?Hardtail Mountain Bike Kerékpár$",
+                "value": "Első teleszkóp"
+              }
+            ]
+          },
+          {
+            "key": "suspension",
+            "labels": ["Hátsó rugóstag:", "Hátsó rugóstag"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": ".",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "rearShockModel",
+            "labels": ["Hátsó rugóstag:", "Hátsó rugóstag"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "frameModel",
+            "labels": ["Váz:", "Váz"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "forkModel",
+            "labels": ["Villa:", "Villa"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "forkType",
+            "labels": ["Villa:", "Villa"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bair\\b|\\bfloat\\b",
+                "value": "Levegős"
+              },
+              {
+                "pattern": "\\bcoil\\b",
+                "value": "Acélrugós"
+              },
+              {
+                "pattern": "\\brigid\\b|\\bmerev\\b|full carbon",
+                "value": "Merev"
+              }
+            ]
+          },
+          {
+            "key": "drivetrain",
+            "labels": ["Lánc:", "Lánc"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "belt|szíj|gates",
+                "value": "Szíj"
+              },
+              {
+                "pattern": ".",
+                "value": "Lánc"
+              }
+            ]
+          },
+          {
+            "key": "chain",
+            "labels": ["Lánc:", "Lánc"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "gearType",
+            "labels": [
+              "Hátsó váltó típusa:",
+              "Hátsó váltó típusa",
+              "Hátsó váltó:",
+              "Hátsó váltó"
+            ],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay",
+                "value": "Agyváltó"
+              },
+              {
+                "pattern": "\\S",
+                "value": "Láncváltó"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Hátsó váltó:", "Hátsó váltó", "Váltókar:", "Váltókar"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "\\bdi2\\b|\\baxs\\b|\\betap\\b|wireless|electronic",
+                "value": "Elektromos"
+              },
+              {
+                "pattern": "\\S",
+                "value": "Mechanikus"
+              }
+            ]
+          },
+          {
+            "key": "shiftingActuation",
+            "labels": ["Váltókar:", "Váltókar"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bdi2\\b|\\baxs\\b|\\betap\\b|wireless|electronic",
+                "value": "Elektromos"
+              }
+            ]
+          },
+          {
+            "key": "rearDerailleur",
+            "labels": ["Hátsó váltó:", "Hátsó váltó"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*(?:nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay))\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "rearDerailleurTier",
+            "labels": ["Hátsó váltó típusa:", "Hátsó váltó típusa"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!.*(?:nexus|alfine|enviolo|nuvinci|rohloff|sturmey|kindernay))\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "frontDerailleur",
+            "labels": ["Első váltó:", "Első váltó"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "shifter",
+            "labels": ["Váltókar:", "Váltókar"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankset",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "crankLength",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.,])(1[4-8]\\d(?:[.,]5)?)\\s*mm\\b"]
+          },
+          {
+            "key": "chainring",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": [";\\s*([A-Za-z][^;]*?)\\s*$"]
+          },
+          {
+            "key": "chainringTeeth",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.x×/-])([2-5]\\d)\\s?T\\b"]
+          },
+          {
+            "key": "chainGuard",
+            "labels": ["Hajtómű:", "Hajtómű"],
+            "valuePatterns": [
+              {
+                "pattern": "chain\\s?guard|\\bw/\\s?CG\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "cassette",
+            "labels": ["Fogaskoszorú:", "Fogaskoszorú"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "cassetteRange",
+            "labels": ["Fogaskoszorú:", "Fogaskoszorú"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])((?:9|1[0-3])-[2-5]\\dT)\\b"]
+          },
+          {
+            "key": "bottomBracket",
+            "labels": ["Középcsapágy:", "Középcsapágy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "pedals",
+            "labels": ["Pedál:", "Pedál"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakeModel",
+            "labels": ["Fék:", "Fék"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "brakePistons",
+            "labels": ["Fék:", "Fék"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<!\\d)(\\d)[- ]?piston"]
+          },
+          {
+            "key": "rotorModel",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "^(?!\\s*disc brake\\b)\\s*([A-Za-z].*\\S)\\s*$"
+            ]
+          },
+          {
+            "key": "rotorSizeFront",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<!\\d)(140|160|180|200|203|220)(?!\\d)"]
+          },
+          {
+            "key": "rotorSizeRear",
+            "labels": ["Féktárcsa:", "Féktárcsa"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(?<!\\d)(?:140|160|180|200|203|220)(?!\\d).*?(?<!\\d)(140|160|180|200|203|220)(?!\\d)"
+            ]
+          },
+          {
+            "key": "wheelset",
+            "labels": ["Kerék:", "Kerék"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "rimModel",
+            "labels": ["Felni:", "Felni"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "hubModel",
+            "labels": ["Kerékagy:", "Kerékagy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "hubType",
+            "labels": ["Kerékagy:", "Kerékagy"],
+            "valuePatterns": [
+              {
+                "pattern": "\\bCL\\b|center\\s?lock",
+                "value": "CenterLock"
+              },
+              {
+                "pattern": "\\b6B\\b|6[- ]?bolt",
+                "value": "6-lyukas (IS)"
+              }
+            ]
+          },
+          {
+            "key": "tireModel",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "tireSize",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "extract": "regexpList",
+            "extractPatterns": ["\\b([1-9]\\d-[1-7]\\d{2})\\b"]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Kerék:", "Kerék"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Felni:", "Felni"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "tubeless",
+            "labels": ["Külsőgumi:", "Külsőgumi"],
+            "valuePatterns": [
+              {
+                "pattern": "tubeless|\\btlr\\b|\\btle\\b",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "handlebar",
+            "labels": ["Kormány:", "Kormány"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "handlebarWidth",
+            "labels": ["Kormány:", "Kormány"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])([4-9]\\d{2})\\s*mm\\b"]
+          },
+          {
+            "key": "handlebarMaterial",
+            "labels": ["Kormány:", "Kormány"],
+            "valuePatterns": [
+              {
+                "pattern": "carbon|karbon",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "\\balloy\\b|\\balu|alumín|\\b(?:6061|7005|7075)\\b",
+                "value": "Alumínium"
+              }
+            ]
+          },
+          {
+            "key": "stem",
+            "labels": ["Kormányszár:", "Kormányszár"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "adjustableStem",
+            "labels": ["Kormányszár:", "Kormányszár"],
+            "valuePatterns": [
+              {
+                "pattern": "adjust|állítható",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "key": "headset",
+            "labels": ["Kormánycsapágy:", "Kormánycsapágy"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "grips",
+            "labels": ["Markolat:", "Markolat"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "saddle",
+            "labels": ["Nyereg:", "Nyereg"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatpost",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "skipValues": [
+              "-",
+              "–",
+              "n/a",
+              "na",
+              "no",
+              "none",
+              "nincs",
+              "0",
+              "tbd",
+              "#tbd"
+            ]
+          },
+          {
+            "key": "seatpostType",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "valuePatterns": [
+              {
+                "pattern": "dropper",
+                "value": "Teleszkópos (dropper)"
+              }
+            ]
+          },
+          {
+            "key": "seatpostDiameter",
+            "labels": ["Nyeregcső:", "Nyeregcső"],
+            "extract": "regexpList",
+            "extractPatterns": ["(?<![\\d.])((?:2[5-9]|3[0-5])[.,]\\d)(?!\\d)"]
+          },
+          {
+            "key": "lighting",
+            "labels": ["Lámpák:", "Lámpák"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "fenders",
+            "labels": ["Sárvédő:", "Sárvédő"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "rack",
+            "labels": ["Csomagtartó:", "Csomagtartó"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "Nincs"
+              },
+              {
+                "pattern": ".",
+                "value": "Alapfelszereltség"
+              }
+            ]
+          },
+          {
+            "key": "kickstand",
+            "labels": ["Letámasztó:", "Letámasztó"],
+            "skipValues": ["tbd", "#tbd"],
+            "valuePatterns": [
+              {
+                "pattern": "^(nincs|none|no|nem|n/?a|-|–|/|0)$",
+                "value": "false"
+              },
+              {
+                "pattern": ".",
+                "value": "true"
+              }
+            ]
+          }
+        ]
+      }
     }
   },
   "category": {
     "labelFrom": [
       {
         "op": "stripPattern",
-        "pattern": "^[^>]*start_nav[^>]*>\\s*"
+        "pattern": "^(?:[^>]*start_nav[^>]*|\\s*Kategóriák\\s*)>\\s*"
       },
       {
         "op": "splitAndTake",
-        "separator": " > ",
+        "trim": true,
         "index": 0,
-        "trim": true
+        "separator": " > "
       }
     ]
   },
@@ -129,8 +2349,8 @@
         "pipeline": [
           {
             "op": "regexCapture",
-            "pattern": "\\b([Tt]rike)\\b",
-            "group": 1
+            "group": 1,
+            "pattern": "\\b([Tt]rike)\\b"
           }
         ]
       },
@@ -144,7 +2364,57 @@
         "pipeline": [
           {
             "op": "regexCapture",
-            "pattern": "/catalog/KT-([12]\\d{9}|0\\d{8})/",
+            "group": 1,
+            "pattern": "/catalog/KT-([12]\\d{9}|0\\d{8})/"
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "group": 1,
+            "pattern": "/catalog/VB-(\\d{6,7}-(?:\\d{2}|XX?S|S|M|L|XX?L))(?:cm|[TE])?/"
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "group": 1,
+            "pattern": "/catalog/BF-(\\d{7})/"
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "group": 1,
+            "pattern": "/catalog/CS-(\\d{8}[A-Z][A-Z0-9]{1,2})/"
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "group": 1,
+            "pattern": "/catalog/KR-(KR[A-Z0-9]{14,18})/"
+          }
+        ]
+      },
+      {
+        "field": "image_url",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "/catalog/SC-(\\d{6})\\d{3}/",
             "group": 1
           }
         ]
@@ -154,41 +2424,87 @@
         "pipeline": [
           {
             "op": "regexCapture",
-            "pattern": "/catalog/VB-(\\d{6,7}-(?:\\d{2}|XX?S|S|M|L|XX?L))(?:cm|[TE])?/",
-            "group": 1
-          }
-        ]
-      },
-      {
-        "field": "image_url",
-        "pipeline": [
-          {
-            "op": "regexCapture",
-            "pattern": "/catalog/BF-(\\d{7})/",
-            "group": 1
-          }
-        ]
-      },
-      {
-        "field": "image_url",
-        "pipeline": [
-          {
-            "op": "regexCapture",
-            "pattern": "/catalog/CS-(\\d{8}[A-Z][A-Z0-9]{1,2})/",
-            "group": 1
-          }
-        ]
-      },
-      {
-        "field": "image_url",
-        "pipeline": [
-          {
-            "op": "regexCapture",
-            "pattern": "/catalog/KR-(KR[A-Z0-9]{14,18})/",
+            "pattern": "/catalog/KL-(\\d{5})/",
             "group": 1
           }
         ]
       }
     ]
+  },
+  "detailPage": {
+    "offers": {
+      "itemMode": "cheerio",
+      "offerList": [
+        {
+          "op": "selectAll",
+          "selector": "#product-action-box"
+        }
+      ],
+      "itemPipeline": [
+        {
+          "op": "assembleOffer",
+          "price": [
+            {
+              "as": "ldScripts",
+              "op": "selectAll",
+              "selector": "script[type=\"application/ld+json\"]"
+            },
+            {
+              "as": "ldOffer",
+              "on": "ldScripts",
+              "op": "findScriptContaining",
+              "contains": "\"@type\":\"Offer\""
+            },
+            {
+              "op": "regexCapture",
+              "group": 1,
+              "value": "ldOffer",
+              "pattern": "\"@type\":\"Offer\",\"price\":\"(\\d+(?:\\.\\d+)?)\""
+            }
+          ],
+          "priceWithoutDiscount": [
+            {
+              "op": "selectText",
+              "trim": true,
+              "first": true,
+              "selector": "#product-action-box .v-action-box-prices-004 span:last-child"
+            },
+            {
+              "op": "regexCapture",
+              "group": 1,
+              "pattern": "^([\\d\\s\\u00a0]+?)\\s*Ft"
+            },
+            {
+              "op": "stripPattern",
+              "flags": "g",
+              "pattern": "\\D"
+            }
+          ]
+        }
+      ]
+    },
+    "rawSpecs": [
+      {
+        "op": "extractSpecTableV2",
+        "dedupeBy": "name",
+        "rowSelector": "#tab1-pane .v-properties-box-parts-properties-002 > div:not(:contains(\"Szállítási idő\"))",
+        "nameSelector": "span:first-child",
+        "descriptionAttr": "data-spec-description",
+        "descriptionSelector": "[data-spec-description]",
+        "sectionHeaderRowClass": "v-properties-section-header",
+        "valueContainerSelector": "span.fw-bold"
+      }
+    ],
+    "description": [
+      {
+        "op": "selectText",
+        "trim": true,
+        "first": true,
+        "selector": "#tab2-pane .v-properties-box-parts-content-002"
+      }
+    ]
+  },
+  "postProcess": {
+    "rerunSpecsOnChange": true
   }
 }

@@ -55,8 +55,151 @@
               "group": 1
             }
           ]
+        },
+        {
+          "label": "Modellév (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(20[12]\\d)\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Kerékméret (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\s*(?:\\S+ )?(\\d{2}(?:\\.5)?)(?:[\"”]|-[aeo]s\\b)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váz anyaga (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "([Aa]lumínium|[Aa]luminium|[Aa]luminum|[Aa]lloy|ALUMINIUM|[Kk]arbon|[Cc]arbon|CARBON|[Aa]cél|[Tt]itán)(?:(?!villa|kerék|kormány|nyereg|[.,;])[^.]){0,25}?váz(?!ak)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Villa rugóútja (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "[Vv]ill(?:a|ával|ája),? (?:\\S+ )?(\\d{2,3}) ?mm(?:-es)? rugóút",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(\\d{3,4} ?[Ww][Hh])(?:-s)?(?! PowerMore)(?! külső)(?! kiegészít)(?:\\s+[^\\s.]+){0,2}?\\s*[Aa]kkumul[aá]tor(?:t|ral|ra|ok|ba)?(?![\\w-])",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Modellév (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valueMap": {
+              "Kerékpárok / Országúti": "Országúti",
+              "Kerékpárok / Gravel": "Gravel",
+              "Kerékpárok / Trekking": "Trekking",
+              "Kerékpárok / Junior, gyerek": "Gyerek",
+              "Elektromos kerékpárok / eJunior": "Gyerek"
+            }
+          },
+          {
+            "key": "usageType",
+            "labels": ["Futóbicikli (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "futó",
+                "value": "Futóbicikli"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga (leírás)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(alumínium|aluminium|aluminum|alloy)$",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "^(karbon|carbon)$",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "^acél$",
+                "value": "Acél"
+              },
+              {
+                "pattern": "^titán$",
+                "value": "Titán"
+              }
+            ]
+          },
+          {
+            "key": "forkTravel",
+            "labels": ["Villa rugóútja (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": ["Motor nyomatéka"],
+            "extract": "number"
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": ["Akkumulátor (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": ["Motor és akkumulátor"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{3,4})\\s*(?:wh(?:-s)?(?:\\s+[^\\s\\d]+){0,3}|w?)\\s*akkumul[aá]tor$"
+            ]
+          },
+          {
+            "key": "motorPower",
+            "labels": ["Motor és akkumulátor"],
+            "extract": "regexpList",
+            "extractPatterns": [
+              "(\\d{3,4})\\s*(?:W|Watt)\\b(?!h)(?!-s)(?!\\s*akkumul)"
+            ]
+          }
+        ]
+      }
     },
     "bikes": {
       "enabled": true,
@@ -88,8 +231,125 @@
         {
           "label": "Webshop kategória",
           "field": "category"
+        },
+        {
+          "label": "Modellév (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(20[12]\\d)\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Futóbicikli (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "([Ff]utó ?(?:bicikli|kerékpár|bringa))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Kerékméret (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\s*(?:\\S+ )?(\\d{2}(?:\\.5)?)(?:[\"”]|-[aeo]s\\b)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váz anyaga (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "([Aa]lumínium|[Aa]luminium|[Aa]luminum|[Aa]lloy|ALUMINIUM|[Kk]arbon|[Cc]arbon|CARBON|[Aa]cél|[Tt]itán)(?:(?!villa|kerék|kormány|nyereg|[.,;])[^.]){0,25}?váz(?!ak)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Villa rugóútja (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "[Vv]ill(?:a|ával|ája),? (?:\\S+ )?(\\d{2,3}) ?mm(?:-es)? rugóút",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Modellév (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valueMap": {
+              "Kerékpárok / Országúti": "Országúti",
+              "Kerékpárok / Gravel": "Gravel",
+              "Kerékpárok / Trekking": "Trekking",
+              "Kerékpárok / Junior, gyerek": "Gyerek",
+              "Elektromos kerékpárok / eJunior": "Gyerek"
+            }
+          },
+          {
+            "key": "usageType",
+            "labels": ["Futóbicikli (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "futó",
+                "value": "Futóbicikli"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga (leírás)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(alumínium|aluminium|aluminum|alloy)$",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "^(karbon|carbon)$",
+                "value": "Karbon"
+              },
+              {
+                "pattern": "^acél$",
+                "value": "Acél"
+              },
+              {
+                "pattern": "^titán$",
+                "value": "Titán"
+              }
+            ]
+          },
+          {
+            "key": "forkTravel",
+            "labels": ["Villa rugóútja (leírás)"],
+            "extract": "number"
+          }
+        ]
+      }
     }
   },
   "category": {
@@ -147,21 +407,33 @@
     "categoryLabel": {
       "field": "category"
     },
-    "mpn": {
-      "field": "identifier",
-      "pipeline": [
-        {
-          "op": "regexCapture",
-          "pattern": "^((?:MY\\d{2}[_-])?\\d{6,7}(?:-2[79])?_(?:\\d{2}|XX?S|S|M|L|XX?L))$",
-          "group": 1
-        },
-        {
-          "op": "stripPattern",
-          "pattern": "^MY\\d{2}[_-]|-2[79](?=_)|_",
-          "flags": "g"
-        }
-      ]
-    }
+    "mpn": [
+      {
+        "field": "identifier",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^((?:MY\\d{2}[_-])?\\d{6,7}(?:-2[79])?_(?:\\d{2}|XX?S|S|M|L|XX?L))$",
+            "group": 1
+          },
+          {
+            "op": "stripPattern",
+            "pattern": "^MY\\d{2}[_-]|-2[79](?=_)|_",
+            "flags": "g"
+          }
+        ]
+      },
+      {
+        "field": "identifier",
+        "pipeline": [
+          {
+            "op": "regexCapture",
+            "pattern": "^SC\\d{2}(\\d{6})(?:[A-Z]{1,5})?(?:-2[79])?(?:_[^_]+)?$",
+            "group": 1
+          }
+        ]
+      }
+    ]
   },
   "postProcess": {
     "identityDescription": {

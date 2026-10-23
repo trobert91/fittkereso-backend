@@ -11,6 +11,407 @@
             "equalsIgnoreCase": "Pedelec kerékpárok"
           }
         }
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(összteleszkópos|fully)$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "^(futóbicikli|futókerékpár)$",
+                "value": "Futóbicikli"
+              },
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "^(összecsukható|összehajtható)$",
+                "value": "Összecsukható"
+              },
+              {
+                "pattern": "^tandem$",
+                "value": "Tandem"
+              },
+              {
+                "pattern": "^trekking$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "^(városi|city)$",
+                "value": "City"
+              },
+              {
+                "pattern": "^cruiser$",
+                "value": "Cruiser"
+              },
+              {
+                "pattern": "^(ciklokrossz|cyclocross)$",
+                "value": "Cyclocross"
+              },
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^fitness$",
+                "value": "Fitness"
+              },
+              {
+                "pattern": "^országúti$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^single ?speed$",
+                "value": "Single speed / Fixi"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "^(gyerek|futóbicikli)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(férfi|ffi)$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^női$",
+                "value": "Női"
+              },
+              {
+                "pattern": "^(unisex|uniszex)$",
+                "value": "Uniszex"
+              },
+              {
+                "pattern": "^(gyerek|gyermek|lányka|fiú)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "brakeType",
+            "labels": ["Fék (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(tárcsaf[ée]k|disc)$",
+                "value": "Tárcsa"
+              },
+              {
+                "pattern": "^v-f[ée]k$",
+                "value": "Racker (Felni)"
+              },
+              {
+                "pattern": "^(kontraf[ée]k|kontrás)$",
+                "value": "Kontrafék"
+              },
+              {
+                "pattern": "^görgős fék$",
+                "value": "Görgős fék"
+              }
+            ]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^alu",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "^acél$",
+                "value": "Acél"
+              },
+              {
+                "pattern": "^(karbon|carbon)$",
+                "value": "Karbon"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret (cím)"],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "suspension",
+            "labels": ["Rugózás (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(összteleszkópos|fully)$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "rearDerailleurTier",
+            "labels": ["Váltó széria (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(deore[\\s-]?)?xt di2$",
+                "value": "Shimano Deore XT Di2"
+              },
+              {
+                "pattern": "^(deore[\\s-]?)?xt$",
+                "value": "Shimano Deore XT"
+              },
+              {
+                "pattern": "^deore$",
+                "value": "Shimano Deore"
+              },
+              {
+                "pattern": "^slx$",
+                "value": "Shimano SLX"
+              },
+              {
+                "pattern": "^tourney$",
+                "value": "Shimano Tourney"
+              },
+              {
+                "pattern": "^altus$",
+                "value": "Shimano Altus"
+              },
+              {
+                "pattern": "^acera$",
+                "value": "Shimano Acera"
+              },
+              {
+                "pattern": "^alivio$",
+                "value": "Shimano Alivio"
+              },
+              {
+                "pattern": "^cues$",
+                "value": "Shimano CUES"
+              },
+              {
+                "pattern": "^claris$",
+                "value": "Shimano Claris"
+              },
+              {
+                "pattern": "^sora$",
+                "value": "Shimano Sora"
+              },
+              {
+                "pattern": "^tiagra$",
+                "value": "Shimano Tiagra"
+              },
+              {
+                "pattern": "^105$",
+                "value": "Shimano 105"
+              },
+              {
+                "pattern": "^grx$",
+                "value": "Shimano GRX"
+              }
+            ]
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": ["Akkumulátor kapacitása (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": ["Nyomaték (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "motorBrand",
+            "labels": ["Motor (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^bosch$",
+                "value": "Bosch"
+              },
+              {
+                "pattern": "^panasoni[cs]$",
+                "value": "Panasonic"
+              },
+              {
+                "pattern": "^(shimano|steps)$",
+                "value": "Shimano"
+              },
+              {
+                "pattern": "^yamaha$",
+                "value": "Yamaha"
+              },
+              {
+                "pattern": "^brose$",
+                "value": "Brose"
+              },
+              {
+                "pattern": "^bafang$",
+                "value": "Bafang"
+              },
+              {
+                "pattern": "^fazua$",
+                "value": "Fazua"
+              },
+              {
+                "pattern": "^xofo$",
+                "value": "XOFO"
+              },
+              {
+                "pattern": "^mxus$",
+                "value": "MXUS"
+              }
+            ]
+          }
+        ]
+      },
+      "extraSpecRows": [
+        {
+          "label": "Típus (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])(összecsukható|összehajtható|[Tt]andem|TANDEM|futóbicikli|futókerékpár|[Gg]yerek|[Gg]yermek|GYEREK|(?:összteleszkópos(?= MTB)|[Ff]ully(?= MTB)|[Tt]rekking|TREKKING|városi|[Cc]ity(?= kerékpár| [Ee][Bb]ike)|(?<=Pedelec )City|[Cc]ruiser|ciklokrossz|cyclocross|gravel(?= kerékpár)|fitness(?= kerékpár)|országúti(?! gravel)|[Ss]ingle ?speed)(?!.*(?:összecsukható|összehajtható|[Tt]andem|TANDEM|futóbicikli|futókerékpár|[Gg]yerek|[Gg]yermek|GYEREK)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Nem (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])((?:férfi|FÉRFI|ffi|FFI|[Nn]ői|NŐI|[Uu]nisex|UNISEX|[Uu]niszex|lányka|fiú)(?![a-zA-Záéíóöőúüű])|[Gg]yerek|[Gg]yermek|GYEREK)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Sebességek (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])([1-3]\\s?[xX×]\\s?\\d{1,2}(?=\\s?-?(?:fok[ao]z|fok\\.|sebess|seb[\\s.,]|f[\\s.,])|[\\s,]|$)|\\d{1,2}(?=\\s?-?(?:fok[ao]z|fok\\.|sebess|seb[\\s.,]|seb$|f[\\s.,]|f$)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Fék (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(./])(tárcsaf[ée]k|[Dd]isc|DISC|V-f[ée]k|kontraf[ée]k|kontrás|görgős fék)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váz anyaga (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])([Aa]lu|ALU|[Aa]lumínium|[Aa]luminium|[Aa]cél|[Kk]arbon|[Cc]arbon)(?:\\/Mg)?\\.?\\s?(?:mono)?(?:váz|VÁZ)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Kerékméret (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])(?<!\\/\\s?)((?:1[246]|18|2[0468]|27[,.]5|29)(?=[\"”]?-?(?:os|as|es)(?![a-zA-Záéíóöőúüű])|[\"”]?\\s?(?:kerék|MTB))|(?:27[,.]5|28|29)(?=[\"”](?!\\s?\\/)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Rugózás (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])(összteleszkópos(?= MTB)|[Ff]ully(?= MTB))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váltó széria (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/])(Deore[\\s-]?XT(?: Di2)?|DeoreXT|(?<=Shimano )XT(?: Di2)?|XT(?= Di2| váltó)|Deore|SLX|Tourney|Altus|ALTUS|Acera|ACERA|Alivio|ALIVIO|Cues|CUES|Claris|Sora|Tiagra|GRX|(?<=Shimano )105)(?=$|[\\s,/.])",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor kapacitása (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/])(\\d{3,4})\\s?(?:Wh|WH)(?![a-zA-Z])",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Nyomaték (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/])(\\d{2,3})\\s?(?:Nm|NM)(?![a-zA-Z])",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Motor (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/])(Bosch|BOSCH|Panasonic|Panasonis|Yamaha|Brose|Bafang|Fazua|XOFO|Xofo|MXUS|Shimano(?= Steps| EP\\d| E\\d{4}|\\s?\\d{2,3}\\s?Nm| motor| meghajt)|Steps(?= meghajt| motor|\\s?\\d{2,3}\\s?Nm))",
+              "group": 1
+            }
+          ]
+        }
       ]
     },
     "bikes": {
@@ -22,6 +423,232 @@
           }
         }
       ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(összteleszkópos|fully)$",
+                "value": "Összteleszkópos MTB"
+              },
+              {
+                "pattern": "^(futóbicikli|futókerékpár)$",
+                "value": "Futóbicikli"
+              },
+              {
+                "pattern": "^(gyerek|gyermek)$",
+                "value": "Gyerek"
+              },
+              {
+                "pattern": "^(összecsukható|összehajtható)$",
+                "value": "Összecsukható"
+              },
+              {
+                "pattern": "^tandem$",
+                "value": "Tandem"
+              },
+              {
+                "pattern": "^trekking$",
+                "value": "Trekking"
+              },
+              {
+                "pattern": "^(városi|city)$",
+                "value": "City"
+              },
+              {
+                "pattern": "^cruiser$",
+                "value": "Cruiser"
+              },
+              {
+                "pattern": "^(ciklokrossz|cyclocross)$",
+                "value": "Cyclocross"
+              },
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              },
+              {
+                "pattern": "^fitness$",
+                "value": "Fitness"
+              },
+              {
+                "pattern": "^országúti$",
+                "value": "Országúti"
+              },
+              {
+                "pattern": "^single ?speed$",
+                "value": "Single speed / Fixi"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              {
+                "pattern": "^(gyerek|futóbicikli)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(férfi|ffi)$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^női$",
+                "value": "Női"
+              },
+              {
+                "pattern": "^(unisex|uniszex)$",
+                "value": "Uniszex"
+              },
+              {
+                "pattern": "^(gyerek|gyermek|lányka|fiú)$",
+                "value": "Gyermek"
+              }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "brakeType",
+            "labels": ["Fék (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(tárcsaf[ée]k|disc)$",
+                "value": "Tárcsa"
+              },
+              {
+                "pattern": "^v-f[ée]k$",
+                "value": "Racker (Felni)"
+              },
+              {
+                "pattern": "^(kontraf[ée]k|kontrás)$",
+                "value": "Kontrafék"
+              },
+              {
+                "pattern": "^görgős fék$",
+                "value": "Görgős fék"
+              }
+            ]
+          },
+          {
+            "key": "frameMaterial",
+            "labels": ["Váz anyaga (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^alu",
+                "value": "Alumínium"
+              },
+              {
+                "pattern": "^acél$",
+                "value": "Acél"
+              },
+              {
+                "pattern": "^(karbon|carbon)$",
+                "value": "Karbon"
+              }
+            ]
+          },
+          {
+            "key": "wheelSize",
+            "labels": ["Kerékméret (cím)"],
+            "replacePatterns": [
+              {
+                "from": ",",
+                "to": "."
+              }
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "suspension",
+            "labels": ["Rugózás (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(összteleszkópos|fully)$",
+                "value": "Első teleszkóp, hátsó rugóstag"
+              }
+            ]
+          },
+          {
+            "key": "rearDerailleurTier",
+            "labels": ["Váltó széria (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^(deore[\\s-]?)?xt di2$",
+                "value": "Shimano Deore XT Di2"
+              },
+              {
+                "pattern": "^(deore[\\s-]?)?xt$",
+                "value": "Shimano Deore XT"
+              },
+              {
+                "pattern": "^deore$",
+                "value": "Shimano Deore"
+              },
+              {
+                "pattern": "^slx$",
+                "value": "Shimano SLX"
+              },
+              {
+                "pattern": "^tourney$",
+                "value": "Shimano Tourney"
+              },
+              {
+                "pattern": "^altus$",
+                "value": "Shimano Altus"
+              },
+              {
+                "pattern": "^acera$",
+                "value": "Shimano Acera"
+              },
+              {
+                "pattern": "^alivio$",
+                "value": "Shimano Alivio"
+              },
+              {
+                "pattern": "^cues$",
+                "value": "Shimano CUES"
+              },
+              {
+                "pattern": "^claris$",
+                "value": "Shimano Claris"
+              },
+              {
+                "pattern": "^sora$",
+                "value": "Shimano Sora"
+              },
+              {
+                "pattern": "^tiagra$",
+                "value": "Shimano Tiagra"
+              },
+              {
+                "pattern": "^105$",
+                "value": "Shimano 105"
+              },
+              {
+                "pattern": "^grx$",
+                "value": "Shimano GRX"
+              }
+            ]
+          }
+        ]
+      },
       "extraSpecRows": [
         {
           "label": "Webshop kategória",
@@ -42,9 +669,6 @@
                 "0104": "MTB 26\"",
                 "0105": "Trekking",
                 "0106": "Cross Trekking",
-                "0107": "Fitness",
-                "0108": "Országúti",
-                "0109": "City",
                 "0110": "Cruiser",
                 "0112": "Tandem",
                 "0120": "MTB 29\"",
@@ -52,6 +676,94 @@
                 "0140": "Cyclocross",
                 "0150": "Gravel"
               }
+            }
+          ]
+        },
+        {
+          "label": "Típus (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])(összecsukható|összehajtható|[Tt]andem|TANDEM|futóbicikli|futókerékpár|[Gg]yerek|[Gg]yermek|GYEREK|(?:összteleszkópos(?= MTB)|[Ff]ully(?= MTB)|[Tt]rekking|TREKKING|városi|[Cc]ity(?= kerékpár| [Ee][Bb]ike)|(?<=Pedelec )City|[Cc]ruiser|ciklokrossz|cyclocross|gravel(?= kerékpár)|fitness(?= kerékpár)|országúti(?! gravel)|[Ss]ingle ?speed)(?!.*(?:összecsukható|összehajtható|[Tt]andem|TANDEM|futóbicikli|futókerékpár|[Gg]yerek|[Gg]yermek|GYEREK)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Nem (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])((?:férfi|FÉRFI|ffi|FFI|[Nn]ői|NŐI|[Uu]nisex|UNISEX|[Uu]niszex|lányka|fiú)(?![a-zA-Záéíóöőúüű])|[Gg]yerek|[Gg]yermek|GYEREK)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Sebességek (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])([1-3]\\s?[xX×]\\s?\\d{1,2}(?=\\s?-?(?:fok[ao]z|fok\\.|sebess|seb[\\s.,]|f[\\s.,])|[\\s,]|$)|\\d{1,2}(?=\\s?-?(?:fok[ao]z|fok\\.|sebess|seb[\\s.,]|seb$|f[\\s.,]|f$)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Fék (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(./])(tárcsaf[ée]k|[Dd]isc|DISC|V-f[ée]k|kontraf[ée]k|kontrás|görgős fék)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váz anyaga (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])([Aa]lu|ALU|[Aa]lumínium|[Aa]luminium|[Aa]cél|[Kk]arbon|[Cc]arbon)(?:\\/Mg)?\\.?\\s?(?:mono)?(?:váz|VÁZ)",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Kerékméret (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(])(?<!\\/\\s?)((?:1[246]|18|2[0468]|27[,.]5|29)(?=[\"”]?-?(?:os|as|es)(?![a-zA-Záéíóöőúüű])|[\"”]?\\s?(?:kerék|MTB))|(?:27[,.]5|28|29)(?=[\"”](?!\\s?\\/)))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Rugózás (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/-])(összteleszkópos(?= MTB)|[Ff]ully(?= MTB))",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Váltó széria (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s,(/])(Deore[\\s-]?XT(?: Di2)?|DeoreXT|(?<=Shimano )XT(?: Di2)?|XT(?= Di2| váltó)|Deore|SLX|Tourney|Altus|ALTUS|Acera|ACERA|Alivio|ALIVIO|Cues|CUES|Claris|Sora|Tiagra|GRX|(?<=Shimano )105)(?=$|[\\s,/.])",
+              "group": 1
             }
           ]
         }

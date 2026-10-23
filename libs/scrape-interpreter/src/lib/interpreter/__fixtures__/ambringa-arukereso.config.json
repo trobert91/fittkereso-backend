@@ -38,6 +38,158 @@
                 "value": "Alacsony"
               }
             ]
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": [
+              "Akkumulátor kapacitása (cím)"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "motorPower",
+            "labels": [
+              "Motor névleges teljesítménye"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "topSpeed",
+            "labels": [
+              "Rásegítés sebességhatára"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "sensorType",
+            "labels": [
+              "Motor működési elve"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "nyomaték.*fordulatszám|fordulatszám.*nyomaték",
+                "value": "Nyomaték- és fordulatszám-szenzor"
+              },
+              {
+                "pattern": "nyomaték",
+                "value": "Nyomatékszenzor"
+              },
+              {
+                "pattern": "fordulatszám",
+                "value": "Fordulatszám-szenzor"
+              }
+            ]
+          },
+          {
+            "key": "batteryPosition",
+            "labels": [
+              "Akkumulátor elhelyezése"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "csomagtart",
+                "value": "Csomagtartóra szerelt"
+              },
+              {
+                "pattern": "vázra szerelt|külső|kívül",
+                "value": "Külső"
+              },
+              {
+                "pattern": "belsej|rejtett|integrált",
+                "value": "Vázba integrált"
+              }
+            ]
+          },
+          {
+            "key": "batteryChemistry",
+            "labels": [
+              "Akkumulátor technológiája"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^li-?ion$",
+                "value": "Li-ion"
+              },
+              {
+                "pattern": "li-?pol",
+                "value": "Li-polimer"
+              }
+            ]
+          },
+          {
+            "key": "batteryRemovable",
+            "labels": [
+              "Akkumulátor levehető"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^igen",
+                "value": "true"
+              },
+              {
+                "pattern": "^nem",
+                "value": "false"
+              }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": [
+              "Nem (cím)"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^(férfi|men)$",
+                "value": "Férfi"
+              },
+              {
+                "pattern": "^(női|women)$",
+                "value": "Női"
+              },
+              {
+                "pattern": "^unisex$",
+                "value": "Uniszex"
+              }
+            ]
+          },
+          {
+            "key": "frameSize",
+            "labels": [
+              "Vázméret (cikkszám, cm)"
+            ],
+            "extract": "number"
+          },
+          {
+            "key": "frameSizeLabel",
+            "labels": [
+              "Vázméret jelölés (cikkszám)"
+            ],
+            "valuePatterns": [
+              {
+                "pattern": "^XXL$",
+                "value": "XXL"
+              },
+              {
+                "pattern": "^XL$",
+                "value": "XL"
+              },
+              {
+                "pattern": "^XS$",
+                "value": "XS"
+              },
+              {
+                "pattern": "^S$",
+                "value": "S"
+              },
+              {
+                "pattern": "^M$",
+                "value": "M"
+              },
+              {
+                "pattern": "^L$",
+                "value": "L"
+              }
+            ]
           }
         ]
       },
@@ -141,6 +293,50 @@
             {
               "op": "regexCapture",
               "pattern": "<em>Levehető az ebike-ról:\\s*</em>\\s*([^<]+?)\\s*<",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Akkumulátor kapacitása (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\((\\d{3,4})\\s*Wh\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Nem (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "(?:^|[\\s(/,-])([Ff]érfi|FÉRFI|[Nn]ői|NŐI|[Uu]nisex|UNISEX|Men|Women)(?=$|[\\s),/-])",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Vázméret (cikkszám, cm)",
+          "field": "sku",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\d{6,7}-(\\d{2})(?:cm|[TE])?_[a-z]{2}$",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Vázméret jelölés (cikkszám)",
+          "field": "sku",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\d{6,7}-(XS|S|M|L|XL|XXL)_[a-z]{2}$",
               "group": 1
             }
           ]

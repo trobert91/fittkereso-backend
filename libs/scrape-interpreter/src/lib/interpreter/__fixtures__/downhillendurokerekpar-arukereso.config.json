@@ -32,8 +32,64 @@
         {
           "label": "Webshop kategória",
           "field": "category"
+        },
+        {
+          "label": "Modellév (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\s*(20[12]\\d)\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Gravel (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(GRAVEL|Gravel|gravel)\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Motor márkája (leírás)",
+          "field": "description",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(Bosch|Shimano|Yamaha|Brose|Bafang|Fazua|TQ)\\b(?=[^.]{0,40}(?:motor(?!oz)|meghajt))",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Modellév (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "usageType",
+            "labels": ["Gravel (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              }
+            ]
+          },
+          {
+            "key": "motorBrand",
+            "labels": ["Motor márkája (leírás)"]
+          }
+        ]
+      }
     },
     "bikes": {
       "enabled": true,
@@ -96,8 +152,49 @@
         {
           "label": "Webshop kategória",
           "field": "category"
+        },
+        {
+          "label": "Modellév (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "^\\s*(20[12]\\d)\\b",
+              "group": 1
+            }
+          ]
+        },
+        {
+          "label": "Gravel (cím)",
+          "field": "name",
+          "pipeline": [
+            {
+              "op": "regexCapture",
+              "pattern": "\\b(GRAVEL|Gravel|gravel)\\b",
+              "group": 1
+            }
+          ]
         }
-      ]
+      ],
+      "specMapping": {
+        "mappings": [
+          {
+            "key": "modelYear",
+            "labels": ["Modellév (cím)"],
+            "extract": "number"
+          },
+          {
+            "key": "usageType",
+            "labels": ["Gravel (cím)"],
+            "valuePatterns": [
+              {
+                "pattern": "^gravel$",
+                "value": "Gravel"
+              }
+            ]
+          }
+        ]
+      }
     }
   },
   "category": {

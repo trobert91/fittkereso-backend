@@ -28,6 +28,52 @@
         {
           "label": "Váz anyaga",
           "field": "material"
+        },
+        {
+          "label": "Nem",
+          "field": "gender"
+        },
+        {
+          "label": "Típus (cím)",
+          "field": "title",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?:^| )(FS|Dirt|(?:cross trekking|trekking|városi|fitness|gravel|országúti|triatlon|cyclocross|gyerek)(?=(?: elektromos)? kerékpár))(?= )", "group": 1 }
+          ]
+        },
+        {
+          "label": "Sebességek (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,x×])((?:\\d ?[x×] ?)?\\d{1,2})[ -]sebességes", "group": 1 }
+          ]
+        },
+        {
+          "label": "Sebességek (cím)",
+          "field": "title",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?:^| )(\\d ?[x×] ?\\d{1,2})(?= )", "group": 1 }
+          ]
+        },
+        {
+          "label": "Tömeg (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,])(\\d{1,2}(?:\\.\\d)?) ?kg-os (?:súlyával|tömegével)", "group": 1 }
+          ]
+        },
+        {
+          "label": "Akkumulátor (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,])(\\d{3,4}) ?Wh\\b", "group": 1 }
+          ]
+        },
+        {
+          "label": "Nyomaték (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,])(\\d{2,3}) ?Nm\\b", "group": 1 }
+          ]
         }
       ],
       "specMapping": {
@@ -58,6 +104,93 @@
               { "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b", "value": "Alumínium" },
               { "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly", "value": "Acél" }
             ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              { "pattern": "összteleszkópos mtb", "value": "Összteleszkópos MTB" },
+              { "pattern": "merevfarú mtb", "value": "MTB" },
+              { "pattern": "> gyerek", "value": "Gyerek" },
+              { "pattern": "> cross trekking", "value": "Cross Trekking" },
+              { "pattern": "> trekking", "value": "Trekking" },
+              { "pattern": "> gravel", "value": "Gravel" },
+              { "pattern": "> országúti", "value": "Országúti" },
+              { "pattern": "> triatlon", "value": "Országúti" },
+              { "pattern": "> cyclocross", "value": "Cyclocross" },
+              { "pattern": "> fitness", "value": "Fitness" },
+              { "pattern": "> városi", "value": "City" }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              { "pattern": "^FS$", "value": "Összteleszkópos MTB" },
+              { "pattern": "^Dirt$", "value": "Dirt" },
+              { "pattern": "^cross trekking$", "value": "Cross Trekking" },
+              { "pattern": "^trekking$", "value": "Trekking" },
+              { "pattern": "^városi$", "value": "City" },
+              { "pattern": "^fitness$", "value": "Fitness" },
+              { "pattern": "^gravel$", "value": "Gravel" },
+              { "pattern": "^országúti$", "value": "Országúti" },
+              { "pattern": "^triatlon$", "value": "Országúti" },
+              { "pattern": "^cyclocross$", "value": "Cyclocross" },
+              { "pattern": "^gyerek$", "value": "Gyerek" }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              { "pattern": "> gyerek", "value": "Gyermek" }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem"],
+            "valuePatterns": [
+              { "pattern": "^férfi$", "value": "Férfi" },
+              { "pattern": "^női$", "value": "Női" },
+              { "pattern": "^gyerek$|^gyermek$", "value": "Gyermek" }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (leírás)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "chainringCount",
+            "labels": ["Sebességek (leírás)"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d) ?[x×]"]
+          },
+          {
+            "key": "chainringCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d) ?[x×]"]
+          },
+          {
+            "key": "weight",
+            "labels": ["Tömeg (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "batteryCapacity",
+            "labels": ["Akkumulátor (leírás)"],
+            "extract": "number"
+          },
+          {
+            "key": "torque",
+            "labels": ["Nyomaték (leírás)"],
+            "extract": "number"
           }
         ]
       }
@@ -87,6 +220,38 @@
         {
           "label": "Váz anyaga",
           "field": "material"
+        },
+        {
+          "label": "Nem",
+          "field": "gender"
+        },
+        {
+          "label": "Típus (cím)",
+          "field": "title",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?:^| )(FS|Dirt|(?:cross trekking|trekking|városi|fitness|gravel|országúti|triatlon|cyclocross|gyerek)(?=(?: elektromos)? kerékpár))(?= )", "group": 1 }
+          ]
+        },
+        {
+          "label": "Sebességek (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,x×])(\\d ?[x×] ?\\d{1,2}(?=[ -]sebességes)|(?<=(?:Nexus|Alfine|Pinion) )\\d{1,2}(?= sebességes))", "group": 1 }
+          ]
+        },
+        {
+          "label": "Sebességek (cím)",
+          "field": "title",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?:^| )(\\d ?[x×] ?\\d{1,2})(?= )", "group": 1 }
+          ]
+        },
+        {
+          "label": "Tömeg (leírás)",
+          "field": "description",
+          "pipeline": [
+            { "op": "regexCapture", "pattern": "(?<![\\d.,])(\\d{1,2}(?:\\.\\d)?) ?kg-os (?:súlyával|tömegével)", "group": 1 }
+          ]
         }
       ],
       "specMapping": {
@@ -117,6 +282,83 @@
               { "pattern": "\\balu|\\balloy|alumín|alimín|hliník|\\b(?:al-?)?(?:6061|6066|6069|6013|7005|7020|7075)\\b", "value": "Alumínium" },
               { "pattern": "hi-?ten|steel|acél|\\bocel|cr-?mo|chromoly", "value": "Acél" }
             ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              { "pattern": "összteleszkópos mtb", "value": "Összteleszkópos MTB" },
+              { "pattern": "merevfarú mtb", "value": "MTB" },
+              { "pattern": "> gyerek", "value": "Gyerek" },
+              { "pattern": "> cross trekking", "value": "Cross Trekking" },
+              { "pattern": "> trekking", "value": "Trekking" },
+              { "pattern": "> gravel", "value": "Gravel" },
+              { "pattern": "> országúti", "value": "Országúti" },
+              { "pattern": "> triatlon", "value": "Országúti" },
+              { "pattern": "> cyclocross", "value": "Cyclocross" },
+              { "pattern": "> fitness", "value": "Fitness" },
+              { "pattern": "> városi", "value": "City" }
+            ]
+          },
+          {
+            "key": "usageType",
+            "labels": ["Típus (cím)"],
+            "valuePatterns": [
+              { "pattern": "^FS$", "value": "Összteleszkópos MTB" },
+              { "pattern": "^Dirt$", "value": "Dirt" },
+              { "pattern": "^cross trekking$", "value": "Cross Trekking" },
+              { "pattern": "^trekking$", "value": "Trekking" },
+              { "pattern": "^városi$", "value": "City" },
+              { "pattern": "^fitness$", "value": "Fitness" },
+              { "pattern": "^gravel$", "value": "Gravel" },
+              { "pattern": "^országúti$", "value": "Országúti" },
+              { "pattern": "^triatlon$", "value": "Országúti" },
+              { "pattern": "^cyclocross$", "value": "Cyclocross" },
+              { "pattern": "^gyerek$", "value": "Gyerek" }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Webshop kategória"],
+            "valuePatterns": [
+              { "pattern": "> gyerek", "value": "Gyermek" }
+            ]
+          },
+          {
+            "key": "gender",
+            "labels": ["Nem"],
+            "valuePatterns": [
+              { "pattern": "^férfi$", "value": "Férfi" },
+              { "pattern": "^női$", "value": "Női" },
+              { "pattern": "^gyerek$|^gyermek$", "value": "Gyermek" }
+            ]
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (leírás)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "gearCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "multiply"
+          },
+          {
+            "key": "chainringCount",
+            "labels": ["Sebességek (leírás)"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d) ?[x×]"]
+          },
+          {
+            "key": "chainringCount",
+            "labels": ["Sebességek (cím)"],
+            "extract": "regexpList",
+            "extractPatterns": ["^(\\d) ?[x×]"]
+          },
+          {
+            "key": "weight",
+            "labels": ["Tömeg (leírás)"],
+            "extract": "number"
           }
         ]
       }
@@ -210,6 +452,9 @@
     },
     "availability": {
       "field": "availability"
+    },
+    "condition": {
+      "field": "condition"
     }
   }
 }
