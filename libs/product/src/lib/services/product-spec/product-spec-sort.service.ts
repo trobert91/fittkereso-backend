@@ -108,6 +108,9 @@ export class ProductSpecSortService {
   ): string {
     const valueStr = value?.toString() ?? '';
     if (!unit) return valueStr;
+    // A value that already carries its unit ("11-50T", as the schema's examples
+    // write a cassette range) is shown as is, not as "11-50TT".
+    if (valueStr.endsWith(unit)) return valueStr;
 
     return unitFormat === 'none' ? `${valueStr}${unit}` : `${valueStr} ${unit}`;
   }

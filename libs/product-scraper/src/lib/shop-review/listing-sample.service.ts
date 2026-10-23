@@ -72,7 +72,7 @@ export class ListingSampleService {
     const readers = new Map<string, SpecLabelReaders>();
     const readersOf = (slug: string | undefined) => {
       const key = slug ?? '';
-      if (!readers.has(key)) readers.set(key, specLabelsReadBy(categorySectionOf(source.config, slug)));
+      if (!readers.has(key)) readers.set(key, specLabelsReadBy(categorySectionOf(source.config, slug), source.config));
       return readers.get(key) as SpecLabelReaders;
     };
     const feedReaders =

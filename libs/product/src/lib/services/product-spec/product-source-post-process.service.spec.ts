@@ -1285,6 +1285,7 @@ describe('ProductSourcePostProcessService', () => {
         componentRow: 'UNIFICATION-ROW',
         descriptionStatement: 'DESCRIPTION',
         noDerivation: 'DERIVATION',
+        fieldMeanings: 'MEANINGS',
       });
 
       expect(identity).toContain('a free-text component row (e.g. IDENTITY-ROW). Extract it');
@@ -1292,6 +1293,7 @@ describe('ProductSourcePostProcessService', () => {
       expect(unification).toContain('a free-text component description (e.g. UNIFICATION-ROW). Extract from');
       expect(unification).toContain('unambiguously stated (e.g. DESCRIPTION) — never from');
       expect(unification).toContain("the input didn't provide (e.g. DERIVATION).\n");
+      expect(unification).toContain('- Fields that read alike hold different things: MEANINGS.\n');
     });
 
     it('states the rules alone for a category without examples', async () => {
@@ -1302,6 +1304,7 @@ describe('ProductSourcePostProcessService', () => {
       expect(unification).toContain('a free-text component description. Extract from');
       expect(unification).toContain('unambiguously stated — never from');
       expect(unification).toContain("the input didn't provide.\n");
+      expect(unification).not.toContain('Fields that read alike');
       expect(`${identity}${unification}`).not.toMatch(/Motor|Bosch|pedelec|Purion|battery/i);
     });
 

@@ -115,7 +115,7 @@ export class ShopReviewSummaryService {
         const readersOf = (category: string | null) => {
           const key = category ?? '';
           if (!readers.has(key)) {
-            readers.set(key, specLabelsReadBy(categorySectionOf(source.config, category ?? undefined)));
+            readers.set(key, specLabelsReadBy(categorySectionOf(source.config, category ?? undefined), source.config));
           }
           return readers.get(key) as SpecLabelReaders;
         };

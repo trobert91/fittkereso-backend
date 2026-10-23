@@ -153,6 +153,9 @@ export interface CategorySpecPromptExamples {
   descriptionStatement?: string;
   /** Spec unification: a value never to be computed from another. */
   noDerivation?: string;
+  /** Spec unification: what fields that read alike each hold — e.g. a rated
+   *  vs a peak power. Its own rule, shown only when the category has one. */
+  fieldMeanings?: string;
   /** Both calls: a word of a model's own name that tells which defined value
    *  (`meta.valueDefinitions`) the product takes. */
   definedValues?: string;

@@ -153,9 +153,10 @@ function formatSpecLabels(summary: SourceReviewSummary): string[] {
   const slugs = [...new Set(summary.specLabels.map((row) => row.slug ?? '–'))];
   for (const slug of slugs) {
     const rows = summary.specLabels.filter((row) => (row.slug ?? '–') === slug);
-    const notMapped = rows.filter((row) => row.reader !== 'mapped');
+    // A row a product-page pipeline reads (the release year from "Modellév") is read too.
+    const notMapped = rows.filter((row) => row.reader !== 'mapped' && row.reader !== 'pipeline');
     L.push(
-      `### Spec rows no mapping reads: ${slug} (${notMapped.length} of ${rows.length} labels; ${rows.length - notMapped.length} are mapped)`,
+      `### Spec rows no mapping reads: ${slug} (${notMapped.length} of ${rows.length} labels; ${rows.length - notMapped.length} are mapped or read by a page pipeline)`,
     );
     if (notMapped.length === 0) {
       L.push('_Every label is mapped._');
@@ -284,7 +285,7 @@ export function formatListingSample(sample: ListingSample, limit: number): strin
   const { source } = sample;
   L.push(`# Listings of ${source.name} (${source.id}): ${sample.offset + 1}–${sample.offset + sample.listings.length} of ${sample.total}`);
   L.push(
-    `Ordered by product publicId (stable), unattached last. Next slice: offset ${sample.offset + limit}. Specs: [d] deterministic mapping · [llm] filled by the LLM · [llm≠d] the LLM replaced the mapped value. Rows: "mapped" a specMapping reads it · "identity" only the identity extraction · "unread" no rule. Feed columns: only the ones no target reads, with the count of read ones.`,
+    `Ordered by product publicId (stable), unattached last. Next slice: offset ${sample.offset + limit}. Specs: [d] deterministic mapping · [llm] filled by the LLM · [llm≠d] the LLM replaced the mapped value. Rows: "mapped" a specMapping reads it · "pipeline" a product-page pipeline reads it · "identity" only the identity extraction · "unread" no rule. Feed columns: only the ones no target reads, with the count of read ones.`,
   );
   if (sample.feedRows) {
     const rows = sample.feedRows;
@@ -326,7 +327,7 @@ function formatListing(listing: ReviewedListing, position: number): string[] {
     }
     L.push(`- **Product lacks:** ${product.missingKeys.join(', ') || 'nothing'}`);
   }
-  for (const reader of ['mapped', 'identity', 'unread'] as const) {
+  for (const reader of ['mapped', 'pipeline', 'identity', 'unread'] as const) {
     const rows = listing.rawRows.filter((row) => row.reader === reader);
     if (rows.length === 0) continue;
     L.push(

@@ -155,7 +155,8 @@
         "Alumínium",
         "Karbon",
         "Acél",
-        "Titán"
+        "Titán",
+        "Magnézium"
       ],
       "type": "string",
       "title": "Frame material",

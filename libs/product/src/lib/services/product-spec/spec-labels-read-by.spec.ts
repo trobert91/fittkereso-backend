@@ -50,6 +50,23 @@ describe('specLabelsReadBy', () => {
     ]);
   });
 
+  it('counts rows a product-page pipeline reads, nested ones too, but not a feed mapping', () => {
+    const withConfig = specLabelsReadBy(
+      { enabled: true, specMapping: { mappings: [{ key: 'torque', labels: ['Nyomaték'] }] } },
+      {
+        detailPage: {
+          releaseYear: [{ op: 'mapSpecValue', label: 'Modellév', single: true, cast: 'number' }],
+          brand: [{ op: 'branch', condition: { isEmpty: true }, ifTrue: [{ op: 'mapSpecValue', label: 'Gyártó', single: true }], ifFalse: [] }],
+        },
+        mapping: { gtin: { field: 'ean', pipeline: [{ op: 'mapSpecValue', label: 'EAN', single: true }] } },
+      },
+    );
+    expect(withConfig.readerOf('modellév')).toBe('pipeline');
+    expect(withConfig.readerOf('Gyártó')).toBe('pipeline');
+    expect(withConfig.readerOf('Nyomaték')).toBe('mapped');
+    expect(withConfig.readerOf('EAN')).toBe('unread');
+  });
+
   it('reads nothing for a missing section', () => {
     const none = specLabelsReadBy(undefined);
     expect(none.readerOf('Nyomaték')).toBe('unread');
