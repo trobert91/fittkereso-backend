@@ -110,9 +110,11 @@ describe('validateRecommender', () => {
     const dupOption = valid();
     dupOption.steps[0].options.push(option('city'));
     expectError(dupOption, 'duplicate option id city');
-    const reserved = valid();
-    reserved.steps[1].id = 'step';
-    expectError(reserved, 'reserved step id');
+    for (const id of ['step', 'usageType', 'recommendation']) {
+      const reserved = valid();
+      reserved.steps[1].id = id;
+      expectError(reserved, 'reserved step id');
+    }
   });
 
   it('rejects a schema property named like a pseudo-spec', () => {

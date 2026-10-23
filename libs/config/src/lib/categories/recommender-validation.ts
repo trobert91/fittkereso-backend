@@ -66,8 +66,11 @@ export const PSEUDO_SPECS: Record<string, RecommenderSchemaProperty> = {
   '@brand': { type: 'string' },
 };
 
-/** Step ids the site's query string already uses: the stepper's cursor, and the listing's usage-type key. */
-const RESERVED_STEP_IDS = ['step', 'usageType'];
+/**
+ * Step ids the site's query string already uses: the stepper's cursor, the listing's usage-type
+ * key, and a saved recommendation's id (the finder page loads its answers from it).
+ */
+const RESERVED_STEP_IDS = ['step', 'usageType', 'recommendation'];
 
 const schema = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'recommender.schema.json'), 'utf8'),
