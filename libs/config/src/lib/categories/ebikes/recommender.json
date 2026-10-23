@@ -5,8 +5,8 @@
     "en": "E-bike finder"
   },
   "intro": {
-    "hu": "Néhány kérdés alapján megmutatjuk a hozzád illő elektromos kerékpárokat. Bármelyik kérdést kihagyhatod.",
-    "en": "A few questions, and we show the e-bikes that suit you. You can skip any question."
+    "hu": "Nem kell adatlapokat böngészned: válaszolj néhány kérdésre, és mi minden e-bike-ot a te igényeidhez mérünk. Azonnal látod, melyik illik hozzád a legjobban, és miért.",
+    "en": "No need to browse spec sheets: answer a few questions and we measure every e-bike against what you need. You see at once which one suits you best, and why."
   },
   "search": {
     "minResults": 12,

@@ -110,7 +110,7 @@ describe('validateRecommender', () => {
     const dupOption = valid();
     dupOption.steps[0].options.push(option('city'));
     expectError(dupOption, 'duplicate option id city');
-    for (const id of ['step', 'usageType', 'recommendation']) {
+    for (const id of ['step', 'page', 'perPage', 'usageType', 'recommendation']) {
       const reserved = valid();
       reserved.steps[1].id = id;
       expectError(reserved, 'reserved step id');
