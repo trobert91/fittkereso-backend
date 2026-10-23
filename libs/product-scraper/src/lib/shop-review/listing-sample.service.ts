@@ -26,7 +26,7 @@ import { FeedSnapshot, FeedSnapshotService } from './feed-snapshot.service';
 export type FeedRowMode = 'auto' | 'live' | 'none';
 
 export const LISTING_SAMPLE_MAX = 50;
-const DESCRIPTION_LIMIT = 400;
+const DESCRIPTION_LIMIT = 1000;
 
 export interface ListingSample {
   source: ProductSource;
