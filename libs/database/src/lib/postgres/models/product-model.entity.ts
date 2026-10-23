@@ -1,7 +1,7 @@
 import {
   Column,
+  Check,
   Entity,
-  Generated,
   Index,
   JoinColumn,
   ManyToOne,
@@ -22,8 +22,13 @@ import { PriceHistory } from './price-history.entity';
 import { SerializeGroup, transfromExposeAll } from '@fittkereso-backend/utils';
 import { Expose, Transform } from 'class-transformer';
 
+/** ProductModel.publicId's range: always 9 digits. */
+export const PUBLIC_ID_MIN = 100_000_000;
+export const PUBLIC_ID_MAX = 999_999_999;
+
 @Entity()
 @Index(['productCategory', 'enabled'])
+@Check(`"publicId" BETWEEN ${PUBLIC_ID_MIN} AND ${PUBLIC_ID_MAX}`)
 export class ProductModel extends BasePostgresEntity {
   @Index()
   @ManyToOne(() => Brand, (brand) => brand.models, { nullable: false })
@@ -146,15 +151,16 @@ export class ProductModel extends BasePostgresEntity {
   slug?: string | null;
 
   /**
-   * The product's short public number, for the site's URLs (`p<publicId>`,
-   * e.g. the comparison's): unlike the slug, it survives a rename. Assigned by
-   * the database on insert (a serial, which also numbered the rows there were
-   * when it was added), never set or changed by code, never reused. The UUID
-   * stays the id everywhere else.
+   * The product's public number, for the site's URLs (`p<publicId>`, e.g. the
+   * comparison's): unlike the slug, it survives a rename. A random, unused
+   * 9-digit number (see PUBLIC_ID_MIN/MAX), so the numbers can't be walked
+   * through. The database assigns it on insert and refuses to change it
+   * (ProductPublicId1793000000000 holds the functions and triggers), so it is
+   * insert/update false here: code never sets it. Not read back on insert -
+   * reload a new product to see it. The UUID stays the id everywhere else.
    */
   @Index({ unique: true })
-  @Column({ type: 'int', nullable: false })
-  @Generated('increment')
+  @Column({ type: 'int', nullable: false, insert: false, update: false })
   @Expose({ groups: [SerializeGroup.list, SerializeGroup.adminList] })
   publicId: number;
 
