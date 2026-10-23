@@ -13,8 +13,10 @@ import { FinderVisitor } from './finder-visitor.entity';
  * - **`answers`** is the finder's canonical answer string (`answersKey` in the
  *   website's recommender engine), re-read against the category's current
  *   `recommender.json` on every use, so a config change never invalidates it.
- * - **`activatedAt`**: a visitor's results of one category are scored by the
- *   one activated last (set on save and when the visitor picks one).
+ * - **`activatedAt`**: set while the result is active, null while it is not.
+ *   Products are scored by every active result of their category - at most two
+ *   per visitor and category, a rule the website enforces - shown in the order
+ *   they were activated.
  * - **`category`** is the category slug, as the website's finder configs are
  *   keyed by it.
  */
@@ -38,6 +40,6 @@ export class FinderResult extends BasePostgresEntity {
   @Column({ type: 'varchar', nullable: false })
   answers: string;
 
-  @Column({ type: 'timestamptz', nullable: false })
-  activatedAt: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  activatedAt?: Date | null;
 }
